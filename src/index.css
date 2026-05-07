@@ -1,0 +1,341 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Claude-inspired warm muted palette */
+  --color-high: #dc3545;
+  --color-medium: #c87d2f;
+  --color-low: #2563eb;
+  --color-pomodoro: #16a34a;
+  --color-event: #7c3aed;
+  --bg-base: #f7f5f2;
+  --bg-card: #ffffff;
+  --bg-elevated: #faf9f7;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border-light: #e5e2dd;
+  --border-medium: #d1cdc6;
+  --accent-warm: #c87d2f;
+  --accent-bg: #fef7ed;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #e8e4df;
+  color: var(--text-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Wood texture - realistic wooden board */
+.wood-texture {
+  background:
+    /* Fine grain lines */
+    repeating-linear-gradient(
+      88deg,
+      transparent,
+      transparent 3px,
+      rgba(120, 100, 80, 0.06) 3px,
+      rgba(120, 100, 80, 0.06) 4px
+    ),
+    /* Medium grain */
+    repeating-linear-gradient(
+      91deg,
+      transparent,
+      transparent 8px,
+      rgba(140, 120, 100, 0.08) 8px,
+      rgba(140, 120, 100, 0.08) 12px
+    ),
+    /* Wide grain bands */
+    repeating-linear-gradient(
+      86deg,
+      transparent,
+      transparent 20px,
+      rgba(100, 85, 70, 0.05) 20px,
+      rgba(100, 85, 70, 0.05) 28px
+    ),
+    /* Knot hint */
+    radial-gradient(ellipse 30px 20px at 15% 30%, rgba(90, 75, 60, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 25px 15px at 80% 70%, rgba(90, 75, 60, 0.06) 0%, transparent 70%),
+    /* Base wood color */
+    linear-gradient(
+      175deg,
+      #8b7b6b 0%,
+      #9d8e7e 15%,
+      #a89888 30%,
+      #b5a595 50%,
+      #a89888 70%,
+      #9d8e7e 85%,
+      #8b7b6b 100%
+    );
+  box-shadow:
+    /* Inner highlight - top edge light */
+    inset 0 2px 3px rgba(255, 255, 255, 0.2),
+    /* Inner shadow - bottom edge depth */
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    /* Left/right inner bevel */
+    inset 2px 0 3px rgba(255, 255, 255, 0.08),
+    inset -2px 0 3px rgba(0, 0, 0, 0.08),
+    /* Offset drop shadow - board floating above surface */
+    4px 6px 0px rgba(0, 0, 0, 0.08),
+    6px 10px 24px rgba(0, 0, 0, 0.15),
+    2px 3px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(60, 50, 40, 0.3);
+  border-top-color: rgba(180, 165, 150, 0.4);
+  border-left-color: rgba(160, 145, 130, 0.3);
+}
+
+/* Paper surface - warm textured paper */
+.paper-surface {
+  background-color: #faf9f7;
+  background-image:
+    /* Subtle paper fiber texture */
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(200, 190, 175, 0.03) 2px,
+      rgba(200, 190, 175, 0.03) 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      rgba(200, 190, 175, 0.02) 3px,
+      rgba(200, 190, 175, 0.02) 4px
+    );
+  border-radius: 16px;
+  box-shadow:
+    /* Paper sits slightly raised */
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.04),
+    /* Soft inner glow */
+    0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Plugin card animations */
+@keyframes plugin-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes plugin-zoom-in {
+  0% { transform: scale(1); z-index: 10; }
+  100% { transform: scale(1.05); z-index: 50; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+}
+
+@keyframes plugin-zoom-out {
+  0% { transform: scale(1.05); z-index: 50; }
+  100% { transform: scale(1); z-index: 1; }
+}
+
+.plugin-card {
+  animation: plugin-enter 0.3s ease-out;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  will-change: transform;
+}
+
+.plugin-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.plugin-card.plugin-zoomed {
+  animation: plugin-zoom-in 0.3s ease-out forwards;
+}
+
+.plugin-card.plugin-unzooming {
+  animation: plugin-zoom-out 0.2s ease-in forwards;
+}
+
+/* Size transitions */
+.plugin-size-transition {
+  transition: max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1cdc6;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b8b4ac;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 1; }
+  50% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(0.95); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+
+/* Sticky note realistic colors */
+.sticky-yellow {
+  background: linear-gradient(135deg, #fef9c3 0%, #fef3c7 40%, #fde68a 100%);
+  border-left: 4px solid #f59e0b;
+}
+.sticky-pink {
+  background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 40%, #f9a8d4 100%);
+  border-left: 4px solid #ec4899;
+}
+.sticky-blue {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 40%, #93c5fd 100%);
+  border-left: 4px solid #3b82f6;
+}
+.sticky-green {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 40%, #86efac 100%);
+  border-left: 4px solid #22c55e;
+}
+.sticky-orange {
+  background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 40%, #fdba74 100%);
+  border-left: 4px solid #f97316;
+}
+.sticky-purple {
+  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 40%, #d8b4fe 100%);
+  border-left: 4px solid #a855f7;
+}
+
+/* Dashboard grid - 12 sub-column grid for flexible sizing */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+  }
+}
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+}
+@media (max-width: 480px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+/* Plugin card grid placement */
+.plugin-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  grid-column: span 4;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.plugin-card[data-size="large"] {
+  grid-column: span 4;
+}
+@media (max-width: 1024px) {
+  .plugin-card {
+    grid-column: span 2;
+  }
+  .plugin-card[data-size="large"] {
+    grid-column: span 3;
+  }
+}
+@media (max-width: 768px) {
+  .plugin-card,
+  .plugin-card[data-size="large"] {
+    grid-column: span 1;
+    grid-row: auto !important;
+  }
+  .plugin-card button[title="缩小"],
+  .plugin-card button[title="放大"] {
+    display: none;
+  }
+}
+.plugin-card > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Calendar paper effect - warm yellow gradient like todo sticky notes */
+.calendar-paper {
+  background: linear-gradient(160deg, #faf9f7 0%, #f5f0e6 40%, #f0e8d8 100%);
+  box-shadow: 2px 2px 0px #e8d4a020, 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* Input styles */
+input, textarea, select {
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 3px rgba(200, 125, 47, 0.1);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Button base */
+button {
+  transition: all 0.2s ease;
+}

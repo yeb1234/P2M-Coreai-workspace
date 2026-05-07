@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm create *)",
+      "Bash(cp -r /c/ProjectYeb/p2m-temp/* /c/ProjectYeb/P2M/)",
+      "Bash(cp /c/ProjectYeb/p2m-temp/.* /c/ProjectYeb/P2M/)",
+      "Bash(rm -rf /c/ProjectYeb/p2m-temp)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(curl -s http://localhost:5174)",
+      "Bash(npx vite *)",
+      "Bash(xargs wc -l)",
+      "Bash(npx vitest *)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}
