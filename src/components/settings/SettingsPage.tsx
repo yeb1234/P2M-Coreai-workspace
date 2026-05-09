@@ -21,6 +21,7 @@ const SECTIONS = [
 ] as const;
 
 type SectionId = typeof SECTIONS[number]['id'];
+type TranscriptionDraft = typeof DEFAULT_TRANSCRIPTION_SETTINGS;
 type NumberDrafts = Record<'wordLimit' | 'cpuThreads' | 'beamSize' | 'bestOf' | 'temperature', string>;
 
 const STORAGE_KEYS = [
@@ -502,11 +503,23 @@ function AISettings() {
 function TranscriptionSettings() {
   const settings = useTranscriptionStore();
   const updateSettings = useTranscriptionStore((s) => s.updateSettings);
-  const resetSettings = useTranscriptionStore((s) => s.resetSettings);
   const [saved, setSaved] = useState(false);
   const [clearingJobs, setClearingJobs] = useState(false);
   const [clearMsg, setClearMsg] = useState('');
   const [fieldHint, setFieldHint] = useState('');
+  const [form, setForm] = useState<TranscriptionDraft>({
+    whisperModel: settings.whisperModel,
+    language: settings.language,
+    doSummary: settings.doSummary,
+    wordLimit: settings.wordLimit,
+    cpuThreads: settings.cpuThreads,
+    computeType: settings.computeType,
+    beamSize: settings.beamSize,
+    bestOf: settings.bestOf,
+    temperature: settings.temperature,
+    vadFilter: settings.vadFilter,
+    subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
+  });
   const [drafts, setDrafts] = useState<NumberDrafts>({
     wordLimit: String(settings.wordLimit),
     cpuThreads: String(settings.cpuThreads),
@@ -517,6 +530,19 @@ function TranscriptionSettings() {
 
   useEffect(() => {
     queueMicrotask(() => {
+      setForm({
+        whisperModel: settings.whisperModel,
+        language: settings.language,
+        doSummary: settings.doSummary,
+        wordLimit: settings.wordLimit,
+        cpuThreads: settings.cpuThreads,
+        computeType: settings.computeType,
+        beamSize: settings.beamSize,
+        bestOf: settings.bestOf,
+        temperature: settings.temperature,
+        vadFilter: settings.vadFilter,
+        subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
+      });
       setDrafts({
         wordLimit: String(settings.wordLimit),
         cpuThreads: String(settings.cpuThreads),
@@ -525,15 +551,22 @@ function TranscriptionSettings() {
         temperature: String(settings.temperature),
       });
     });
-  }, [settings.wordLimit, settings.cpuThreads, settings.beamSize, settings.bestOf, settings.temperature]);
+  }, [settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled]);
 
-  const save = (updates: Partial<typeof settings>) => {
-    updateSettings(updates);
+  const updateForm = (updates: Partial<TranscriptionDraft>) => {
+    setForm((current) => ({ ...current, ...updates }));
+    setFieldHint('有未保存的转写设置。');
+  };
+
+  const saveForm = () => {
+    const next = { ...form };
+    updateSettings(next);
     setSaved(true);
+    setFieldHint('转写设置已保存，后续新任务会使用这些参数。');
     setTimeout(() => setSaved(false), 1500);
   };
 
-  const syncNumberDrafts = (updates: Partial<typeof settings>) => {
+  const syncNumberDrafts = (updates: Partial<TranscriptionDraft>) => {
     setDrafts((current) => ({
       ...current,
       ...(updates.wordLimit !== undefined ? { wordLimit: String(updates.wordLimit) } : {}),
@@ -544,8 +577,8 @@ function TranscriptionSettings() {
     }));
   };
 
-  const applyPreset = (updates: Partial<typeof settings>, hint: string) => {
-    save(updates);
+  const applyPreset = (updates: Partial<TranscriptionDraft>, hint: string) => {
+    updateForm(updates);
     syncNumberDrafts(updates);
     setFieldHint(hint);
   };
@@ -556,7 +589,7 @@ function TranscriptionSettings() {
 
   const commitNumber = (
     key: keyof NumberDrafts,
-    storeKey: keyof Pick<typeof settings, 'wordLimit' | 'cpuThreads' | 'beamSize' | 'bestOf' | 'temperature'>,
+    storeKey: keyof Pick<TranscriptionDraft, 'wordLimit' | 'cpuThreads' | 'beamSize' | 'bestOf' | 'temperature'>,
     min: number,
     max: number,
     label: string,
@@ -565,14 +598,14 @@ function TranscriptionSettings() {
     const raw = drafts[key].trim();
     const parsed = Number(raw);
     if (!raw || !Number.isFinite(parsed)) {
-      setDrafts((current) => ({ ...current, [key]: String(settings[storeKey]) }));
+      setDrafts((current) => ({ ...current, [key]: String(form[storeKey]) }));
       setFieldHint(`${label} 需要输入数字，已恢复为当前值。`);
       return;
     }
     const clamped = Math.max(min, Math.min(max, integer ? Math.round(parsed) : parsed));
-    save({ [storeKey]: clamped });
+    updateForm({ [storeKey]: clamped });
     setDrafts((current) => ({ ...current, [key]: String(clamped) }));
-    setFieldHint(clamped !== parsed ? `${label} 范围是 ${min}-${max}，已自动修正为 ${clamped}。` : '');
+    setFieldHint(clamped !== parsed ? `${label} 范围是 ${min}-${max}，已自动修正为 ${clamped}，保存后生效。` : '有未保存的转写设置。');
   };
 
   const handleNumberKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -599,8 +632,8 @@ function TranscriptionSettings() {
       <div>
         <label className="block text-xs font-medium text-[#6b7280] mb-1.5">Whisper 模型</label>
         <select
-          value={settings.whisperModel}
-          onChange={(e) => save({ whisperModel: e.target.value })}
+          value={form.whisperModel}
+          onChange={(e) => updateForm({ whisperModel: e.target.value })}
           className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
         >
           {WHISPER_MODELS.map((model) => (
@@ -614,8 +647,8 @@ function TranscriptionSettings() {
         <div>
           <label className="block text-xs font-medium text-[#6b7280] mb-1.5">识别语言</label>
           <input
-            value={settings.language}
-            onChange={(e) => save({ language: e.target.value })}
+            value={form.language}
+            onChange={(e) => updateForm({ language: e.target.value })}
             className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
           />
         </div>
@@ -645,8 +678,8 @@ function TranscriptionSettings() {
         <div>
           <label className="block text-xs font-medium text-[#6b7280] mb-1.5">compute_type</label>
           <select
-            value={settings.computeType}
-            onChange={(e) => save({ computeType: e.target.value })}
+            value={form.computeType}
+            onChange={(e) => updateForm({ computeType: e.target.value })}
             className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
           >
             {['int8', 'int8_float16', 'int16', 'float16', 'float32'].map((type) => (
@@ -693,10 +726,10 @@ function TranscriptionSettings() {
             <p className="text-xs text-[#9ca3af]">去掉长静音，更稳一点</p>
           </div>
           <button
-            onClick={() => save({ vadFilter: !settings.vadFilter })}
-            className={`relative w-10 h-5 rounded-full transition-colors ${settings.vadFilter ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
+            onClick={() => updateForm({ vadFilter: !form.vadFilter })}
+            className={`relative w-10 h-5 rounded-full transition-colors ${form.vadFilter ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
           >
-            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings.vadFilter ? 'left-[22px]' : 'left-0.5'}`} />
+            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.vadFilter ? 'left-[22px]' : 'left-0.5'}`} />
           </button>
         </div>
         <div className="flex items-center justify-between py-2">
@@ -705,10 +738,10 @@ function TranscriptionSettings() {
             <p className="text-xs text-[#9ca3af]">字幕生成后先过一遍本地 AI 修正</p>
           </div>
           <button
-            onClick={() => save({ subtitleCorrectionEnabled: !settings.subtitleCorrectionEnabled })}
-            className={`relative w-10 h-5 rounded-full transition-colors ${settings.subtitleCorrectionEnabled ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
+            onClick={() => updateForm({ subtitleCorrectionEnabled: !form.subtitleCorrectionEnabled })}
+            className={`relative w-10 h-5 rounded-full transition-colors ${form.subtitleCorrectionEnabled ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
           >
-            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings.subtitleCorrectionEnabled ? 'left-[22px]' : 'left-0.5'}`} />
+            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.subtitleCorrectionEnabled ? 'left-[22px]' : 'left-0.5'}`} />
           </button>
         </div>
       </div>
@@ -736,6 +769,7 @@ function TranscriptionSettings() {
             const maxThreads = Math.max(1, Math.min(128, navigator.hardwareConcurrency || 8));
             applyPreset(
               {
+                whisperModel: 'large-v3',
                 cpuThreads: maxThreads,
                 computeType: 'int8',
                 beamSize: 5,
@@ -744,7 +778,7 @@ function TranscriptionSettings() {
                 vadFilter: true,
                 subtitleCorrectionEnabled: true,
               },
-              `高性能模式：使用浏览器检测到的 ${maxThreads} 个 CPU 逻辑线程。`
+              `高性能模式：large-v3 模型，使用浏览器检测到的 ${maxThreads} 个 CPU 逻辑线程。`
             );
           }}
           className="px-4 py-2 text-sm font-medium text-white bg-[#c87d2f] border border-[#c87d2f] rounded-lg hover:bg-[#b06d20]"
@@ -753,14 +787,19 @@ function TranscriptionSettings() {
         </button>
         <button
           onClick={() => {
-            resetSettings();
+            setForm(DEFAULT_TRANSCRIPTION_SETTINGS);
             syncNumberDrafts(DEFAULT_TRANSCRIPTION_SETTINGS);
-            setFieldHint('已恢复默认转写设置。');
-            setSaved(true);
+            setFieldHint('已恢复默认草稿，保存后生效。');
           }}
           className="px-4 py-2 text-sm font-medium text-[#6b7280] border border-[#e5e2dd] rounded-lg hover:bg-[#f3f2ef]"
         >
           恢复默认
+        </button>
+        <button
+          onClick={saveForm}
+          className="px-4 py-2 text-sm font-medium text-white bg-[#1a1a1a] border border-[#1a1a1a] rounded-lg hover:bg-[#2f2f2f]"
+        >
+          保存转写设置
         </button>
         <button
           onClick={() => void clearJobs()}
