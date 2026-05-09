@@ -41,6 +41,11 @@ SiteYeb/
   docs/                 Notes and implementation records
 ```
 
+Implementation notes:
+
+- [Codex improvement log](docs/codex-improvements.md)
+- [Fixes and pitfalls, 2026-05-10](docs/today-fixes-and-pitfalls.md)
+
 Generated runtime files are intentionally ignored: `.env`, SQLite databases, `output/`, `thumbnails/`, `sprites/`, `work/`, and Python virtual environments.
 
 ## Development

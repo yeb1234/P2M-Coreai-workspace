@@ -41,6 +41,11 @@ SiteYeb/
   docs/                 设计记录和踩坑记录
 ```
 
+实现记录：
+
+- [Codex 改进记录](docs/codex-improvements.md)
+- [2026-05-10 改进与踩坑记录](docs/today-fixes-and-pitfalls.md)
+
 以下运行时文件不提交：`.env`、SQLite 数据库、`output/`、`thumbnails/`、`sprites/`、`work/`、Python 虚拟环境。
 
 ## 启动方式
