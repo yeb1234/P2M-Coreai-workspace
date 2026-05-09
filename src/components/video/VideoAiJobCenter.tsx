@@ -4,8 +4,21 @@ import type { AiJobListOut } from '../../lib/videoApi';
 interface VideoAiJobCenterProps {
   jobs: AiJobListOut | null;
   loading: boolean;
+  selectedStatus: string | null;
+  batchCount?: number;
+  batchLoading?: boolean;
+  onStatusChange: (status: string | null) => void;
+  onBatchFolder?: () => void;
   onRefresh: () => void;
 }
+
+const STATUS_FILTERS = [
+  { value: null, label: '全部' },
+  { value: 'running', label: '运行' },
+  { value: 'queued', label: '排队' },
+  { value: 'failed', label: '失败' },
+  { value: 'completed', label: '完成' },
+] as const;
 
 function statusLabel(status: string): string {
   if (status === 'queued') return '排队中';
@@ -36,7 +49,16 @@ function statusIcon(status: string) {
   return <Clock3 size={13} className="text-[#6b7280]" />;
 }
 
-export function VideoAiJobCenter({ jobs, loading, onRefresh }: VideoAiJobCenterProps) {
+export function VideoAiJobCenter({
+  jobs,
+  loading,
+  selectedStatus,
+  batchCount = 0,
+  batchLoading = false,
+  onStatusChange,
+  onBatchFolder,
+  onRefresh,
+}: VideoAiJobCenterProps) {
   const items = jobs?.items ?? [];
 
   return (
@@ -57,9 +79,37 @@ export function VideoAiJobCenter({ jobs, loading, onRefresh }: VideoAiJobCenterP
         </button>
       </div>
 
+      {onBatchFolder && (
+        <button
+          onClick={onBatchFolder}
+          disabled={batchLoading || batchCount <= 0}
+          className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#f2d6b8] bg-[#fff7ed] px-3 py-2 text-xs font-medium text-[#a95f17] transition-colors hover:bg-[#ffedd5] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {batchLoading ? <Loader2 size={13} className="animate-spin" /> : null}
+          批处理当前文件夹{batchCount > 0 ? `（${batchCount} 个）` : ''}
+        </button>
+      )}
+
+      <div className="mb-3 grid grid-cols-5 gap-1">
+        {STATUS_FILTERS.map((filter) => {
+          const active = selectedStatus === filter.value;
+          return (
+            <button
+              key={filter.value ?? 'all'}
+              onClick={() => onStatusChange(filter.value)}
+              className={`rounded-md px-1.5 py-1 text-[11px] transition-colors ${
+                active ? 'bg-[#c87d2f] text-white' : 'bg-[#f3f2ef] text-[#6b7280] hover:bg-[#e5e2dd]'
+              }`}
+            >
+              {filter.label}
+            </button>
+          );
+        })}
+      </div>
+
       {items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[#e5e2dd] bg-[#faf9f7] px-3 py-4 text-xs text-[#6b7280]">
-          还没有 AI 转写或总结任务。
+          {selectedStatus ? `没有${statusLabel(selectedStatus)}的 AI 任务。` : '还没有 AI 转写或总结任务。'}
         </div>
       ) : (
         <div className="max-h-64 space-y-2 overflow-y-auto pr-1">

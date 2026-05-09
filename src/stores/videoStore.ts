@@ -197,13 +197,15 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     const poll = async () => {
       try {
         const job = await fetchAiJob(jobId);
-        set({ jobStatus: job.status, jobStage: job.stage });
+        const currentAtPoll = get().currentVideo;
+        const jobBelongsToCurrentVideo = currentAtPoll?.id === job.video_id;
+        if (jobBelongsToCurrentVideo) {
+          set({ jobStatus: job.status, jobStage: job.stage });
+        }
         if (job.status === 'completed' || job.status === 'failed') {
-          // Re-fetch from database to ensure state is consistent
-          const { currentVideo } = get();
-          if (currentVideo) {
-            try {
-              const fresh = await fetchVideo(currentVideo.id);
+          try {
+            const fresh = await fetchVideo(job.video_id);
+            if (get().currentVideo?.id === job.video_id) {
                 set({
                   currentVideo: fresh,
                   currentSegments: fresh.transcript_segments || [],
@@ -211,12 +213,10 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
                   jobStatus: fresh.ai_status || 'idle',
                   jobStage: fresh.ai_stage || null,
                 });
-                const { page, searchQuery, currentCategoryId } = get();
-                const data = await fetchVideos(page, 20, currentCategoryId ?? undefined, searchQuery || undefined);
-                set({ videos: data.items, total: data.total });
-            } catch {
-              // fallback: patch from job result
-              if (job.status === 'completed') {
+            }
+          } catch {
+            const currentVideo = get().currentVideo;
+            if (job.status === 'completed' && currentVideo?.id === job.video_id) {
                 const updated = {
                   ...currentVideo,
                   summary: job.summary ?? currentVideo.summary,
@@ -235,8 +235,14 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
                   jobStatus: 'completed',
                   jobStage: 'completed',
                 });
-              }
             }
+          }
+          try {
+            const { page, searchQuery, currentCategoryId } = get();
+            const data = await fetchVideos(page, 20, currentCategoryId ?? undefined, searchQuery || undefined);
+            set({ videos: data.items, total: data.total });
+          } catch {
+            // list refresh is best-effort
           }
           return;
         }

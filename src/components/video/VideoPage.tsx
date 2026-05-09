@@ -3,7 +3,7 @@ import { PlayCircle, ArrowLeft } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { useVideoStore } from '../../stores/videoStore';
 import { useTranscriptionStore } from '../../stores/transcriptionStore';
-import { getVideoStreamUrl, getSubtitleFileUrl, fetchAiJobs, fetchPlaylist, fetchVideo, saveWatchHistory, type AiJobListOut, type PlaylistItem, type TranscriptSegment } from '../../lib/videoApi';
+import { getVideoStreamUrl, getSubtitleFileUrl, fetchAiJobs, saveWatchHistory, type AiJobListOut, type TranscriptSegment } from '../../lib/videoApi';
 import { VideoList } from './VideoList';
 import { VideoAiSummaryPanel } from './VideoAiSummaryPanel';
 import { MediaErrorOverlay, PausedOverlay, SubtitleOverlay } from './VideoOverlays';
@@ -11,11 +11,12 @@ import { VideoPlayerControls } from './VideoPlayerControls';
 import { VideoPlaylistPanel } from './VideoPlaylistPanel';
 import { VideoAiJobCenter } from './VideoAiJobCenter';
 import { VideoErrorBoundary } from './VideoErrorBoundary';
-import { normalizeSegment, playlistItemToVideoItem } from './videoPlayerAdapters';
+import { normalizeSegment } from './videoPlayerAdapters';
 import { loadPlayerSettings, savePlayerSettings, type PlayerSettings } from './videoPlayerSettings';
 import { usePlaylistResize } from './usePlaylistResize';
 import { useVideoControlChrome } from './useVideoControlChrome';
 import { useVideoKeyboardShortcuts } from './useVideoKeyboardShortcuts';
+import { useVideoPlaylist } from './useVideoPlaylist';
 
 // ── Video Player ──
 
@@ -39,7 +40,6 @@ function VideoPlayerView() {
   const initialSettings = useMemo(() => loadPlayerSettings(), []);
   const settingsRef = useRef<PlayerSettings>(initialSettings);
   const lastVolumeRef = useRef(initialSettings.volume || 1);
-  const playAfterLoadRef = useRef(false);
   const [activeSegIdx, setActiveSegIdx] = useState(-1);
   const currentTimeRef = useRef(0);
   const [showSubtitles, setShowSubtitles] = useState(initialSettings.showSubtitles);
@@ -56,8 +56,6 @@ function VideoPlayerView() {
   const [subtitleOpacity, setSubtitleOpacity] = useState(initialSettings.subtitleOpacity);
   const [subtitleSize, setSubtitleSize] = useState(initialSettings.subtitleSize);
   const [autoPlay, setAutoPlay] = useState(initialSettings.autoPlay);
-  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
-  const [playlistIdx, setPlaylistIdx] = useState(-1);
   const { width: playlistPanelWidth, startResize: startPlaylistResize } = usePlaylistResize(360);
   const [volume, setVolume] = useState(initialSettings.volume);
   const [isMuted, setIsMuted] = useState(initialSettings.muted);
@@ -65,6 +63,8 @@ function VideoPlayerView() {
   const [mediaError, setMediaError] = useState('');
   const [aiJobs, setAiJobs] = useState<AiJobListOut | null>(null);
   const [aiJobsLoading, setAiJobsLoading] = useState(false);
+  const [aiJobStatusFilter, setAiJobStatusFilter] = useState<string | null>(null);
+  const [batchingFolder, setBatchingFolder] = useState(false);
   const {
     showControls,
     setShowControls,
@@ -74,6 +74,12 @@ function VideoPlayerView() {
     setShowSubtitleMenu,
     resetHideTimer,
   } = useVideoControlChrome(isPlaying);
+  const {
+    playlist,
+    playAfterLoadRef,
+    selectPlaylistItem,
+    playNextFromPlaylist,
+  } = useVideoPlaylist({ currentVideo, selectVideo });
 
   const videoUrl = currentVideo ? getVideoStreamUrl(currentVideo.id) : '';
   const subtitleUrl = currentVideo && (currentVideo.subtitle_url || currentVideo.subtitle_path)
@@ -98,13 +104,52 @@ function VideoPlayerView() {
   const loadAiJobs = useCallback(async () => {
     setAiJobsLoading(true);
     try {
-      setAiJobs(await fetchAiJobs(12));
+      setAiJobs(await fetchAiJobs(12, aiJobStatusFilter ?? undefined));
     } catch {
       // The job center is diagnostic UI; playback should not depend on it.
     } finally {
       setAiJobsLoading(false);
     }
-  }, []);
+  }, [aiJobStatusFilter]);
+
+  const aiJobOptions = useMemo(() => ({
+    whisper_model: whisperModel,
+    language: transcriptionLanguage,
+    do_summary: doSummary,
+    word_limit: wordLimit,
+    cpu_threads: cpuThreads,
+    compute_type: computeType,
+    beam_size: beamSize,
+    best_of: bestOf,
+    temperature,
+    vad_filter: vadFilter,
+    subtitle_correction_enabled: subtitleCorrectionEnabled,
+  }), [
+    whisperModel,
+    transcriptionLanguage,
+    doSummary,
+    wordLimit,
+    cpuThreads,
+    computeType,
+    beamSize,
+    bestOf,
+    temperature,
+    vadFilter,
+    subtitleCorrectionEnabled,
+  ]);
+
+  const batchCurrentFolder = useCallback(async () => {
+    if (!playlist.length || batchingFolder) return;
+    setBatchingFolder(true);
+    try {
+      for (const item of playlist) {
+        await triggerAi(item.id, aiJobOptions);
+      }
+      await loadAiJobs();
+    } finally {
+      setBatchingFolder(false);
+    }
+  }, [aiJobOptions, batchingFolder, loadAiJobs, playlist, triggerAi]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -137,18 +182,6 @@ function VideoPlayerView() {
       setMediaError('');
     });
   }, [currentVideo?.id]);
-
-  // Load playlist
-  useEffect(() => {
-    if (!currentVideo) return;
-    let cancelled = false;
-    fetchPlaylist(currentVideo.id).then((p) => {
-      if (cancelled) return;
-      setPlaylist(p.videos);
-      setPlaylistIdx(p.current_index);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [currentVideo]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -311,28 +344,10 @@ function VideoPlayerView() {
     }, 10000);
   }, [normalizedSegments, activeSegIdx, currentVideo]);
 
-  const selectPlaylistItem = useCallback(async (item: PlaylistItem, playAfterLoad = false) => {
-    playAfterLoadRef.current = playAfterLoad;
-    setPlaylistIdx((idx) => {
-      const nextIdx = playlist.findIndex((playlistItem) => playlistItem.id === item.id);
-      return nextIdx >= 0 ? nextIdx : idx;
-    });
-    try {
-      const fresh = await fetchVideo(item.id);
-      selectVideo(fresh);
-    } catch {
-      selectVideo(playlistItemToVideoItem(item));
-    }
-  }, [playlist, selectVideo]);
-
   const handleEnded = useCallback(() => {
-    if (!autoPlay || playlist.length === 0) return;
-    const currentIdx = playlist.findIndex((item) => item.id === currentVideo?.id);
-    const nextIdx = (currentIdx >= 0 ? currentIdx : playlistIdx) + 1;
-    if (nextIdx < playlist.length) {
-      void selectPlaylistItem(playlist[nextIdx], true);
-    }
-  }, [autoPlay, currentVideo?.id, playlist, playlistIdx, selectPlaylistItem]);
+    if (!autoPlay) return;
+    playNextFromPlaylist();
+  }, [autoPlay, playNextFromPlaylist]);
 
   const handleProgressMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -539,22 +554,21 @@ function VideoPlayerView() {
           jobStatus={jobStatus}
           autoPlay={autoPlay}
           onResizeStart={startPlaylistResize}
-          onTriggerAi={() => triggerAi(currentVideo.id, {
-            whisper_model: whisperModel,
-            language: transcriptionLanguage,
-            do_summary: doSummary,
-            word_limit: wordLimit,
-            cpu_threads: cpuThreads,
-            compute_type: computeType,
-            beam_size: beamSize,
-            best_of: bestOf,
-            temperature,
-            vad_filter: vadFilter,
-            subtitle_correction_enabled: subtitleCorrectionEnabled,
-          })}
+          onTriggerAi={() => triggerAi(currentVideo.id, aiJobOptions)}
           onToggleAutoPlay={() => setAutoPlay(!autoPlay)}
           onSelectItem={(item) => { void selectPlaylistItem(item); }}
-          footer={<VideoAiJobCenter jobs={aiJobs} loading={aiJobsLoading} onRefresh={() => void loadAiJobs()} />}
+          footer={
+            <VideoAiJobCenter
+              jobs={aiJobs}
+              loading={aiJobsLoading}
+              selectedStatus={aiJobStatusFilter}
+              batchCount={playlist.length}
+              batchLoading={batchingFolder}
+              onStatusChange={setAiJobStatusFilter}
+              onBatchFolder={() => void batchCurrentFolder()}
+              onRefresh={() => void loadAiJobs()}
+            />
+          }
         />
       </div>
     </div>
