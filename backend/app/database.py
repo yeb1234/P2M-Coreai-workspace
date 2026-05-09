@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     subtitle_correction_enabled: bool = True
     subtitle_correction_batch_size: int = 60
     subtitle_correction_timeout_s: int = 180
+    whisper_engine: str = "faster-whisper"
+    whisper_cpp_exe: str = ""
+    whisper_cpp_model: str = ""
+    whisper_cpp_extra_args: str = ""
 
     model_config = SettingsConfigDict(env_file=str(ROOT_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
 
@@ -115,6 +119,7 @@ def ensure_runtime_schema() -> None:
             ("vad_filter", "BOOLEAN"),
             ("subtitle_correction_enabled", "BOOLEAN"),
             ("subtitle_correction_prompt", "TEXT"),
+            ("whisper_engine", "TEXT"),
         ):
             if column_name not in ai_job_columns:
                 connection.exec_driver_sql(f"ALTER TABLE ai_jobs ADD COLUMN {column_name} {column_sql}")

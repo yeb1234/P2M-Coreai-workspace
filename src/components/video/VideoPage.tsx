@@ -22,6 +22,7 @@ import { useVideoPlaylist } from './useVideoPlaylist';
 
 function VideoPlayerView() {
   const { currentVideo, currentSegments, jobStatus, jobStage, triggerAi, clearSelection, selectVideo, loadCurrentVideo } = useVideoStore();
+  const whisperEngine = useTranscriptionStore((s) => s.whisperEngine);
   const whisperModel = useTranscriptionStore((s) => s.whisperModel);
   const transcriptionLanguage = useTranscriptionStore((s) => s.language);
   const doSummary = useTranscriptionStore((s) => s.doSummary);
@@ -114,6 +115,7 @@ function VideoPlayerView() {
   }, [aiJobStatusFilter]);
 
   const aiJobOptions = useMemo(() => ({
+    whisper_engine: whisperEngine,
     whisper_model: whisperModel,
     language: transcriptionLanguage,
     do_summary: doSummary,
@@ -128,6 +130,7 @@ function VideoPlayerView() {
     subtitle_correction_prompt: subtitleCorrectionPrompt,
   }), [
     whisperModel,
+    whisperEngine,
     transcriptionLanguage,
     doSummary,
     wordLimit,

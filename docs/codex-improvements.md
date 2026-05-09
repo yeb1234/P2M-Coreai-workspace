@@ -107,6 +107,32 @@
 
 默认关闭是保守选择，因为 ffmpeg 批量读视频对机械硬盘、移动硬盘、大目录都很不友好。
 
+## AMD GPU / 7800 XT 转写预留
+
+当前稳定默认仍是 `faster-whisper` CPU 路线。为 AMD 7800 XT 预留了 `whisper.cpp` 外部引擎入口，用来接 Vulkan/HIP/ROCm 版本的 whisper.cpp，而不是直接把 faster-whisper 强行改成 CUDA。
+
+后端 `.env` 可配置：
+
+```env
+WHISPER_ENGINE=faster-whisper
+WHISPER_CPP_EXE=
+WHISPER_CPP_MODEL=
+WHISPER_CPP_EXTRA_ARGS=
+```
+
+如果已经单独验证 whisper.cpp GPU 命令可用，可改成：
+
+```env
+WHISPER_ENGINE=whisper.cpp
+WHISPER_CPP_EXE=D:\tools\whisper.cpp\build\bin\Release\whisper-cli.exe
+WHISPER_CPP_MODEL=D:\models\whisper\ggml-large-v3.bin
+WHISPER_CPP_EXTRA_ARGS=
+```
+
+设置页的“转写引擎”会随 AI 任务保存到 job。健康状态页会检查 whisper.cpp 可执行文件和模型路径是否存在。
+
+注意：whisper.cpp 的 GPU 能否实际跑满 7800 XT 取决于你下载或编译的 whisper.cpp 后端版本，例如 Vulkan/HIP/ROCm。网站这里只负责调用已验证可用的可执行文件。
+
 ## 文档与编码
 
 - `README.md` 保留英文说明。

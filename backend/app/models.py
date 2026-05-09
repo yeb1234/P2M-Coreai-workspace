@@ -72,6 +72,7 @@ class AiJob(Base):
     stage = Column(String, default="queued")
     message = Column(String, default="Queued")
     error = Column(Text, nullable=True)
+    whisper_engine = Column(String, nullable=True)
     whisper_model = Column(String, default="small")
     language = Column(String, default="zh")
     do_summary = Column(Boolean, default=True)

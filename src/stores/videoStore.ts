@@ -47,6 +47,7 @@ interface VideoState {
   setSearchQuery: (q: string) => void;
   doSearch: (q: string) => Promise<void>;
     triggerAi: (videoId: number, opts?: {
+      whisper_engine?: string;
       whisper_model?: string;
       language?: string;
       do_summary?: boolean;
@@ -173,6 +174,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     triggerAi: async (videoId, opts) => {
       try {
         const res = await startAiJob(videoId, {
+          whisper_engine: opts?.whisper_engine,
           whisper_model: opts?.whisper_model,
           language: opts?.language,
           do_summary: opts?.do_summary ?? true,

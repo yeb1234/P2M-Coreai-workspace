@@ -82,6 +82,7 @@ class WatchHistoryIn(BaseModel):
 
 
 class AiJobCreate(BaseModel):
+    whisper_engine: Optional[str] = None
     whisper_model: str = "small"
     language: str = "zh"
     do_summary: bool = True
@@ -104,6 +105,7 @@ class AiJobOut(BaseModel):
     stage: str
     message: str
     error: Optional[str] = None
+    whisper_engine: Optional[str] = None
     whisper_model: str
     language: str
     do_summary: bool
@@ -130,6 +132,7 @@ class AiJobListItem(BaseModel):
     stage: str
     message: str
     error: Optional[str] = None
+    whisper_engine: Optional[str] = None
     whisper_model: str
     language: str
     do_summary: bool

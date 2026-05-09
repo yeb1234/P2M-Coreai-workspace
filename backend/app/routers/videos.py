@@ -438,6 +438,7 @@ def start_ai_job(video_id: int, payload: AiJobCreate, db: Session = Depends(get_
     job = create_ai_job(
         video_id=video_id,
         whisper_model=payload.whisper_model,
+        whisper_engine=payload.whisper_engine,
         language=payload.language,
         do_summary=payload.do_summary,
         word_limit=payload.word_limit,

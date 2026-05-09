@@ -66,6 +66,21 @@ def backend_health():
     checks.append(_health_item("ffmpeg", bool(ffmpeg_path), "已找到" if ffmpeg_path else "未找到，请确认 PATH", {"path": ffmpeg_path or ""}))
     checks.append(_health_item("ffprobe", bool(ffprobe_path), "已找到" if ffprobe_path else "未找到，请确认 PATH", {"path": ffprobe_path or ""}))
 
+    whisper_cpp_exe = Path(settings.whisper_cpp_exe) if settings.whisper_cpp_exe else None
+    whisper_cpp_model = Path(settings.whisper_cpp_model) if settings.whisper_cpp_model else None
+    checks.append(_health_item(
+        "whisper.cpp 可执行文件",
+        bool(whisper_cpp_exe and whisper_cpp_exe.exists()),
+        "已配置" if whisper_cpp_exe and whisper_cpp_exe.exists() else "未配置或文件不存在",
+        {"path": str(whisper_cpp_exe or ""), "extra_args": settings.whisper_cpp_extra_args},
+    ))
+    checks.append(_health_item(
+        "whisper.cpp 模型",
+        bool(whisper_cpp_model and whisper_cpp_model.exists()),
+        "已配置" if whisper_cpp_model and whisper_cpp_model.exists() else "未配置或文件不存在",
+        {"path": str(whisper_cpp_model or "")},
+    ))
+
     checks.append(_check_http_json("LM Studio / OpenAI 兼容接口", settings.openai_base_url.rstrip("/") + "/models"))
     checks.append(_check_http_json("Ollama", settings.ollama_base_url.rstrip("/") + "/api/tags"))
 
@@ -101,6 +116,9 @@ def backend_health():
             "compute_type": settings.whisper_compute_type,
             "subtitle_correction_enabled": settings.subtitle_correction_enabled,
             "thumbnail_background_enabled": settings.thumbnail_background_enabled,
+            "whisper_engine": settings.whisper_engine,
+            "whisper_cpp_exe": settings.whisper_cpp_exe,
+            "whisper_cpp_model": settings.whisper_cpp_model,
         },
     ))
 

@@ -18,6 +18,7 @@ from app.utils.serialization import dump_segments
 
 @dataclass(frozen=True)
 class AiJobOptions:
+    whisper_engine: str
     whisper_model: str
     language: str
     do_summary: bool
@@ -44,6 +45,7 @@ class AiJobPaths:
 def _build_job_options(
     *,
     whisper_model: str,
+    whisper_engine: str | None = None,
     language: str,
     do_summary: bool,
     word_limit: int,
@@ -58,6 +60,7 @@ def _build_job_options(
     subtitle_correction_prompt: str | None = None,
 ) -> AiJobOptions:
     return AiJobOptions(
+        whisper_engine=whisper_engine or settings.whisper_engine,
         whisper_model=whisper_model or settings.default_whisper_model,
         language=language or settings.default_language,
         do_summary=do_summary,
@@ -75,6 +78,7 @@ def _build_job_options(
 
 
 def _apply_job_options(job: AiJob, options: AiJobOptions) -> None:
+    job.whisper_engine = options.whisper_engine
     job.whisper_model = options.whisper_model
     job.language = options.language
     job.do_summary = options.do_summary
@@ -105,6 +109,7 @@ def create_ai_job(
     *,
     video_id: int,
     whisper_model: str,
+    whisper_engine: str | None = None,
     language: str,
     do_summary: bool,
     word_limit: int,
@@ -120,6 +125,7 @@ def create_ai_job(
 ) -> AiJob:
     options = _build_job_options(
         whisper_model=whisper_model,
+        whisper_engine=whisper_engine,
         language=language,
         do_summary=do_summary,
         word_limit=word_limit,
@@ -306,6 +312,7 @@ def run_ai_job(job_id: str) -> None:
         update_job_state(db, job, video, status="running", stage="transcribing", message="Transcribing audio")
         transcript_result = transcribe_wav(
             wav_path=paths.wav,
+            engine=job.whisper_engine,
             model_size=job.whisper_model,
             language=job.language,
             cpu_threads=job.cpu_threads,

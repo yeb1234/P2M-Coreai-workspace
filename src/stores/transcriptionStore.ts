@@ -14,6 +14,7 @@ export const WHISPER_MODELS = [
 ];
 
 export interface TranscriptionSettings {
+  whisperEngine: string;
   whisperModel: string;
   language: string;
   doSummary: boolean;
@@ -34,6 +35,7 @@ interface TranscriptionState extends TranscriptionSettings {
 }
 
 export const DEFAULT_TRANSCRIPTION_SETTINGS: TranscriptionSettings = {
+  whisperEngine: 'faster-whisper',
   whisperModel: 'medium',
   language: 'zh',
   doSummary: true,
@@ -59,6 +61,9 @@ function sanitizeSettings(value: Partial<TranscriptionSettings>): TranscriptionS
     whisperModel: typeof value.whisperModel === 'string' && modelIds.has(value.whisperModel)
       ? value.whisperModel
       : DEFAULT_TRANSCRIPTION_SETTINGS.whisperModel,
+    whisperEngine: typeof value.whisperEngine === 'string' && value.whisperEngine.trim()
+      ? value.whisperEngine
+      : DEFAULT_TRANSCRIPTION_SETTINGS.whisperEngine,
     language: typeof value.language === 'string' ? value.language : DEFAULT_TRANSCRIPTION_SETTINGS.language,
     doSummary: typeof value.doSummary === 'boolean' ? value.doSummary : DEFAULT_TRANSCRIPTION_SETTINGS.doSummary,
     wordLimit: Math.round(clampNumber(value.wordLimit, DEFAULT_TRANSCRIPTION_SETTINGS.wordLimit, 50, 2000)),

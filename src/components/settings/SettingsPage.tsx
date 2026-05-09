@@ -509,6 +509,7 @@ function TranscriptionSettings() {
   const [clearMsg, setClearMsg] = useState('');
   const [fieldHint, setFieldHint] = useState('');
   const [form, setForm] = useState<TranscriptionDraft>({
+    whisperEngine: settings.whisperEngine,
     whisperModel: settings.whisperModel,
     language: settings.language,
     doSummary: settings.doSummary,
@@ -533,6 +534,7 @@ function TranscriptionSettings() {
   useEffect(() => {
     queueMicrotask(() => {
       setForm({
+        whisperEngine: settings.whisperEngine,
         whisperModel: settings.whisperModel,
         language: settings.language,
         doSummary: settings.doSummary,
@@ -554,7 +556,7 @@ function TranscriptionSettings() {
         temperature: String(settings.temperature),
       });
     });
-  }, [settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled, settings.subtitleCorrectionPrompt]);
+  }, [settings.whisperEngine, settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled, settings.subtitleCorrectionPrompt]);
 
   const updateForm = (updates: Partial<TranscriptionDraft>) => {
     setForm((current) => ({ ...current, ...updates }));
@@ -632,6 +634,19 @@ function TranscriptionSettings() {
 
   return (
     <div className="space-y-6">
+      <div>
+        <label className="block text-xs font-medium text-[#6b7280] mb-1.5">转写引擎</label>
+        <select
+          value={form.whisperEngine}
+          onChange={(e) => updateForm({ whisperEngine: e.target.value })}
+          className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
+        >
+          <option value="faster-whisper">faster-whisper CPU（稳定默认）</option>
+          <option value="whisper.cpp">whisper.cpp 外部引擎（可接 Vulkan/HIP）</option>
+        </select>
+        <p className="text-[10px] text-[#9ca3af] mt-1">7800 XT 路线建议先用 whisper.cpp 的 Vulkan/HIP 版本单独验证，再在后端 .env 配置可执行文件和模型路径。</p>
+      </div>
+
       <div>
         <label className="block text-xs font-medium text-[#6b7280] mb-1.5">Whisper 模型</label>
         <select
@@ -764,6 +779,7 @@ function TranscriptionSettings() {
         <button
           onClick={() => applyPreset(
             {
+              whisperEngine: 'faster-whisper',
               cpuThreads: 4,
               computeType: 'int8',
               beamSize: 1,
@@ -784,6 +800,7 @@ function TranscriptionSettings() {
             applyPreset(
               {
                 whisperModel: 'large-v3',
+                whisperEngine: 'faster-whisper',
                 cpuThreads: maxThreads,
                 computeType: 'int8',
                 beamSize: 5,

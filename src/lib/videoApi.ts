@@ -88,6 +88,7 @@ export interface AiJobOut {
   stage: string;
   message: string;
   error: string | null;
+  whisper_engine: string | null;
   whisper_model: string;
   language: string;
   do_summary: boolean;
@@ -112,6 +113,7 @@ export interface AiJobListItem {
   stage: string;
   message: string;
   error: string | null;
+  whisper_engine: string | null;
   whisper_model: string;
   language: string;
   do_summary: boolean;
@@ -248,6 +250,7 @@ export async function saveWatchHistory(videoId: number, progress: number, durati
 export async function startAiJob(
   videoId: number,
   opts?: {
+    whisper_engine?: string;
     whisper_model?: string;
     language?: string;
     do_summary?: boolean;
@@ -266,6 +269,7 @@ export async function startAiJob(
   return apiFetch(`/api/videos/${videoId}/ai-jobs`, {
     method: 'POST',
     body: JSON.stringify({
+      whisper_engine: opts?.whisper_engine,
       whisper_model: opts?.whisper_model ?? '',
       language: opts?.language ?? 'zh',
       do_summary: opts?.do_summary ?? true,
