@@ -121,6 +121,35 @@ class AiJobOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AiJobListItem(BaseModel):
+    id: str
+    video_id: int
+    video_title: str | None = None
+    status: str
+    stage: str
+    message: str
+    error: Optional[str] = None
+    whisper_model: str
+    language: str
+    do_summary: bool
+    word_limit: int
+    cpu_threads: Optional[int] = None
+    compute_type: Optional[str] = None
+    subtitle_correction_enabled: Optional[bool] = None
+    summary_error: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiJobListOut(BaseModel):
+    items: list[AiJobListItem]
+    total: int
+    running: int
+    queued: int
+    failed: int
+    completed: int
+
+
 class NoteOut(BaseModel):
     id: int
     video_id: Optional[int] = None

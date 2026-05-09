@@ -3,16 +3,18 @@ import { PlayCircle, ArrowLeft } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { useVideoStore } from '../../stores/videoStore';
 import { useTranscriptionStore } from '../../stores/transcriptionStore';
-import { getVideoStreamUrl, getSubtitleFileUrl, fetchPlaylist, fetchVideo, saveWatchHistory, type PlaylistItem, type TranscriptSegment } from '../../lib/videoApi';
+import { getVideoStreamUrl, getSubtitleFileUrl, fetchAiJobs, fetchPlaylist, fetchVideo, saveWatchHistory, type AiJobListOut, type PlaylistItem, type TranscriptSegment } from '../../lib/videoApi';
 import { VideoList } from './VideoList';
 import { VideoAiSummaryPanel } from './VideoAiSummaryPanel';
 import { MediaErrorOverlay, PausedOverlay, SubtitleOverlay } from './VideoOverlays';
 import { VideoPlayerControls } from './VideoPlayerControls';
 import { VideoPlaylistPanel } from './VideoPlaylistPanel';
+import { VideoAiJobCenter } from './VideoAiJobCenter';
 import { VideoErrorBoundary } from './VideoErrorBoundary';
 import { normalizeSegment, playlistItemToVideoItem } from './videoPlayerAdapters';
 import { loadPlayerSettings, savePlayerSettings, type PlayerSettings } from './videoPlayerSettings';
 import { usePlaylistResize } from './usePlaylistResize';
+import { useVideoControlChrome } from './useVideoControlChrome';
 import { useVideoKeyboardShortcuts } from './useVideoKeyboardShortcuts';
 
 // ── Video Player ──
@@ -33,7 +35,6 @@ function VideoPlayerView() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPlayingRef = useRef(false);
   const initialSettings = useMemo(() => loadPlayerSettings(), []);
   const settingsRef = useRef<PlayerSettings>(initialSettings);
@@ -58,13 +59,21 @@ function VideoPlayerView() {
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [playlistIdx, setPlaylistIdx] = useState(-1);
   const { width: playlistPanelWidth, startResize: startPlaylistResize } = usePlaylistResize(360);
-  const [showControls, setShowControls] = useState(true);
   const [volume, setVolume] = useState(initialSettings.volume);
   const [isMuted, setIsMuted] = useState(initialSettings.muted);
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [mediaError, setMediaError] = useState('');
+  const [aiJobs, setAiJobs] = useState<AiJobListOut | null>(null);
+  const [aiJobsLoading, setAiJobsLoading] = useState(false);
+  const {
+    showControls,
+    setShowControls,
+    showSpeedMenu,
+    setShowSpeedMenu,
+    showSubtitleMenu,
+    setShowSubtitleMenu,
+    resetHideTimer,
+  } = useVideoControlChrome(isPlaying);
 
   const videoUrl = currentVideo ? getVideoStreamUrl(currentVideo.id) : '';
   const subtitleUrl = currentVideo && (currentVideo.subtitle_url || currentVideo.subtitle_path)
@@ -85,6 +94,31 @@ function VideoPlayerView() {
     currentVideo?.summary ||
     currentVideo?.transcription
   );
+
+  const loadAiJobs = useCallback(async () => {
+    setAiJobsLoading(true);
+    try {
+      setAiJobs(await fetchAiJobs(12));
+    } catch {
+      // The job center is diagnostic UI; playback should not depend on it.
+    } finally {
+      setAiJobsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadAiJobs();
+    });
+  }, [loadAiJobs]);
+
+  useEffect(() => {
+    if (jobStatus !== 'running' && jobStatus !== 'queued') return;
+    const timer = window.setInterval(() => {
+      void loadAiJobs();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [jobStatus, loadAiJobs]);
 
   useEffect(() => {
     if (!currentVideoId || hasVideoDetails) return;
@@ -116,22 +150,6 @@ function VideoPlayerView() {
     return () => { cancelled = true; };
   }, [currentVideo]);
 
-  // Controls visibility: show on mouse move, hide after 3s
-  const resetHideTimer = useCallback(() => {
-    setShowControls(true);
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => {
-      if (isPlaying) setShowControls(false);
-    }, 3000);
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (!isPlaying) {
-      queueMicrotask(() => setShowControls(true));
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    }
-  }, [isPlaying]);
-
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
@@ -151,7 +169,6 @@ function VideoPlayerView() {
 
   useEffect(() => {
     return () => {
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, []);
@@ -174,17 +191,6 @@ function VideoPlayerView() {
     v.currentTime = next;
     setProgress(next);
   }, [videoDuration]);
-
-  // Close menus on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-speed-menu]') && !target.closest('[data-speed-btn]')) setShowSpeedMenu(false);
-      if (!target.closest('[data-subtitle-menu]') && !target.closest('[data-subtitle-btn]')) setShowSubtitleMenu(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   const toggleSubtitles = useCallback(() => {
     const next = !showSubtitles;
@@ -548,6 +554,7 @@ function VideoPlayerView() {
           })}
           onToggleAutoPlay={() => setAutoPlay(!autoPlay)}
           onSelectItem={(item) => { void selectPlaylistItem(item); }}
+          footer={<VideoAiJobCenter jobs={aiJobs} loading={aiJobsLoading} onRefresh={() => void loadAiJobs()} />}
         />
       </div>
     </div>

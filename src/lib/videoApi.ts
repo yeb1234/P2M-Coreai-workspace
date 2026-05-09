@@ -104,6 +104,35 @@ export interface AiJobOut {
   updated_at: string;
 }
 
+export interface AiJobListItem {
+  id: string;
+  video_id: number;
+  video_title: string | null;
+  status: string;
+  stage: string;
+  message: string;
+  error: string | null;
+  whisper_model: string;
+  language: string;
+  do_summary: boolean;
+  word_limit: number;
+  cpu_threads: number | null;
+  compute_type: string | null;
+  subtitle_correction_enabled: boolean | null;
+  summary_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiJobListOut {
+  items: AiJobListItem[];
+  total: number;
+  running: number;
+  queued: number;
+  failed: number;
+  completed: number;
+}
+
 export interface PlaylistItem {
   id: number;
   title: string;
@@ -241,6 +270,12 @@ export async function startAiJob(
 
 export async function fetchAiJob(jobId: string): Promise<AiJobOut> {
   return apiFetch<AiJobOut>(`/api/ai-jobs/${jobId}`);
+}
+
+export async function fetchAiJobs(limit = 20, status?: string): Promise<AiJobListOut> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (status) params.set('status', status);
+  return apiFetch<AiJobListOut>(`/api/ai-jobs?${params}`);
 }
 
 // ── Category Tree ──

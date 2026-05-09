@@ -1,3 +1,4 @@
+import type React from 'react';
 import { CheckCircle2, List, Loader2, PlayCircle, RotateCcw, Sparkles } from 'lucide-react';
 import { getThumbnailUrl, type PlaylistItem, type VideoItem } from '../../lib/videoApi';
 
@@ -13,6 +14,7 @@ interface VideoPlaylistPanelProps {
   onTriggerAi: () => void;
   onToggleAutoPlay: () => void;
   onSelectItem: (item: PlaylistItem) => void;
+  footer?: React.ReactNode;
 }
 
 export function VideoPlaylistPanel({
@@ -27,6 +29,7 @@ export function VideoPlaylistPanel({
   onTriggerAi,
   onToggleAutoPlay,
   onSelectItem,
+  footer,
 }: VideoPlaylistPanelProps) {
   return (
     <div className="relative space-y-3 lg:shrink-0" style={{ width: `${width}px` }}>
@@ -124,6 +127,7 @@ export function VideoPlaylistPanel({
           </div>
         ))}
       </div>
+      {footer}
     </div>
   );
 }
