@@ -1,11 +1,11 @@
 import json
 from collections import defaultdict
 
-import requests
 from sqlalchemy import desc, or_, text
 
 from app.database import SessionLocal, settings
 from app.models import ChatMessage, ChatSession, SubtitleSegment, Video
+from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 from app.utils.files import unique_suffix
 
 
@@ -159,19 +159,11 @@ def compose_reference_context(references: list[dict]) -> str:
 def answer_with_ollama(message: str, references: list[dict], depth: str = "basic") -> str:
     context = compose_reference_context(references)
     prompt = build_learning_prompt(message, context, depth=depth)
-    response = requests.post(
-        settings.ollama_base_url.rstrip("/") + "/api/generate",
-        json={
-            "model": settings.ollama_model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.2},
-        },
-        timeout=180,
+    return OllamaClient(base_url=settings.ollama_base_url, timeout_s=180).generate(
+        model=settings.ollama_model,
+        prompt=prompt,
+        temperature=0.2,
     )
-    response.raise_for_status()
-    data = response.json()
-    return (data.get("response") or "").strip()
 
 
 def build_learning_prompt(message: str, context: str, depth: str = "basic") -> str:
@@ -201,32 +193,21 @@ def answer_with_external_llm(message: str, references: list[dict], depth: str = 
 
     context = compose_reference_context(references)
     prompt = build_learning_prompt(message, context, depth=depth)
-    response = requests.post(
-        settings.external_llm_base_url.rstrip("/") + "/chat/completions",
-        headers={
-            "Authorization": f"Bearer {settings.external_llm_api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": settings.external_llm_model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You answer study questions using cited video transcript snippets and timestamp recommendations.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.2,
-        },
-        timeout=180,
+    return OpenAICompatibleClient(
+        base_url=settings.external_llm_base_url,
+        api_key=settings.external_llm_api_key,
+        timeout_s=180,
+    ).chat_completion(
+        model=settings.external_llm_model,
+        messages=[
+            {
+                "role": "system",
+                "content": "You answer study questions using cited video transcript snippets and timestamp recommendations.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.2,
     )
-    response.raise_for_status()
-    data = response.json()
-    choices = data.get("choices") or []
-    if not choices:
-        raise RuntimeError("External LLM returned no choices")
-    message_data = choices[0].get("message") or {}
-    return (message_data.get("content") or "").strip()
 
 
 def answer_with_configured_llm(message: str, references: list[dict], depth: str = "basic") -> tuple[str, str]:

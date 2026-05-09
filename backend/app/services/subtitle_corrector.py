@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import requests
+from app.services.llm_client import OpenAICompatibleClient
 
 
 SYSTEM_PROMPT = (
@@ -75,28 +75,18 @@ def correct_segments_with_openai(
         return segments
 
     corrected = [{**segment} for segment in segments]
-    url = base_url.rstrip("/") + "/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}"}
+    client = OpenAICompatibleClient(base_url=base_url, api_key=api_key, timeout_s=timeout_s)
 
     for batch in _chunk_segments(corrected, batch_size):
-        payload = {
-            "model": model,
-            "messages": [
+        content = client.chat_completion(
+            model=model,
+            messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": _build_user_prompt(batch)},
             ],
-            "temperature": 0.1,
-            "max_tokens": 4096,
-        }
-        response = requests.post(url, json=payload, headers=headers, timeout=timeout_s)
-        if response.status_code != 200:
-            raise RuntimeError(f"字幕校对 HTTP {response.status_code}: {response.text[:500]}")
-
-        data = response.json()
-        try:
-            content = data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError):
-            raise RuntimeError(f"字幕校对返回格式异常: {json.dumps(data, ensure_ascii=False)[:500]}")
+            temperature=0.1,
+            max_tokens=4096,
+        )
 
         for item in _extract_json_array(content):
             if not isinstance(item, dict):

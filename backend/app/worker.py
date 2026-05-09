@@ -66,8 +66,10 @@ def main() -> None:
                 continue
 
             idle_cycles += 1
-            if idle_cycles % 5 == 0:
-                generate_missing_thumbnails(limit=1)
+            thumbnail_cycles = max(1, int(settings.thumbnail_background_idle_cycles or 10))
+            thumbnail_limit = max(1, int(settings.thumbnail_background_limit or 1))
+            if settings.thumbnail_background_enabled and idle_cycles % thumbnail_cycles == 0:
+                generate_missing_thumbnails(limit=thumbnail_limit)
             time.sleep(settings.ai_worker_poll_interval)
 
 

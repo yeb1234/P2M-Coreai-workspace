@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     ai_worker_concurrency: int = 1
     ai_worker_poll_interval: float = 2.0
     ai_worker_requeue_running_on_start: bool = False
+    thumbnail_background_enabled: bool = False
+    thumbnail_background_idle_cycles: int = 10
+    thumbnail_background_limit: int = 1
     whisper_cpu_threads: int = min(4, os.cpu_count() or 4)
     whisper_compute_type: str = "int8"
     whisper_beam_size: int = 5

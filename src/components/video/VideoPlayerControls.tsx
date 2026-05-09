@@ -1,0 +1,209 @@
+import type React from 'react';
+import {
+  Maximize,
+  Minimize,
+  Pause,
+  PictureInPicture2,
+  Play,
+  SkipBack,
+  SkipForward,
+  Subtitles,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import { SpritePreview } from './SpritePreview';
+import { Slider } from './VideoSlider';
+import { PLAYER_SPEED_MAX, PLAYER_SPEED_MIN, PLAYER_SPEED_STEP, clampPlaybackRate, formatTime } from './videoPlayerUtils';
+
+interface VideoPlayerControlsProps {
+  showControls: boolean;
+  videoId: number;
+  videoDuration: number;
+  progress: number;
+  progressPct: number;
+  hoverTime: number | null;
+  hoverX: number;
+  playerWidth: number;
+  progressBarRef: React.RefObject<HTMLDivElement | null>;
+  isPlaying: boolean;
+  isMuted: boolean;
+  volume: number;
+  hasSubtitle: boolean;
+  showSubtitles: boolean;
+  showSubtitleMenu: boolean;
+  subtitleOpacity: number;
+  subtitleSize: number;
+  showSpeedMenu: boolean;
+  playbackRate: number;
+  isFullscreen: boolean;
+  onStopControlClick: (e: React.MouseEvent) => void;
+  onProgressMouseDown: (e: React.MouseEvent) => void;
+  onProgressMouseMove: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onProgressMouseLeave: () => void;
+  onTogglePlay: () => void;
+  onSeekBy: (delta: number) => void;
+  onToggleMute: () => void;
+  onVolumeChange: (volume: number) => void;
+  onToggleSubtitleMenu: () => void;
+  onToggleSubtitles: () => void;
+  onSubtitleOpacityChange: (opacity: number) => void;
+  onSubtitleSizeChange: (size: number) => void;
+  onToggleSpeedMenu: () => void;
+  onPlaybackRateChange: (rate: number) => void;
+  onTogglePip: () => void;
+  onToggleFullscreen: () => void;
+}
+
+export function VideoPlayerControls({
+  showControls,
+  videoId,
+  videoDuration,
+  progress,
+  progressPct,
+  hoverTime,
+  hoverX,
+  playerWidth,
+  progressBarRef,
+  isPlaying,
+  isMuted,
+  volume,
+  hasSubtitle,
+  showSubtitles,
+  showSubtitleMenu,
+  subtitleOpacity,
+  subtitleSize,
+  showSpeedMenu,
+  playbackRate,
+  isFullscreen,
+  onStopControlClick,
+  onProgressMouseDown,
+  onProgressMouseMove,
+  onProgressMouseLeave,
+  onTogglePlay,
+  onSeekBy,
+  onToggleMute,
+  onVolumeChange,
+  onToggleSubtitleMenu,
+  onToggleSubtitles,
+  onSubtitleOpacityChange,
+  onSubtitleSizeChange,
+  onToggleSpeedMenu,
+  onPlaybackRateChange,
+  onTogglePip,
+  onToggleFullscreen,
+}: VideoPlayerControlsProps) {
+  return (
+    <div
+      className={`absolute inset-x-0 bottom-0 z-20 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      onClick={onStopControlClick}
+      onDoubleClick={onStopControlClick}
+    >
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
+      <div className="relative px-3 pb-2 pt-8">
+        {videoDuration > 0 && (
+          <div
+            ref={progressBarRef}
+            className="relative h-[3px] hover:h-[6px] bg-white/20 rounded-full cursor-pointer mb-2 transition-all duration-150 group/progress"
+            onMouseDown={onProgressMouseDown}
+            onMouseMove={onProgressMouseMove}
+            onMouseLeave={onProgressMouseLeave}
+          >
+            <div className="absolute inset-y-0 left-0 bg-[#c87d2f] rounded-full" style={{ width: `${progressPct}%` }} />
+            <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-[#c87d2f] rounded-full shadow-sm opacity-0 group-hover/progress:opacity-100 transition-opacity" style={{ left: `calc(${progressPct}% - 6px)` }} />
+            {hoverTime !== null && (
+              <div
+                className="absolute bottom-full mb-3 pointer-events-none z-30"
+                style={{ left: Math.max(84, Math.min(hoverX, playerWidth - 84)), transform: 'translateX(-50%)' }}
+              >
+                <SpritePreview videoId={videoId} time={hoverTime} />
+                <div className="text-center text-[10px] text-white mt-1 font-mono bg-black/70 rounded px-1">{formatTime(hoverTime)}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center gap-1">
+          <button onClick={onTogglePlay} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isPlaying ? '暂停 (空格)' : '播放 (空格)'}>
+            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+          </button>
+          <button onClick={() => onSeekBy(-10)} className="p-1.5 text-white/80 hover:text-white transition-colors" title="后退10秒">
+            <SkipBack size={16} />
+          </button>
+          <button onClick={() => onSeekBy(10)} className="p-1.5 text-white/80 hover:text-white transition-colors" title="前进10秒">
+            <SkipForward size={16} />
+          </button>
+
+          <div className="flex items-center gap-1 group/vol">
+            <button onClick={onToggleMute} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isMuted ? '取消静音 (M)' : '静音 (M)'}>
+              {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            </button>
+            <div className="w-0 group-hover/vol:w-20 overflow-hidden transition-all duration-200">
+              <Slider value={isMuted ? 0 : volume} min={0} max={1} step={0.05} onChange={onVolumeChange} className="w-20" />
+            </div>
+          </div>
+
+          <span className="text-[11px] text-white/70 font-mono ml-2 select-none">{formatTime(progress)} / {formatTime(videoDuration)}</span>
+          <div className="flex-1" />
+
+          {hasSubtitle && (
+            <div className="relative">
+              <button data-subtitle-btn onClick={onToggleSubtitleMenu} className={`p-1.5 transition-colors ${showSubtitles ? 'text-[#c87d2f]' : 'text-white/80 hover:text-white'}`} title="字幕">
+                <Subtitles size={16} />
+              </button>
+              {showSubtitleMenu && (
+                <div data-subtitle-menu className="absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-sm rounded-lg p-3 min-w-[180px] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/70">字幕</span>
+                    <button onClick={onToggleSubtitles} className={`px-2 py-0.5 text-[10px] rounded ${showSubtitles ? 'bg-[#c87d2f] text-white' : 'bg-white/10 text-white/60'}`}>
+                      {showSubtitles ? '开' : '关'}
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/50">透明度</span>
+                      <span className="text-[10px] text-white/70">{Math.round(subtitleOpacity * 100)}%</span>
+                    </div>
+                    <Slider value={subtitleOpacity} min={0} max={1} step={0.05} onChange={onSubtitleOpacityChange} className="w-full" dark />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/50">字号</span>
+                      <span className="text-[10px] text-white/70">{subtitleSize}%</span>
+                    </div>
+                    <Slider value={subtitleSize} min={50} max={200} step={10} onChange={onSubtitleSizeChange} className="w-full" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="relative">
+            <button data-speed-btn onClick={onToggleSpeedMenu} className="px-1.5 py-1 text-[11px] text-white/80 hover:text-white transition-colors font-medium" title="倍速">
+              {playbackRate === 1 ? '倍速' : `${playbackRate.toFixed(1)}x`}
+            </button>
+            {showSpeedMenu && (
+              <div data-speed-menu className="absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-sm rounded-lg p-3 min-w-[190px] space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-white/70">倍速</span>
+                  <span className="text-xs text-white/90 font-mono">{playbackRate.toFixed(1)}x</span>
+                </div>
+                <Slider value={playbackRate} min={PLAYER_SPEED_MIN} max={PLAYER_SPEED_MAX} step={PLAYER_SPEED_STEP} onChange={(next) => onPlaybackRateChange(clampPlaybackRate(next))} className="w-full" dark />
+                <div className="flex items-center justify-between text-[10px] text-white/45 font-mono">
+                  <span>0.5x</span>
+                  <span>2.0x</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button onClick={onTogglePip} className="p-1.5 text-white/80 hover:text-white transition-colors" title="画中画">
+            <PictureInPicture2 size={16} />
+          </button>
+          <button onClick={onToggleFullscreen} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isFullscreen ? '退出全屏 (F)' : '全屏 (F)'}>
+            {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

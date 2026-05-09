@@ -1,6 +1,4 @@
-import json
-
-import requests
+from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 
 
 def _build_prompt(transcript: str, word_limit: int) -> str:
@@ -27,21 +25,11 @@ def summarize_with_ollama(
         return ""
 
     prompt = _build_prompt(transcript, word_limit)
-    url = base_url.rstrip("/") + "/api/generate"
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.2},
-    }
-    response = requests.post(url, json=payload, timeout=timeout_s)
-    if response.status_code != 200:
-        raise RuntimeError(f"Ollama HTTP {response.status_code}: {response.text[:500]}")
-
-    data = response.json()
-    if not isinstance(data, dict) or "response" not in data:
-        raise RuntimeError(f"Unexpected Ollama response: {json.dumps(data)[:500]}")
-    return (data.get("response") or "").strip()
+    return OllamaClient(base_url=base_url, timeout_s=timeout_s).generate(
+        model=model,
+        prompt=prompt,
+        temperature=0.2,
+    )
 
 
 def summarize_with_openai(
@@ -56,20 +44,9 @@ def summarize_with_openai(
         return ""
 
     prompt = _build_prompt(transcript, word_limit)
-    url = base_url.rstrip("/") + "/chat/completions"
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-        "max_tokens": 1024,
-    }
-    headers = {"Authorization": f"Bearer {api_key}"}
-    response = requests.post(url, json=payload, headers=headers, timeout=timeout_s)
-    if response.status_code != 200:
-        raise RuntimeError(f"OpenAI API HTTP {response.status_code}: {response.text[:500]}")
-
-    data = response.json()
-    try:
-        return data["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError):
-        raise RuntimeError(f"Unexpected OpenAI response: {json.dumps(data)[:500]}")
+    return OpenAICompatibleClient(base_url=base_url, api_key=api_key, timeout_s=timeout_s).chat_completion(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        max_tokens=1024,
+    )

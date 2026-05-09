@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -13,6 +14,87 @@ from app.services.transcribe_whisper import transcribe_wav
 from app.services.write_md import write_markdown_output
 from app.utils.files import safe_stem, unique_suffix
 from app.utils.serialization import dump_segments
+
+
+@dataclass(frozen=True)
+class AiJobOptions:
+    whisper_model: str
+    language: str
+    do_summary: bool
+    word_limit: int
+    ollama_model: str | None
+    cpu_threads: int
+    compute_type: str
+    beam_size: int | None
+    best_of: int | None
+    temperature: float | None
+    vad_filter: bool | None
+    subtitle_correction_enabled: bool | None
+
+
+@dataclass(frozen=True)
+class AiJobPaths:
+    source: Path
+    wav: Path
+    markdown: Path
+    subtitle: Path
+
+
+def _build_job_options(
+    *,
+    whisper_model: str,
+    language: str,
+    do_summary: bool,
+    word_limit: int,
+    ollama_model: str | None,
+    cpu_threads: int | None = None,
+    compute_type: str | None = None,
+    beam_size: int | None = None,
+    best_of: int | None = None,
+    temperature: float | None = None,
+    vad_filter: bool | None = None,
+    subtitle_correction_enabled: bool | None = None,
+) -> AiJobOptions:
+    return AiJobOptions(
+        whisper_model=whisper_model or settings.default_whisper_model,
+        language=language or settings.default_language,
+        do_summary=do_summary,
+        word_limit=word_limit,
+        ollama_model=ollama_model,
+        cpu_threads=cpu_threads or settings.whisper_cpu_threads,
+        compute_type=compute_type or settings.whisper_compute_type,
+        beam_size=beam_size,
+        best_of=best_of,
+        temperature=temperature,
+        vad_filter=vad_filter,
+        subtitle_correction_enabled=subtitle_correction_enabled,
+    )
+
+
+def _apply_job_options(job: AiJob, options: AiJobOptions) -> None:
+    job.whisper_model = options.whisper_model
+    job.language = options.language
+    job.do_summary = options.do_summary
+    job.word_limit = options.word_limit
+    job.ollama_model = options.ollama_model
+    job.cpu_threads = options.cpu_threads
+    job.compute_type = options.compute_type
+    job.beam_size = options.beam_size
+    job.best_of = options.best_of
+    job.temperature = options.temperature
+    job.vad_filter = options.vad_filter
+    job.subtitle_correction_enabled = options.subtitle_correction_enabled
+
+
+def _build_job_paths(video: Video, job: AiJob) -> AiJobPaths:
+    source_path = Path(video.filepath)
+    base_name = safe_stem(source_path.stem) or f"video-{video.id}"
+    return AiJobPaths(
+        source=source_path,
+        wav=Path(settings.work_dir) / f"{base_name}-{job.id}.wav",
+        markdown=Path(settings.output_dir) / "notes" / f"{base_name}-{job.id}.md",
+        subtitle=Path(settings.output_dir) / "subtitles" / f"{base_name}-{job.id}.vtt",
+    )
 
 
 def create_ai_job(
@@ -31,6 +113,20 @@ def create_ai_job(
     vad_filter: bool | None = None,
     subtitle_correction_enabled: bool | None = None,
 ) -> AiJob:
+    options = _build_job_options(
+        whisper_model=whisper_model,
+        language=language,
+        do_summary=do_summary,
+        word_limit=word_limit,
+        ollama_model=ollama_model,
+        cpu_threads=cpu_threads,
+        compute_type=compute_type,
+        beam_size=beam_size,
+        best_of=best_of,
+        temperature=temperature,
+        vad_filter=vad_filter,
+        subtitle_correction_enabled=subtitle_correction_enabled,
+    )
     db = SessionLocal()
     try:
         video = db.query(Video).filter(Video.id == video_id).first()
@@ -44,18 +140,7 @@ def create_ai_job(
             .first()
         )
         if existing_job:
-            existing_job.whisper_model = whisper_model or settings.default_whisper_model
-            existing_job.language = language or settings.default_language
-            existing_job.do_summary = do_summary
-            existing_job.word_limit = word_limit
-            existing_job.ollama_model = ollama_model
-            existing_job.cpu_threads = cpu_threads or settings.whisper_cpu_threads
-            existing_job.compute_type = compute_type or settings.whisper_compute_type
-            existing_job.beam_size = beam_size
-            existing_job.best_of = best_of
-            existing_job.temperature = temperature
-            existing_job.vad_filter = vad_filter
-            existing_job.subtitle_correction_enabled = subtitle_correction_enabled
+            _apply_job_options(existing_job, options)
             db.commit()
             db.refresh(existing_job)
             return existing_job
@@ -66,19 +151,8 @@ def create_ai_job(
             status="queued",
             stage="queued",
             message="Queued for processing",
-            whisper_model=whisper_model or settings.default_whisper_model,
-            language=language or settings.default_language,
-            do_summary=do_summary,
-            word_limit=word_limit,
-            ollama_model=ollama_model,
-            cpu_threads=cpu_threads or settings.whisper_cpu_threads,
-            compute_type=compute_type or settings.whisper_compute_type,
-            beam_size=beam_size,
-            best_of=best_of,
-            temperature=temperature,
-            vad_filter=vad_filter,
-            subtitle_correction_enabled=subtitle_correction_enabled,
         )
+        _apply_job_options(job, options)
         db.add(job)
         video.ai_status = "queued"
         video.ai_stage = "queued"
@@ -207,8 +281,8 @@ def run_ai_job(job_id: str) -> None:
             db.commit()
             return
 
-        source_path = Path(video.filepath)
-        if not source_path.exists():
+        paths = _build_job_paths(video, job)
+        if not paths.source.exists():
             update_job_state(
                 db,
                 job,
@@ -220,17 +294,12 @@ def run_ai_job(job_id: str) -> None:
             )
             return
 
-        base_name = safe_stem(source_path.stem) or f"video-{video.id}"
-        wav_path = Path(settings.work_dir) / f"{base_name}-{job.id}.wav"
-        md_path = Path(settings.output_dir) / "notes" / f"{base_name}-{job.id}.md"
-        vtt_path = Path(settings.output_dir) / "subtitles" / f"{base_name}-{job.id}.vtt"
-
         update_job_state(db, job, video, status="running", stage="extracting", message="Extracting audio")
-        extract_wav_16k_mono(source_path, wav_path)
+        extract_wav_16k_mono(paths.source, paths.wav, cpu_threads=job.cpu_threads)
 
         update_job_state(db, job, video, status="running", stage="transcribing", message="Transcribing audio")
         transcript_result = transcribe_wav(
-            wav_path=wav_path,
+            wav_path=paths.wav,
             model_size=job.whisper_model,
             language=job.language,
             cpu_threads=job.cpu_threads,
@@ -268,8 +337,8 @@ def run_ai_job(job_id: str) -> None:
         job.transcript_segments = dump_segments(segments)
         db.commit()
 
-        write_vtt_output(vtt_path, segments)
-        job.subtitle_path = str(vtt_path)
+        write_vtt_output(paths.subtitle, segments)
+        job.subtitle_path = str(paths.subtitle)
         db.commit()
         replace_subtitle_segments(db, video, segments)
 
@@ -298,7 +367,7 @@ def run_ai_job(job_id: str) -> None:
 
         update_job_state(db, job, video, status="running", stage="writing", message="Writing markdown and subtitles")
         write_markdown_output(
-            md_path=md_path,
+            md_path=paths.markdown,
             source_filename=video.filename,
             transcript=transcript,
             transcript_segments=segments,
@@ -306,21 +375,21 @@ def run_ai_job(job_id: str) -> None:
             word_limit=job.word_limit,
             whisper_model=job.whisper_model,
             language=job.language,
-            subtitle_filename=vtt_path.name,
+            subtitle_filename=paths.subtitle.name,
             summary_error=summary_error,
         )
 
         note = ensure_video_note(db, video)
         note.title = f"{video.title} 学习笔记"
         note.source = "ai"
-        note.markdown_path = str(md_path)
-        note.content = md_path.read_text(encoding="utf-8")
+        note.markdown_path = str(paths.markdown)
+        note.content = paths.markdown.read_text(encoding="utf-8")
 
         video.transcription = transcript
         video.transcript_segments = dump_segments(segments)
         video.summary = summary
-        video.markdown_path = str(md_path)
-        video.subtitle_path = str(vtt_path)
+        video.markdown_path = str(paths.markdown)
+        video.subtitle_path = str(paths.subtitle)
         video.ai_status = "completed"
         video.ai_stage = "completed"
         video.ai_error = summary_error if summary_error and not summary else None
@@ -330,8 +399,8 @@ def run_ai_job(job_id: str) -> None:
         job.message = "Processing complete"
         job.summary = summary
         job.summary_error = summary_error
-        job.markdown_path = str(md_path)
-        job.subtitle_path = str(vtt_path)
+        job.markdown_path = str(paths.markdown)
+        job.subtitle_path = str(paths.subtitle)
         db.commit()
     except Exception as exc:
         failed_db = db

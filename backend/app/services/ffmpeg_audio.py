@@ -5,7 +5,15 @@ from pathlib import Path
 from app.database import settings
 
 
-def extract_wav_16k_mono(video_path: Path, wav_path: Path) -> None:
+def _resolve_threads(cpu_threads: int | None = None) -> int:
+    value = cpu_threads if cpu_threads is not None else settings.whisper_cpu_threads
+    try:
+        return max(1, min(128, int(value)))
+    except (TypeError, ValueError):
+        return 4
+
+
+def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | None = None) -> None:
     wav_path.parent.mkdir(parents=True, exist_ok=True)
 
     if shutil.which("ffmpeg") is None:
@@ -15,7 +23,7 @@ def extract_wav_16k_mono(video_path: Path, wav_path: Path) -> None:
         "ffmpeg",
         "-y",
         "-threads",
-        str(max(1, int(settings.whisper_cpu_threads or 4))),
+        str(_resolve_threads(cpu_threads)),
         "-i",
         str(video_path),
         "-vn",
