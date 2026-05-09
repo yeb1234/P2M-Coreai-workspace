@@ -7,6 +7,13 @@ interface VideoAiJobCenterProps {
   selectedStatus: string | null;
   batchCount?: number;
   batchLoading?: boolean;
+  batchProgress?: {
+    completed: number;
+    running: number;
+    queued: number;
+    failed: number;
+    total: number;
+  };
   onStatusChange: (status: string | null) => void;
   onBatchFolder?: () => void;
   onRefresh: () => void;
@@ -55,6 +62,7 @@ export function VideoAiJobCenter({
   selectedStatus,
   batchCount = 0,
   batchLoading = false,
+  batchProgress,
   onStatusChange,
   onBatchFolder,
   onRefresh,
@@ -80,14 +88,30 @@ export function VideoAiJobCenter({
       </div>
 
       {onBatchFolder && (
-        <button
-          onClick={onBatchFolder}
-          disabled={batchLoading || batchCount <= 0}
-          className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#f2d6b8] bg-[#fff7ed] px-3 py-2 text-xs font-medium text-[#a95f17] transition-colors hover:bg-[#ffedd5] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {batchLoading ? <Loader2 size={13} className="animate-spin" /> : null}
-          批处理当前文件夹{batchCount > 0 ? `（${batchCount} 个）` : ''}
-        </button>
+        <div className="mb-3 rounded-lg border border-[#f2d6b8] bg-[#fff7ed] p-2">
+          <button
+            onClick={onBatchFolder}
+            disabled={batchLoading || batchCount <= 0}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-white px-3 py-2 text-xs font-medium text-[#a95f17] transition-colors hover:bg-[#ffedd5] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {batchLoading ? <Loader2 size={13} className="animate-spin" /> : null}
+            批处理当前文件夹{batchCount > 0 ? `（${batchCount} 个）` : ''}
+          </button>
+          {batchProgress && batchProgress.total > 0 && (
+            <div className="mt-2 space-y-1 text-[11px] text-[#8a5a2b]">
+              <div className="flex justify-between">
+                <span>完成 {batchProgress.completed}/{batchProgress.total}</span>
+                <span>运行 {batchProgress.running} · 排队 {batchProgress.queued} · 失败 {batchProgress.failed}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#f2d6b8]">
+                <div
+                  className="h-full rounded-full bg-[#c87d2f]"
+                  style={{ width: `${Math.min(100, (batchProgress.completed / batchProgress.total) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="mb-3 grid grid-cols-5 gap-1">

@@ -94,6 +94,7 @@ class AiJobCreate(BaseModel):
     temperature: Optional[float] = Field(default=None, ge=0, le=1)
     vad_filter: Optional[bool] = None
     subtitle_correction_enabled: Optional[bool] = None
+    subtitle_correction_prompt: Optional[str] = None
 
 
 class AiJobOut(BaseModel):
@@ -136,6 +137,7 @@ class AiJobListItem(BaseModel):
     cpu_threads: Optional[int] = None
     compute_type: Optional[str] = None
     subtitle_correction_enabled: Optional[bool] = None
+    subtitle_correction_prompt: Optional[str] = None
     summary_error: Optional[str] = None
     created_at: datetime
     updated_at: datetime

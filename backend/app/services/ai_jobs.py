@@ -30,6 +30,7 @@ class AiJobOptions:
     temperature: float | None
     vad_filter: bool | None
     subtitle_correction_enabled: bool | None
+    subtitle_correction_prompt: str | None
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,7 @@ def _build_job_options(
     temperature: float | None = None,
     vad_filter: bool | None = None,
     subtitle_correction_enabled: bool | None = None,
+    subtitle_correction_prompt: str | None = None,
 ) -> AiJobOptions:
     return AiJobOptions(
         whisper_model=whisper_model or settings.default_whisper_model,
@@ -68,6 +70,7 @@ def _build_job_options(
         temperature=temperature,
         vad_filter=vad_filter,
         subtitle_correction_enabled=subtitle_correction_enabled,
+        subtitle_correction_prompt=subtitle_correction_prompt.strip() if subtitle_correction_prompt else None,
     )
 
 
@@ -84,6 +87,7 @@ def _apply_job_options(job: AiJob, options: AiJobOptions) -> None:
     job.temperature = options.temperature
     job.vad_filter = options.vad_filter
     job.subtitle_correction_enabled = options.subtitle_correction_enabled
+    job.subtitle_correction_prompt = options.subtitle_correction_prompt
 
 
 def _build_job_paths(video: Video, job: AiJob) -> AiJobPaths:
@@ -112,6 +116,7 @@ def create_ai_job(
     temperature: float | None = None,
     vad_filter: bool | None = None,
     subtitle_correction_enabled: bool | None = None,
+    subtitle_correction_prompt: str | None = None,
 ) -> AiJob:
     options = _build_job_options(
         whisper_model=whisper_model,
@@ -126,6 +131,7 @@ def create_ai_job(
         temperature=temperature,
         vad_filter=vad_filter,
         subtitle_correction_enabled=subtitle_correction_enabled,
+        subtitle_correction_prompt=subtitle_correction_prompt,
     )
     db = SessionLocal()
     try:
@@ -327,6 +333,7 @@ def run_ai_job(job_id: str) -> None:
                     api_key=settings.openai_api_key,
                     batch_size=settings.subtitle_correction_batch_size,
                     timeout_s=settings.subtitle_correction_timeout_s,
+                    extra_prompt=job.subtitle_correction_prompt,
                 )
                 transcript = "\n".join((segment.get("text") or "").strip() for segment in segments).strip()
             except Exception as exc:

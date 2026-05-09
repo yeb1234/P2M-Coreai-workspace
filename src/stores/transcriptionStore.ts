@@ -25,6 +25,7 @@ export interface TranscriptionSettings {
   temperature: number;
   vadFilter: boolean;
   subtitleCorrectionEnabled: boolean;
+  subtitleCorrectionPrompt: string;
 }
 
 interface TranscriptionState extends TranscriptionSettings {
@@ -44,6 +45,7 @@ export const DEFAULT_TRANSCRIPTION_SETTINGS: TranscriptionSettings = {
   temperature: 0,
   vadFilter: true,
   subtitleCorrectionEnabled: true,
+  subtitleCorrectionPrompt: '根据上下文修正明显识别错误。技术课里优先保留 Git、GitHub、commit、branch、merge、Python、JavaScript、API 等术语。',
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -71,6 +73,9 @@ function sanitizeSettings(value: Partial<TranscriptionSettings>): TranscriptionS
     subtitleCorrectionEnabled: typeof value.subtitleCorrectionEnabled === 'boolean'
       ? value.subtitleCorrectionEnabled
       : DEFAULT_TRANSCRIPTION_SETTINGS.subtitleCorrectionEnabled,
+    subtitleCorrectionPrompt: typeof value.subtitleCorrectionPrompt === 'string'
+      ? value.subtitleCorrectionPrompt
+      : DEFAULT_TRANSCRIPTION_SETTINGS.subtitleCorrectionPrompt,
   };
 }
 

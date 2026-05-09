@@ -35,7 +35,7 @@ def _extract_json_array(content: str) -> list[Any]:
     return data
 
 
-def _build_user_prompt(batch: list[dict]) -> str:
+def _build_user_prompt(batch: list[dict], extra_prompt: str | None = None) -> str:
     lines = []
     for item in batch:
         lines.append(
@@ -51,7 +51,8 @@ def _build_user_prompt(batch: list[dict]) -> str:
         )
     return (
         "请根据上下文校对下面字幕。保留 index，不返回 start/end，只返回 JSON 数组。\n"
-        "字幕逐行如下：\n"
+        + (f"额外术语和校对要求：{extra_prompt.strip()}\n" if extra_prompt and extra_prompt.strip() else "")
+        + "字幕逐行如下：\n"
         + "\n".join(lines)
     )
 
@@ -70,6 +71,7 @@ def correct_segments_with_openai(
     api_key: str = "lm-studio",
     batch_size: int = 60,
     timeout_s: int = 180,
+    extra_prompt: str | None = None,
 ) -> list[dict]:
     if not segments:
         return segments
@@ -82,7 +84,7 @@ def correct_segments_with_openai(
             model=model,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": _build_user_prompt(batch)},
+                {"role": "user", "content": _build_user_prompt(batch, extra_prompt=extra_prompt)},
             ],
             temperature=0.1,
             max_tokens=4096,

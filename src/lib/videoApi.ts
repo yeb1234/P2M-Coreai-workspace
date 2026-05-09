@@ -119,6 +119,7 @@ export interface AiJobListItem {
   cpu_threads: number | null;
   compute_type: string | null;
   subtitle_correction_enabled: boolean | null;
+  subtitle_correction_prompt: string | null;
   summary_error: string | null;
   created_at: string;
   updated_at: string;
@@ -131,6 +132,18 @@ export interface AiJobListOut {
   queued: number;
   failed: number;
   completed: number;
+}
+
+export interface BackendHealthCheck {
+  name: string;
+  ok: boolean;
+  message: string;
+  details: Record<string, unknown>;
+}
+
+export interface BackendHealthOut {
+  ok: boolean;
+  checks: BackendHealthCheck[];
 }
 
 export interface PlaylistItem {
@@ -247,6 +260,7 @@ export async function startAiJob(
     temperature?: number;
     vad_filter?: boolean;
     subtitle_correction_enabled?: boolean;
+    subtitle_correction_prompt?: string;
   }
 ): Promise<{ job_id: string; status: string; stage: string }> {
   return apiFetch(`/api/videos/${videoId}/ai-jobs`, {
@@ -264,6 +278,7 @@ export async function startAiJob(
       temperature: opts?.temperature,
       vad_filter: opts?.vad_filter,
       subtitle_correction_enabled: opts?.subtitle_correction_enabled,
+      subtitle_correction_prompt: opts?.subtitle_correction_prompt,
     }),
   });
 }
@@ -298,4 +313,8 @@ export async function fetchCategoryTree(): Promise<CategoryTree[]> {
 
 export async function clearActiveAiJobs(): Promise<{ cleared: number }> {
   return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-active', { method: 'POST' });
+}
+
+export async function fetchBackendHealth(): Promise<BackendHealthOut> {
+  return apiFetch<BackendHealthOut>('/api/admin/health');
 }

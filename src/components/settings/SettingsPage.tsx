@@ -1,10 +1,10 @@
 ﻿import React, { useState, useRef } from 'react';
 import { useEffect } from 'react';
-import { Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save, Download, Upload, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save, Download, Upload, AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
 import { PageTitle, ConfirmDialog } from '../shared';
 import { usePomodoroStore, useUIStore, useNotificationStore, useTodoStore, useNotesStore, useCalendarStore, useAuthStore, useAIStore, useTranscriptionStore, WHISPER_MODELS, DEFAULT_TRANSCRIPTION_SETTINGS } from '../../stores';
 import { getUser, hashPassword, idbStorage, upsertUser } from '../../lib/idbStorage';
-import { clearActiveAiJobs } from '../../lib/videoApi';
+import { clearActiveAiJobs, fetchBackendHealth, type BackendHealthOut } from '../../lib/videoApi';
 import { THEME_PRESETS, applyTheme, generateThemeCss, type ThemeVars } from '../../lib/themes';
 import { buildAIRequestSystemPrompt } from '../../stores/aiStore';
 import type { PomodoroConfig } from '../../types';
@@ -16,6 +16,7 @@ const SECTIONS = [
   { id: 'appearance', label: '外观', icon: <Palette size={16} /> },
   { id: 'ai', label: 'AI 助手', icon: <Bot size={16} /> },
   { id: 'transcription', label: '转写设置', icon: <Database size={16} /> },
+  { id: 'backend', label: '后端状态', icon: <CheckCircle2 size={16} /> },
   { id: 'privacy', label: '隐私', icon: <Shield size={16} /> },
   { id: 'data', label: '数据', icon: <Database size={16} /> },
 ] as const;
@@ -519,6 +520,7 @@ function TranscriptionSettings() {
     temperature: settings.temperature,
     vadFilter: settings.vadFilter,
     subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
+    subtitleCorrectionPrompt: settings.subtitleCorrectionPrompt,
   });
   const [drafts, setDrafts] = useState<NumberDrafts>({
     wordLimit: String(settings.wordLimit),
@@ -542,6 +544,7 @@ function TranscriptionSettings() {
         temperature: settings.temperature,
         vadFilter: settings.vadFilter,
         subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
+        subtitleCorrectionPrompt: settings.subtitleCorrectionPrompt,
       });
       setDrafts({
         wordLimit: String(settings.wordLimit),
@@ -551,7 +554,7 @@ function TranscriptionSettings() {
         temperature: String(settings.temperature),
       });
     });
-  }, [settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled]);
+  }, [settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled, settings.subtitleCorrectionPrompt]);
 
   const updateForm = (updates: Partial<TranscriptionDraft>) => {
     setForm((current) => ({ ...current, ...updates }));
@@ -744,6 +747,17 @@ function TranscriptionSettings() {
             <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.subtitleCorrectionEnabled ? 'left-[22px]' : 'left-0.5'}`} />
           </button>
         </div>
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">字幕校对提示词模板</label>
+          <textarea
+            value={form.subtitleCorrectionPrompt}
+            onChange={(e) => updateForm({ subtitleCorrectionPrompt: e.target.value })}
+            rows={4}
+            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm leading-6 outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10"
+            placeholder="写入术语表、课程上下文、常见误识别修正规则。保存后新任务生效。"
+          />
+          <p className="text-[10px] text-[#9ca3af] mt-1">这里只影响字幕校对阶段，不会改时间轴，不会合并或拆分字幕。</p>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
@@ -811,6 +825,70 @@ function TranscriptionSettings() {
         {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
         {fieldHint && <span className="text-xs text-[#c87d2f]">{fieldHint}</span>}
         {clearMsg && <span className="text-xs text-[#6b7280]">{clearMsg}</span>}
+      </div>
+    </div>
+  );
+}
+
+function BackendHealthSettings() {
+  const [health, setHealth] = useState<BackendHealthOut | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadHealth = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      setHealth(await fetchBackendHealth());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '后端健康检查失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadHealth();
+    });
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => void loadHealth()}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#1a1a1a] rounded-lg hover:bg-[#2f2f2f] disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          检测后端状态
+        </button>
+        {health && (
+          <span className={`text-xs ${health.ok ? 'text-[#16a34a]' : 'text-[#dc3545]'}`}>
+            {health.ok ? '核心服务正常' : '存在需要处理的项目'}
+          </span>
+        )}
+        {error && <span className="text-xs text-[#dc3545]">{error}</span>}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {(health?.checks ?? []).map((check) => (
+          <div key={check.name} className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-3">
+            <div className="flex items-start gap-2">
+              {check.ok ? <CheckCircle2 size={16} className="mt-0.5 text-[#16a34a]" /> : <XCircle size={16} className="mt-0.5 text-[#dc3545]" />}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-[#1a1a1a]">{check.name}</p>
+                <p className="mt-1 text-xs leading-5 text-[#6b7280]">{check.message}</p>
+                {Object.keys(check.details || {}).length > 0 && (
+                  <pre className="mt-2 max-h-24 overflow-auto rounded-lg bg-white px-2 py-1.5 text-[10px] leading-4 text-[#6b7280]">
+                    {JSON.stringify(check.details, null, 2)}
+                  </pre>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -924,6 +1002,8 @@ export const SettingsPage: React.FC = () => {
         return <div><h3 className="text-sm font-semibold text-[#1a1a1a] mb-4">AI 助手</h3><AISettings /></div>;
       case 'transcription':
         return <div><h3 className="text-sm font-semibold text-[#1a1a1a] mb-4">转写设置</h3><TranscriptionSettings /></div>;
+      case 'backend':
+        return <div><h3 className="text-sm font-semibold text-[#1a1a1a] mb-4">后端健康状态</h3><BackendHealthSettings /></div>;
       case 'privacy':
         return <div><h3 className="text-sm font-semibold text-[#1a1a1a] mb-4">隐私设置</h3><PrivacySettings /></div>;
       case 'data':

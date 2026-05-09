@@ -84,6 +84,7 @@ class AiJob(Base):
     temperature = Column(Float, nullable=True)
     vad_filter = Column(Boolean, nullable=True)
     subtitle_correction_enabled = Column(Boolean, nullable=True)
+    subtitle_correction_prompt = Column(Text, nullable=True)
     transcript = Column(Text, nullable=True)
     transcript_segments = Column(Text, nullable=True)
     summary = Column(Text, nullable=True)

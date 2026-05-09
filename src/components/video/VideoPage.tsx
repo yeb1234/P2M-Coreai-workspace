@@ -33,6 +33,7 @@ function VideoPlayerView() {
   const temperature = useTranscriptionStore((s) => s.temperature);
   const vadFilter = useTranscriptionStore((s) => s.vadFilter);
   const subtitleCorrectionEnabled = useTranscriptionStore((s) => s.subtitleCorrectionEnabled);
+  const subtitleCorrectionPrompt = useTranscriptionStore((s) => s.subtitleCorrectionPrompt);
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -124,6 +125,7 @@ function VideoPlayerView() {
     temperature,
     vad_filter: vadFilter,
     subtitle_correction_enabled: subtitleCorrectionEnabled,
+    subtitle_correction_prompt: subtitleCorrectionPrompt,
   }), [
     whisperModel,
     transcriptionLanguage,
@@ -136,6 +138,7 @@ function VideoPlayerView() {
     temperature,
     vadFilter,
     subtitleCorrectionEnabled,
+    subtitleCorrectionPrompt,
   ]);
 
   const batchCurrentFolder = useCallback(async () => {
@@ -401,6 +404,22 @@ function VideoPlayerView() {
 
   const isProcessing = jobStatus === 'running' || jobStatus === 'queued';
   const progressPct = videoDuration > 0 ? (progress / videoDuration) * 100 : 0;
+  const batchProgress = useMemo(() => {
+    const ids = new Set(playlist.map((item) => item.id));
+    const folderJobs = (aiJobs?.items ?? []).filter((job) => ids.has(job.video_id));
+    const latestByVideo = new Map<number, (typeof folderJobs)[number]>();
+    for (const job of folderJobs) {
+      if (!latestByVideo.has(job.video_id)) latestByVideo.set(job.video_id, job);
+    }
+    const values = [...latestByVideo.values()];
+    return {
+      total: playlist.length,
+      completed: values.filter((job) => job.status === 'completed').length,
+      running: values.filter((job) => job.status === 'running').length,
+      queued: values.filter((job) => job.status === 'queued').length,
+      failed: values.filter((job) => job.status === 'failed').length,
+    };
+  }, [aiJobs?.items, playlist]);
 
   if (!currentVideo) return null;
 
@@ -564,6 +583,7 @@ function VideoPlayerView() {
               selectedStatus={aiJobStatusFilter}
               batchCount={playlist.length}
               batchLoading={batchingFolder}
+              batchProgress={batchProgress}
               onStatusChange={setAiJobStatusFilter}
               onBatchFolder={() => void batchCurrentFolder()}
               onRefresh={() => void loadAiJobs()}

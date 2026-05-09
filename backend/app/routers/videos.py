@@ -449,6 +449,7 @@ def start_ai_job(video_id: int, payload: AiJobCreate, db: Session = Depends(get_
         temperature=payload.temperature,
         vad_filter=payload.vad_filter,
         subtitle_correction_enabled=payload.subtitle_correction_enabled,
+        subtitle_correction_prompt=payload.subtitle_correction_prompt,
     )
     return {"job_id": job.id, "status": job.status, "stage": job.stage}
 

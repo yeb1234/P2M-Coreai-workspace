@@ -114,6 +114,7 @@ def ensure_runtime_schema() -> None:
             ("temperature", "FLOAT"),
             ("vad_filter", "BOOLEAN"),
             ("subtitle_correction_enabled", "BOOLEAN"),
+            ("subtitle_correction_prompt", "TEXT"),
         ):
             if column_name not in ai_job_columns:
                 connection.exec_driver_sql(f"ALTER TABLE ai_jobs ADD COLUMN {column_name} {column_sql}")
