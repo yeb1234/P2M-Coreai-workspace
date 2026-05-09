@@ -31,11 +31,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   const [customMode, setCustomMode] = useState(false);
   const [customHours, setCustomHours] = useState(() => {
     if (!todo?.pomodoroRounds) return '1.5';
-    const { workDuration, shortBreakDuration, longBreakDuration, longBreakInterval } = config;
-    const perRound = longBreakInterval * (workDuration + shortBreakDuration) + longBreakDuration;
-    const totalMin = todo.pomodoroRounds * (workDuration + shortBreakDuration) - shortBreakDuration;
-    const rounds = Math.ceil(totalMin / perRound);
-    return ((rounds * perRound) / 60).toFixed(1);
+    return ((todo.pomodoroRounds * config.workDuration) / 60).toFixed(1);
   });
 
   const PRESET_OPTIONS = [0, 1, 2, 3];
@@ -106,18 +102,9 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   }, []);
 
   const calcTotalPomodoros = (hours: number): number => {
-    const { workDuration, shortBreakDuration, longBreakDuration, longBreakInterval } = config;
-    const N = longBreakInterval;
     const totalMin = hours * 60;
-    if (totalMin < workDuration) return 0;
-    let p = 0;
-    while (true) {
-      const next = p + 1;
-      const time = next * (workDuration + shortBreakDuration) - shortBreakDuration + Math.floor(next / N) * longBreakDuration;
-      if (time > totalMin) break;
-      p = next;
-    }
-    return p;
+    if (totalMin <= 0) return 0;
+    return Math.max(1, Math.floor(totalMin / config.workDuration));
   };
 
   const formatTimeEstimate = (hours: number): string => {

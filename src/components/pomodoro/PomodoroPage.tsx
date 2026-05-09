@@ -13,10 +13,10 @@ export const PomodoroPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4 relative">
           <div className="lg:pr-6 flex flex-col items-center">
-            <div className="w-full max-w-sm">
+            <div className="w-full max-w-lg">
               <PomodoroTimer />
             </div>
-            <div className="w-full max-w-sm">
+            <div className="w-full max-w-lg">
               <PomodoroSettings />
             </div>
           </div>

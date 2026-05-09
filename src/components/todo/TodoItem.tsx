@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Check, Clock, Trash2, Play, Edit, Calendar, GripVertical } from 'lucide-react';
-import type { Todo, TodoPriority } from '../../types';
-import { useTodoStore, usePomodoroStore, useUIStore } from '../../stores';
+import type { Todo } from '../../types';
+import { useTodoStore, usePomodoroStore } from '../../stores';
 import { formatDate, formatDuration } from '../../lib/date';
+import { playNotificationSound } from '../../lib/sounds';
 import { TodoBadge } from './TodoBadge';
+import { ConfirmDialog } from '../shared';
 
 const STICKY_COLORS: Record<string, string> = {
   high: '#e8a0a0',
@@ -12,34 +14,36 @@ const STICKY_COLORS: Record<string, string> = {
   green: '#a0d4a0',
 };
 
-const STATUS_ICONS = {
-  pending: <div className="w-5 h-5 border-2 border-[#d1cdc6] rounded-full" />,
-  in_progress: <div className="w-5 h-5 border-2 border-[#c87d2f] rounded-full bg-[#fef7ed]" />,
-  completed: <Check size={20} className="text-[#16a34a]" />,
-};
 
 interface TodoItemProps {
   todo: Todo;
   onEdit: (todo: Todo) => void;
   onDragStart?: (id: string) => void;
-  onDragOver?: (id: string) => void;
+  onDragOver?: (id: string, position: 'top' | 'bottom') => void;
   onDrop?: (id: string) => void;
   onDragEnd?: () => void;
   isDragging?: boolean;
   isDropTarget?: boolean;
+  dropPosition?: 'top' | 'bottom';
 }
 
-export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDropTarget }) => {
+export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDropTarget, dropPosition }) => {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showOverrideConfirm, setShowOverrideConfirm] = useState(false);
+  const [toggleHover, setToggleHover] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
   const toggleTodoStatus = useTodoStore((s) => s.toggleTodoStatus);
   const deleteTodo = useTodoStore((s) => s.deleteTodo);
   const updateTodo = useTodoStore((s) => s.updateTodo);
   const startTimer = usePomodoroStore((s) => s.startTimer);
   const linkToTodo = usePomodoroStore((s) => s.linkToTodo);
+  const resetTimer = usePomodoroStore((s) => s.resetTimer);
   const config = usePomodoroStore((s) => s.config);
-  const setActiveView = useUIStore((s) => s.setActiveView);
+  const timer = usePomodoroStore((s) => s.timer);
+  const todos = useTodoStore((s) => s.todos);
+
 
   useEffect(() => {
     if (editing && editRef.current) {
@@ -66,35 +70,60 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
     setEditValue('');
   }, []);
 
+  const totalPomodoros = Math.max(0, todo.pomodoroRounds || 0);
+
   const { plannedMinutes, completedMinutes } = useMemo(() => {
     const { workDuration, shortBreakDuration, longBreakDuration, longBreakInterval } = config;
-    const N = longBreakInterval;
+    const plannedPomodoros = Math.max(0, todo.pomodoroRounds || 0);
+    const plannedShortBreaks = Math.max(0, plannedPomodoros - 1);
+    const plannedLongBreaks = Math.max(0, Math.floor((plannedPomodoros - 1) / longBreakInterval));
+    const planned = plannedPomodoros * workDuration
+      + plannedShortBreaks * shortBreakDuration
+      + plannedLongBreaks * longBreakDuration;
 
-    const totalPomodoros = todo.pomodoroRounds;
-    const workMin = totalPomodoros * (workDuration + shortBreakDuration) - shortBreakDuration;
-    const rounds = Math.ceil(totalPomodoros / N);
-    const longBreaks = Math.max(0, rounds - 1);
-    const planned = workMin + longBreaks * longBreakDuration;
-
-    const count = todo.pomodoroCount;
-    let completed = 0;
-    if (count > 0) {
-      const cWorkMin = count * (workDuration + shortBreakDuration) - shortBreakDuration;
-      const cLongBreaks = Math.floor(count / N);
-      completed = cWorkMin + cLongBreaks * longBreakDuration;
-    }
+    const completedPomodoros = Math.max(0, Math.min(todo.pomodoroCount, plannedPomodoros));
+    const completedShortBreaks = Math.max(0, completedPomodoros - 1);
+    const completedLongBreaks = Math.max(0, Math.floor((completedPomodoros - 1) / longBreakInterval));
+    const completed = completedPomodoros * workDuration
+      + completedShortBreaks * shortBreakDuration
+      + completedLongBreaks * longBreakDuration;
 
     return { plannedMinutes: planned, completedMinutes: completed };
   }, [config, todo.pomodoroRounds, todo.pomodoroCount]);
 
-  const handleStartPomodoro = useCallback(() => {
+  const doStartPomodoro = useCallback(() => {
     linkToTodo(todo.id);
     startTimer(todo.id);
+    playNotificationSound();
     if (todo.status === 'pending') {
       updateTodo(todo.id, { status: 'in_progress' });
     }
-    setActiveView('pomodoro');
-  }, [todo.id, todo.status, linkToTodo, startTimer, updateTodo, setActiveView]);
+  }, [todo.id, todo.status, linkToTodo, startTimer, updateTodo]);
+
+  const handleStartPomodoro = useCallback(() => {
+    const isRunning = timer.status === 'running';
+    const linkedTodoId = timer.linkedTodoId;
+    const isRunningOnDifferentTodo = isRunning && linkedTodoId && linkedTodoId !== todo.id;
+
+    if (isRunningOnDifferentTodo) {
+      setShowOverrideConfirm(true);
+    } else if (todo.pomodoroCount > 0) {
+      setShowResetConfirm(true);
+    } else {
+      doStartPomodoro();
+    }
+  }, [todo.pomodoroCount, todo.id, timer.status, timer.linkedTodoId, doStartPomodoro]);
+
+  const handleConfirmReset = useCallback(() => {
+    resetTimer();
+    updateTodo(todo.id, { pomodoroCount: 0, totalFocusMinutes: 0 });
+    doStartPomodoro();
+  }, [todo.id, resetTimer, updateTodo, doStartPomodoro]);
+
+  const handleConfirmOverride = useCallback(() => {
+    resetTimer();
+    doStartPomodoro();
+  }, [resetTimer, doStartPomodoro]);
 
   const stickyColor = STICKY_COLORS[todo.priority] || STICKY_COLORS.medium;
 
@@ -107,23 +136,26 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
   }), [stickyColor]);
 
   const progressBarStyle = useMemo(() => ({
-    width: `${Math.min(100, (todo.pomodoroCount / todo.pomodoroRounds) * 100)}%`,
-    backgroundColor: todo.pomodoroCount >= todo.pomodoroRounds ? '#16a34a' : '#c87d2f',
-  }), [todo.pomodoroCount, todo.pomodoroRounds]);
+    width: `${totalPomodoros > 0 ? Math.min(100, (todo.pomodoroCount / totalPomodoros) * 100) : 0}%`,
+    backgroundColor: totalPomodoros > 0 && todo.pomodoroCount >= totalPomodoros ? '#16a34a' : '#c87d2f',
+  }), [todo.pomodoroCount, totalPomodoros]);
 
   return (
     <>
       <div
         data-todo-card
-        className={`group flex items-start gap-3 p-3 rounded-lg border transition-all cursor-default ${
+        className={`group relative flex items-start gap-3 p-3 rounded-lg border transition-all cursor-default ${
           todo.status === 'completed' ? 'opacity-50' : ''
-        } ${isDragging ? 'opacity-60 shadow-xl scale-[1.02] z-10' : 'hover:shadow-md'} ${isDropTarget ? 'ring-2 ring-[#c87d2f] ring-offset-1' : ''}`}
+        } ${isDragging ? 'opacity-60 shadow-xl scale-[1.02] z-10' : 'hover:shadow-md'}`}
         style={cardStyle}
         onDoubleClick={startInlineEdit}
         onDragOver={(e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          onDragOver?.(todo.id);
+          const rect = e.currentTarget.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          const position = e.clientY < midY ? 'top' : 'bottom';
+          onDragOver?.(todo.id, position);
         }}
         onDrop={(e) => {
           e.preventDefault();
@@ -138,21 +170,9 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
             e.dataTransfer.setData('text/plain', todo.id);
             const card = (e.target as HTMLElement).closest('[data-todo-card]') as HTMLElement;
             if (card) {
-              const clone = card.cloneNode(true) as HTMLElement;
-              clone.style.position = 'fixed';
-              clone.style.top = '-9999px';
-              clone.style.left = '-9999px';
-              clone.style.width = `${card.offsetWidth}px`;
-              clone.style.boxShadow = '0 12px 28px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.1)';
-              clone.style.transform = 'rotate(2deg) scale(1.03)';
-              clone.style.opacity = '0.92';
-              clone.style.zIndex = '9999';
-              clone.style.borderRadius = '12px';
-              document.body.appendChild(clone);
               const gripRect = (e.target as HTMLElement).getBoundingClientRect();
-              const offsetX = gripRect.left - card.getBoundingClientRect().left + gripRect.width / 2;
-              e.dataTransfer.setDragImage(clone, offsetX, 24);
-              requestAnimationFrame(() => document.body.removeChild(clone));
+              const cardRect = card.getBoundingClientRect();
+              e.dataTransfer.setDragImage(card, gripRect.left - cardRect.left + gripRect.width / 2, gripRect.top - cardRect.top + gripRect.height / 2);
             }
             onDragStart?.(todo.id);
           }}
@@ -161,10 +181,22 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
           <GripVertical size={14} />
         </div>
         <button
-          onClick={() => toggleTodoStatus(todo.id)}
+          onDoubleClick={() => toggleTodoStatus(todo.id)}
+          onMouseEnter={() => setToggleHover(true)}
+          onMouseLeave={() => setToggleHover(false)}
           className="mt-0.5 flex-shrink-0 hover:scale-110 transition-transform"
         >
-          {STATUS_ICONS[todo.status]}
+          {todo.status === 'pending' && (
+            <div className={`w-5 h-5 border-2 rounded-full transition-colors ${toggleHover ? 'border-[#c87d2f]' : 'border-[#d1cdc6]'}`} />
+          )}
+          {todo.status === 'in_progress' && (
+            <div className="w-5 h-5 border-2 border-[#c87d2f] rounded-full bg-[#fef7ed]" />
+          )}
+          {todo.status === 'completed' && (
+            <div className="w-5 h-5 bg-[#16a34a] rounded-full flex items-center justify-center">
+              <Check size={13} className="text-white" strokeWidth={3} />
+            </div>
+          )}
         </button>
 
         <div className="flex-1 min-w-0">
@@ -220,7 +252,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
                   <div className="h-full rounded-full transition-all" style={progressBarStyle} />
                 </div>
                 <span className="text-[10px] text-[#9ca3af] flex-shrink-0">
-                  {todo.pomodoroCount}/{todo.pomodoroRounds} 番茄
+                  {todo.pomodoroCount}/{totalPomodoros} 番茄
                 </span>
               </div>
               <div className="text-[10px] text-[#b8b4ac] mt-0.5">
@@ -232,7 +264,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
         </div>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {todo.status !== 'completed' && (
+          {todo.status !== 'completed' && todo.pomodoroRounds > 0 && (
             <button
               onClick={handleStartPomodoro}
               className="p-1.5 rounded-lg hover:bg-[#f0fdf4] text-[#9ca3af] hover:text-[#16a34a] transition-colors"
@@ -256,7 +288,33 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
             <Trash2 size={16} />
           </button>
         </div>
+        {isDropTarget && (
+          <div
+            className={`absolute left-2 right-2 h-0.5 bg-[#b8b4ac] rounded-full pointer-events-none ${
+              dropPosition === 'top' ? '-top-px' : '-bottom-px'
+            }`}
+            style={{ boxShadow: '0 0 4px rgba(184,180,172,0.4)' }}
+          />
+        )}
       </div>
+      <ConfirmDialog
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={handleConfirmReset}
+        title="重新开始番茄"
+        message={`该待办已完成 ${todo.pomodoroCount} 个番茄，确认重置并重新开始？`}
+        confirmText="重置并开始"
+        variant="warning"
+      />
+      <ConfirmDialog
+        isOpen={showOverrideConfirm}
+        onClose={() => setShowOverrideConfirm(false)}
+        onConfirm={handleConfirmOverride}
+        title="替换当前番茄钟"
+        message={`当前正在「${timer.linkedTodoId ? todos[timer.linkedTodoId]?.title || '其他待办' : '未关联待办'}」上专注，确认替换为「${todo.title}」？`}
+        confirmText="替换并开始"
+        variant="warning"
+      />
     </>
   );
 });

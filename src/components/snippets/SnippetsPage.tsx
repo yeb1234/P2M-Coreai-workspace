@@ -13,7 +13,7 @@ const MOCK_SNIPPETS = [
 export const SnippetsPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="代码片段"
         subtitle="收藏常用代码，快速复用"
         icon={<Code2 size={22} />}

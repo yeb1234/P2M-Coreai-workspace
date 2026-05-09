@@ -23,7 +23,7 @@ const WEEK_WEIGHT = [
 export const HealthPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="健康助手"
         subtitle="同步 P1 健康数据，关注身体状态"
         icon={<Heart size={22} />}

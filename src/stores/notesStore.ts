@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from '../lib/idbStorage';
 import { generateId } from '../lib/id';
 
 export type NoteColor = 'sticky-yellow' | 'sticky-pink' | 'sticky-blue' | 'sticky-green' | 'sticky-orange' | 'sticky-purple';
@@ -252,6 +253,7 @@ export const useNotesStore = create<NotesState>()(
     }),
     {
       name: 'p2m-notes-storage',
+      storage: createJSONStorage(() => idbStorage),
       partialize: (state) => ({ notes: state.notes }),
     }
   )

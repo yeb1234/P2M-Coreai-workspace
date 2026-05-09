@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, CheckCircle, Clock, Star, BookOpen, ChevronRight } from 'lucide-react';
+import { MessageSquare, CheckCircle, Star, BookOpen, ChevronRight } from 'lucide-react';
 import { PageTitle } from '../shared';
 
 const MOCK_QUESTIONS = [
@@ -18,7 +18,7 @@ const CATEGORIES = ['全部', 'JavaScript', 'React', 'CSS', '网络', '性能', 
 export const InterviewPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="面试鸭"
         subtitle="高频面试题库，模拟面试训练"
         icon={<MessageSquare size={22} />}

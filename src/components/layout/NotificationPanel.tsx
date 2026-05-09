@@ -44,12 +44,14 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
   // Reset position near content area right edge each time panel opens
   useEffect(() => {
     if (isOpen) {
-      const main = document.querySelector('main');
-      const rect = main?.getBoundingClientRect();
-      const rightEdge = rect ? rect.right : window.innerWidth - 60;
-      setPosition({
-        x: Math.max(16, rightEdge - 400),
-        y: 64,
+      queueMicrotask(() => {
+        const main = document.querySelector('main');
+        const rect = main?.getBoundingClientRect();
+        const rightEdge = rect ? rect.right : window.innerWidth - 60;
+        setPosition({
+          x: Math.max(16, rightEdge - 400),
+          y: 64,
+        });
       });
     }
   }, [isOpen]);

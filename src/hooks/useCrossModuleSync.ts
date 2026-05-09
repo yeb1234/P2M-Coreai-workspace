@@ -6,7 +6,6 @@ import { toLocalDateString } from '../lib/date';
 
 export const useCrossModuleSync = () => {
   const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
-  const prevStatusRef = useRef<string>('idle');
 
   // Restore timer on app load (adjust for elapsed time while page was closed)
   useEffect(() => {
@@ -93,7 +92,7 @@ export const useCrossModuleSync = () => {
       if (!sessions) return;
 
       const pending = Object.values(sessions as Record<string, PomodoroSession>).filter(
-        (s) => s.completed && s.todoId && !s.calendarEventId
+        (s) => s.completed && s.phase === 'work' && s.todoId && !s.calendarEventId
       );
 
       if (pending.length === 0) return;

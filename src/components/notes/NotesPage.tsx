@@ -93,7 +93,7 @@ export const NotesPage: React.FC = () => {
   const renderCard = (note: Note) => {
     if (editingId === note.id) {
       return (
-        <div key={note.id} className={`${note.color} rounded-xl p-4 col-span-1 sm:col-span-2 lg:col-span-2`}>
+        <div key={note.id} className={`${editColor} rounded-xl p-4 col-span-1 sm:col-span-2 lg:col-span-2`}>
           <input
             type="text"
             value={editTitle}
@@ -113,7 +113,7 @@ export const NotesPage: React.FC = () => {
               {COLORS.map((c) => (
                 <button
                   key={c.value}
-                  onClick={() => setEditColor(c.value)}
+                  onClick={() => { setEditColor(c.value); if (editingId) updateNote(editingId, { color: c.value }); }}
                   className={`w-4 h-4 rounded-full border-2 transition-all ${editColor === c.value ? 'border-[#1a1a1a] scale-110' : 'border-transparent'}`}
                   style={{ backgroundColor: COLOR_DOT[c.value] }}
                   title={c.label}

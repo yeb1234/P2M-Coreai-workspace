@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, CalendarDays } from 'lucide-react';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarGrid } from './CalendarGrid';
@@ -68,7 +68,21 @@ export const CalendarPage: React.FC = () => {
 
 const SelectedDateEvents: React.FC = () => {
   const { selectedDate, getEventsForDate } = useCalendarStore();
-  const events = selectedDate ? getEventsForDate(selectedDate) : [];
+  const todos = useTodoStore((s) => s.todos);
+  const completedTodoSet = useMemo(() => {
+    const completed = Object.values(todos).filter((t) => t.status === 'completed');
+    return {
+      ids: new Set(completed.map((t) => t.id)),
+      titles: new Set(completed.map((t) => t.title)),
+    };
+  }, [todos]);
+  const allEvents = selectedDate ? getEventsForDate(selectedDate) : [];
+  const events = allEvents.filter((e) => {
+    if (e.type !== 'todo') return true;
+    if (e.todoId && completedTodoSet.ids.has(e.todoId)) return false;
+    if (!e.todoId && completedTodoSet.titles.has(e.title)) return false;
+    return true;
+  });
 
   if (!selectedDate || events.length === 0) return null;
 

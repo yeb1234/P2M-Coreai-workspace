@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Download, Star, GitBranch, Package, ExternalLink } from 'lucide-react';
+import { Search, Download, Star, Package, ExternalLink } from 'lucide-react';
 import { PageTitle } from '../shared';
 
 const MOCK_PACKAGES = [
@@ -14,7 +14,7 @@ const MOCK_PACKAGES = [
 export const OpenClawPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="OpenClaw"
         subtitle="开源包搜索、对比、下载管理"
         icon={<Package size={22} />}

@@ -24,7 +24,7 @@ const MOCK_COMPARE = [
 export const ComparePage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="产品对比"
         subtitle="技术选型一目了然"
         icon={<GitCompare size={22} />}

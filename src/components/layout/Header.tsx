@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { Bell, Settings, Clock } from 'lucide-react';
-import { usePomodoroStore, useTodoStore, useUIStore, useNotificationStore } from '../../stores';
+import { Bell, Settings, Clock, LogOut, Bot } from 'lucide-react';
+import { usePomodoroStore, useTodoStore, useUIStore, useNotificationStore, useAuthStore, useAIStore } from '../../stores';
 import { NotificationPanel } from './NotificationPanel';
 import { toLocalDateString } from '../../lib/date';
 
@@ -33,6 +33,10 @@ export const Header: React.FC = () => {
   const todos = useTodoStore((s) => s.todos);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const notifications = useNotificationStore((s) => s.notifications);
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const logout = useAuthStore((s) => s.logout);
+  const chatOpen = useAIStore((s) => s.chatOpen);
+  const toggleChat = useAIStore((s) => s.toggleChat);
 
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -68,17 +72,34 @@ export const Header: React.FC = () => {
           <LiveClock />
 
           <div className="flex items-center gap-6 text-sm">
-            <div className="flex items-center gap-2 text-[#6b7280]">
+            <button
+              onClick={() => setActiveView('todo')}
+              className="flex items-center gap-2 text-[#6b7280] hover:text-[#1a1a1a] transition-colors"
+            >
               <span className="text-[#c87d2f] font-medium">{pendingTodos}</span>
               <span>待办</span>
-            </div>
-            <div className="flex items-center gap-2 text-[#6b7280]">
+            </button>
+            <button
+              onClick={() => setActiveView('pomodoro')}
+              className="flex items-center gap-2 text-[#6b7280] hover:text-[#1a1a1a] transition-colors"
+            >
               <span className="text-[#16a34a] font-medium">{todaySessions.length}</span>
               <span>今日番茄</span>
-            </div>
+            </button>
           </div>
 
           <div className="flex items-center gap-1">
+            <button
+              onClick={toggleChat}
+              className={`p-2 rounded-lg transition-colors relative ${
+                chatOpen
+                  ? 'text-[#c87d2f] bg-[#fef7ed]'
+                  : 'text-[#6b7280] hover:text-[#1a1a1a] hover:bg-[#f3f2ef]'
+              }`}
+              title={chatOpen ? '关闭 AI 助手' : '打开 AI 助手'}
+            >
+              <Bot size={18} />
+            </button>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="p-2 text-[#6b7280] hover:text-[#1a1a1a] hover:bg-[#f3f2ef] rounded-lg transition-colors relative"
@@ -97,6 +118,19 @@ export const Header: React.FC = () => {
               <Settings size={18} />
             </button>
           </div>
+
+          {currentUser && (
+            <div className="flex items-center gap-2 pl-2 border-l border-[#e5e2dd]">
+              <span className="text-xs font-medium text-[#8b7355]">{currentUser}</span>
+              <button
+                onClick={logout}
+                className="p-1.5 text-[#b8b4ac] hover:text-[#dc3545] rounded-lg transition-colors"
+                title="退出登录"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <NotificationPanel isOpen={showNotifications} onClose={() => setShowNotifications(false)} />

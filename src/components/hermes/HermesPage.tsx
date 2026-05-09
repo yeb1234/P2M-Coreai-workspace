@@ -24,7 +24,7 @@ const RESULT_MAP: Record<string, { icon: React.ReactNode; color: string }> = {
 export const HermesPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="Hermes"
         subtitle="工作流自动化编排引擎"
         icon={<Workflow size={22} />}

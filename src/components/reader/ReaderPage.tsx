@@ -14,7 +14,7 @@ const MOCK_ARTICLES = [
 export const ReaderPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="阅读器"
         subtitle="收藏文章，离线阅读，标记重点"
         icon={<BookOpen size={22} />}

@@ -61,7 +61,7 @@ export function playTickSound(): void {
 
     osc.start(now);
     osc.stop(now + 0.05);
-  } catch (e) {
+  } catch {
     // Silent fail for tick
   }
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Calendar, Users, TrendingUp, Clock, MapPin } from 'lucide-react';
+import { Trophy, Calendar, Users, TrendingUp, Clock } from 'lucide-react';
 import { PageTitle } from '../shared';
 
 const MOCK_MATCHES = [
@@ -21,7 +21,7 @@ const MOCK_STANDINGS = [
 export const EsportsPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="赛事数据"
         subtitle="实时赛况、战队排名、数据分析"
         icon={<Trophy size={22} />}

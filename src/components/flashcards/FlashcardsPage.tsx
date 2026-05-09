@@ -13,7 +13,7 @@ const MOCK_DECKS = [
 export const FlashcardsPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="闪卡记忆"
         subtitle="间隔重复，高效记忆"
         icon={<Layers size={22} />}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Code, CheckCircle, Clock, Flame, Target, TrendingUp, Filter } from 'lucide-react';
+import { Code, CheckCircle, Flame, Target, TrendingUp, Filter } from 'lucide-react';
 import { PageTitle } from '../shared';
 
 const MOCK_PROBLEMS = [
@@ -22,7 +22,7 @@ const DIFF_COLOR: Record<string, string> = {
 export const LeetcodePage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="LeetCode"
         subtitle="刷题训练，算法提升"
         icon={<Code size={22} />}

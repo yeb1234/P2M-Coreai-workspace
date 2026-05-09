@@ -1,50 +1,55 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { ListTodo, Calendar, Timer, ChevronLeft, ChevronRight, LayoutDashboard, PlayCircle, StickyNote, BarChart3, RotateCcw, BookOpen, Code2, Target, Layers, Bookmark, Heart, GitCompare, ShoppingCart, Trophy, Coins, MessageSquare, Compass, Bot, Package, Workflow } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Eye, RefreshCw, X, GripVertical } from 'lucide-react';
 import { useUIStore, usePomodoroStore } from '../../stores';
+import { PAGE_MAP } from '../../config/pageRegistry';
 import type { ActiveView } from '../../stores/uiStore';
 
-const NAV_META: Record<ActiveView, { label: string; icon: React.ReactNode; color: string }> = {
-  dashboard: { label: '工作台', icon: <LayoutDashboard size={20} />, color: 'text-[#c87d2f]' },
-  todo: { label: '待办事项', icon: <ListTodo size={20} />, color: 'text-[#2563eb]' },
-  calendar: { label: '日历', icon: <Calendar size={20} />, color: 'text-[#7c3aed]' },
-  notes: { label: '笔记', icon: <StickyNote size={20} />, color: 'text-[#f59e0b]' },
-  pomodoro: { label: '番茄钟', icon: <Timer size={20} />, color: 'text-[#16a34a]' },
-  video: { label: '视频站', icon: <PlayCircle size={20} />, color: 'text-[#ec4899]' },
-  stats: { label: '数据中心', icon: <BarChart3 size={20} />, color: 'text-[#06b6d4]' },
-  reader: { label: '阅读器', icon: <BookOpen size={20} />, color: 'text-[#2563eb]' },
-  snippets: { label: '代码片段', icon: <Code2 size={20} />, color: 'text-[#8b5cf6]' },
-  habits: { label: '习惯追踪', icon: <Target size={20} />, color: 'text-[#16a34a]' },
-  flashcards: { label: '闪卡记忆', icon: <Layers size={20} />, color: 'text-[#f59e0b]' },
-  bookmarks: { label: '书签收藏', icon: <Bookmark size={20} />, color: 'text-[#06b6d4]' },
-  health: { label: '健康助手', icon: <Heart size={20} />, color: 'text-[#ec4899]' },
-  compare: { label: '产品对比', icon: <GitCompare size={20} />, color: 'text-[#06b6d4]' },
-  shop: { label: '电商中心', icon: <ShoppingCart size={20} />, color: 'text-[#f59e0b]' },
-  esports: { label: '赛事数据', icon: <Trophy size={20} />, color: 'text-[#f59e0b]' },
-  tokens: { label: 'Token 用量', icon: <Coins size={20} />, color: 'text-[#c87d2f]' },
-  leetcode: { label: 'LeetCode', icon: <Code2 size={20} />, color: 'text-[#f59e0b]' },
-  interview: { label: '面试鸭', icon: <MessageSquare size={20} />, color: 'text-[#ec4899]' },
-  codenav: { label: '编程导航', icon: <Compass size={20} />, color: 'text-[#2563eb]' },
-  aiagent: { label: 'AI 智能体', icon: <Bot size={20} />, color: 'text-[#8b5cf6]' },
-  openclaw: { label: 'OpenClaw', icon: <Package size={20} />, color: 'text-[#dc3545]' },
-  hermes: { label: 'Hermes', icon: <Workflow size={20} />, color: 'text-[#c87d2f]' },
-};
-
 const HEADER_STYLE = { height: '56px' };
+const COLLAPSED_WIDTH = 64;
 
 export const Sidebar: React.FC = () => {
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
   const navOrder = useUIStore((s) => s.navOrder);
   const reorderNav = useUIStore((s) => s.reorderNav);
   const resetNavOrder = useUIStore((s) => s.resetNavOrder);
+  const hiddenNavItems = useUIStore((s) => s.hiddenNavItems);
+  const hideNav = useUIStore((s) => s.hideNav);
+  const showNav = useUIStore((s) => s.showNav);
+  const showAllNav = useUIStore((s) => s.showAllNav);
   const timerStatus = usePomodoroStore((s) => s.timer.status);
   const timerTimeRemaining = usePomodoroStore((s) => s.timer.timeRemaining);
 
   const [dragId, setDragId] = useState<ActiveView | null>(null);
   const [overId, setOverId] = useState<ActiveView | null>(null);
+  const [showRestorePanel, setShowRestorePanel] = useState(false);
   const dragRef = useRef<HTMLDivElement>(null);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    if (!sidebarOpen) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMove = (event: MouseEvent) => {
+      setSidebarWidth(startWidth + event.clientX - startX);
+    };
+    const handleUp = () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [setSidebarWidth, sidebarOpen, sidebarWidth]);
 
   const handleDragStart = useCallback((e: React.DragEvent, id: ActiveView) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -60,13 +65,11 @@ export const Sidebar: React.FC = () => {
     clone.style.position = 'absolute';
     clone.style.top = '-9999px';
     clone.style.borderRadius = '8px';
-    clone.style.background = '#faf9f7';
+    clone.style.background = 'var(--bg-card)';
     document.body.appendChild(clone);
 
     const rect = el.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
-    e.dataTransfer.setDragImage(clone, offsetX, offsetY);
+    e.dataTransfer.setDragImage(clone, e.clientX - rect.left, e.clientY - rect.top);
 
     requestAnimationFrame(() => {
       document.body.removeChild(clone);
@@ -76,16 +79,12 @@ export const Sidebar: React.FC = () => {
   const handleDragOver = useCallback((e: React.DragEvent, id: ActiveView) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (dragId && dragId !== id) {
-      setOverId(id);
-    }
+    if (dragId && dragId !== id) setOverId(id);
   }, [dragId]);
 
   const handleDrop = useCallback((e: React.DragEvent, id: ActiveView) => {
     e.preventDefault();
-    if (dragId && dragId !== id) {
-      reorderNav(dragId, id);
-    }
+    if (dragId && dragId !== id) reorderNav(dragId, id);
     setDragId(null);
     setOverId(null);
   }, [dragId, reorderNav]);
@@ -96,26 +95,24 @@ export const Sidebar: React.FC = () => {
   }, []);
 
   const handleClick = useCallback((id: ActiveView) => {
-    if (!dragId) {
-      setActiveView(id);
-    }
+    if (!dragId) setActiveView(id);
   }, [dragId, setActiveView]);
 
   return (
     <aside
-      className={`bg-gradient-to-b from-[#faf9f7] to-[#f5f3ef] border-r border-[#e5e2dd] transition-all duration-300 relative ${
-        sidebarOpen ? 'w-52' : 'w-16'
-      }`}
+      className="theme-sidebar border-r transition-[width] duration-200 relative shrink-0"
+      style={{ width: sidebarOpen ? sidebarWidth : COLLAPSED_WIDTH }}
     >
       <div className="flex flex-col h-full">
         <div className="px-2 pb-1 flex items-center gap-1" style={HEADER_STYLE}>
           <button
             onClick={toggleSidebar}
-            className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed] transition-all"
+            className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] transition-all"
+            title={sidebarOpen ? '收起左侧栏' : '展开左侧栏'}
           >
             {sidebarOpen ? (
               <>
-                <span className="text-sm font-bold text-[#c87d2f] tracking-wider">灵境</span>
+                <span className="text-sm font-bold text-[var(--accent)] tracking-wider">灵境</span>
                 <ChevronLeft size={16} />
               </>
             ) : (
@@ -123,19 +120,32 @@ export const Sidebar: React.FC = () => {
             )}
           </button>
           {sidebarOpen && (
-            <button
-              onClick={resetNavOrder}
-              className="p-1.5 rounded-lg text-[#b8b4ac] hover:text-[#c87d2f] hover:bg-[#fef7ed] transition-all"
-              title="重置顺序"
-            >
-              <RotateCcw size={14} />
-            </button>
+            <>
+              <button
+                onClick={resetNavOrder}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] transition-all"
+                title="重置顺序"
+              >
+                <RotateCcw size={14} />
+              </button>
+              <button
+                onClick={() => setShowRestorePanel((v) => !v)}
+                className={`p-1.5 rounded-lg transition-all ${
+                  showRestorePanel
+                    ? 'text-[var(--accent)] bg-[var(--accent-bg)]'
+                    : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)]'
+                }`}
+                title="恢复隐藏插件"
+              >
+                <Eye size={14} />
+              </button>
+            </>
           )}
         </div>
 
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto min-h-0">
-          {navOrder.map((id) => {
-            const meta = NAV_META[id];
+          {navOrder.filter((id) => !hiddenNavItems.includes(id)).map((id) => {
+            const meta = PAGE_MAP[id];
             if (!meta) return null;
             const isDragging = dragId === id;
             const isDropTarget = overId === id && dragId !== id;
@@ -143,39 +153,89 @@ export const Sidebar: React.FC = () => {
             return (
               <div
                 key={id}
+                ref={dragRef}
                 draggable
                 onDragStart={(e) => handleDragStart(e, id)}
                 onDragOver={(e) => handleDragOver(e, id)}
                 onDrop={(e) => handleDrop(e, id)}
                 onDragEnd={handleDragEnd}
                 onClick={() => handleClick(id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer select-none ${
+                className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer select-none ${
                   isDragging ? 'opacity-30' : ''
-                } ${isDropTarget ? 'ring-2 ring-[#c87d2f] ring-offset-1' : ''} ${
+                } ${isDropTarget ? 'ring-2 ring-[var(--accent)] ring-offset-1' : ''} ${
                   activeView === id
-                    ? 'bg-[#fef7ed] text-[#1a1a1a]'
-                    : 'text-[#6b7280] hover:bg-[#f3f2ef] hover:text-[#1a1a1a]'
+                    ? 'bg-[var(--accent-bg)] text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 <span className={activeView === id ? meta.color : ''}>
                   {meta.icon}
                 </span>
                 {sidebarOpen && (
-                  <span className="text-sm font-medium">{meta.label}</span>
+                  <span className="text-sm font-medium truncate">
+                    {meta.label}
+                    {meta.dev && <span className="ml-1 text-[10px] text-[var(--accent)] opacity-70">开发中</span>}
+                  </span>
                 )}
                 {id === 'pomodoro' && timerStatus === 'running' && (
-                  <span className="ml-auto w-2 h-2 bg-[#16a34a] rounded-full animate-pulse" />
+                  <span className="ml-auto w-2 h-2 bg-[var(--success)] rounded-full animate-pulse" />
+                )}
+                {sidebarOpen && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); hideNav(id); }}
+                    className="ml-auto p-0.5 rounded opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] transition-all"
+                    title="隐藏"
+                  >
+                    <X size={12} />
+                  </button>
                 )}
               </div>
             );
           })}
         </nav>
 
+        {sidebarOpen && showRestorePanel && hiddenNavItems.length > 0 && (
+          <div className="px-3 py-2 border-t border-[var(--border-light)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-[var(--text-muted)]">已隐藏插件</span>
+              <button
+                onClick={showAllNav}
+                className="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors flex items-center gap-1"
+              >
+                <RefreshCw size={10} />
+                全部恢复
+              </button>
+            </div>
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {hiddenNavItems.map((id) => {
+                const meta = PAGE_MAP[id];
+                if (!meta) return null;
+                return (
+                  <div key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--bg-elevated)] transition-colors">
+                    <span className="text-[var(--text-muted)]">{meta.icon}</span>
+                    <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">
+                      {meta.label}
+                      {meta.dev && <span className="ml-1 text-[10px] opacity-70">开发中</span>}
+                    </span>
+                    <button
+                      onClick={() => showNav(id)}
+                      className="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+                      title="恢复"
+                    >
+                      <Eye size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {sidebarOpen && timerStatus === 'running' && (
-          <div className="p-3 border-t border-[#e5e2dd]">
-            <div className="px-3 py-2 bg-[#f0fdf4] rounded-lg">
-              <p className="text-xs text-[#16a34a] font-medium">专注进行中</p>
-              <p className="text-lg font-bold text-[#15803d] font-mono">
+          <div className="p-3 border-t border-[var(--border-light)]">
+            <div className="px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-card))]">
+              <p className="text-xs text-[var(--success)] font-medium">专注进行中</p>
+              <p className="text-lg font-bold text-[var(--success)] font-mono">
                 {Math.floor(timerTimeRemaining / 60).toString().padStart(2, '0')}:
                 {(timerTimeRemaining % 60).toString().padStart(2, '0')}
               </p>
@@ -183,6 +243,17 @@ export const Sidebar: React.FC = () => {
           </div>
         )}
       </div>
+
+      {sidebarOpen && (
+        <button
+          type="button"
+          onMouseDown={handleResizeStart}
+          className="absolute top-0 right-[-5px] h-full w-2 cursor-col-resize text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)]/60 transition-colors"
+          title="拖动调整左侧栏宽度"
+        >
+          <GripVertical size={12} className="absolute top-1/2 -translate-y-1/2 right-[-2px]" />
+        </button>
+      )}
     </aside>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import { useCalendarStore } from '../../stores';
+import { useCalendarStore, useTodoStore } from '../../stores';
 import { getMonthDays, getWeekDayNames, isCurrentMonth, toISODateString } from '../../lib/date';
 import { DayCell } from './DayCell';
 import { WeekView } from './WeekView';
@@ -10,35 +10,50 @@ interface CalendarGridProps {
 }
 
 export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) => {
-  const currentMonth = useCalendarStore((s) => s.currentMonth);
+  const rawMonth = useCalendarStore((s) => s.currentMonth);
+  const currentMonth = rawMonth instanceof Date ? rawMonth : new Date(rawMonth);
   const currentView = useCalendarStore((s) => s.currentView);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
   const getEventsForMonth = useCalendarStore((s) => s.getEventsForMonth);
   const getPomodoroHeatMap = useCalendarStore((s) => s.getPomodoroHeatMap);
+  const todos = useTodoStore((s) => s.todos);
 
-  if (currentView === 'week') {
-    return <WeekView />;
-  }
+  // Hooks must be called BEFORE any early returns (Rules of Hooks)
+  const completedTodoSet = useMemo(() => {
+    const completed = Object.values(todos).filter((t) => t.status === 'completed');
+    return {
+      ids: new Set(completed.map((t) => t.id)),
+      titles: new Set(completed.map((t) => t.title)),
+    };
+  }, [todos]);
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
 
-  const days = getMonthDays(currentMonth);
-  const weekDays = getWeekDayNames();
-  const events = getEventsForMonth(year, month);
-  const heatMap = getPomodoroHeatMap(year, month);
+  const rawEvents = getEventsForMonth(year, month);
 
-  const eventsByDate = useMemo(() => {
-    const map: Record<string, CalendarEvent[]> = {};
-    events.forEach((event) => {
-      if (!map[event.date]) map[event.date] = [];
-      map[event.date].push(event);
-    });
-    return map;
-  }, [events]);
+  const eventsByDate: Record<string, CalendarEvent[]> = {};
+  rawEvents.forEach((event) => {
+    if (event.type === 'pomodoro') return;
+    if (event.type === 'todo') {
+      if (event.todoId && completedTodoSet.ids.has(event.todoId)) return;
+      if (!event.todoId && completedTodoSet.titles.has(event.title)) return;
+    }
+    if (!eventsByDate[event.date]) eventsByDate[event.date] = [];
+    eventsByDate[event.date].push(event);
+  });
 
   const handleEventClick = useCallback(() => {}, []);
+
+  // Now safe to branch
+  if (currentView === 'week') {
+    return <WeekView />;
+  }
+
+  const days = getMonthDays(currentMonth);
+  const weekDays = getWeekDayNames();
+  const heatMap = getPomodoroHeatMap(year, month);
 
   return (
     <div>

@@ -4,7 +4,11 @@ import { formatDate, getNextMonth, getPrevMonth, getNextWeek, getPrevWeek, getWe
 import { useCalendarStore } from '../../stores';
 
 export const CalendarToolbar: React.FC = () => {
-  const { currentMonth, setCurrentMonth, currentView, setView } = useCalendarStore();
+  const rawMonth = useCalendarStore((s) => s.currentMonth);
+  const currentMonth = rawMonth instanceof Date ? rawMonth : new Date(rawMonth);
+  const setCurrentMonth = useCalendarStore((s) => s.setCurrentMonth);
+  const currentView = useCalendarStore((s) => s.currentView);
+  const setView = useCalendarStore((s) => s.setView);
 
   const isWeek = currentView === 'week';
 

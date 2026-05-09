@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from '../lib/idbStorage';
 import type { CalendarEvent, CalendarViewType, ID, ISODateString } from '../types';
 import { generateId } from '../lib/id';
 import { toISODateTimeString } from '../lib/date';
@@ -108,9 +109,20 @@ export const useCalendarStore = create<CalendarState>()(
     }),
     {
       name: 'p2m-calendar-storage',
+      storage: createJSONStorage(() => idbStorage),
       partialize: (state) => ({
         events: state.events,
       }),
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<CalendarState>;
+        return {
+          ...current,
+          ...saved,
+          currentMonth: new Date(),
+          currentView: current.currentView,
+          selectedDate: null,
+        };
+      },
     }
   )
 );

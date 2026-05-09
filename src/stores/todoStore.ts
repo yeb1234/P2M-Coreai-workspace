@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from '../lib/idbStorage';
 import type { Todo, TodoTag, TodoPriority, TodoStatus, ID, ISODateString } from '../types';
 import { generateId } from '../lib/id';
 import { toISODateTimeString } from '../lib/date';
@@ -95,7 +96,7 @@ export const useTodoStore = create<TodoState>()(
         set((state) => ({
           todos: { ...state.todos, [id]: todo },
           todoOrder: [...state.todoOrder, id],
-          undoStack: [...state.undoStack, { type: 'create', id }].slice(-50),
+          undoStack: [...state.undoStack, { type: 'create' as const, id }].slice(-50),
           redoStack: [],
         }));
         return id;
@@ -125,7 +126,7 @@ export const useTodoStore = create<TodoState>()(
             todos,
             todoOrder: state.todoOrder.filter((oid) => oid !== id),
             trash: { ...state.trash, [id]: { todo, deletedAt: now() } },
-            undoStack: [...state.undoStack, { type: 'delete', todo, orderIndex }].slice(-50),
+            undoStack: [...state.undoStack, { type: 'delete' as const, todo, orderIndex }].slice(-50),
             redoStack: [],
           };
         });
@@ -141,7 +142,7 @@ export const useTodoStore = create<TodoState>()(
             todos: { ...state.todos, [id]: trashed.todo },
             todoOrder: [...state.todoOrder, id],
             trash,
-            undoStack: [...state.undoStack, { type: 'restore', id }].slice(-50),
+            undoStack: [...state.undoStack, { type: 'restore' as const, id }].slice(-50),
             redoStack: [],
           };
         });
@@ -177,9 +178,9 @@ export const useTodoStore = create<TodoState>()(
             redoStack: [...state.redoStack, action],
           });
         } else if (action.type === 'delete') {
-          const { todo, orderIndex } = action;
+          const { todo } = action;
           const todoOrder = [...state.todoOrder];
-          todoOrder.splice(orderIndex, 0, todo.id);
+          todoOrder.splice(action.orderIndex, 0, todo.id);
           const trash = { ...state.trash };
           delete trash[todo.id];
           set({
@@ -222,7 +223,7 @@ export const useTodoStore = create<TodoState>()(
             redoStack,
           });
         } else if (action.type === 'delete') {
-          const { todo, orderIndex } = action;
+          const { todo } = action;
           const todos = { ...state.todos };
           delete todos[todo.id];
           set({
@@ -304,13 +305,17 @@ export const useTodoStore = create<TodoState>()(
         set((state) => {
           const todo = state.todos[todoId];
           if (!todo) return state;
+          const nextCount = todo.pomodoroCount + 1;
+          const targetCount = Math.max(0, todo.pomodoroRounds || 0);
+          const reachedTarget = targetCount > 0 && nextCount >= targetCount;
           return {
             todos: {
               ...state.todos,
               [todoId]: {
                 ...todo,
-                pomodoroCount: todo.pomodoroCount + 1,
+                pomodoroCount: nextCount,
                 totalFocusMinutes: todo.totalFocusMinutes + focusMinutes,
+                status: reachedTarget ? 'completed' : 'in_progress',
                 updatedAt: now(),
               },
             },
@@ -383,6 +388,7 @@ export const useTodoStore = create<TodoState>()(
     }),
     {
       name: 'p2m-todo-storage',
+      storage: createJSONStorage(() => idbStorage),
       partialize: (state) => ({
         todos: state.todos,
         tags: state.tags,

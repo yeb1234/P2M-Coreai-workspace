@@ -15,7 +15,7 @@ const WEEK = ['一', '二', '三', '四', '五', '六', '日'];
 export const HabitsPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="习惯追踪"
         subtitle="每日打卡，养成好习惯"
         icon={<Target size={22} />}

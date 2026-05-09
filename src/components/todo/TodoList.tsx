@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Plus, ListTodo, CheckSquare, Trash2, RotateCcw, RotateCw, Undo2, X } from 'lucide-react';
+import { Plus, ListTodo, CheckSquare, Trash2, RotateCcw, RotateCw, Undo2, X, SlidersHorizontal, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTodoStore } from '../../stores';
 import { TodoItem } from './TodoItem';
 import { TodoForm } from './TodoForm';
@@ -94,9 +94,9 @@ const InlineAddInput: React.FC = () => {
 export const TodoList: React.FC = () => {
   // Subscribe to raw data so component re-renders on changes
   const todos = useTodoStore((s) => s.todos);
-  const todoOrder = useTodoStore((s) => s.todoOrder);
-  const filter = useTodoStore((s) => s.filter);
-  const trash = useTodoStore((s) => s.trash);
+  useTodoStore((s) => s.todoOrder);
+  useTodoStore((s) => s.filter);
+  useTodoStore((s) => s.trash);
   const getFilteredTodos = useTodoStore((s) => s.getFilteredTodos);
   const getTrashedTodos = useTodoStore((s) => s.getTrashedTodos);
   const reorderTodos = useTodoStore((s) => s.reorderTodos);
@@ -115,9 +115,13 @@ export const TodoList: React.FC = () => {
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
+  const [showToolbar, setShowToolbar] = useState(true);
+  const [collapsedTrash, setCollapsedTrash] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'top' | 'bottom'>('bottom');
   const trashRef = useRef<HTMLDivElement>(null);
+  const [collapsedFilters, setCollapsedFilters] = useState(false);
 
   // Call getters now that we subscribe to the underlying data
   const filteredTodos = getFilteredTodos();
@@ -128,7 +132,8 @@ export const TodoList: React.FC = () => {
 
   useEffect(() => {
     if (pendingTodoDate) {
-      setShowForm(true);
+      const openForm = setTimeout(() => setShowForm(true), 0);
+      return () => clearTimeout(openForm);
     }
   }, [pendingTodoDate]);
 
@@ -186,6 +191,13 @@ export const TodoList: React.FC = () => {
         action={
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowToolbar(!showToolbar)}
+              className={`p-2 rounded-lg transition-colors ${showToolbar ? 'text-[#c87d2f] bg-[#fef7ed]' : 'text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed]'}`}
+              title="筛选/统计"
+            >
+              <SlidersHorizontal size={16} />
+            </button>
+            <button
               onClick={undo}
               className="p-2 text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
               title="撤销 (Ctrl+Z)"
@@ -224,18 +236,45 @@ export const TodoList: React.FC = () => {
         }
       />
 
-      <TodoFilters />
+      {showToolbar && (
+        <TodoFilters
+          collapsed={collapsedFilters}
+          onToggle={() => setCollapsedFilters(!collapsedFilters)}
+        >
+          {(() => {
+            const today = new Date().toISOString().slice(0, 10);
+            const allTodos = Object.values(todos);
+            const todayTodos = allTodos.filter((t) => t.dueDate === today && t.pomodoroRounds > 0);
+            if (todayTodos.length === 0) return null;
+            const totalRounds = todayTodos.reduce((s, t) => s + t.pomodoroRounds, 0);
+            const completedRounds = todayTodos.reduce((s, t) => s + Math.min(t.pomodoroCount, t.pomodoroRounds), 0);
+            return (
+              <div className="flex items-center gap-3 px-3 py-2 bg-[#fef7ed] border border-[#e5e2dd] rounded-lg text-xs mt-1">
+                <span className="text-[#c87d2f] font-medium">今日待办番茄</span>
+                <span className="text-[#1a1a1a] font-bold">{completedRounds}/{totalRounds}</span>
+                <div className="flex-1 h-1.5 bg-[#e5e2dd] rounded-full overflow-hidden">
+                  <div className="h-full bg-[#c87d2f] rounded-full transition-all" style={{ width: `${Math.min(100, (completedRounds / totalRounds) * 100)}%` }} />
+                </div>
+              </div>
+            );
+          })()}
+        </TodoFilters>
+      )}
 
       {showTrash && (
         <div ref={trashRef} className="border border-[#e5e2dd] rounded-lg bg-[#f8f6f2] overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-[#e5e2dd]">
+          <button
+            onClick={() => setCollapsedTrash(!collapsedTrash)}
+            className="w-full flex items-center justify-between px-3 py-2 border-b border-[#e5e2dd]"
+          >
             <div className="flex items-center gap-2">
+              {collapsedTrash ? <ChevronRight size={14} className="text-[#dc3545]" /> : <ChevronDown size={14} className="text-[#dc3545]" />}
               <Trash2 size={14} className="text-[#dc3545]" />
               <span className="text-sm font-medium text-[#1a1a1a]">垃圾箱</span>
               <span className="text-xs text-[#9ca3af]">({trashedTodos.length})</span>
             </div>
-            <div className="flex items-center gap-1">
-              {trashedTodos.length > 0 && (
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              {trashedTodos.length > 0 && !collapsedTrash && (
                 <button
                   onClick={clearTrash}
                   className="text-xs text-[#9ca3af] hover:text-[#dc3545] transition-colors px-2 py-1"
@@ -250,38 +289,40 @@ export const TodoList: React.FC = () => {
                 <X size={14} />
               </button>
             </div>
-          </div>
-          {trashedTodos.length === 0 ? (
-            <div className="text-center py-6 text-[#9ca3af] text-sm">垃圾箱为空</div>
-          ) : (
-            <div className="max-h-60 overflow-y-auto divide-y divide-[#e5e2dd]">
-              {trashedTodos.map(({ todo, deletedAt }) => (
-                <div key={todo.id} className="flex items-center gap-3 px-3 py-2 hover:bg-[#fef7ed] transition-colors">
-                  <div
-                    className="w-3 h-3 rounded-sm flex-shrink-0"
-                    style={{ backgroundColor: PRIORITY_COLORS[todo.priority] }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm text-[#1a1a1a] truncate block">{todo.title}</span>
-                    <span className="text-[10px] text-[#b8b4ac]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
+          </button>
+          {!collapsedTrash && (
+            trashedTodos.length === 0 ? (
+              <div className="text-center py-6 text-[#9ca3af] text-sm">垃圾箱为空</div>
+            ) : (
+              <div className="max-h-60 overflow-y-auto divide-y divide-[#e5e2dd]">
+                {trashedTodos.map(({ todo, deletedAt }) => (
+                  <div key={todo.id} className="flex items-center gap-3 px-3 py-2 hover:bg-[#fef7ed] transition-colors">
+                    <div
+                      className="w-3 h-3 rounded-sm flex-shrink-0"
+                      style={{ backgroundColor: PRIORITY_COLORS[todo.priority] }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-[#1a1a1a] truncate block">{todo.title}</span>
+                      <span className="text-[10px] text-[#b8b4ac]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
+                    </div>
+                    <button
+                      onClick={() => restoreTodo(todo.id)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-[#c87d2f] hover:bg-[#fef7ed] rounded transition-colors"
+                    >
+                      <RotateCcw size={12} />
+                      恢复
+                    </button>
+                    <button
+                      onClick={() => permanentDeleteTodo(todo.id)}
+                      className="p-1 text-[#9ca3af] hover:text-[#dc3545] transition-colors"
+                      title="永久删除"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => restoreTodo(todo.id)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs text-[#c87d2f] hover:bg-[#fef7ed] rounded transition-colors"
-                  >
-                    <RotateCcw size={12} />
-                    恢复
-                  </button>
-                  <button
-                    onClick={() => permanentDeleteTodo(todo.id)}
-                    className="p-1 text-[#9ca3af] hover:text-[#dc3545] transition-colors"
-                    title="永久删除"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       )}
@@ -301,11 +342,12 @@ export const TodoList: React.FC = () => {
                 todo={todo}
                 onEdit={handleEdit}
                 onDragStart={setDragId}
-                onDragOver={setOverId}
+                onDragOver={(id, pos) => { setOverId(id); setDropPosition(pos); }}
                 onDrop={handleDrop}
                 onDragEnd={handleDragEnd}
                 isDragging={dragId === todo.id}
                 isDropTarget={overId === todo.id && dragId !== todo.id}
+                dropPosition={overId === todo.id ? dropPosition : 'bottom'}
               />
             ))}
           </div>
@@ -322,11 +364,12 @@ export const TodoList: React.FC = () => {
                   todo={todo}
                   onEdit={handleEdit}
                   onDragStart={setDragId}
-                  onDragOver={setOverId}
+                  onDragOver={(id, pos) => { setOverId(id); setDropPosition(pos); }}
                   onDrop={handleDrop}
                   onDragEnd={handleDragEnd}
                   isDragging={dragId === todo.id}
                   isDropTarget={overId === todo.id && dragId !== todo.id}
+                  dropPosition={overId === todo.id ? dropPosition : 'bottom'}
                 />
               ))}
             </div>

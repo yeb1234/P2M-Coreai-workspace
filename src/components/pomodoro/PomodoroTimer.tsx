@@ -70,20 +70,20 @@ export const PomodoroTimer: React.FC = () => {
   }, [ambientSound]);
 
   return (
-    <div className="flex flex-col items-center p-6 bg-[#fef7ed] rounded-2xl shadow-sm border border-[#e5e2dd]">
+    <div className="flex flex-col items-center p-8 bg-[#fef7ed] rounded-2xl shadow-sm border border-[#e5e2dd]">
       {linkedTodo && (
-        <div className="mb-4 px-3 py-1.5 bg-[#f3f2ef] rounded-lg">
+        <div className="mb-5 px-3 py-1.5 bg-[#f3f2ef] rounded-lg">
           <p className="text-[10px] text-[#9ca3af]">当前专注</p>
           <p className="text-sm font-medium text-[#1a1a1a]">{linkedTodo.title}</p>
         </div>
       )}
 
-      <div className="relative w-52 h-52 mb-6">
+      <div className="relative w-72 h-72 mb-6">
         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e2dd" strokeWidth="6" />
+          <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e2dd" strokeWidth="5" />
           <circle
             cx="50" cy="50" r="45" fill="none"
-            stroke="currentColor" strokeWidth="6" strokeLinecap="round"
+            stroke="currentColor" strokeWidth="5" strokeLinecap="round"
             strokeDasharray={`${2 * Math.PI * 45}`}
             strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
             className={`transition-all duration-1000 ${PHASE_COLORS[timer.phase]}`}
@@ -91,10 +91,10 @@ export const PomodoroTimer: React.FC = () => {
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-4xl font-bold font-mono ${PHASE_COLORS[timer.phase]}`}>
+          <span className={`text-6xl font-bold font-mono ${PHASE_COLORS[timer.phase]}`}>
             {formatTime(timer.timeRemaining)}
           </span>
-          <span className={`mt-1 text-xs font-medium ${PHASE_COLORS[timer.phase]}`}>
+          <span className={`mt-1.5 text-sm font-medium ${PHASE_COLORS[timer.phase]}`}>
             {PHASE_LABELS[timer.phase]}
           </span>
         </div>

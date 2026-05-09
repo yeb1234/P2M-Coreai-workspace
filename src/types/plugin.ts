@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 
-export type PluginSize = 'small' | 'large';
+export type PluginSize = 'small' | 'large' | 'full';
 
 export interface PluginMetadata {
   id: string;

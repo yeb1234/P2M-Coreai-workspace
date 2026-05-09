@@ -1,5 +1,5 @@
 import React from 'react';
-import { Compass, ExternalLink, Star, Search, Folder } from 'lucide-react';
+import { Compass, ExternalLink, Star, Search } from 'lucide-react';
 import { PageTitle } from '../shared';
 
 const MOCK_RESOURCES = [
@@ -18,7 +18,7 @@ const CATS = ['全部', '学习平台', '教程', '官方文档', '工具', '学
 export const CodeNavPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="编程导航"
         subtitle="精选编程学习资源一站收录"
         icon={<Compass size={22} />}

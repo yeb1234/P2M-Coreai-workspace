@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, TrendingUp, TrendingDown, Package, AlertTriangle, Truck, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { ShoppingCart, TrendingDown, Package, AlertTriangle, Truck, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { PageTitle } from '../shared';
 
 const MOCK_ORDERS = [
@@ -18,7 +18,7 @@ const MOCK_ALERTS = [
 export const ShopPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="电商中心"
         subtitle="订单、库存、物流、售后一站式管理"
         icon={<ShoppingCart size={22} />}

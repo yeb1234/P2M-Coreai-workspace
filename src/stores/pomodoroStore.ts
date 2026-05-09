@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from '../lib/idbStorage';
 import type {
   PomodoroSession,
   PomodoroConfig,
@@ -10,6 +11,7 @@ import type {
 import { DEFAULT_CONFIG } from '../types';
 import { generateId } from '../lib/id';
 import { toISODateTimeString, toLocalDateString } from '../lib/date';
+import { useTodoStore } from './todoStore';
 
 interface PomodoroState {
   config: PomodoroConfig;
@@ -154,6 +156,21 @@ export const usePomodoroStore = create<PomodoroState>()(
 
             const newSessionsCompleted = phase === 'work' ? sessionsCompleted + 1 : sessionsCompleted;
 
+            if (linkedTodoId && phase === 'work') {
+              const todo = useTodoStore.getState().todos[linkedTodoId];
+              const plannedPomodoros = Math.max(0, todo?.pomodoroRounds || 0);
+              const nextCompletedPomodoros = (todo?.pomodoroCount || 0) + 1;
+
+              if (plannedPomodoros > 0 && nextCompletedPomodoros >= plannedPomodoros) {
+                set({
+                  sessions: { ...state.sessions, [currentSessionId]: updatedSession },
+                  timer: { ...initialTimerState, linkedTodoId },
+                  _lastTickTimestamp: null,
+                });
+                return;
+              }
+            }
+
             let nextPhase: PomodoroPhase;
             let nextTimeRemaining: number;
 
@@ -262,7 +279,7 @@ export const usePomodoroStore = create<PomodoroState>()(
         const state = get();
         const today = toLocalDateString(new Date());
         const sessions = Object.values(state.sessions).filter(
-          (s) => s.completed && toLocalDateString(s.startTime) === today
+          (s) => s.completed && s.phase === 'work' && toLocalDateString(s.startTime) === today
         );
         return {
           totalPomodoros: sessions.length,
@@ -275,7 +292,7 @@ export const usePomodoroStore = create<PomodoroState>()(
         const now = new Date();
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const sessions = Object.values(state.sessions).filter(
-          (s) => s.completed && new Date(s.startTime) >= weekAgo
+          (s) => s.completed && s.phase === 'work' && new Date(s.startTime) >= weekAgo
         );
 
         const dailyBreakdown: Record<string, { pomodoros: number; minutes: number }> = {};
@@ -296,7 +313,7 @@ export const usePomodoroStore = create<PomodoroState>()(
         const now = new Date();
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const sessions = Object.values(state.sessions).filter(
-          (s) => s.completed && new Date(s.startTime) >= weekAgo
+          (s) => s.completed && s.phase === 'work' && new Date(s.startTime) >= weekAgo
         );
 
         const grouped: Record<string, PomodoroSession[]> = {};
@@ -350,10 +367,11 @@ export const usePomodoroStore = create<PomodoroState>()(
     }),
     {
       name: 'p2m-pomodoro-storage',
+      storage: createJSONStorage(() => idbStorage),
       version: 2,
       migrate: (persisted: unknown, version: number) => {
         const data = persisted as Record<string, unknown>;
-        const safe = {
+        const safe: Record<string, unknown> = {
           ...data,
           sessions: data.sessions && typeof data.sessions === 'object' ? data.sessions : {},
           config: data.config && typeof data.config === 'object' ? data.config : { ...DEFAULT_CONFIG },

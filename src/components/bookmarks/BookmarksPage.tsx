@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bookmark, Plus, Search, ExternalLink, Folder } from 'lucide-react';
+import { Bookmark, Plus, Search, ExternalLink } from 'lucide-react';
 import { PageTitle } from '../shared';
 
 const MOCK_BOOKMARKS = [
@@ -18,7 +18,7 @@ const FOLDERS = ['全部', '前端', '工具', '设计', '部署'];
 export const BookmarksPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="书签收藏"
         subtitle="收藏常用网站，快速访问"
         icon={<Bookmark size={22} />}

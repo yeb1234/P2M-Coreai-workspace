@@ -42,7 +42,7 @@ export const TokensPage: React.FC = () => {
 
   return (
     <div className="w-full pt-2 space-y-6">
-      <PageTitle
+      <PageTitle dev
         title="Token 用量"
         subtitle="AI API 调用统计与成本监控"
         icon={<Coins size={22} />}
