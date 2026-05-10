@@ -9,7 +9,9 @@ import { PageTitle } from '../shared';
 export const PomodoroPage: React.FC = () => {
   return (
     <div className="w-full pt-2">
-      <PageTitle title="番茄钟" subtitle="专注工作，高效休息" icon={<Timer size={22} />} />
+      <div className="hidden md:block">
+        <PageTitle title="番茄钟" subtitle="专注工作，高效休息" icon={<Timer size={22} />} />
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4 relative">
           <div className="lg:pr-6 flex flex-col items-center">

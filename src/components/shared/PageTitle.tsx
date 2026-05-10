@@ -10,7 +10,7 @@ interface PageTitleProps {
 
 export const PageTitle: React.FC<PageTitleProps> = React.memo(({ title, subtitle, icon, action, dev }) => {
   return (
-    <div className="flex items-end justify-between mb-6 pb-3 border-b border-[#e5e2dd]">
+    <div className="flex items-end justify-between mb-3 pb-2 border-b border-[#e5e2dd]">
       <div className="flex items-center gap-2.5">
         {icon && (
           <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#fef7ed] text-[#c87d2f]">

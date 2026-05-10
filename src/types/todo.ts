@@ -22,6 +22,7 @@ export interface Todo {
   totalFocusMinutes: number;
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
+  completedAt?: ISODateTimeString | null;
   calendarEventId: ID | null;
 }
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from app.database import SessionLocal, settings
 from app.models import AiJob, Note, SubtitleSegment, Video
 from app.services.ffmpeg_audio import extract_wav_16k_mono
+from app.services.ai_queue import is_queue_paused
 from app.services.ollama_summarize import summarize_with_ollama, summarize_with_openai
 from app.services.subtitle_corrector import correct_segments_with_openai
 from app.services.subtitle_writer import write_vtt_output
@@ -14,6 +15,15 @@ from app.services.transcribe_whisper import transcribe_wav
 from app.services.write_md import write_markdown_output
 from app.utils.files import safe_stem, unique_suffix
 from app.utils.serialization import dump_segments
+
+
+def _stored_transcription_defaults() -> dict:
+    try:
+        from app.routers.admin import load_transcription_settings
+
+        return load_transcription_settings()
+    except Exception:
+        return {}
 
 
 @dataclass(frozen=True)
@@ -24,13 +34,14 @@ class AiJobOptions:
     do_summary: bool
     word_limit: int
     ollama_model: str | None
-    cpu_threads: int
+    cpu_threads: int | None
     compute_type: str
     beam_size: int | None
     best_of: int | None
     temperature: float | None
     vad_filter: bool | None
     subtitle_correction_enabled: bool | None
+    subtitle_correction_scope: str | None
     subtitle_correction_prompt: str | None
 
 
@@ -57,23 +68,33 @@ def _build_job_options(
     temperature: float | None = None,
     vad_filter: bool | None = None,
     subtitle_correction_enabled: bool | None = None,
+    subtitle_correction_scope: str | None = None,
     subtitle_correction_prompt: str | None = None,
 ) -> AiJobOptions:
+    stored = _stored_transcription_defaults()
+    resolved_engine = whisper_engine or stored.get("whisper_engine") or settings.whisper_engine
+    if subtitle_correction_scope is not None:
+        resolved_correction_scope = "off" if subtitle_correction_scope == "off" else "full"
+    elif stored.get("subtitle_correction_scope") is not None:
+        resolved_correction_scope = "off" if stored.get("subtitle_correction_scope") == "off" else "full"
+    else:
+        resolved_correction_scope = "full" if subtitle_correction_enabled else "off"
     return AiJobOptions(
-        whisper_engine=whisper_engine or settings.whisper_engine,
-        whisper_model=whisper_model or settings.default_whisper_model,
-        language=language or settings.default_language,
+        whisper_engine=resolved_engine,
+        whisper_model=whisper_model or stored.get("whisper_model") or settings.default_whisper_model,
+        language=language or stored.get("language") or settings.default_language,
         do_summary=do_summary,
         word_limit=word_limit,
         ollama_model=ollama_model,
-        cpu_threads=cpu_threads or settings.whisper_cpu_threads,
-        compute_type=compute_type or settings.whisper_compute_type,
-        beam_size=beam_size,
-        best_of=best_of,
-        temperature=temperature,
-        vad_filter=vad_filter,
-        subtitle_correction_enabled=subtitle_correction_enabled,
-        subtitle_correction_prompt=subtitle_correction_prompt.strip() if subtitle_correction_prompt else None,
+        cpu_threads=(cpu_threads or stored.get("cpu_threads") or settings.whisper_cpu_threads) if resolved_engine != "whisper.cpp" else None,
+        compute_type=compute_type or stored.get("compute_type") or settings.whisper_compute_type,
+        beam_size=beam_size if beam_size is not None else stored.get("beam_size"),
+        best_of=best_of if best_of is not None else stored.get("best_of"),
+        temperature=temperature if temperature is not None else stored.get("temperature"),
+        vad_filter=vad_filter if vad_filter is not None else stored.get("vad_filter"),
+        subtitle_correction_enabled=subtitle_correction_enabled if subtitle_correction_enabled is not None else stored.get("subtitle_correction_enabled"),
+        subtitle_correction_scope=resolved_correction_scope,
+        subtitle_correction_prompt=(subtitle_correction_prompt.strip() if subtitle_correction_prompt else stored.get("subtitle_correction_prompt") or None),
     )
 
 
@@ -91,6 +112,7 @@ def _apply_job_options(job: AiJob, options: AiJobOptions) -> None:
     job.temperature = options.temperature
     job.vad_filter = options.vad_filter
     job.subtitle_correction_enabled = options.subtitle_correction_enabled
+    job.subtitle_correction_scope = options.subtitle_correction_scope
     job.subtitle_correction_prompt = options.subtitle_correction_prompt
 
 
@@ -107,6 +129,7 @@ def _build_job_paths(video: Video, job: AiJob) -> AiJobPaths:
 
 def create_ai_job(
     *,
+    db,
     video_id: int,
     whisper_model: str,
     whisper_engine: str | None = None,
@@ -121,6 +144,7 @@ def create_ai_job(
     temperature: float | None = None,
     vad_filter: bool | None = None,
     subtitle_correction_enabled: bool | None = None,
+    subtitle_correction_scope: str | None = None,
     subtitle_correction_prompt: str | None = None,
 ) -> AiJob:
     options = _build_job_options(
@@ -137,48 +161,68 @@ def create_ai_job(
         temperature=temperature,
         vad_filter=vad_filter,
         subtitle_correction_enabled=subtitle_correction_enabled,
+        subtitle_correction_scope=subtitle_correction_scope,
         subtitle_correction_prompt=subtitle_correction_prompt,
     )
-    db = SessionLocal()
-    try:
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
-            raise ValueError("Video not found")
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise ValueError("Video not found")
 
-        existing_job = (
-            db.query(AiJob)
-            .filter(AiJob.video_id == video_id, AiJob.status.in_(("queued", "running")))
-            .order_by(AiJob.created_at.desc())
-            .first()
-        )
-        if existing_job:
-            _apply_job_options(existing_job, options)
-            db.commit()
-            db.refresh(existing_job)
-            return existing_job
-
-        job = AiJob(
-            id=unique_suffix(),
-            video_id=video_id,
-            status="queued",
-            stage="queued",
-            message="Queued for processing",
-        )
-        _apply_job_options(job, options)
-        db.add(job)
-        video.ai_status = "queued"
-        video.ai_stage = "queued"
-        video.ai_error = None
+    existing_job = (
+        db.query(AiJob)
+        .filter(AiJob.video_id == video_id, AiJob.status.in_(("queued", "running")))
+        .order_by(AiJob.created_at.desc())
+        .first()
+    )
+    if existing_job:
+        _apply_job_options(existing_job, options)
         db.commit()
-        db.refresh(job)
-        return job
-    finally:
-        db.close()
+        db.refresh(existing_job)
+        return existing_job
+
+    job = AiJob(
+        id=unique_suffix(),
+        video_id=video_id,
+        status="queued",
+        stage="queued",
+        message="Queued for processing",
+    )
+    _apply_job_options(job, options)
+    db.add(job)
+    video.ai_status = "queued"
+    video.ai_stage = "queued"
+    video.ai_error = None
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def create_ai_job_from_payload(db, video_id: int, payload) -> AiJob:
+    return create_ai_job(
+        db=db,
+        video_id=video_id,
+        whisper_model=payload.whisper_model,
+        whisper_engine=payload.whisper_engine,
+        language=payload.language,
+        do_summary=payload.do_summary,
+        word_limit=payload.word_limit,
+        ollama_model=payload.ollama_model,
+        cpu_threads=payload.cpu_threads,
+        compute_type=payload.compute_type,
+        beam_size=payload.beam_size,
+        best_of=payload.best_of,
+        temperature=payload.temperature,
+        vad_filter=payload.vad_filter,
+        subtitle_correction_enabled=payload.subtitle_correction_enabled,
+        subtitle_correction_scope=payload.subtitle_correction_scope,
+        subtitle_correction_prompt=payload.subtitle_correction_prompt,
+    )
 
 
 def update_job_state(db, job: AiJob, video: Video, **values) -> None:
     for key, value in values.items():
         setattr(job, key, value)
+    job.updated_at = datetime.now()
     if "status" in values:
         video.ai_status = values["status"]
     if "stage" in values:
@@ -228,6 +272,9 @@ def replace_subtitle_segments(db, video: Video, segments: list[dict]) -> None:
 
 
 def claim_next_ai_job() -> str | None:
+    if is_queue_paused():
+        return None
+
     db = SessionLocal()
     try:
         running_count = db.query(AiJob).filter(AiJob.status == "running").count()
@@ -244,6 +291,8 @@ def claim_next_ai_job() -> str | None:
             return None
 
         video = db.query(Video).filter(Video.id == job.video_id).first()
+        if job.status != "queued":
+            return None
         job.status = "running"
         job.stage = "claimed"
         job.message = "Worker claimed job"
@@ -256,6 +305,16 @@ def claim_next_ai_job() -> str | None:
         return job.id
     finally:
         db.close()
+
+
+def is_job_cancelled(db, job_id: str) -> bool:
+    job = db.query(AiJob).filter(AiJob.id == job_id).first()
+    return bool(job and job.status == "cancelled")
+
+
+def raise_if_cancelled(db, job_id: str) -> None:
+    if is_job_cancelled(db, job_id):
+        raise RuntimeError("Job cancelled")
 
 
 def requeue_interrupted_ai_jobs() -> int:
@@ -279,8 +338,161 @@ def requeue_interrupted_ai_jobs() -> int:
         db.close()
 
 
+def _step_extract_audio(db, job, video, paths):
+    update_job_state(db, job, video, status="running", stage="extracting", message="Extracting audio")
+    extract_wav_16k_mono(paths.source, paths.wav, cpu_threads=job.cpu_threads if job.whisper_engine != "whisper.cpp" else None)
+
+
+def _step_transcribe(db, job, video, paths):
+    update_job_state(db, job, video, status="running", stage="transcribing", message="Transcribing audio")
+    result = transcribe_wav(
+        wav_path=paths.wav,
+        engine=job.whisper_engine,
+        model_size=job.whisper_model,
+        language=job.language,
+        cpu_threads=job.cpu_threads,
+        compute_type=job.compute_type,
+        beam_size=job.beam_size,
+        best_of=job.best_of,
+        temperature=job.temperature,
+        vad_filter=job.vad_filter,
+    )
+    return result["text"], result["segments"]
+
+
+def _step_correct_subtitles(db, job, video, transcript, segments):
+    should_correct = (
+        settings.subtitle_correction_enabled
+        if job.subtitle_correction_enabled is None
+        else job.subtitle_correction_enabled
+    )
+    if not should_correct or settings.assistant_llm_provider not in ("openai", "lmstudio") or not segments:
+        return transcript, segments, None
+
+    correction_scope = "off" if (job.subtitle_correction_scope or settings.subtitle_correction_scope) == "off" else "full"
+    if correction_scope == "off":
+        return transcript, segments, None
+
+    update_job_state(db, job, video, status="running", stage="correcting-subtitles", message="Correcting subtitles")
+    try:
+        segments = correct_segments_with_openai(
+            segments,
+            model=job.ollama_model or settings.openai_model,
+            base_url=settings.openai_base_url,
+            api_key=settings.openai_api_key,
+            batch_size=settings.subtitle_correction_batch_size,
+            timeout_s=settings.subtitle_correction_timeout_s,
+            extra_prompt=job.subtitle_correction_prompt,
+            scope=correction_scope,
+        )
+        transcript = "\n".join((s.get("text") or "").strip() for s in segments).strip()
+        return transcript, segments, None
+    except Exception as exc:
+        return transcript, segments, f"字幕校对失败，已保留原字幕：{exc}"
+
+
+def _step_summarize(db, job, video, transcript):
+    if not job.do_summary:
+        return None, None
+
+    update_job_state(db, job, video, status="running", stage="summarizing", message="Summarizing content")
+    try:
+        if settings.assistant_llm_provider in ("openai", "lmstudio"):
+            summary = summarize_with_openai(
+                transcript=transcript,
+                word_limit=job.word_limit,
+                model=job.ollama_model or settings.openai_model,
+                base_url=settings.openai_base_url,
+                api_key=settings.openai_api_key,
+            )
+        else:
+            summary = summarize_with_ollama(
+                transcript=transcript,
+                word_limit=job.word_limit,
+                model=job.ollama_model or settings.ollama_model,
+                base_url=settings.ollama_base_url,
+            )
+        return summary, None
+    except Exception as exc:
+        return None, str(exc)
+
+
+def _step_write_outputs(db, job, video, paths, transcript, segments, summary, summary_error):
+    update_job_state(db, job, video, status="running", stage="writing", message="Writing markdown and subtitles")
+
+    write_vtt_output(paths.subtitle, segments)
+    replace_subtitle_segments(db, video, segments)
+
+    write_markdown_output(
+        md_path=paths.markdown,
+        source_filename=video.filename,
+        transcript=transcript,
+        transcript_segments=segments,
+        summary=summary,
+        word_limit=job.word_limit,
+        whisper_model=job.whisper_model,
+        language=job.language,
+        subtitle_filename=paths.subtitle.name,
+        summary_error=summary_error,
+    )
+
+    note = ensure_video_note(db, video)
+    note.title = f"{video.title} 学习笔记"
+    note.source = "ai"
+    note.markdown_path = str(paths.markdown)
+    note.content = paths.markdown.read_text(encoding="utf-8")
+
+
+def _finalize_job(db, job, video, paths, transcript, segments, summary, summary_error):
+    video.transcription = transcript
+    video.transcript_segments = dump_segments(segments)
+    video.summary = summary
+    video.markdown_path = str(paths.markdown)
+    video.subtitle_path = str(paths.subtitle)
+    video.ai_status = "completed"
+    video.ai_stage = "completed"
+    video.ai_error = summary_error if summary_error and not summary else None
+
+    job.status = "completed"
+    job.stage = "completed"
+    job.message = "Processing complete"
+    job.transcript = transcript
+    job.transcript_segments = dump_segments(segments)
+    job.summary = summary
+    job.summary_error = summary_error
+    job.markdown_path = str(paths.markdown)
+    job.subtitle_path = str(paths.subtitle)
+    db.commit()
+
+
+def _handle_job_failure(db, job_id, exc):
+    job = db.query(AiJob).filter(AiJob.id == job_id).first()
+    if not job:
+        return
+    video = db.query(Video).filter(Video.id == job.video_id).first()
+    if is_job_cancelled(db, job_id):
+        if video:
+            video.ai_status = "idle"
+            video.ai_stage = None
+            video.ai_error = None
+        job.stage = "cancelled"
+        job.message = "Cancelled by user"
+        job.error = "Cancelled by user"
+        db.commit()
+        return
+    if video:
+        video.ai_status = "failed"
+        video.ai_stage = job.stage
+        video.ai_error = str(exc)
+    job.status = "failed"
+    job.error = str(exc)
+    job.message = str(exc)
+    db.commit()
+
+
 def run_ai_job(job_id: str) -> None:
     db = SessionLocal()
+    paths: AiJobPaths | None = None
     try:
         job = db.query(AiJob).filter(AiJob.id == job_id).first()
         if not job:
@@ -295,139 +507,36 @@ def run_ai_job(job_id: str) -> None:
 
         paths = _build_job_paths(video, job)
         if not paths.source.exists():
-            update_job_state(
-                db,
-                job,
-                video,
-                status="failed",
-                stage="missing-video",
-                message="Video file is missing",
-                error="Video file does not exist",
-            )
+            update_job_state(db, job, video, status="failed", stage="missing-video",
+                             message="Video file is missing", error="Video file does not exist")
             return
 
-        update_job_state(db, job, video, status="running", stage="extracting", message="Extracting audio")
-        extract_wav_16k_mono(paths.source, paths.wav, cpu_threads=job.cpu_threads)
+        _step_extract_audio(db, job, video, paths)
+        raise_if_cancelled(db, job_id)
 
-        update_job_state(db, job, video, status="running", stage="transcribing", message="Transcribing audio")
-        transcript_result = transcribe_wav(
-            wav_path=paths.wav,
-            engine=job.whisper_engine,
-            model_size=job.whisper_model,
-            language=job.language,
-            cpu_threads=job.cpu_threads,
-            compute_type=job.compute_type,
-            beam_size=job.beam_size,
-            best_of=job.best_of,
-            temperature=job.temperature,
-            vad_filter=job.vad_filter,
-        )
-        transcript = transcript_result["text"]
-        segments = transcript_result["segments"]
+        transcript, segments = _step_transcribe(db, job, video, paths)
+        raise_if_cancelled(db, job_id)
 
-        should_correct_subtitles = (
-            settings.subtitle_correction_enabled
-            if job.subtitle_correction_enabled is None
-            else job.subtitle_correction_enabled
-        )
-        if should_correct_subtitles and settings.assistant_llm_provider in ("openai", "lmstudio") and segments:
-            update_job_state(db, job, video, status="running", stage="correcting-subtitles", message="Correcting subtitles")
-            try:
-                segments = correct_segments_with_openai(
-                    segments,
-                    model=job.ollama_model or settings.openai_model,
-                    base_url=settings.openai_base_url,
-                    api_key=settings.openai_api_key,
-                    batch_size=settings.subtitle_correction_batch_size,
-                    timeout_s=settings.subtitle_correction_timeout_s,
-                    extra_prompt=job.subtitle_correction_prompt,
-                )
-                transcript = "\n".join((segment.get("text") or "").strip() for segment in segments).strip()
-            except Exception as exc:
-                job.error = f"字幕校对失败，已保留原字幕：{exc}"
-                db.commit()
+        transcript, segments, correction_error = _step_correct_subtitles(db, job, video, transcript, segments)
+        if correction_error:
+            job.error = correction_error
+            db.commit()
+        raise_if_cancelled(db, job_id)
 
-        job.transcript = transcript
-        job.transcript_segments = dump_segments(segments)
-        db.commit()
+        summary, summary_error = _step_summarize(db, job, video, transcript)
+        raise_if_cancelled(db, job_id)
 
-        write_vtt_output(paths.subtitle, segments)
-        job.subtitle_path = str(paths.subtitle)
-        db.commit()
-        replace_subtitle_segments(db, video, segments)
+        _step_write_outputs(db, job, video, paths, transcript, segments, summary, summary_error)
+        raise_if_cancelled(db, job_id)
 
-        summary = None
-        summary_error = None
-        if job.do_summary:
-            update_job_state(db, job, video, status="running", stage="summarizing", message="Summarizing content")
-            try:
-                if settings.assistant_llm_provider in ("openai", "lmstudio"):
-                    summary = summarize_with_openai(
-                        transcript=transcript,
-                        word_limit=job.word_limit,
-                        model=job.ollama_model or settings.openai_model,
-                        base_url=settings.openai_base_url,
-                        api_key=settings.openai_api_key,
-                    )
-                else:
-                    summary = summarize_with_ollama(
-                        transcript=transcript,
-                        word_limit=job.word_limit,
-                        model=job.ollama_model or settings.ollama_model,
-                        base_url=settings.ollama_base_url,
-                    )
-            except Exception as exc:
-                summary_error = str(exc)
+        _finalize_job(db, job, video, paths, transcript, segments, summary, summary_error)
 
-        update_job_state(db, job, video, status="running", stage="writing", message="Writing markdown and subtitles")
-        write_markdown_output(
-            md_path=paths.markdown,
-            source_filename=video.filename,
-            transcript=transcript,
-            transcript_segments=segments,
-            summary=summary,
-            word_limit=job.word_limit,
-            whisper_model=job.whisper_model,
-            language=job.language,
-            subtitle_filename=paths.subtitle.name,
-            summary_error=summary_error,
-        )
-
-        note = ensure_video_note(db, video)
-        note.title = f"{video.title} 学习笔记"
-        note.source = "ai"
-        note.markdown_path = str(paths.markdown)
-        note.content = paths.markdown.read_text(encoding="utf-8")
-
-        video.transcription = transcript
-        video.transcript_segments = dump_segments(segments)
-        video.summary = summary
-        video.markdown_path = str(paths.markdown)
-        video.subtitle_path = str(paths.subtitle)
-        video.ai_status = "completed"
-        video.ai_stage = "completed"
-        video.ai_error = summary_error if summary_error and not summary else None
-
-        job.status = "completed"
-        job.stage = "completed"
-        job.message = "Processing complete"
-        job.summary = summary
-        job.summary_error = summary_error
-        job.markdown_path = str(paths.markdown)
-        job.subtitle_path = str(paths.subtitle)
-        db.commit()
     except Exception as exc:
-        failed_db = db
-        job = failed_db.query(AiJob).filter(AiJob.id == job_id).first()
-        if job:
-            video = failed_db.query(Video).filter(Video.id == job.video_id).first()
-            if video:
-                video.ai_status = "failed"
-                video.ai_stage = job.stage
-                video.ai_error = str(exc)
-            job.status = "failed"
-            job.error = str(exc)
-            job.message = str(exc)
-            failed_db.commit()
+        _handle_job_failure(db, job_id, exc)
     finally:
+        if paths and paths.wav.exists():
+            try:
+                paths.wav.unlink()
+            except OSError:
+                pass
         db.close()

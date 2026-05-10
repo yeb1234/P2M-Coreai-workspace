@@ -1,26 +1,27 @@
 # Codex 改进记录
 
-本文档记录本轮 Codex 对 SiteYeb / P2M CoreAI 工作台做的主要改进点，方便后续继续接手、回滚或扩展。
+本文记录当前这一轮对 SiteYeb / P2M CoreAI 工作台做过的架构、性能、接口和 UI 改进，方便后续继续接手。
 
 ## 总体目标
 
-这轮优化的核心不是单点修 bug，而是把前面反复出现的问题收束到更稳的结构里：
+这轮优化不是单点修 bug，而是把反复出现的问题收敛到更稳定的结构里：
 
-- 视频站从“大组件堆状态”转向可维护的模块化结构。
-- 本地 LLM、字幕校对、AI 总结使用统一接口，减少重复 HTTP 逻辑。
-- 转写和缩略图这类重任务变得可控，避免开机或进入页面时把 CPU、磁盘打满。
+- 视频站从“超大组件堆状态”转向模块化结构。
+- 本地 LLM、字幕校对、AI 总结使用统一接口层。
+- 转写、缩略图、雪碧图这类重任务变得可控，避免开机或进入页面时打满 CPU/磁盘。
 - 中文编码统一按 UTF-8 处理，避免 prompt、文档、前端文案继续出现乱码。
+- 右侧栏和 AI 任务中心采用更紧凑的工具布局，避免按钮溢出。
 
-## 视频站前端
+## 前端模块化
 
-### 组件拆分
-
-`VideoPage.tsx` 原来承担了太多职责：列表、播放、字幕、AI 总结、播放列表、快捷键、布局拖拽、播放器参数持久化都混在一起。现在已拆出：
+视频站相关职责已拆分到多个文件：
 
 - `VideoList.tsx`：视频站列表页入口。
 - `VideoListSections.tsx`：继续观看、最近观看、最新视频等列表区块。
+- `VideoPage.tsx`：播放器页面主编排。
 - `VideoPlayerControls.tsx`：播放器内嵌控制条。
-- `VideoPlaylistPanel.tsx`：右侧播放列表。
+- `VideoPlaylistPanel.tsx`：右侧播放列表和动作按钮。
+- `VideoAiJobCenter.tsx`：AI 任务中心、批处理、队列操作。
 - `VideoAiSummaryPanel.tsx`：AI 总结面板。
 - `VideoOverlays.tsx`：字幕等播放器覆盖层。
 - `SpritePreview.tsx`：雪碧图预览。
@@ -32,138 +33,144 @@
 - `videoPlayerAdapters.ts`：接口数据到 UI 数据的适配。
 - `videoPlayerUtils.ts` / `videoFormat.ts`：通用工具函数。
 
-这样后续再改字幕、播放控制、列表展示或右侧 AI 面板时，不需要每次都进入一个超长文件里找状态来源。
+后续建议：
 
-### 稳定性
-
-- 视频播放器外层增加错误边界，避免某个视频、字幕或播放器状态异常时把整个视频站页面打崩。
-- 播放器设置从 localStorage 恢复后再进入 React state，减少 render 阶段副作用和无限更新风险。
-- 字幕显示继续使用自定义 overlay，避免浏览器原生 track 和自定义字幕重复显示。
-
-### 列表体验
-
-- “最近观看”和“最新视频”统一成小卡片预览 3 条。
-- 点击右侧数量后，下方主列表展示对应的 8 条视频。
-- 搜索、进入文件夹、点击面包屑会回到普通目录上下文，避免“当前列表”来源混乱。
+- 继续把 `VideoPage.tsx` 里的播放状态机拆到 hook。
+- 把 AI 任务中心图标工具条抽成通用 `IconToolbar`。
+- 把批处理预估和入队逻辑封装成独立 hook，降低主组件复杂度。
 
 ## AI / LLM 接口
 
-新增 `backend/app/services/llm_client.py`，把本地 AI 请求抽成两类客户端：
+新增统一 LLM 客户端层：
 
-- `OllamaClient`：用于 Ollama 风格接口。
-- `OpenAICompatibleClient`：用于 LM Studio / OpenAI 兼容接口。
+- `backend/app/services/llm_client.py`
 
-目前复用到：
+复用位置：
 
 - `assistant.py`：AI 助手聊天。
 - `ollama_summarize.py`：视频总结。
 - `subtitle_corrector.py`：字幕校对。
 
-这让后续接 LM Studio、Ollama、OpenAI-compatible endpoint 时只需要维护一层 HTTP 行为，不必在每个业务文件里重复写请求、超时、错误解析。
+接口策略：
 
-## 字幕与转写
+- Ollama 和 OpenAI-compatible/LM Studio 分别封装。
+- LM Studio 默认地址为 `http://127.0.0.1:1234/v1`。
+- 业务代码不再重复处理 HTTP 请求、超时、错误解析。
 
-### 字幕校对
+## 字幕校对策略
 
-- 字幕校对 prompt 已改回 UTF-8 中文。
-- 新增“根据上下文修正文章内容”的要求，适合修正语音识别里常见的技术词错误，例如 Git 场景中把 Gate 纠正为 Git。
-- 校对仍要求保持字幕时间轴不变，只修正每条字幕 text，避免破坏播放同步。
+当前策略：
 
-### Whisper 参数
+- 默认不校对。
+- 普通“生成字幕”只做转写和总结。
+- 手动“校对字幕”强制 `large-v3`，并开启本地 LLM 校对。
+- 批处理默认不校对；打开“同时校对字幕”后，批处理切到 `large-v3` 并启用校对。
+- 校对范围不再区分英文/术语/自动，开启就是全量校对。
 
-转写任务支持这些参数：
+关键字段：
 
-- `whisper_model`
-- `language`
-- `cpu_threads`
-- `compute_type`
-- `beam_size`
-- `best_of`
-- `temperature`
-- `vad_filter`
-- `subtitle_correction_enabled`
-
-后端通过 `AiJobOptions` 统一归一化任务参数，新建任务和复用排队任务都走同一套逻辑，避免设置页参数一边生效、一边失效。
-
-## CPU 与后台性能
-
-### CPU 线程控制
-
-之前用户反馈 `.env` 里改 4 线程不明显。现在做了两点：
-
-- Faster-Whisper 继续使用任务里的 `cpu_threads`。
-- ffmpeg 抽音频也改为使用同一个 `cpu_threads`，不再只读全局默认值。
-
-注意：`.env` 修改后必须重启后端 worker，已运行的进程不会自动重新读取环境变量。
-
-### 缩略图后台任务
-
-用户担心开机自动扫缩略图把网站卡住，这个风险已经收敛：
-
-- 后台 worker 默认不再自动补生成缩略图。
-- 需要开启时设置 `THUMBNAIL_BACKGROUND_ENABLED=true`。
-- `THUMBNAIL_BACKGROUND_IDLE_CYCLES` 控制空闲多少轮后补图。
-- `THUMBNAIL_BACKGROUND_LIMIT` 控制每轮最多生成几个缩略图。
-
-默认关闭是保守选择，因为 ffmpeg 批量读视频对机械硬盘、移动硬盘、大目录都很不友好。
-
-## AMD GPU / 7800 XT 转写预留
-
-当前稳定默认仍是 `faster-whisper` CPU 路线。为 AMD 7800 XT 预留了 `whisper.cpp` 外部引擎入口，用来接 Vulkan/HIP/ROCm 版本的 whisper.cpp，而不是直接把 faster-whisper 强行改成 CUDA。
-
-后端 `.env` 可配置：
-
-```env
-WHISPER_ENGINE=faster-whisper
-WHISPER_CPP_EXE=
-WHISPER_CPP_MODEL=
-WHISPER_CPP_EXTRA_ARGS=
+```text
+subtitle_correction_enabled
+subtitle_correction_scope
+subtitle_correction_prompt
 ```
 
-如果已经单独验证 whisper.cpp GPU 命令可用，可改成：
+后端行为：
+
+- `subtitle_correction_enabled=false` 或 `subtitle_correction_scope=off` 时跳过。
+- 其他情况走全量校对。
+- 校对只修改字幕文本，不改时间轴，不合并或拆分字幕。
+
+## Whisper / GPU / CPU
+
+支持两条转写路线：
+
+- `faster-whisper`
+  - CPU 路线。
+  - 使用任务里的 `cpu_threads`。
+  - ffmpeg 提取音频也使用同一个线程数。
+- `whisper.cpp`
+  - 外部引擎路线。
+  - 不使用 CPU 转写线程设置。
+  - 是否用上 AMD 7800 XT 取决于 `whisper-cli.exe` 是否是 Vulkan/HIP/ROCm 等 GPU 后端版本。
+
+设置原则：
+
+- 默认线程数为 12。
+- 高性能预设：`whisper.cpp + large-v3`。
+- 低占用预设：`faster-whisper CPU`，低搜索参数，关闭校对。
+- `.env` 修改后必须重启后端 worker。
+- 已排队任务保存的是创建时参数快照，不会自动读取新设置。
+
+## 后台任务与性能
+
+已做策略：
+
+- 启动扫描会在数据库已有视频时跳过全量扫描。
+- 后台缩略图补图默认关闭。
+- 雪碧图按需生成。
+- AI 任务队列支持暂停、恢复、恢复卡住任务、清除已完成、清除全部。
+- 批处理有预估、数量上限、确认入队。
+
+关键环境变量：
 
 ```env
-WHISPER_ENGINE=whisper.cpp
-WHISPER_CPP_EXE=D:\tools\whisper.cpp\build\bin\Release\whisper-cli.exe
-WHISPER_CPP_MODEL=D:\models\whisper\ggml-large-v3.bin
-WHISPER_CPP_EXTRA_ARGS=
+THUMBNAIL_BACKGROUND_ENABLED=false
+THUMBNAIL_BACKGROUND_IDLE_CYCLES=10
+THUMBNAIL_BACKGROUND_LIMIT=1
 ```
 
-设置页的“转写引擎”会随 AI 任务保存到 job。健康状态页会检查 whisper.cpp 可执行文件和模型路径是否存在。
+后续性能建议：
 
-注意：whisper.cpp 的 GPU 能否实际跑满 7800 XT 取决于你下载或编译的 whisper.cpp 后端版本，例如 Vulkan/HIP/ROCm。网站这里只负责调用已验证可用的可执行文件。
+- 后端 `videos.py` 可继续抽出列表序列化 helper，减少分类路径、观看记录和任务状态查询重复。
+- 缩略图/雪碧图可以做单独任务中心，显示队列、限速、暂停和失败重试。
+- 前端 AI 任务轮询可以按任务状态自适应间隔，避免无任务时频繁请求。
 
-## 文档与编码
+## 主题与样式
 
-- `README.md` 保留英文说明。
-- `README_cn.md` 更新中文说明。
-- `docs/today-fixes-and-pitfalls.md` 记录当天踩坑点。
-- 本文档记录 Codex 本轮架构和性能改进点。
+已改进：
 
-中文文件统一按 UTF-8 保存。PowerShell 控制台可能把 UTF-8 中文显示成乱码，判断文件是否真乱码时不要只看终端视觉结果，应使用 UTF-8 读取或实际浏览器/编辑器确认。
+- `themes.ts` 重写为干净 UTF-8 中文说明。
+- CSS 导出包含变量注释和排查提示。
+- 新增/保留夜间模式、蓝夜模式等深色方案。
+- 视频右侧栏按钮改为紧凑布局，避免撑出可调宽侧栏。
+- AI 任务中心工具栏改成轻量图标组。
 
-## 验证结果
+维护原则：
 
-本轮改动后已通过：
+- 页面内新增硬编码颜色时要同步检查深色模式。
+- 可复用面板优先使用 `theme-surface` / `theme-elevated`。
+- 避免在窄侧栏里放大号固定宽按钮。
+
+## 编码与文档
+
+今天发现 PowerShell/脚本写中文容易造成编码污染：
+
+- 中文可能被写成 `????`。
+- 文件可能出现 mojibake，例如 `瀛︿範`。
+- JSX 的 `title` 引号可能被错误替换，导致结构损坏。
+
+安全约定：
+
+- 手工改文件优先用 `apply_patch`。
+- 需要脚本写中文时，使用 Unicode escape 或确认写入链路为 UTF-8。
+- 改完跑：
 
 ```bash
-npm run lint
-npm test
+rg "\?\?\?" src backend docs
+npx tsc -b --pretty false
 npm run build
-backend/.venv311/Scripts/python -m compileall backend/app
+python -m compileall backend/app
 ```
 
-最近一次结果：
+## 验证记录
 
-- ESLint 通过。
-- Vitest 5 个文件、31 个测试通过。
-- 前端生产构建通过。
-- 后端 compileall 通过。
+最近执行并通过：
 
-## 后续建议
+```bash
+npx tsc -b --pretty false
+npm run build
+python -m compileall backend/app
+```
 
-- 继续把 `VideoPlayerView` 的播放状态机拆成 hook，降低播放器主视图复杂度。
-- 给 AI job 增加更明确的队列状态查询接口，前端可以更及时刷新“字幕生成完成 / 总结完成”。
-- 缩略图和雪碧图可以进一步做显式队列页，用户能暂停、恢复、限速。
-- 字幕来源可以加兼容层，统一处理自动生成 VTT、数据库字幕段、外部字幕文件三类来源。
-- 深色主题还可以继续按页面做视觉 QA，重点检查对比度、hover 状态和历史数据颜色。
+备注：`rg` 扫到的 TypeScript `??` 是空值合并运算符，不代表乱码；真正要关注的是连续问号文案、mojibake 字符串和浏览器里的可见乱码。

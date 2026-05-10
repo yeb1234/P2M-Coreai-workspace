@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { LayoutDashboard, Maximize2, Minimize2, Settings2, Eye, EyeOff, Bot } from 'lucide-react';
+import { LayoutDashboard, Maximize2, Minimize2, Settings2, Eye, EyeOff } from 'lucide-react';
 import { pluginRegistry } from '../../plugins';
-import { useAIStore, usePluginStore } from '../../stores';
+import { usePluginStore } from '../../stores';
 import { PluginCard } from './PluginCard';
 import { PageTitle } from '../shared';
 import { ImportantDates } from './ImportantDates';
@@ -11,7 +11,6 @@ export const DashboardPage: React.FC = () => {
   const swapPlugins = usePluginStore((s) => s.swapPlugins);
   const setAllPluginSize = usePluginStore((s) => s.setAllPluginSize);
   const togglePlugin = usePluginStore((s) => s.togglePlugin);
-  const setChatOpen = useAIStore((s) => s.setChatOpen);
 
   const plugins = pluginRegistry.getAllPlugins();
   const [dragId, setDragId] = useState<string | null>(null);
@@ -56,25 +55,16 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full pt-2 space-y-6">
+    <div className="w-full pt-2 space-y-3">
       <PageTitle
         title="工作台"
         subtitle="拖动卡片调整位置，点一下可以放大或缩小"
         icon={<LayoutDashboard size={22} />}
-        action={
-          <button
-            onClick={() => setChatOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
-          >
-            <Bot size={13} />
-            打开 AI
-          </button>
-        }
       />
 
       <ImportantDates />
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-start gap-2">
         <button
           onClick={() => setShowManager(!showManager)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors"

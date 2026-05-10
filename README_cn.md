@@ -46,7 +46,9 @@ SiteYeb/
 - [Codex 改进记录](docs/codex-improvements.md)
 - [2026-05-10 改进与踩坑记录](docs/today-fixes-and-pitfalls.md)
 
-以下运行时文件不提交：`.env`、SQLite 数据库、`output/`、`thumbnails/`、`sprites/`、`work/`、Python 虚拟环境。
+以下运行时文件不提交：`.env`、SQLite 数据库、`output/`、`thumbnails/`、`sprites/`、`work/`、`tools/`、Python 虚拟环境。
+
+`tools/` 是本机 Whisper 工具、模型和二进制文件目录，里面可能有数 GB 的模型文件，例如 `ggml-large-v3.bin`。不要把它加入 Git；如果系统里突然出现大量 `git.exe` 进程，优先检查是否误触发了 `git add tools/` 或把大模型文件加入暂存。
 
 ## 快速启动（一键启动）
 
@@ -63,7 +65,7 @@ chmod +x start.sh
 ./start.sh
 ```
 
-会同时启动前端 (5173) 和后端 (5200)。
+会同时启动前端开发服务 (8000) 和后端 / 生产入口 (80)。
 
 ## 手动启动
 
@@ -75,7 +77,7 @@ chmod +x start.sh
 cd backend
 .venv311/Scripts/activate       # Windows
 # source .venv311/bin/activate  # Linux/macOS
-python -m uvicorn app.main:app --host 127.0.0.1 --port 5200
+python -m uvicorn app.main:app --host 0.0.0.0 --port 80
 ```
 
 **终端 2 — 前端（Vite 开发服务器）**
@@ -89,8 +91,8 @@ npm run dev
 
 | 服务 | 地址 | 说明 |
 | --- | --- | --- |
-| 前端 | http://localhost:5173 | Vite 开发服务器 |
-| 后端 API | http://127.0.0.1:5200 | FastAPI，前端通过 `.env` 中 `VITE_API_BASE_URL` 连接 |
+| 前端开发 | http://localhost:8000 | Vite 开发服务器，API 自动代理到 80 |
+| 后端 / 生产入口 | http://localhost | FastAPI，同时提供 API 和构建后的前端 |
 | 本地 LLM | http://127.0.0.1:1234/v1 | LM Studio / OpenAI 兼容接口 |
 | Ollama | http://localhost:11434 | Ollama 本地模型 |
 
@@ -101,7 +103,7 @@ npm run dev
 ```bash
 DATABASE_URL=sqlite:///D:/SiteYeb/learning_os.db   # SQLite 数据库路径
 VIDEO_FOLDER=D:/ITJC                               # 视频文件夹路径
-VITE_API_BASE_URL=http://127.0.0.1:5200            # 前端连接后端的地址
+VITE_API_BASE_URL=                                 # 留空，前端使用同源或 Vite 代理
 
 # Whisper 转写
 WHISPER_ENGINE=whisper.cpp                          # whisper.cpp 或 faster-whisper
@@ -126,7 +128,7 @@ OLLAMA_MODEL=qwen2.5:7b-instruct
 docker-compose up -d
 ```
 
-前端访问 http://localhost:3000，后端通过 nginx 自动代理。
+前端访问 http://localhost，后端通过 nginx 自动代理。
 
 > **注意**：Docker 中 `whisper-cli.exe` 无法运行（Windows 二进制），
 > 需要将 `.env` 中 `WHISPER_ENGINE` 改为 `faster-whisper`。

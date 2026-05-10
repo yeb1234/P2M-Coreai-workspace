@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import AiJob, Video
-from app.schemas import AiJobListItem, AiJobListOut, AiJobOut
+from app.models import AiJob, Note, SubtitleSegment, Video
+from app.schemas import AiJobBatchCreate, AiJobBatchOut, AiJobBatchSkippedItem, AiJobListItem, AiJobListOut, AiJobOut
+from app.services.ai_jobs import create_ai_job_from_payload
 from app.utils.serialization import load_segments, to_output_url
 
 
@@ -27,6 +29,8 @@ def _job_list_item(job: AiJob) -> AiJobListItem:
         cpu_threads=job.cpu_threads,
         compute_type=job.compute_type,
         subtitle_correction_enabled=job.subtitle_correction_enabled,
+        subtitle_correction_scope=job.subtitle_correction_scope,
+        subtitle_correction_prompt=job.subtitle_correction_prompt,
         summary_error=job.summary_error,
         created_at=job.created_at,
         updated_at=job.updated_at,
@@ -44,7 +48,31 @@ def list_ai_jobs(
         query = query.filter(AiJob.status == status)
 
     total = query.count()
-    jobs = query.order_by(AiJob.updated_at.desc(), AiJob.created_at.desc()).limit(limit).all()
+    if status == "queued":
+        jobs = query.order_by(AiJob.created_at.asc(), AiJob.id.asc()).limit(limit).all()
+    elif status == "running":
+        jobs = query.order_by(AiJob.updated_at.desc(), AiJob.created_at.asc()).limit(limit).all()
+    elif status:
+        jobs = query.order_by(AiJob.updated_at.desc(), AiJob.created_at.desc()).limit(limit).all()
+    else:
+        status_rank = case(
+            (AiJob.status == "running", 0),
+            (AiJob.status == "queued", 1),
+            (AiJob.status == "failed", 2),
+            (AiJob.status == "cancelled", 3),
+            (AiJob.status == "completed", 4),
+            else_=5,
+        )
+        jobs = (
+            query.order_by(
+                status_rank.asc(),
+                case((AiJob.status == "queued", AiJob.created_at)).asc(),
+                AiJob.updated_at.desc(),
+                AiJob.created_at.desc(),
+            )
+            .limit(limit)
+            .all()
+        )
 
     return AiJobListOut(
         items=[_job_list_item(job) for job in jobs],
@@ -53,6 +81,148 @@ def list_ai_jobs(
         queued=db.query(AiJob).filter(AiJob.status == "queued").count(),
         failed=db.query(AiJob).filter(AiJob.status == "failed").count(),
         completed=db.query(AiJob).filter(AiJob.status == "completed").count(),
+    )
+
+
+def _has_subtitles(video: Video) -> bool:
+    return bool(video.subtitle_path or video.transcript_segments)
+
+
+def _needs_resume(video: Video, latest_job: AiJob | None, payload: AiJobBatchCreate) -> bool:
+    if latest_job and latest_job.status in ("failed", "cancelled"):
+        return True
+    if not _has_subtitles(video):
+        return True
+    if payload.do_summary and not video.summary:
+        return True
+    if not latest_job:
+        return True
+    if latest_job.status != "completed":
+        return True
+    if payload.subtitle_correction_enabled is not False and latest_job.subtitle_correction_enabled is False:
+        return True
+    return False
+
+
+def _latest_job_by_video(db: Session, video_ids: list[int]) -> dict[int, AiJob]:
+    if not video_ids:
+        return {}
+    jobs = (
+        db.query(AiJob)
+        .filter(AiJob.video_id.in_(video_ids))
+        .order_by(AiJob.video_id.asc(), AiJob.updated_at.desc(), AiJob.created_at.desc())
+        .all()
+    )
+    latest: dict[int, AiJob] = {}
+    for job in jobs:
+        if job.video_id not in latest:
+            latest[job.video_id] = job
+    return latest
+
+
+def _reset_video_ai_outputs(db: Session, video: Video) -> None:
+    video.transcription = None
+    video.transcript_segments = None
+    video.summary = None
+    video.markdown_path = None
+    video.subtitle_path = None
+    video.ai_status = "idle"
+    video.ai_stage = None
+    video.ai_error = None
+    db.query(SubtitleSegment).filter(SubtitleSegment.video_id == video.id).delete()
+
+
+def _prepare_force_rerun(db: Session, video: Video) -> None:
+    _reset_video_ai_outputs(db, video)
+    jobs = db.query(AiJob).filter(AiJob.video_id == video.id).all()
+    for job in jobs:
+        if job.status == "running":
+            job.status = "cancelled"
+            job.stage = "cancelled"
+            job.message = "Cancelled by force rerun"
+            job.error = "Cancelled by force rerun"
+            continue
+        db.delete(job)
+    notes = db.query(Note).filter(Note.video_id == video.id, Note.source == "ai").all()
+    for note in notes:
+        note.content = ""
+        note.markdown_path = None
+
+
+@router.post("/batch", response_model=AiJobBatchOut)
+def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
+    unique_ids = list(dict.fromkeys(payload.video_ids))
+    videos = db.query(Video).filter(Video.id.in_(unique_ids)).all()
+    video_by_id = {video.id: video for video in videos}
+    latest_jobs = _latest_job_by_video(db, unique_ids)
+
+    eligible: list[Video] = []
+    skipped_items: list[AiJobBatchSkippedItem] = []
+    active = 0
+    already_done = 0
+    failed = 0
+
+    for video_id in unique_ids:
+        video = video_by_id.get(video_id)
+        if not video:
+            skipped_items.append(AiJobBatchSkippedItem(video_id=video_id, title=f"#{video_id}", reason="missing_video"))
+            continue
+
+        latest_job = latest_jobs.get(video_id)
+        force_rerun = payload.mode == "all"
+        if latest_job and latest_job.status in ("queued", "running") and not force_rerun:
+            active += 1
+            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="active_job"))
+            continue
+        if latest_job and latest_job.status in ("queued", "running") and force_rerun:
+            active += 1
+
+        has_subtitles = _has_subtitles(video)
+        has_summary = bool(video.summary)
+        if payload.mode == "missing_subtitles" and has_subtitles:
+            already_done += 1
+            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="has_subtitles"))
+            continue
+        if payload.mode == "missing_summary" and has_summary:
+            already_done += 1
+            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="has_summary"))
+            continue
+        if payload.mode == "failed_only" and (not latest_job or latest_job.status != "failed"):
+            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="not_failed"))
+            continue
+        if payload.mode == "unfinished" and not _needs_resume(video, latest_job, payload):
+            already_done += 1
+            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="complete"))
+            continue
+        if latest_job and latest_job.status == "failed":
+            failed += 1
+
+        eligible.append(video)
+
+    selected = eligible[: payload.max_enqueue]
+    limited = len(eligible) > len(selected)
+    job_ids: list[str] = []
+    if not payload.dry_run:
+        for video in selected:
+            if payload.mode == "all":
+                _prepare_force_rerun(db, video)
+                db.commit()
+            job = create_ai_job_from_payload(db, video.id, payload)
+            job_ids.append(job.id)
+
+    return AiJobBatchOut(
+        mode=payload.mode,
+        requested=len(unique_ids),
+        eligible=len(eligible),
+        enqueued=0 if payload.dry_run else len(job_ids),
+        skipped=len(unique_ids) - len(eligible),
+        active=active,
+        already_done=already_done,
+        failed=failed,
+        limited=limited,
+        max_enqueue=payload.max_enqueue,
+        job_ids=job_ids,
+        skipped_items=skipped_items[:20],
     )
 
 
@@ -77,6 +247,7 @@ def get_ai_job(job_id: str, db: Session = Depends(get_db)):
         ollama_model=job.ollama_model,
         transcript=job.transcript,
         transcript_segments=load_segments(job.transcript_segments),
+        subtitle_correction_scope=job.subtitle_correction_scope,
         summary=job.summary,
         summary_error=job.summary_error,
         markdown_path=job.markdown_path,

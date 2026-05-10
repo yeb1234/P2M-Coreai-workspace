@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Send, X, Trash2, Loader2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, Send, X, Trash2, Loader2, PlayCircle } from 'lucide-react';
 import { useAIStore } from '../../stores';
 import { buildAIRequestSystemPrompt } from '../../stores/aiStore';
+import { searchSegments, type SegmentSearchResult } from '../../lib/videoApi';
+import { useDragResize } from '../../hooks/useDragResize';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -10,44 +12,33 @@ export const AIChatPanel: React.FC = () => {
     chatOpen, setChatOpen, endpoint, model, systemPrompt, promptTemplates, activeTemplateId,
     chatWidth, setChatWidth, messages, addMessage, clearMessages,
   } = useAIStore();
-  const resizeRef = useRef({ active: false, startX: 0, startWidth: 380 });
+  const { width: liveChatWidth, startResize } = useDragResize({
+    initialWidth: chatWidth,
+    minWidth: 300,
+    maxWidth: 640,
+    side: 'left',
+    onWidthChange: setChatWidth,
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [videoResults, setVideoResults] = useState<SegmentSearchResult[]>([]);
+  const unmountedRef = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => { unmountedRef.current = true; };
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
 
   const activeTemplate = useMemo(
     () => promptTemplates.find((template) => template.id === activeTemplateId) ?? promptTemplates[0],
     [activeTemplateId, promptTemplates]
   );
-
-  useEffect(() => {
-    const handleMove = (event: MouseEvent) => {
-      if (!resizeRef.current.active) return;
-      const delta = resizeRef.current.startX - event.clientX;
-      setChatWidth(resizeRef.current.startWidth + delta);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    };
-    const handleUp = () => {
-      resizeRef.current.active = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [setChatWidth]);
-
-  const startResize = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    resizeRef.current = { active: true, startX: event.clientX, startWidth: chatWidth };
-  }, [chatWidth]);
 
   if (!chatOpen) return null;
 
@@ -56,9 +47,34 @@ export const AIChatPanel: React.FC = () => {
     if (!text || loading) return;
     setError('');
     setInput('');
+    setVideoResults([]);
     const userId = makeId();
     addMessage({ id: userId, role: 'user', content: text });
     setLoading(true);
+
+    // Search for relevant videos
+    let videoContext = '';
+    try {
+      const results = await searchSegments(text, 5);
+      if (results.length > 0) {
+        setVideoResults(results);
+        const uniqueVideos = new Map<number, { title: string; matches: string[] }>();
+        for (const r of results) {
+          const existing = uniqueVideos.get(r.video_id);
+          if (existing) {
+            existing.matches.push(r.text);
+          } else {
+            uniqueVideos.set(r.video_id, { title: r.video_title || `视频 ${r.video_id}`, matches: [r.text] });
+          }
+        }
+        const lines = [...uniqueVideos.entries()].map(([id, v]) =>
+          `- 《${v.title}》(ID:${id})：${v.matches.slice(0, 2).join('；')}`
+        );
+        videoContext = `\n\n用户视频库中找到以下相关视频：\n${lines.join('\n')}\n请根据这些视频内容回答用户问题，并推荐相关视频。`;
+      }
+    } catch {
+      // Video search is best-effort
+    }
 
     const assistantId = makeId();
     setStreamingId(assistantId);
@@ -68,35 +84,42 @@ export const AIChatPanel: React.FC = () => {
       const payload = {
         model,
         messages: [
-          { role: 'system', content: buildAIRequestSystemPrompt(systemPrompt, activeTemplate?.content ?? '') },
+          { role: 'system', content: buildAIRequestSystemPrompt(systemPrompt, activeTemplate?.content ?? '') + videoContext },
           ...messages.map((message) => ({ role: message.role, content: message.content })),
           { role: 'user', content: text },
         ],
         stream: true,
       };
+      console.log('[AIChat] fetching', endpoint);
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      console.log('[AIChat] response status', res.status, 'ok:', res.ok, 'body:', !!res.body);
       if (!res.ok || !res.body) throw new Error(`接口返回 ${res.status}`);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let finalText = '';
+      let chunkCount = 0;
 
       while (true) {
+        if (unmountedRef.current) { reader.cancel(); break; }
         const { done, value } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        const text = decoder.decode(value, { stream: true });
+        chunkCount++;
+        if (chunkCount <= 3) console.log('[AIChat] chunk', chunkCount, ':', text.slice(0, 200));
+        buffer += text;
         const chunks = buffer.split('\n');
         buffer = chunks.pop() ?? '';
 
         for (const chunk of chunks) {
           const line = chunk.trim();
           if (!line) continue;
-          if (line === 'data: [DONE]') continue;
+          if (line === 'data: [DONE]') { console.log('[AIChat] stream DONE'); continue; }
           if (!line.startsWith('data:')) continue;
           try {
             const json = JSON.parse(line.slice(5).trim());
@@ -116,6 +139,7 @@ export const AIChatPanel: React.FC = () => {
         }
       }
 
+      console.log('[AIChat] stream finished, total chunks:', chunkCount, 'finalText length:', finalText.length);
       if (!finalText.trim()) {
         useAIStore.setState((state) => ({
           messages: state.messages.map((message) =>
@@ -124,6 +148,7 @@ export const AIChatPanel: React.FC = () => {
         }));
       }
     } catch (err) {
+      console.error('[AIChat] error:', err);
       setError(err instanceof Error ? err.message : '本地 AI 请求失败');
       useAIStore.setState((state) => ({
         messages: state.messages.map((message) =>
@@ -139,11 +164,12 @@ export const AIChatPanel: React.FC = () => {
   return (
     <aside
       className="relative shrink-0 border-l border-[var(--border-light)] bg-[var(--bg-card)] flex flex-col"
-      style={{ width: `${chatWidth}px` }}
+      style={{ width: `${liveChatWidth}px` }}
     >
       <button
         type="button"
-        onMouseDown={startResize}
+        onMouseDown={(e) => { e.preventDefault(); startResize(e.clientX); }}
+        onTouchStart={(e) => { e.preventDefault(); startResize(e.touches[0].clientX); }}
         className="absolute -left-3 top-0 z-10 flex h-full w-3 cursor-col-resize items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)]"
         title="拖动调整 AI 助手宽度"
       >
@@ -203,6 +229,28 @@ export const AIChatPanel: React.FC = () => {
           </div>
         )}
         {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
+        <div ref={messagesEndRef} />
+        {videoResults.length > 0 && !loading && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-medium text-[var(--text-muted)]">相关视频</p>
+            {[...new Map(videoResults.map((r) => [r.video_id, r])).values()].slice(0, 5).map((r) => (
+              <button
+                key={r.video_id}
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('p2m:play-video', { detail: { videoId: r.video_id } }));
+                }}
+                className="flex w-full items-start gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2.5 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
+              >
+                <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-[var(--text-primary)] truncate">{r.video_title || `视频 ${r.video_id}`}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] line-clamp-2">{r.text}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="p-3 border-t border-[var(--border-light)]">

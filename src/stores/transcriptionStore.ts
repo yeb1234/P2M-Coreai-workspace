@@ -7,11 +7,12 @@ export const WHISPER_MODELS = [
   { id: 'base', name: 'base', desc: '很快，适合粗略字幕' },
   { id: 'small', name: 'small', desc: '速度和质量比较均衡' },
   { id: 'medium', name: 'medium', desc: '中文和技术课推荐，质量更稳' },
-  { id: 'large-v1', name: 'large-v1', desc: '旧版大模型，质量高但慢' },
-  { id: 'large-v2', name: 'large-v2', desc: '新版大模型之一，质量高' },
+  { id: 'large', name: 'large', desc: 'large 系列基础版本' },
   { id: 'large-v3', name: 'large-v3', desc: '高质量推荐，资源占用最高' },
-  { id: 'large', name: 'large', desc: '通常指向当前 large 系列默认版本' },
 ];
+
+export const DEFAULT_SUBTITLE_CORRECTION_PROMPT =
+  '根据上下文校对字幕文本，修正明显的识别错误、错别字、专有名词和技术词。保持原意，不扩写，不翻译，不合并或拆分字幕，不改变时间轴。';
 
 export interface TranscriptionSettings {
   whisperEngine: string;
@@ -26,6 +27,7 @@ export interface TranscriptionSettings {
   temperature: number;
   vadFilter: boolean;
   subtitleCorrectionEnabled: boolean;
+  subtitleCorrectionScope: 'full' | 'off';
   subtitleCorrectionPrompt: string;
 }
 
@@ -35,19 +37,20 @@ interface TranscriptionState extends TranscriptionSettings {
 }
 
 export const DEFAULT_TRANSCRIPTION_SETTINGS: TranscriptionSettings = {
-  whisperEngine: 'faster-whisper',
-  whisperModel: 'medium',
+  whisperEngine: 'whisper.cpp',
+  whisperModel: 'large-v3',
   language: 'zh',
   doSummary: true,
   wordLimit: 200,
-  cpuThreads: 4,
+  cpuThreads: 12,
   computeType: 'int8',
   beamSize: 5,
   bestOf: 5,
   temperature: 0,
   vadFilter: true,
-  subtitleCorrectionEnabled: true,
-  subtitleCorrectionPrompt: '根据上下文修正明显识别错误。技术课里优先保留 Git、GitHub、commit、branch、merge、Python、JavaScript、API 等术语。',
+  subtitleCorrectionEnabled: false,
+  subtitleCorrectionScope: 'full',
+  subtitleCorrectionPrompt: DEFAULT_SUBTITLE_CORRECTION_PROMPT,
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -57,6 +60,10 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
 
 function sanitizeSettings(value: Partial<TranscriptionSettings>): TranscriptionSettings {
   const modelIds = new Set(WHISPER_MODELS.map((model) => model.id));
+  const rawPrompt = typeof value.subtitleCorrectionPrompt === 'string'
+    ? value.subtitleCorrectionPrompt
+    : DEFAULT_TRANSCRIPTION_SETTINGS.subtitleCorrectionPrompt;
+  const promptLooksCorrupt = rawPrompt.includes('????') || /\u5fd9.|\ufffd/.test(rawPrompt);
   return {
     whisperModel: typeof value.whisperModel === 'string' && modelIds.has(value.whisperModel)
       ? value.whisperModel
@@ -78,10 +85,22 @@ function sanitizeSettings(value: Partial<TranscriptionSettings>): TranscriptionS
     subtitleCorrectionEnabled: typeof value.subtitleCorrectionEnabled === 'boolean'
       ? value.subtitleCorrectionEnabled
       : DEFAULT_TRANSCRIPTION_SETTINGS.subtitleCorrectionEnabled,
-    subtitleCorrectionPrompt: typeof value.subtitleCorrectionPrompt === 'string'
-      ? value.subtitleCorrectionPrompt
-      : DEFAULT_TRANSCRIPTION_SETTINGS.subtitleCorrectionPrompt,
+    subtitleCorrectionScope: value.subtitleCorrectionScope === 'off' ? 'off' : 'full',
+    subtitleCorrectionPrompt: promptLooksCorrupt ? DEFAULT_SUBTITLE_CORRECTION_PROMPT : rawPrompt,
   };
+}
+
+function migrateSettings(persistedState: unknown): TranscriptionSettings {
+  const raw = (persistedState as Partial<TranscriptionSettings>) || {};
+  const next = sanitizeSettings(raw);
+  const wasLegacyDefault =
+    (!raw.whisperEngine || raw.whisperEngine === 'faster-whisper') &&
+    (!raw.whisperModel || raw.whisperModel === 'medium');
+  const migrated = wasLegacyDefault
+    ? { ...next, whisperEngine: DEFAULT_TRANSCRIPTION_SETTINGS.whisperEngine, whisperModel: DEFAULT_TRANSCRIPTION_SETTINGS.whisperModel }
+    : next;
+  const wasOldThreadDefault = raw.cpuThreads === undefined || raw.cpuThreads === 4;
+  return wasOldThreadDefault ? { ...migrated, cpuThreads: DEFAULT_TRANSCRIPTION_SETTINGS.cpuThreads } : migrated;
 }
 
 export const useTranscriptionStore = create<TranscriptionState>()(
@@ -94,10 +113,10 @@ export const useTranscriptionStore = create<TranscriptionState>()(
     {
       name: 'p2m-transcription-storage',
       storage: createJSONStorage(() => idbStorage),
-      version: 1,
+      version: 5,
       migrate: (persistedState: unknown) => ({
         ...DEFAULT_TRANSCRIPTION_SETTINGS,
-        ...sanitizeSettings((persistedState as Partial<TranscriptionSettings>) || {}),
+        ...migrateSettings(persistedState),
       }),
       partialize: (state) => sanitizeSettings(state),
     }

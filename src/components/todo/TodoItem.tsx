@@ -144,7 +144,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
     <>
       <div
         data-todo-card
-        className={`group relative flex items-start gap-3 p-3 rounded-lg border transition-all cursor-default ${
+        className={`group relative flex items-center gap-2 md:gap-3 px-2.5 py-1.5 md:px-3 md:py-3 rounded-lg border transition-all cursor-default ${
           todo.status === 'completed' ? 'opacity-50' : ''
         } ${isDragging ? 'opacity-60 shadow-xl scale-[1.02] z-10' : 'hover:shadow-md'}`}
         style={cardStyle}
@@ -181,26 +181,26 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
           <GripVertical size={14} />
         </div>
         <button
-          onDoubleClick={() => toggleTodoStatus(todo.id)}
+          onClick={() => toggleTodoStatus(todo.id)}
           onMouseEnter={() => setToggleHover(true)}
           onMouseLeave={() => setToggleHover(false)}
           className="mt-0.5 flex-shrink-0 hover:scale-110 transition-transform"
         >
           {todo.status === 'pending' && (
-            <div className={`w-5 h-5 border-2 rounded-full transition-colors ${toggleHover ? 'border-[#c87d2f]' : 'border-[#d1cdc6]'}`} />
+            <div className={`w-4 h-4 md:w-5 md:h-5 border-2 rounded-full transition-colors ${toggleHover ? 'border-[#c87d2f]' : 'border-[#d1cdc6]'}`} />
           )}
           {todo.status === 'in_progress' && (
-            <div className="w-5 h-5 border-2 border-[#c87d2f] rounded-full bg-[#fef7ed]" />
+            <div className="w-4 h-4 md:w-5 md:h-5 border-2 border-[#c87d2f] rounded-full bg-[#fef7ed]" />
           )}
           {todo.status === 'completed' && (
-            <div className="w-5 h-5 bg-[#16a34a] rounded-full flex items-center justify-center">
-              <Check size={13} className="text-white" strokeWidth={3} />
+            <div className="w-4 h-4 md:w-5 md:h-5 bg-[#16a34a] rounded-full flex items-center justify-center">
+              <Check size={11} className="text-white" strokeWidth={3} />
             </div>
           )}
         </button>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-1.5 md:gap-2 mb-0 md:mb-1">
             {editing ? (
               <input
                 ref={editRef}
@@ -217,7 +217,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
               />
             ) : (
               <h3
-                className={`font-medium text-[#1a1a1a] truncate ${
+                className={`font-medium text-[#1a1a1a] truncate text-[16px] md:text-sm ${
                   todo.status === 'completed' ? 'line-through text-[#9ca3af]' : ''
                 }`}
               >
@@ -228,34 +228,36 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
           </div>
 
           {todo.description && (
-            <p className="text-sm text-[#9ca3af] truncate mb-2">{todo.description}</p>
+            <p className="text-[13px] md:text-sm text-[#9ca3af] truncate mb-0.5 md:mb-2">{todo.description}</p>
           )}
 
-          <div className="flex items-center gap-4 text-xs text-[#9ca3af]">
+          <div className="flex items-center gap-3 md:gap-4 text-[12px] md:text-xs text-[#9ca3af]">
             {todo.dueDate && (
               <span className="flex items-center gap-1">
                 <Calendar size={12} />
                 {formatDate(todo.dueDate, 'MM月dd日')}
               </span>
             )}
-            {todo.pomodoroCount > 0 && (
+            {todo.pomodoroRounds > 0 && (
               <span className="flex items-center gap-1 text-[#16a34a]">
                 <Clock size={12} />
-                {todo.pomodoroCount}个番茄 ({formatDuration(todo.totalFocusMinutes)})
+                {todo.pomodoroRounds - todo.pomodoroCount > 0
+                  ? `剩余${todo.pomodoroRounds - todo.pomodoroCount}个番茄`
+                  : '已完成'}
               </span>
             )}
           </div>
           {todo.pomodoroRounds > 0 && (
-            <div className="mt-2">
+            <div className="hidden md:block mt-1 md:mt-2">
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-[#e5e2dd] rounded-full overflow-hidden">
+                <div className="flex-1 h-1 md:h-1.5 bg-[#e5e2dd] rounded-full overflow-hidden">
                   <div className="h-full rounded-full transition-all" style={progressBarStyle} />
                 </div>
-                <span className="text-[10px] text-[#9ca3af] flex-shrink-0">
-                  {todo.pomodoroCount}/{totalPomodoros} 番茄
+                <span className="text-[9px] md:text-[10px] text-[#9ca3af] flex-shrink-0">
+                  {todo.pomodoroCount}/{totalPomodoros}
                 </span>
               </div>
-              <div className="text-[10px] text-[#b8b4ac] mt-0.5">
+              <div className="text-[9px] md:text-[10px] text-[#b8b4ac] mt-0.5">
                 预计 {formatDuration(plannedMinutes)}
                 {todo.pomodoroCount > 0 && ` · 已用 ${formatDuration(completedMinutes)}`}
               </div>

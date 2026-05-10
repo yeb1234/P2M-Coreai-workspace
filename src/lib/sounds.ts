@@ -1,6 +1,6 @@
 // Sound system for Pomodoro timer
 // Uses Web Audio API for notification tones
-// Ambient sounds use HTML5 Audio with free sound URLs
+// Ambient sounds use HTML5 Audio with local loopable files
 
 let audioContext: AudioContext | null = null;
 
@@ -41,6 +41,36 @@ export function playNotificationSound(): void {
   }
 }
 
+export function playBreakSound(): void {
+  playSoftBreakTone();
+}
+
+function playSoftBreakTone(): void {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    const notes = [392.0, 493.88];
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + i * 0.22);
+      gain.gain.linearRampToValueAtTime(0.075, now + i * 0.22 + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.22 + 1.1);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.22);
+      osc.stop(now + i * 0.22 + 1.1);
+    });
+  } catch {
+    // Silent fail.
+  }
+}
+
 // Play a soft tick sound (for each second, optional)
 export function playTickSound(): void {
   try {
@@ -71,8 +101,6 @@ export type AmbientSound = 'none' | 'rain' | 'cafe' | 'fireplace' | 'forest';
 
 interface AmbientSoundConfig {
   name: string;
-  // Replace these URLs with your own AI-generated audio files
-  // Recommended: 5-10 minute loops, MP3 format
   url: string;
   volume: number;
 }
@@ -80,22 +108,22 @@ interface AmbientSoundConfig {
 export const AMBIENT_SOUNDS: Record<Exclude<AmbientSound, 'none'>, AmbientSoundConfig> = {
   rain: {
     name: '雨声',
-    url: '/sounds/rain.mp3', // Place your AI-generated rain sound here
+    url: '/sounds/rain.wav',
     volume: 0.3,
   },
   cafe: {
     name: '咖啡馆',
-    url: '/sounds/cafe.mp3', // Place your AI-generated cafe ambient here
+    url: '/sounds/cafe.wav',
     volume: 0.2,
   },
   fireplace: {
     name: '壁炉',
-    url: '/sounds/fireplace.mp3', // Place your AI-generated fireplace sound here
+    url: '/sounds/fireplace.wav',
     volume: 0.25,
   },
   forest: {
     name: '森林',
-    url: '/sounds/forest.mp3', // Place your AI-generated forest ambient here
+    url: '/sounds/forest.wav',
     volume: 0.2,
   },
 };
@@ -127,8 +155,7 @@ class AmbientPlayer {
     this.currentSound = sound;
 
     this.audio.play().catch(() => {
-      // Audio file not found - this is expected if sounds haven't been added yet
-      console.info(`Ambient sound "${config.name}" not available. Place audio file at: ${config.url}`);
+      console.info(`Ambient sound "${config.name}" not available: ${config.url}`);
     });
     this.isPlaying = true;
   }

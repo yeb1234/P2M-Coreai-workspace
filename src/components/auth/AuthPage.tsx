@@ -2,10 +2,21 @@ import React, { useState } from 'react';
 import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../stores';
 
+const REMEMBER_KEY = 'p2m-remember';
+
+function loadRemembered(): { username: string; password: string } | null {
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export const AuthPage: React.FC = () => {
+  const remembered = loadRemembered();
   const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState(remembered?.username ?? '');
+  const [password, setPassword] = useState(remembered?.password ?? '');
+  const [remember, setRemember] = useState(!!remembered);
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +31,12 @@ export const AuthPage: React.FC = () => {
     }
     setLoading(true);
     const fn = isRegister ? register : login;
-    await fn(username, password);
+    const ok = await fn(username, password);
+    if (ok && remember) {
+      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ username, password }));
+    } else if (ok && !remember) {
+      localStorage.removeItem(REMEMBER_KEY);
+    }
     setLoading(false);
   };
 
@@ -84,6 +100,18 @@ export const AuthPage: React.FC = () => {
                   autoComplete="new-password"
                 />
               </div>
+            )}
+
+            {!isRegister && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-[#d1cdc6] text-[#c87d2f] focus:ring-[#c87d2f]/20"
+                />
+                <span className="text-xs text-[#6b7280]">记住密码</span>
+              </label>
             )}
 
             {error && (

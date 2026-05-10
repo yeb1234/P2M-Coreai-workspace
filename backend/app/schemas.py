@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -95,6 +95,7 @@ class AiJobCreate(BaseModel):
     temperature: Optional[float] = Field(default=None, ge=0, le=1)
     vad_filter: Optional[bool] = None
     subtitle_correction_enabled: Optional[bool] = None
+    subtitle_correction_scope: Optional[Literal["full", "off"]] = None
     subtitle_correction_prompt: Optional[str] = None
 
 
@@ -113,6 +114,7 @@ class AiJobOut(BaseModel):
     ollama_model: Optional[str] = None
     transcript: Optional[str] = None
     transcript_segments: list[TranscriptSegment] = Field(default_factory=list)
+    subtitle_correction_scope: Optional[str] = None
     summary: Optional[str] = None
     summary_error: Optional[str] = None
     markdown_path: Optional[str] = None
@@ -140,6 +142,7 @@ class AiJobListItem(BaseModel):
     cpu_threads: Optional[int] = None
     compute_type: Optional[str] = None
     subtitle_correction_enabled: Optional[bool] = None
+    subtitle_correction_scope: Optional[str] = None
     subtitle_correction_prompt: Optional[str] = None
     summary_error: Optional[str] = None
     created_at: datetime
@@ -153,6 +156,68 @@ class AiJobListOut(BaseModel):
     queued: int
     failed: int
     completed: int
+
+
+class AiJobBatchCreate(AiJobCreate):
+    video_ids: list[int] = Field(min_length=1, max_length=500)
+    mode: str = "missing_subtitles"
+    max_enqueue: int = Field(default=20, ge=1, le=500)
+    dry_run: bool = True
+
+
+class AiJobBatchSkippedItem(BaseModel):
+    video_id: int
+    title: str
+    reason: str
+
+
+class AiJobBatchOut(BaseModel):
+    mode: str
+    requested: int
+    eligible: int
+    enqueued: int
+    skipped: int
+    active: int
+    already_done: int
+    failed: int
+    limited: bool
+    max_enqueue: int
+    job_ids: list[str] = Field(default_factory=list)
+    skipped_items: list[AiJobBatchSkippedItem] = Field(default_factory=list)
+
+
+class TranscriptionSettingsOut(BaseModel):
+    whisper_engine: str
+    whisper_model: str
+    language: str
+    do_summary: bool
+    word_limit: int
+    cpu_threads: int
+    compute_type: str
+    beam_size: int
+    best_of: int
+    temperature: float
+    vad_filter: bool
+    subtitle_correction_enabled: bool
+    subtitle_correction_scope: Literal["full", "off"]
+    subtitle_correction_prompt: str
+
+
+class TranscriptionSettingsIn(BaseModel):
+    whisper_engine: Optional[str] = None
+    whisper_model: Optional[str] = None
+    language: Optional[str] = None
+    do_summary: Optional[bool] = None
+    word_limit: Optional[int] = Field(default=None, ge=50, le=2000)
+    cpu_threads: Optional[int] = Field(default=None, ge=1, le=128)
+    compute_type: Optional[str] = None
+    beam_size: Optional[int] = Field(default=None, ge=1, le=10)
+    best_of: Optional[int] = Field(default=None, ge=1, le=10)
+    temperature: Optional[float] = Field(default=None, ge=0, le=1)
+    vad_filter: Optional[bool] = None
+    subtitle_correction_enabled: Optional[bool] = None
+    subtitle_correction_scope: Optional[Literal["full", "off"]] = None
+    subtitle_correction_prompt: Optional[str] = None
 
 
 class NoteOut(BaseModel):
@@ -228,3 +293,35 @@ class AssistantChatOut(BaseModel):
     web_search_enabled: bool = False
     deep_research_enabled: bool = False
     references: list[AssistantReference] = Field(default_factory=list)
+
+
+class UserRegister(BaseModel):
+    username: str = Field(min_length=2, max_length=50)
+    password: str = Field(min_length=4, max_length=128)
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    display_name: str | None = None
+    model_config = {"from_attributes": True}
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
+class UserDataItem(BaseModel):
+    value: str
+
+
+class UserDataBulkImport(BaseModel):
+    users: list[dict]
+    kv_data: dict[str, str]

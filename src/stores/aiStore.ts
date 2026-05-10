@@ -37,7 +37,7 @@ interface AIState {
   clearMessages: () => void;
 }
 
-const DEFAULT_ENDPOINT = 'http://127.0.0.1:1234/v1/chat/completions';
+const DEFAULT_ENDPOINT = 'http://192.168.3.161:1234/v1/chat/completions';
 const DEFAULT_MODEL = 'local-model';
 const DEFAULT_SYSTEM_PROMPT = '你是灵境里的本地 AI 助手，只使用中文回答，风格简洁、具体、可执行。';
 export const LOCAL_CORRECTION_PROMPT = '在回答前，先根据上下文自动纠正明显的错别字、误识别词和大小写；如果某个词在当前语境下明显不对，优先按正确术语理解后再回答。';
@@ -66,7 +66,7 @@ function hasCorruptText(value: unknown): boolean {
 
 function normalizeEndpoint(endpoint: unknown): string {
   if (typeof endpoint !== 'string' || hasCorruptText(endpoint)) return DEFAULT_ENDPOINT;
-  if (endpoint === 'http://127.0.0.1:1234') return DEFAULT_ENDPOINT;
+  if (endpoint === 'http://127.0.0.1:1234' || endpoint === 'http://localhost:1234') return DEFAULT_ENDPOINT;
   if (endpoint.endsWith('/v1/chat/completions')) return endpoint;
   if (endpoint.endsWith('/')) return `${endpoint}v1/chat/completions`;
   return endpoint;

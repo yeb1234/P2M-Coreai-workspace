@@ -1,10 +1,11 @@
-# Ambient Sounds
+# Sounds
 
-Place your AI-generated ambient sound files here:
+Local generated audio used by the Pomodoro timer.
 
-- `rain.mp3` - Rain sounds (recommended: 5-10 min loop)
-- `cafe.mp3` - Cafe background noise
-- `fireplace.mp3` - Fireplace crackling
-- `forest.mp3` - Forest/nature sounds
+- Break-start cue is generated with Web Audio in `src/lib/sounds.ts`; the old `break-chime.wav` asset is no longer used by default.
+- `rain.wav` - loopable rain background.
+- `cafe.wav` - loopable cafe background.
+- `fireplace.wav` - loopable fireplace background.
+- `forest.wav` - loopable forest background.
 
-Recommended format: MP3, 128-192kbps, loopable
+The ambient files are short local loops so the app does not depend on external audio URLs.

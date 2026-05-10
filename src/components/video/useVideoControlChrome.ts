@@ -22,7 +22,7 @@ export function useVideoControlChrome(isPlaying: boolean) {
   }, [isPlaying]);
 
   useEffect(() => {
-    const handler = (event: MouseEvent) => {
+    const handler = (event: MouseEvent | TouchEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest('[data-speed-menu]') && !target.closest('[data-speed-btn]')) {
         setShowSpeedMenu(false);
@@ -32,7 +32,11 @@ export function useVideoControlChrome(isPlaying: boolean) {
       }
     };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
   }, []);
 
   useEffect(() => () => {

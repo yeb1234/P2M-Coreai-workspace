@@ -15,7 +15,7 @@
 
 ```bash
 cd D:/SiteYeb/backend
-.venv311/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv311/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 80
 ```
 
 启动后自动运行：API 服务 + AI Worker + 文件监控
@@ -68,7 +68,7 @@ Local video learning platform backend with AI subtitle transcription, smart summ
 
 ```bash
 cd D:/SiteYeb/backend
-.venv311/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv311/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 80
 ```
 
 Starts automatically: API server + AI Worker + File watcher

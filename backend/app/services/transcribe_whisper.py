@@ -89,7 +89,6 @@ def _transcribe_with_whisper_cpp(
     *,
     model_size: str,
     language: Optional[str],
-    cpu_threads: Optional[int],
 ) -> dict:
     exe = settings.whisper_cpp_exe.strip()
     model = settings.whisper_cpp_model.strip()
@@ -99,6 +98,10 @@ def _transcribe_with_whisper_cpp(
         raise RuntimeError("WHISPER_CPP_MODEL is not configured")
     exe_path = Path(exe)
     model_path = Path(model)
+    model_filename = f"ggml-{model_size}.bin" if model_size else ""
+    model_candidate = Path(settings.work_dir).parent / "tools" / "models" / "whisper" / model_filename
+    if model_filename and model_candidate.exists():
+        model_path = model_candidate
     if not exe_path.exists():
         raise RuntimeError(f"whisper.cpp executable not found: {exe_path}")
     if not model_path.exists():
@@ -115,8 +118,6 @@ def _transcribe_with_whisper_cpp(
         "-oj",
         "-of",
         str(output_base),
-        "-t",
-        str(_resolve_cpu_threads(cpu_threads)),
     ]
     if language:
         command.extend(["-l", language])
@@ -151,7 +152,6 @@ def transcribe_wav(
             wav_path,
             model_size=model_size,
             language=language,
-            cpu_threads=cpu_threads,
         )
 
     model = get_whisper_model(model_size, cpu_threads=cpu_threads, compute_type=compute_type)

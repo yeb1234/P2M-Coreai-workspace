@@ -1,5 +1,6 @@
 import Dexie from 'dexie';
 import type { StateStorage } from 'zustand/middleware';
+import { getUserData, setUserData, deleteUserData } from './authApi';
 
 interface UserRow {
   username: string;
@@ -41,10 +42,6 @@ export function restoreUser(): string | null {
   const saved = localStorage.getItem('p2m-current-user');
   currentUser = saved;
   return saved;
-}
-
-function prefixKey(key: string): string {
-  return currentUser ? `${currentUser}:${key}` : key;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -99,24 +96,65 @@ export async function upsertUser(username: string, passwordHash: string): Promis
   await db.users.put({ username: normalized, passwordHash, displayName: username.trim() });
 }
 
+export async function getAllIDBUsers(): Promise<UserRow[]> {
+  if (!db) return Array.from(memoryUsers.values());
+  return db.users.toArray();
+}
+
+export async function getAllIDBKvData(username: string): Promise<Record<string, string>> {
+  const prefix = `${username}:`;
+  if (!db) {
+    const result: Record<string, string> = {};
+    for (const [key, value] of memoryKv.entries()) {
+      if (key.startsWith(prefix)) {
+        result[key.slice(prefix.length)] = value;
+      }
+    }
+    return result;
+  }
+  const rows = await db.kv.where('key').startsWith(prefix).toArray();
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    result[row.key.slice(prefix.length)] = row.value;
+  }
+  return result;
+}
+
+export async function clearIDBData(): Promise<void> {
+  if (!db) {
+    memoryKv.clear();
+    memoryUsers.clear();
+    return;
+  }
+  await db.kv.clear();
+  await db.users.clear();
+}
+
 export const idbStorage: StateStorage = {
   getItem: async (name: string) => {
-    if (!db) return memoryKv.get(prefixKey(name)) ?? null;
-    const row = await db.kv.get(prefixKey(name));
-    return row?.value ?? null;
+    try {
+      const result = await getUserData(name);
+      return result ?? null;
+    } catch {
+      if (!db) return memoryKv.get(name) ?? null;
+      const row = await db.kv.get(name);
+      return row?.value ?? null;
+    }
   },
   setItem: async (name: string, value: string) => {
-    if (!db) {
-      memoryKv.set(prefixKey(name), value);
-      return;
+    try {
+      await setUserData(name, value);
+    } catch {
+      if (!db) { memoryKv.set(name, value); return; }
+      await db.kv.put({ key: name, value });
     }
-    await db.kv.put({ key: prefixKey(name), value });
   },
   removeItem: async (name: string) => {
-    if (!db) {
-      memoryKv.delete(prefixKey(name));
-      return;
+    try {
+      await deleteUserData(name);
+    } catch {
+      if (!db) { memoryKv.delete(name); return; }
+      await db.kv.delete(name);
     }
-    await db.kv.delete(prefixKey(name));
   },
 };

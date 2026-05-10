@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useCalendarStore, useTodoStore } from '../../stores';
 import { getWeekDays, getWeekDayNames, isTodayCheck, toISODateString } from '../../lib/date';
+import type { Todo } from '../../types';
 
 export const WeekView: React.FC = () => {
   const rawMonth = useCalendarStore((s) => s.currentMonth);
@@ -21,8 +22,155 @@ export const WeekView: React.FC = () => {
   const weekDays = getWeekDays(currentMonth);
   const dayNames = getWeekDayNames();
 
+  const pendingTodosByDate = useMemo(() => {
+    const byDate: Record<string, Todo[]> = {};
+    Object.values(todos).forEach((todo) => {
+      if (todo.status === 'completed' || !todo.dueDate) return;
+      if (!byDate[todo.dueDate]) byDate[todo.dueDate] = [];
+      byDate[todo.dueDate].push(todo);
+    });
+    return byDate;
+  }, [todos]);
+
   return (
-    <div className="grid grid-cols-7 gap-2">
+    <div className="space-y-3 md:grid md:grid-cols-7 md:gap-2 md:space-y-0">
+      {/* Mobile: compact two-row day strip */}
+      <div className="grid grid-cols-4 gap-1.5 md:hidden">
+        {weekDays.map((date, idx) => {
+          const dateStr = toISODateString(date);
+          const events = getEventsForDate(dateStr).filter((e) => {
+            if (e.type !== 'todo') return true;
+            if (e.todoId && completedTodoSet.ids.has(e.todoId)) return false;
+            if (!e.todoId && completedTodoSet.titles.has(e.title)) return false;
+            return true;
+          });
+          const todos = pendingTodosByDate[dateStr] || [];
+          const isToday = isTodayCheck(date);
+          const isSelected = selectedDate === dateStr;
+          const totalItems = events.length + todos.length;
+
+          return (
+            <button
+              key={dateStr}
+              type="button"
+              onClick={() => setSelectedDate(dateStr)}
+              className="flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 transition-all"
+              style={{
+                background: isSelected
+                  ? 'linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, var(--bg-card)) 0%, color-mix(in srgb, var(--accent) 10%, var(--bg-card)) 100%)'
+                  : isToday
+                  ? 'color-mix(in srgb, var(--accent) 8%, var(--bg-card))'
+                  : undefined,
+                boxShadow: isSelected ? 'var(--shadow-card)' : 'none',
+              }}
+            >
+              <span
+                className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-all ${
+                  isToday
+                    ? 'bg-[var(--accent)] text-white'
+                    : isSelected
+                    ? 'text-[var(--accent)] font-bold ring-1 ring-[var(--accent)]'
+                    : 'text-[var(--text-primary)]'
+                }`}
+              >
+                {date.getDate()}
+              </span>
+              <span className={`min-w-0 text-[11px] font-medium ${isToday ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
+                {dayNames[idx]}
+              </span>
+              <span className={`ml-auto text-[10px] ${totalItems > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
+                {totalItems > 0 ? totalItems : ''}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Mobile: expanded details for every day in the week */}
+      <div className="space-y-2 md:hidden">
+        {weekDays.map((date, idx) => {
+          const dateStr = toISODateString(date);
+          const events = getEventsForDate(dateStr).filter((e) => {
+            if (e.type !== 'todo') return true;
+            if (e.todoId && completedTodoSet.ids.has(e.todoId)) return false;
+            if (!e.todoId && completedTodoSet.titles.has(e.title)) return false;
+            return true;
+          });
+          const todos = pendingTodosByDate[dateStr] || [];
+          const isToday = isTodayCheck(date);
+          const isSelected = selectedDate === dateStr;
+          const hasItems = events.length > 0 || todos.length > 0;
+
+          return (
+            <button
+              key={dateStr}
+              type="button"
+              onClick={() => setSelectedDate(dateStr)}
+              className={`w-full rounded-xl border p-3 text-left transition-all ${
+                isSelected
+                  ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]'
+                  : 'border-[var(--border-light)]'
+              }`}
+              style={{
+                background: isToday
+                  ? 'color-mix(in srgb, var(--accent) 7%, var(--bg-card))'
+                  : 'var(--bg-card)',
+                boxShadow: isSelected ? 'var(--shadow-card)' : 'none',
+              }}
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <span
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                    isToday ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)]'
+                  }`}
+                >
+                  {date.getDate()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{dayNames[idx]}</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">{dateStr}</p>
+                </div>
+                <span className="text-[10px] text-[var(--text-muted)]">{events.length + todos.length} 项</span>
+              </div>
+
+              {!hasItems ? (
+                <p className="rounded-lg bg-[var(--bg-secondary)] px-2 py-2 text-xs text-[var(--text-muted)]">当天无内容</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {events.map((event) => (
+                    <div
+                      key={event.id}
+                      className="rounded-lg px-2 py-1.5 text-xs"
+                      style={{
+                        background: `color-mix(in srgb, ${event.color} 14%, var(--bg-card))`,
+                        borderLeft: `3px solid ${event.color}`,
+                      }}
+                    >
+                      <div className="truncate font-medium text-[var(--text-primary)]">{event.title}</div>
+                      {event.startTime && (
+                        <div className="text-[10px] text-[var(--text-secondary)]">{event.startTime}{event.endTime ? ` - ${event.endTime}` : ''}</div>
+                      )}
+                    </div>
+                  ))}
+                  {todos.map((todo) => (
+                    <div
+                      key={todo.id}
+                      className="rounded-lg bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] px-2 py-1.5 text-xs"
+                    >
+                      <div className="truncate font-medium text-[var(--accent)]">{todo.priority === 'high' ? '! ' : ''}{todo.title}</div>
+                      {todo.pomodoroRounds > 0 && (
+                        <div className="text-[10px] text-[var(--text-muted)]">{todo.pomodoroRounds} 轮</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Desktop: vertical card grid */}
       {weekDays.map((date, idx) => {
         const dateStr = toISODateString(date);
         const events = getEventsForDate(dateStr).filter((e) => {
@@ -39,22 +187,24 @@ export const WeekView: React.FC = () => {
             key={dateStr}
             type="button"
             onClick={() => setSelectedDate(dateStr)}
-            className={`flex flex-col text-left rounded-xl border transition-all hover:shadow-md ${
+            className={`hidden md:flex flex-col items-stretch text-left rounded-lg border transition-all hover:shadow-sm ${
               isSelected
                 ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]'
                 : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'
-            }`}
+            } ${isToday ? 'bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-card))]' : ''}`}
             style={{
               background: isSelected
                 ? 'linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, var(--bg-card)) 0%, color-mix(in srgb, var(--accent) 10%, var(--bg-card)) 100%)'
-                : 'linear-gradient(160deg, var(--bg-card) 0%, var(--bg-elevated) 100%)',
+                : undefined,
               boxShadow: isSelected ? 'var(--shadow-card)' : 'none',
             }}
           >
             <div className="text-center py-2 border-b border-[var(--border-light)]">
-              <div className="text-[10px] text-[var(--text-muted)] mb-0.5">{dayNames[idx]}</div>
+              <div className={`text-[10px] ${isToday ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-muted)]'}`}>
+                {dayNames[idx]}
+              </div>
               <span
-                className={`inline-flex items-center justify-center w-7 h-7 text-sm font-medium rounded-full ${
+                className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full ${
                   isToday
                     ? 'bg-[var(--accent)] text-white'
                     : isSelected
@@ -65,28 +215,37 @@ export const WeekView: React.FC = () => {
                 {date.getDate()}
               </span>
             </div>
-
             <div className="flex-1 space-y-1 min-h-[100px] p-1.5">
-              {events.length === 0 ? (
+              {events.length === 0 && (pendingTodosByDate[dateStr] || []).length === 0 ? (
                 <div className="h-full flex items-center justify-center">
                   <span className="text-[9px] text-[var(--text-muted)]">-</span>
                 </div>
               ) : (
-                events.map((event) => (
-                  <div
-                    key={event.id}
-                    className="text-[11px] p-1.5 rounded"
-                    style={{
-                      background: `color-mix(in srgb, ${event.color} 16%, var(--bg-card))`,
-                      borderLeft: `2px solid ${event.color}`,
-                    }}
-                  >
-                    <div className="font-medium text-[var(--text-primary)] truncate">{event.title}</div>
-                    {event.startTime && (
-                      <div className="text-[10px] text-[var(--text-secondary)]">{event.startTime}</div>
-                    )}
-                  </div>
-                ))
+                <>
+                  {events.map((event) => (
+                    <div
+                      key={event.id}
+                      className="text-[11px] p-1.5 rounded"
+                      style={{
+                        background: `color-mix(in srgb, ${event.color} 16%, var(--bg-card))`,
+                        borderLeft: `2px solid ${event.color}`,
+                      }}
+                    >
+                      <div className="font-medium text-[var(--text-primary)] truncate">{event.title}</div>
+                      {event.startTime && (
+                        <div className="text-[10px] text-[var(--text-secondary)]">{event.startTime}</div>
+                      )}
+                    </div>
+                  ))}
+                  {(pendingTodosByDate[dateStr] || []).slice(0, 3).map((t) => (
+                    <div
+                      key={t.id}
+                      className="text-[11px] p-1.5 rounded bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]"
+                    >
+                      <div className="font-medium text-[var(--accent)] truncate">{t.priority === 'high' ? '!' : ''} {t.title}</div>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           </button>

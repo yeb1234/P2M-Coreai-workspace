@@ -3,18 +3,18 @@ echo "========================================"
 echo "  SiteYeb / P2M CoreAI Workspace"
 echo "========================================"
 echo ""
-echo "Starting backend (port 5200)..."
-cd backend && .venv311/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 5200 --reload &
+echo "Starting backend (port 80)..."
+cd backend && .venv311/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload &
 BACKEND_PID=$!
 cd ..
 sleep 2
-echo "Starting frontend (port 5173)..."
+echo "Starting frontend dev server (port 8000)..."
 npm run dev &
 FRONTEND_PID=$!
 echo ""
 echo "Services running:"
-echo "  Frontend: http://localhost:5173"
-echo "  Backend:  http://127.0.0.1:5200"
+echo "  App / Backend: http://localhost"
+echo "  Frontend dev: http://localhost:8000"
 echo ""
 echo "Press Ctrl+C to stop all services."
 trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit" INT TERM

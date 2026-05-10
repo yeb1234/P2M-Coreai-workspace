@@ -85,6 +85,7 @@ class AiJob(Base):
     temperature = Column(Float, nullable=True)
     vad_filter = Column(Boolean, nullable=True)
     subtitle_correction_enabled = Column(Boolean, nullable=True)
+    subtitle_correction_scope = Column(String, nullable=True)
     subtitle_correction_prompt = Column(Text, nullable=True)
     transcript = Column(Text, nullable=True)
     transcript_segments = Column(Text, nullable=True)
@@ -96,6 +97,14 @@ class AiJob(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     video = relationship("Video", back_populates="ai_jobs")
+
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key = Column(String, primary_key=True, index=True)
+    value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class Note(Base):
@@ -150,3 +159,31 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     references_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    display_name = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    data = relationship("UserData", back_populates="user", cascade="all, delete-orphan")
+
+
+class UserData(Base):
+    __tablename__ = "user_data"
+    __table_args__ = (
+        Index("ix_user_data_user_store", "user_id", "store_key", unique=True),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    store_key = Column(String, nullable=False)
+    value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    user = relationship("User", back_populates="data")

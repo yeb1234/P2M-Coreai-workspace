@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5200';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export function resolveApiUrl(url: string | null | undefined): string | null {
   if (!url) return null;

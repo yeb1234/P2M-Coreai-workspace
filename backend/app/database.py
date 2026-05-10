@@ -24,28 +24,32 @@ class Settings(BaseSettings):
     external_llm_api_key: str = ""
     external_llm_model: str = "sensenova-6.7-flash-lite"
     assistant_llm_provider: str = "local"
-    openai_base_url: str = "http://localhost:1234/v1"
+    openai_base_url: str = "http://192.168.3.161:1234/v1"
     openai_api_key: str = "lm-studio"
     openai_model: str = "qwen3-vl-8b"
     ai_worker_concurrency: int = 1
     ai_worker_poll_interval: float = 2.0
-    ai_worker_requeue_running_on_start: bool = False
+    ai_worker_requeue_running_on_start: bool = True
     thumbnail_background_enabled: bool = False
     thumbnail_background_idle_cycles: int = 10
     thumbnail_background_limit: int = 1
-    whisper_cpu_threads: int = min(4, os.cpu_count() or 4)
+    whisper_cpu_threads: int = min(12, os.cpu_count() or 12)
     whisper_compute_type: str = "int8"
     whisper_beam_size: int = 5
     whisper_best_of: int = 5
     whisper_temperature: float = 0.0
     whisper_vad_filter: bool = True
-    subtitle_correction_enabled: bool = True
+    subtitle_correction_enabled: bool = False
+    subtitle_correction_scope: str = "full"
     subtitle_correction_batch_size: int = 60
     subtitle_correction_timeout_s: int = 180
     whisper_engine: str = "faster-whisper"
     whisper_cpp_exe: str = ""
     whisper_cpp_model: str = ""
     whisper_cpp_extra_args: str = ""
+    jwt_secret: str = "p2m-local-dev-secret-change-in-prod"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 72
 
     model_config = SettingsConfigDict(env_file=str(ROOT_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
 
@@ -104,7 +108,25 @@ def ensure_runtime_schema() -> None:
             "CREATE INDEX IF NOT EXISTS ix_watch_history_video_watched ON watch_history(video_id, watched_at)"
         )
         connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_watch_history_watched ON watch_history(watched_at)"
+        )
+        connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_subtitle_segments_video_index ON subtitle_segments(video_id, segment_index)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_ai_jobs_status_created ON ai_jobs(status, created_at)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_ai_jobs_video_status ON ai_jobs(video_id, status)"
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at DATETIME
+            )
+            """
         )
         ai_job_columns = {
             row[1]
@@ -118,6 +140,7 @@ def ensure_runtime_schema() -> None:
             ("temperature", "FLOAT"),
             ("vad_filter", "BOOLEAN"),
             ("subtitle_correction_enabled", "BOOLEAN"),
+            ("subtitle_correction_scope", "TEXT"),
             ("subtitle_correction_prompt", "TEXT"),
             ("whisper_engine", "TEXT"),
         ):
@@ -162,3 +185,33 @@ def ensure_runtime_schema() -> None:
         except Exception:
             # Some SQLite builds omit FTS5; substring fallback search remains available.
             pass
+
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                display_name TEXT,
+                created_at DATETIME,
+                updated_at DATETIME
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users(username)"
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS user_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                store_key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                updated_at DATETIME
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_data_user_store ON user_data(user_id, store_key)"
+        )

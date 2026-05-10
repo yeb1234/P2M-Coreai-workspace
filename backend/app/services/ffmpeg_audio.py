@@ -5,12 +5,14 @@ from pathlib import Path
 from app.database import settings
 
 
-def _resolve_threads(cpu_threads: int | None = None) -> int:
-    value = cpu_threads if cpu_threads is not None else settings.whisper_cpu_threads
+def _resolve_threads(cpu_threads: int | None = None) -> int | None:
+    if cpu_threads is None:
+        return None
+    value = cpu_threads
     try:
         return max(1, min(128, int(value)))
     except (TypeError, ValueError):
-        return 4
+        return None
 
 
 def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | None = None) -> None:
@@ -22,8 +24,6 @@ def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | No
     cmd = [
         "ffmpeg",
         "-y",
-        "-threads",
-        str(_resolve_threads(cpu_threads)),
         "-i",
         str(video_path),
         "-vn",
@@ -35,6 +35,9 @@ def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | No
         "wav",
         str(wav_path),
     ]
+    resolved_threads = _resolve_threads(cpu_threads)
+    if resolved_threads is not None:
+        cmd[2:2] = ["-threads", str(resolved_threads)]
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if process.returncode != 0:
         raise RuntimeError(process.stderr.strip() or "ffmpeg failed")

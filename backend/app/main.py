@@ -1,18 +1,22 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 import logging
 import threading
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy import func
 
 from app.database import Base, SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
-from app.routers import admin, ai_jobs, assistant, categories, notes, videos
+from app.routers import admin, ai_jobs, assistant, auth, categories, notes, user_data, videos
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
 from app.worker import main as worker_main
+
+DIST_DIR = Path(__file__).resolve().parents[2] / "dist"
 
 
 logger = logging.getLogger(__name__)
@@ -65,12 +69,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174", "http://localhost:5175", "http://127.0.0.1:5175"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
+app.include_router(user_data.router)
 app.include_router(videos.router)
 app.include_router(categories.router)
 app.include_router(ai_jobs.router)
@@ -82,13 +88,8 @@ app.mount("/output", StaticFiles(directory=settings.output_dir), name="output")
 app.mount("/thumbnails", StaticFiles(directory=settings.thumbnail_dir), name="thumbnails")
 app.mount("/sprites", StaticFiles(directory=settings.sprite_dir), name="sprites")
 
-
-@app.get("/")
-def root():
-    return {
-        "message": "P2 Learning OS API",
-        "video_folder": settings.video_folder,
-    }
+if DIST_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="static-assets")
 
 
 @app.get("/api/stats", response_model=StatsOut)
@@ -115,3 +116,14 @@ def get_stats():
         )
     finally:
         db.close()
+
+
+@app.get("/{full_path:path}")
+async def serve_spa(request: Request, full_path: str):
+    if full_path.startswith("api/") or full_path.startswith("output/") or full_path.startswith("thumbnails/") or full_path.startswith("sprites/") or full_path.startswith("assets/"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    index = DIST_DIR / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    return {"message": "P2 Learning OS API", "video_folder": settings.video_folder}

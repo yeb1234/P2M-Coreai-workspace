@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTodoStore, useCalendarStore, usePomodoroStore, useNotificationStore } from '../stores';
 import { PRIORITY_COLORS, type Todo, type PomodoroSession } from '../types';
-import { playNotificationSound } from '../lib/sounds';
+import { playBreakSound, playNotificationSound } from '../lib/sounds';
 import { toLocalDateString } from '../lib/date';
 
 export const useCrossModuleSync = () => {
@@ -47,6 +47,7 @@ export const useCrossModuleSync = () => {
       if (phaseChanged || stoppedRunning) {
         playNotificationSound();
         if (phaseChanged && prevPhase === 'work') {
+          playBreakSound();
           const completedSessions = state.timer.sessionsCompleted;
           const longBreakInterval = state.config.longBreakInterval;
           useNotificationStore.getState().addNotification({

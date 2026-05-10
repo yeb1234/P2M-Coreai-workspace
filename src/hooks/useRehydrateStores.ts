@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useUIStore, useTodoStore, useCalendarStore, usePomodoroStore, usePluginStore, useNotesStore, useNotificationStore } from '../stores';
+import { useUIStore, useTodoStore, useCalendarStore, usePomodoroStore, usePluginStore, useNotesStore, useNotificationStore, useTranscriptionStore } from '../stores';
 
 const ALL_STORES = [
   useUIStore,
@@ -9,6 +9,7 @@ const ALL_STORES = [
   usePluginStore,
   useNotesStore,
   useNotificationStore,
+  useTranscriptionStore,
 ];
 
 export function useRehydrateStores(currentUser: string | null) {

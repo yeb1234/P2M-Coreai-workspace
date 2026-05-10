@@ -31,6 +31,16 @@ describe('todoStore', () => {
     expect(useTodoStore.getState().trash[id]).toBeDefined();
   });
 
+  it('moves completed todos to trash', () => {
+    const done = useTodoStore.getState().addTodo({ title: 'Done', status: 'completed' });
+    const active = useTodoStore.getState().addTodo({ title: 'Active' });
+    const moved = useTodoStore.getState().trashCompletedTodos();
+    expect(moved).toBe(1);
+    expect(useTodoStore.getState().todos[done]).toBeUndefined();
+    expect(useTodoStore.getState().trash[done]).toBeDefined();
+    expect(useTodoStore.getState().todos[active]).toBeDefined();
+  });
+
   it('restores a todo from trash', () => {
     const id = useTodoStore.getState().addTodo({ title: 'To restore' });
     useTodoStore.getState().deleteTodo(id);

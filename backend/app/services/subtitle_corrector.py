@@ -7,10 +7,11 @@ from app.services.llm_client import OpenAICompatibleClient
 
 
 SYSTEM_PROMPT = (
-    "你是字幕校对助手。只修正每条字幕 text 中明显的语音识别错误、错别字、技术术语和大小写。"
-    "例如在 Git、GitHub、代码管理、提交、分支语境里，Gate 应修为 Git。"
-    "不要总结，不要扩写，不要翻译，不要合并或拆分字幕，不要改时间。"
-    "只返回严格 JSON 数组，格式为 [{\"index\": 0, \"text\": \"修正后的字幕\"}]。"
+    "/no_thinking\n"
+    "你是字幕校对助手。只修正每条字幕 text 中明显的语音识别错误、错别字、专有名词和大小写。\n"
+    "不要总结，不要扩写，不要翻译，不要合并或拆分字幕，不要改时间。\n"
+    "不要输出思考过程、解释、Markdown 或代码块。只返回严格 JSON 数组，格式为 "
+    "[{\"index\": 0, \"text\": \"修正后的字幕\"}]。"
 )
 
 
@@ -50,17 +51,23 @@ def _build_user_prompt(batch: list[dict], extra_prompt: str | None = None) -> st
             )
         )
     return (
+        "/no_thinking\n"
         "请根据上下文校对下面字幕。保留 index，不返回 start/end，只返回 JSON 数组。\n"
-        + (f"额外术语和校对要求：{extra_prompt.strip()}\n" if extra_prompt and extra_prompt.strip() else "")
+        + (f"额外校对要求：{extra_prompt.strip()}\n" if extra_prompt and extra_prompt.strip() else "")
         + "字幕逐行如下：\n"
         + "\n".join(lines)
     )
 
 
-def _chunk_segments(segments: list[dict], batch_size: int) -> list[list[dict]]:
+def _select_segments_for_scope(segments: list[dict], scope: str) -> list[dict]:
+    if scope == "off":
+        return []
+    return [{**segment, "index": index} for index, segment in enumerate(segments)]
+
+
+def _chunk_indexed_segments(indexed_segments: list[dict], batch_size: int) -> list[list[dict]]:
     size = max(1, batch_size)
-    indexed = [{**segment, "index": index} for index, segment in enumerate(segments)]
-    return [indexed[index : index + size] for index in range(0, len(indexed), size)]
+    return [indexed_segments[index : index + size] for index in range(0, len(indexed_segments), size)]
 
 
 def correct_segments_with_openai(
@@ -72,14 +79,19 @@ def correct_segments_with_openai(
     batch_size: int = 60,
     timeout_s: int = 180,
     extra_prompt: str | None = None,
+    scope: str = "full",
 ) -> list[dict]:
     if not segments:
         return segments
 
     corrected = [{**segment} for segment in segments]
+    selected = _select_segments_for_scope(corrected, scope)
+    if not selected:
+        return corrected
+
     client = OpenAICompatibleClient(base_url=base_url, api_key=api_key, timeout_s=timeout_s)
 
-    for batch in _chunk_segments(corrected, batch_size):
+    for batch in _chunk_indexed_segments(selected, batch_size):
         content = client.chat_completion(
             model=model,
             messages=[

@@ -33,6 +33,7 @@ interface TodoState {
   addTodo: (data: Partial<Todo> & { title: string }) => ID;
   updateTodo: (id: ID, updates: Partial<Todo>) => void;
   deleteTodo: (id: ID) => void;
+  trashCompletedTodos: (ids?: ID[]) => number;
   restoreTodo: (id: ID) => void;
   permanentDeleteTodo: (id: ID) => void;
   clearTrash: () => void;
@@ -91,6 +92,7 @@ export const useTodoStore = create<TodoState>()(
           totalFocusMinutes: data.totalFocusMinutes || 0,
           createdAt: timestamp,
           updatedAt: timestamp,
+          completedAt: data.status === 'completed' ? timestamp : null,
           calendarEventId: data.calendarEventId || null,
         };
         set((state) => ({
@@ -106,10 +108,15 @@ export const useTodoStore = create<TodoState>()(
         set((state) => {
           const todo = state.todos[id];
           if (!todo) return state;
+          const timestamp = now();
+          const nextStatus = updates.status ?? todo.status;
+          const completedAt = nextStatus === 'completed'
+            ? (todo.status === 'completed' ? todo.completedAt ?? timestamp : timestamp)
+            : null;
           return {
             todos: {
               ...state.todos,
-              [id]: { ...todo, ...updates, updatedAt: now() },
+              [id]: { ...todo, ...updates, completedAt, updatedAt: timestamp },
             },
           };
         });
@@ -130,6 +137,33 @@ export const useTodoStore = create<TodoState>()(
             redoStack: [],
           };
         });
+      },
+
+      trashCompletedTodos: (ids) => {
+        const targetIds = new Set(ids);
+        let moved = 0;
+        set((state) => {
+          const timestamp = now();
+          const todos = { ...state.todos };
+          const trash = { ...state.trash };
+          const movedIds: ID[] = [];
+          for (const todo of Object.values(state.todos)) {
+            if (todo.status !== 'completed') continue;
+            if (ids && !targetIds.has(todo.id)) continue;
+            delete todos[todo.id];
+            trash[todo.id] = { todo, deletedAt: timestamp };
+            movedIds.push(todo.id);
+          }
+          moved = movedIds.length;
+          if (movedIds.length === 0) return state;
+          const movedSet = new Set(movedIds);
+          return {
+            todos,
+            trash,
+            todoOrder: state.todoOrder.filter((id) => !movedSet.has(id)),
+          };
+        });
+        return moved;
       },
 
       restoreTodo: (id) => {
@@ -165,17 +199,17 @@ export const useTodoStore = create<TodoState>()(
         const action = state.undoStack[state.undoStack.length - 1];
         if (!action) return;
         const undoStack = state.undoStack.slice(0, -1);
+        const pushRedo = { undoStack, redoStack: [...state.redoStack, action] };
         if (action.type === 'create') {
           const todo = state.todos[action.id];
           if (!todo) return;
           const todos = { ...state.todos };
           delete todos[action.id];
           set({
+            ...pushRedo,
             todos,
             todoOrder: state.todoOrder.filter((oid) => oid !== action.id),
             trash: { ...state.trash, [action.id]: { todo, deletedAt: now() } },
-            undoStack,
-            redoStack: [...state.redoStack, action],
           });
         } else if (action.type === 'delete') {
           const { todo } = action;
@@ -184,11 +218,10 @@ export const useTodoStore = create<TodoState>()(
           const trash = { ...state.trash };
           delete trash[todo.id];
           set({
+            ...pushRedo,
             todos: { ...state.todos, [todo.id]: todo },
             todoOrder,
             trash,
-            undoStack,
-            redoStack: [...state.redoStack, action],
           });
         } else if (action.type === 'restore') {
           const todo = state.todos[action.id];
@@ -196,11 +229,10 @@ export const useTodoStore = create<TodoState>()(
           const todos = { ...state.todos };
           delete todos[action.id];
           set({
+            ...pushRedo,
             todos,
             todoOrder: state.todoOrder.filter((oid) => oid !== action.id),
             trash: { ...state.trash, [action.id]: { todo, deletedAt: now() } },
-            undoStack,
-            redoStack: [...state.redoStack, action],
           });
         }
       },
@@ -210,28 +242,27 @@ export const useTodoStore = create<TodoState>()(
         const action = state.redoStack[state.redoStack.length - 1];
         if (!action) return;
         const redoStack = state.redoStack.slice(0, -1);
+        const pushUndo = { undoStack: [...state.undoStack, action], redoStack };
         if (action.type === 'create') {
           const trashed = state.trash[action.id];
           if (!trashed) return;
           const trash = { ...state.trash };
           delete trash[action.id];
           set({
+            ...pushUndo,
             todos: { ...state.todos, [action.id]: trashed.todo },
             todoOrder: [...state.todoOrder, action.id],
             trash,
-            undoStack: [...state.undoStack, action],
-            redoStack,
           });
         } else if (action.type === 'delete') {
           const { todo } = action;
           const todos = { ...state.todos };
           delete todos[todo.id];
           set({
+            ...pushUndo,
             todos,
             todoOrder: state.todoOrder.filter((oid) => oid !== todo.id),
             trash: { ...state.trash, [todo.id]: { todo, deletedAt: now() } },
-            undoStack: [...state.undoStack, action],
-            redoStack,
           });
         } else if (action.type === 'restore') {
           const trashed = state.trash[action.id];
@@ -239,11 +270,10 @@ export const useTodoStore = create<TodoState>()(
           const trash = { ...state.trash };
           delete trash[action.id];
           set({
+            ...pushUndo,
             todos: { ...state.todos, [action.id]: trashed.todo },
             todoOrder: [...state.todoOrder, action.id],
             trash,
-            undoStack: [...state.undoStack, action],
-            redoStack,
           });
         }
       },
@@ -257,13 +287,16 @@ export const useTodoStore = create<TodoState>()(
             in_progress: 'completed',
             completed: 'pending',
           };
+          const nextStatus = statusMap[todo.status];
+          const timestamp = now();
           return {
             todos: {
               ...state.todos,
               [id]: {
                 ...todo,
-                status: statusMap[todo.status],
-                updatedAt: now(),
+                status: nextStatus,
+                completedAt: nextStatus === 'completed' ? timestamp : null,
+                updatedAt: timestamp,
               },
             },
           };
@@ -308,6 +341,7 @@ export const useTodoStore = create<TodoState>()(
           const nextCount = todo.pomodoroCount + 1;
           const targetCount = Math.max(0, todo.pomodoroRounds || 0);
           const reachedTarget = targetCount > 0 && nextCount >= targetCount;
+          const timestamp = now();
           return {
             todos: {
               ...state.todos,
@@ -316,7 +350,8 @@ export const useTodoStore = create<TodoState>()(
                 pomodoroCount: nextCount,
                 totalFocusMinutes: todo.totalFocusMinutes + focusMinutes,
                 status: reachedTarget ? 'completed' : 'in_progress',
-                updatedAt: now(),
+                completedAt: reachedTarget ? (todo.completedAt ?? timestamp) : null,
+                updatedAt: timestamp,
               },
             },
           };

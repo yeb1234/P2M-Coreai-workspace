@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle2, FolderTree, List, Loader2, PlayCircle, RotateCcw, Sparkles } from 'lucide-react';
 import { getThumbnailUrl, type PlaylistItem, type VideoItem } from '../../lib/videoApi';
 import type { PlaylistScope } from './useVideoPlaylist';
@@ -38,8 +39,19 @@ export function VideoPlaylistPanel({
   onSelectItem,
   footer,
 }: VideoPlaylistPanelProps) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   return (
-    <div className="relative min-w-0 space-y-3 lg:shrink-0" style={{ width: `${width}px`, maxWidth: '100%' }}>
+    <div
+      className="relative min-w-0 space-y-3 lg:shrink-0"
+      style={isMobile ? { width: '100%', maxWidth: '100%' } : { width: `${width}px`, maxWidth: '100%' }}
+    >
       <div
         className="group absolute -left-4 top-0 bottom-0 hidden w-4 cursor-col-resize items-center justify-center lg:flex"
         onMouseDown={(e) => {
@@ -108,7 +120,7 @@ export function VideoPlaylistPanel({
         </label>
       </div>
 
-      <div className="h-[60vh] space-y-1 overflow-y-auto pr-1">
+      <div className={`${isMobile ? 'h-[35vh]' : 'h-[60vh]'} space-y-1 overflow-y-auto pr-1`}>
         {playlist.map((item) => (
           <div
             key={item.id}

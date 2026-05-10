@@ -1,11 +1,13 @@
 import React from 'react';
-import type { CalendarEvent, ISODateString } from '../../types';
+import type { CalendarEvent, ISODateString, Todo } from '../../types';
 import { isTodayCheck, toISODateString } from '../../lib/date';
 import { EventChip } from './EventChip';
 
 interface DayCellProps {
   date: Date;
   events: CalendarEvent[];
+  completedTodos?: Todo[];
+  pendingTodos?: Todo[];
   isSelected: boolean;
   isCurrentMonth: boolean;
   heatLevel: number;
@@ -25,6 +27,8 @@ const HEAT_COLORS = [
 export const DayCell: React.FC<DayCellProps> = React.memo(({
   date,
   events,
+  completedTodos = [],
+  pendingTodos = [],
   isSelected,
   isCurrentMonth: isInMonth,
   heatLevel,
@@ -35,12 +39,14 @@ export const DayCell: React.FC<DayCellProps> = React.memo(({
   const isToday = isTodayCheck(date);
   const dayNumber = date.getDate();
   const dateStr = toISODateString(date);
+  const visibleCompletedTodos = completedTodos.slice(0, 1);
+  const visiblePending = pendingTodos.slice(0, 2);
 
   return (
     <button
       onClick={() => onSelect(dateStr)}
       onDoubleClick={() => onDoubleClick?.(dateStr)}
-      className={`relative h-[76px] p-1.5 rounded-lg border transition-all hover:shadow-md overflow-hidden ${
+      className={`relative h-[52px] md:h-[76px] p-1 rounded-lg border transition-all hover:shadow-md overflow-hidden ${
         isSelected ? 'ring-2 ring-[#c87d2f] border-[#c87d2f]' : ''
       } ${!isInMonth ? 'opacity-40' : ''}`}
       style={{
@@ -54,16 +60,16 @@ export const DayCell: React.FC<DayCellProps> = React.memo(({
       }}
     >
       <div
-        className={`text-xs font-medium mb-0.5 ${
+        className={`text-[10px] md:text-xs font-medium mb-0.5 ${
           isToday
-            ? 'w-5 h-5 flex items-center justify-center bg-[#c87d2f] text-white rounded-full mx-auto text-[10px]'
+            ? 'w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-[#c87d2f] text-white rounded-full mx-auto text-[8px] md:text-[10px]'
             : 'text-[#1a1a1a]'
         }`}
       >
         {dayNumber}
       </div>
 
-      <div className="space-y-0.5 overflow-y-auto max-h-[42px]">
+      <div className="space-y-0.5 overflow-y-auto max-h-[28px] md:max-h-[42px]">
         {events.map((event) => (
           <EventChip
             key={event.id}
@@ -71,6 +77,25 @@ export const DayCell: React.FC<DayCellProps> = React.memo(({
             onClick={() => onEventClick?.(event)}
           />
         ))}
+        {events.length === 0 && visiblePending.map((todo) => (
+          <div
+            key={todo.id}
+            className="truncate rounded px-1 py-0.5 text-left text-[8px] md:text-[10px] leading-2.5 md:leading-3 text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]"
+            title={todo.title}
+          >
+            {todo.priority === 'high' ? '!' : ''} {todo.title}
+          </div>
+        ))}
+        {events.length === 0 && pendingTodos.length > visiblePending.length && (
+          <div className="truncate px-1 text-left text-[8px] md:text-[10px] leading-2.5 text-[var(--text-muted)]">
+            +{pendingTodos.length - visiblePending.length} 个待办
+          </div>
+        )}
+        {events.length === 0 && pendingTodos.length === 0 && visibleCompletedTodos.length > 0 && (
+          <div className="truncate rounded px-1 py-0.5 text-left text-[8px] md:text-[10px] leading-2.5 md:leading-3 text-[var(--success)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)]">
+            ✓ {visibleCompletedTodos[0].title}
+          </div>
+        )}
       </div>
     </button>
   );

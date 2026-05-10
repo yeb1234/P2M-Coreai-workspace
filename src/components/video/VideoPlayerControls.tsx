@@ -17,6 +17,7 @@ import { PLAYER_SPEED_MAX, PLAYER_SPEED_MIN, PLAYER_SPEED_STEP, clampPlaybackRat
 
 interface VideoPlayerControlsProps {
   showControls: boolean;
+  isMobile: boolean;
   videoId: number;
   videoDuration: number;
   progress: number;
@@ -38,6 +39,7 @@ interface VideoPlayerControlsProps {
   isFullscreen: boolean;
   onStopControlClick: (e: React.MouseEvent) => void;
   onProgressMouseDown: (e: React.MouseEvent) => void;
+  onProgressTouchStart: (e: React.TouchEvent) => void;
   onProgressMouseMove: (e: React.MouseEvent<HTMLDivElement>) => void;
   onProgressMouseLeave: () => void;
   onTogglePlay: () => void;
@@ -56,6 +58,7 @@ interface VideoPlayerControlsProps {
 
 export function VideoPlayerControls({
   showControls,
+  isMobile,
   videoId,
   videoDuration,
   progress,
@@ -77,6 +80,7 @@ export function VideoPlayerControls({
   isFullscreen,
   onStopControlClick,
   onProgressMouseDown,
+  onProgressTouchStart,
   onProgressMouseMove,
   onProgressMouseLeave,
   onTogglePlay,
@@ -99,12 +103,13 @@ export function VideoPlayerControls({
       onDoubleClick={onStopControlClick}
     >
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
-      <div className="relative px-3 pb-2 pt-8">
+      <div className={`relative ${isMobile ? 'px-2 pb-1.5 pt-6' : 'px-3 pb-2 pt-8'}`}>
         {videoDuration > 0 && (
           <div
             ref={progressBarRef}
-            className="relative h-[3px] hover:h-[6px] bg-white/20 rounded-full cursor-pointer mb-2 transition-all duration-150 group/progress"
+            className={`relative ${isMobile ? 'h-[4px]' : 'h-[3px] hover:h-[6px]'} bg-white/20 rounded-full cursor-pointer ${isMobile ? 'mb-1.5' : 'mb-2'} transition-all duration-150 group/progress`}
             onMouseDown={onProgressMouseDown}
+            onTouchStart={onProgressTouchStart}
             onMouseMove={onProgressMouseMove}
             onMouseLeave={onProgressMouseLeave}
           >
@@ -122,33 +127,35 @@ export function VideoPlayerControls({
           </div>
         )}
 
-        <div className="flex items-center gap-1">
-          <button onClick={onTogglePlay} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isPlaying ? '暂停 (空格)' : '播放 (空格)'}>
-            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+        <div className={`flex items-center ${isMobile ? 'gap-1.5' : 'gap-1'}`}>
+          <button onClick={onTogglePlay} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title={isPlaying ? '暂停 (空格)' : '播放 (空格)'}>
+            {isPlaying ? <Pause size={isMobile ? 18 : 20} /> : <Play size={isMobile ? 18 : 20} />}
           </button>
-          <button onClick={() => onSeekBy(-10)} className="p-1.5 text-white/80 hover:text-white transition-colors" title="后退10秒">
-            <SkipBack size={16} />
+          <button onClick={() => onSeekBy(-10)} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="后退10秒">
+            <SkipBack size={isMobile ? 14 : 16} />
           </button>
-          <button onClick={() => onSeekBy(10)} className="p-1.5 text-white/80 hover:text-white transition-colors" title="前进10秒">
-            <SkipForward size={16} />
+          <button onClick={() => onSeekBy(10)} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="前进10秒">
+            <SkipForward size={isMobile ? 14 : 16} />
           </button>
 
-          <div className="flex items-center gap-1 group/vol">
-            <button onClick={onToggleMute} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isMuted ? '取消静音 (M)' : '静音 (M)'}>
-              {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </button>
-            <div className="w-0 group-hover/vol:w-20 overflow-hidden transition-all duration-200">
-              <Slider value={isMuted ? 0 : volume} min={0} max={1} step={0.05} onChange={onVolumeChange} className="w-20" />
+          {!isMobile && (
+            <div className="flex items-center gap-1 group/vol">
+              <button onClick={onToggleMute} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isMuted ? '取消静音 (M)' : '静音 (M)'}>
+                {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
+              <div className="w-0 group-hover/vol:w-20 overflow-hidden transition-all duration-200">
+                <Slider value={isMuted ? 0 : volume} min={0} max={1} step={0.05} onChange={onVolumeChange} className="w-20" />
+              </div>
             </div>
-          </div>
+          )}
 
-          <span className="text-[11px] text-white/70 font-mono ml-2 select-none">{formatTime(progress)} / {formatTime(videoDuration)}</span>
+          <span className={`${isMobile ? 'text-[9px] ml-1' : 'text-[11px] ml-2'} text-white/70 font-mono select-none`}>{formatTime(progress)} / {formatTime(videoDuration)}</span>
           <div className="flex-1" />
 
           {hasSubtitle && (
             <div className="relative">
-              <button data-subtitle-btn onClick={onToggleSubtitleMenu} className={`p-1.5 transition-colors ${showSubtitles ? 'text-[#c87d2f]' : 'text-white/80 hover:text-white'}`} title="字幕">
-                <Subtitles size={16} />
+              <button data-subtitle-btn onClick={onToggleSubtitleMenu} className={`${isMobile ? 'p-1.5' : 'p-1.5'} transition-colors ${showSubtitles ? 'text-[#c87d2f]' : 'text-white/80 hover:text-white'}`} title="字幕">
+                <Subtitles size={isMobile ? 14 : 16} />
               </button>
               {showSubtitleMenu && (
                 <div data-subtitle-menu className="absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-sm rounded-lg p-3 min-w-[180px] space-y-3">
@@ -178,7 +185,7 @@ export function VideoPlayerControls({
           )}
 
           <div className="relative">
-            <button data-speed-btn onClick={onToggleSpeedMenu} className="px-1.5 py-1 text-[11px] text-white/80 hover:text-white transition-colors font-medium" title="倍速">
+            <button data-speed-btn onClick={onToggleSpeedMenu} className={`${isMobile ? 'px-1.5 py-1 text-[10px]' : 'px-1.5 py-1 text-[11px]'} text-white/80 hover:text-white transition-colors font-medium`} title="倍速">
               {playbackRate === 1 ? '倍速' : `${playbackRate.toFixed(1)}x`}
             </button>
             {showSpeedMenu && (
@@ -196,11 +203,13 @@ export function VideoPlayerControls({
             )}
           </div>
 
-          <button onClick={onTogglePip} className="p-1.5 text-white/80 hover:text-white transition-colors" title="画中画">
-            <PictureInPicture2 size={16} />
-          </button>
-          <button onClick={onToggleFullscreen} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isFullscreen ? '退出全屏 (F)' : '全屏 (F)'}>
-            {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+          {!isMobile && (
+            <button onClick={onTogglePip} className="p-1.5 text-white/80 hover:text-white transition-colors" title="画中画">
+              <PictureInPicture2 size={16} />
+            </button>
+          )}
+          <button onClick={onToggleFullscreen} className={`${isMobile ? 'p-1.5' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title={isFullscreen ? '退出全屏 (F)' : '全屏 (F)'}>
+            {isFullscreen ? <Minimize size={isMobile ? 14 : 16} /> : <Maximize size={isMobile ? 14 : 16} />}
           </button>
         </div>
       </div>

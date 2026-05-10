@@ -16,7 +16,7 @@ COPY . .
 RUN mkdir -p /data/output /data/thumbnails /data/sprites /data/work /data/db
 
 # Expose port
-EXPOSE 5200
+EXPOSE 80
 
 # Run with uvicorn
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5200"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]

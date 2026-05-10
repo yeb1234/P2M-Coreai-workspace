@@ -22,6 +22,9 @@ thumbnails/
 sprites/
 work/
 
+# Local tool binaries and AI models
+tools/
+
 # Python backend local environment/cache
 backend/.venv*/
 __pycache__/

@@ -38,17 +38,17 @@ export const CalendarToolbar: React.FC = () => {
     : formatDate(currentMonth, 'yyyy年MM月');
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <button
           onClick={handleToday}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-[#6b7280] bg-[#faf9f7] border border-[#e5e2dd] rounded-lg hover:bg-[#f3f2ef] transition-colors"
+          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium text-[#6b7280] bg-[#faf9f7] border border-[#e5e2dd] rounded-lg hover:bg-[#f3f2ef] transition-colors"
         >
           <Calendar size={14} />
           今天
         </button>
 
-        <div className="flex items-center">
+        <div className="flex shrink-0 items-center">
           <button
             onClick={handlePrev}
             className="p-1.5 hover:bg-[#f3f2ef] rounded-lg transition-colors"
@@ -63,15 +63,15 @@ export const CalendarToolbar: React.FC = () => {
           </button>
         </div>
 
-        <h2 className="text-lg font-semibold text-[#1a1a1a]">
+        <h2 className="min-w-0 flex-1 text-base font-semibold text-[#1a1a1a] md:text-lg">
           {titleText}
         </h2>
       </div>
 
-      <div className="flex items-center gap-1 bg-[#f3f2ef] rounded-lg p-0.5">
+      <div className="ml-auto flex shrink-0 items-center gap-1 bg-[#f3f2ef] rounded-lg p-0.5">
         <button
           onClick={() => setView('month')}
-          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+          className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
             currentView === 'month'
               ? 'bg-[#faf9f7] text-[#1a1a1a] shadow-sm'
               : 'text-[#6b7280] hover:text-[#1a1a1a]'
@@ -81,7 +81,7 @@ export const CalendarToolbar: React.FC = () => {
         </button>
         <button
           onClick={() => setView('week')}
-          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+          className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
             currentView === 'week'
               ? 'bg-[#faf9f7] text-[#1a1a1a] shadow-sm'
               : 'text-[#6b7280] hover:text-[#1a1a1a]'

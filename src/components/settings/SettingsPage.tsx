@@ -1,13 +1,15 @@
-﻿import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useEffect } from 'react';
 import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save, Download, Upload, AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
 import { PageTitle, ConfirmDialog } from '../shared';
-import { usePomodoroStore, useUIStore, useNotificationStore, useTodoStore, useNotesStore, useCalendarStore, useAuthStore, useAIStore, useTranscriptionStore, WHISPER_MODELS, DEFAULT_TRANSCRIPTION_SETTINGS } from '../../stores';
+import { usePomodoroStore, useUIStore, useNotificationStore, useTodoStore, useNotesStore, useCalendarStore, useAuthStore } from '../../stores';
 import { getUser, hashPassword, idbStorage, upsertUser } from '../../lib/idbStorage';
-import { clearActiveAiJobs, fetchBackendHealth, type BackendHealthOut } from '../../lib/videoApi';
+import { fetchBackendHealth, type BackendHealthOut } from '../../lib/videoApi';
 import { THEME_PRESETS, applyTheme, generateThemeCss, type ThemeVars } from '../../lib/themes';
-import { buildAIRequestSystemPrompt } from '../../stores/aiStore';
 import type { PomodoroConfig } from '../../types';
+import { STORAGE_KEYS } from './types';
+import { AISettings } from './AISettingsSection';
+import { TranscriptionSettings } from './TranscriptionSettingsSection';
 
 const SECTIONS = [
   { id: 'pomodoro', label: '番茄钟', icon: <Timer size={16} /> },
@@ -22,18 +24,6 @@ const SECTIONS = [
 ] as const;
 
 type SectionId = typeof SECTIONS[number]['id'];
-type TranscriptionDraft = typeof DEFAULT_TRANSCRIPTION_SETTINGS;
-type NumberDrafts = Record<'wordLimit' | 'cpuThreads' | 'beamSize' | 'bestOf' | 'temperature', string>;
-
-const STORAGE_KEYS = [
-  'p2m-ui-storage',
-  'p2m-pomodoro-storage',
-  'p2m-todo-storage',
-  'p2m-calendar-storage',
-  'p2m-notes-storage',
-  'p2m-plugin-storage',
-  'p2m-notification-storage',
-];
 
 /* ─── Pomodoro ─── */
 function PomodoroSettings() {
@@ -177,12 +167,21 @@ function ProfileSettings() {
 function NotificationSettings() {
   const settings = useNotificationStore((s) => s.settings);
   const updateSettings = useNotificationStore((s) => s.updateSettings);
+  const [draft, setDraft] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    setDraft({ ...settings });
+  }, [settings]);
+
   const handleToggle = (key: keyof typeof settings) => {
-    updateSettings({ [key]: !settings[key] });
+    setDraft((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  const handleSave = () => {
+    updateSettings(draft);
     setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   const toggles: { key: keyof typeof settings; label: string; desc: string }[] = [
@@ -204,16 +203,21 @@ function NotificationSettings() {
           <button
             onClick={() => handleToggle(key)}
             className={`relative w-10 h-5 rounded-full transition-colors ${
-              settings[key] ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'
+              draft[key] ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'
             }`}
           >
             <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-              settings[key] ? 'left-[22px]' : 'left-0.5'
+              draft[key] ? 'left-[22px]' : 'left-0.5'
             }`} />
           </button>
         </div>
       ))}
-      {saved && <p className="text-xs text-[#16a34a]">设置已更新</p>}
+      <div className="flex items-center gap-3">
+        <button onClick={handleSave} className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d24] transition-colors">
+          <Save size={14} /> 保存设置
+        </button>
+        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
+      </div>
     </div>
   );
 }
@@ -255,8 +259,8 @@ function AppearanceSettings() {
           vars = JSON.parse(text) as ThemeVars;
         }
         if (vars['--bg-body'] && vars['--accent']) {
-          applyTheme('custom', vars as ThemeVars);
           setCustomTheme(vars as ThemeVars);
+          applyTheme('custom', vars as ThemeVars);
         }
       } catch { /* ignore invalid */ }
     };
@@ -273,19 +277,21 @@ function AppearanceSettings() {
           {THEME_PRESETS.map((t) => (
             <button
               key={t.id}
-              onClick={() => { setTheme(t.id); applyTheme(t.id, t.vars); }}
+              onClick={() => {
+                setTheme(t.id);
+                applyTheme(t.id, t.vars);
+              }}
               className={`relative px-3 py-3 rounded-lg text-left border transition-all ${
                 themeId === t.id
                   ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20'
                   : 'border-[#e5e2dd] hover:border-[#d1cdc6]'
               }`}
-              style={{ background: t.vars['--bg-card'], color: t.vars['--text-primary'] }}
             >
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-3 h-3 rounded-full" style={{ background: t.vars['--accent'] }} />
-                <span className="text-xs font-medium" style={{ color: t.vars['--text-primary'] }}>{t.name}</span>
+                <span className="text-xs font-medium text-[#1a1a1a]">{t.name}</span>
               </div>
-              <p className="text-[10px]" style={{ color: t.vars['--text-muted'] }}>{t.description}</p>
+              <p className="text-[10px] text-[#9ca3af]">{t.description}</p>
             </button>
           ))}
         </div>
@@ -354,495 +360,6 @@ function PrivacySettings() {
         message="确定要删除所有数据吗？这将清除所有待办、笔记、日历事件、番茄记录等，且无法恢复。"
         confirmText="确认清除"
       />
-    </div>
-  );
-}
-
-/* ─── AI ─── */
-function AISettings() {
-  const endpoint = useAIStore((s) => s.endpoint);
-  const model = useAIStore((s) => s.model);
-  const systemPrompt = useAIStore((s) => s.systemPrompt);
-  const promptTemplates = useAIStore((s) => s.promptTemplates);
-  const activeTemplateId = useAIStore((s) => s.activeTemplateId);
-  const setEndpoint = useAIStore((s) => s.setEndpoint);
-  const setModel = useAIStore((s) => s.setModel);
-  const setSystemPrompt = useAIStore((s) => s.setSystemPrompt);
-  const [testInput, setTestInput] = useState('你好，简单回复一句，说明你已经连接成功。');
-  const [testReply, setTestReply] = useState('');
-  const [testError, setTestError] = useState('');
-  const [testing, setTesting] = useState(false);
-
-  const activeTemplate = promptTemplates.find((template) => template.id === activeTemplateId) ?? promptTemplates[0];
-
-  const handleTestAI = async () => {
-    const text = testInput.trim();
-    if (!text || testing) return;
-    setTesting(true);
-    setTestReply('');
-    setTestError('');
-
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          stream: true,
-          messages: [
-            { role: 'system', content: buildAIRequestSystemPrompt(systemPrompt, activeTemplate?.content ?? '') },
-            { role: 'user', content: text },
-          ],
-        }),
-      });
-      if (!res.ok) throw new Error(`接口返回 ${res.status}`);
-
-      if (!res.body) {
-        const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content || data?.message?.content || '';
-        setTestReply(content || '本地 AI 已返回，但没有可显示的文本。');
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let finalText = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const chunks = buffer.split('\n');
-        buffer = chunks.pop() ?? '';
-
-        for (const chunk of chunks) {
-          const line = chunk.trim();
-          if (!line || line === 'data: [DONE]' || !line.startsWith('data:')) continue;
-          try {
-            const json = JSON.parse(line.slice(5).trim());
-            const delta = json?.choices?.[0]?.delta?.content || json?.choices?.[0]?.message?.content || json?.message?.content || '';
-            if (delta) {
-              finalText += delta;
-              setTestReply(finalText);
-            }
-          } catch {
-            // ignore malformed stream chunks
-          }
-        }
-      }
-
-      if (!finalText.trim()) setTestReply('本地 AI 已返回，但没有可显示的文本。');
-    } catch (err) {
-      setTestError(err instanceof Error ? err.message : '测试请求失败，请检查 LM Studio 是否已启动。');
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4">
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">接口地址</label>
-          <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm" />
-          <p className="text-[10px] text-[#9ca3af] mt-1">LM Studio 默认可用地址：<code>http://127.0.0.1:1234/v1/chat/completions</code></p>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">模型名</label>
-          <input value={model} onChange={(e) => setModel(e.target.value)} className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">系统提示词</label>
-          <textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} className="w-full min-h-24 px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm resize-y" />
-        </div>
-      </div>
-
-      <div className="border-t border-[#e5e2dd] pt-4">
-        <h4 className="text-sm font-medium text-[#1a1a1a] mb-2">当前提示词模板</h4>
-        {activeTemplate ? (
-          <div className="rounded-lg border border-[#e5e2dd] bg-[#faf9f7] p-3">
-            <p className="text-sm font-medium text-[#1a1a1a]">{activeTemplate.name}</p>
-            <p className="text-xs text-[#6b7280] mt-1 whitespace-pre-wrap">{activeTemplate.content}</p>
-          </div>
-        ) : (
-          <p className="text-xs text-[#9ca3af]">暂无模板</p>
-        )}
-      </div>
-
-      <div className="border-t border-[#e5e2dd] pt-4 space-y-3">
-        <div>
-          <h4 className="text-sm font-medium text-[#1a1a1a] mb-1">连接测试</h4>
-          <p className="text-xs text-[#9ca3af]">这里不会保存对话，只用来确认本地 AI 接口是否能正常回复。</p>
-        </div>
-        <textarea
-          value={testInput}
-          onChange={(e) => setTestInput(e.target.value)}
-          className="w-full min-h-20 px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm resize-y"
-          placeholder="输入一句测试消息"
-        />
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => void handleTestAI()}
-            disabled={testing || !testInput.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d24] disabled:opacity-50 transition-colors"
-          >
-            {testing ? '测试中...' : '发送测试'}
-          </button>
-          {testError && <span className="text-xs text-[#dc3545]">{testError}</span>}
-        </div>
-        {testReply && (
-          <div className="rounded-lg border border-[#e5e2dd] bg-[#faf9f7] p-3 text-sm leading-6 text-[#1a1a1a] whitespace-pre-wrap">
-            {testReply}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TranscriptionSettings() {
-  const settings = useTranscriptionStore();
-  const updateSettings = useTranscriptionStore((s) => s.updateSettings);
-  const [saved, setSaved] = useState(false);
-  const [clearingJobs, setClearingJobs] = useState(false);
-  const [clearMsg, setClearMsg] = useState('');
-  const [fieldHint, setFieldHint] = useState('');
-  const [form, setForm] = useState<TranscriptionDraft>({
-    whisperEngine: settings.whisperEngine,
-    whisperModel: settings.whisperModel,
-    language: settings.language,
-    doSummary: settings.doSummary,
-    wordLimit: settings.wordLimit,
-    cpuThreads: settings.cpuThreads,
-    computeType: settings.computeType,
-    beamSize: settings.beamSize,
-    bestOf: settings.bestOf,
-    temperature: settings.temperature,
-    vadFilter: settings.vadFilter,
-    subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
-    subtitleCorrectionPrompt: settings.subtitleCorrectionPrompt,
-  });
-  const [drafts, setDrafts] = useState<NumberDrafts>({
-    wordLimit: String(settings.wordLimit),
-    cpuThreads: String(settings.cpuThreads),
-    beamSize: String(settings.beamSize),
-    bestOf: String(settings.bestOf),
-    temperature: String(settings.temperature),
-  });
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      setForm({
-        whisperEngine: settings.whisperEngine,
-        whisperModel: settings.whisperModel,
-        language: settings.language,
-        doSummary: settings.doSummary,
-        wordLimit: settings.wordLimit,
-        cpuThreads: settings.cpuThreads,
-        computeType: settings.computeType,
-        beamSize: settings.beamSize,
-        bestOf: settings.bestOf,
-        temperature: settings.temperature,
-        vadFilter: settings.vadFilter,
-        subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
-        subtitleCorrectionPrompt: settings.subtitleCorrectionPrompt,
-      });
-      setDrafts({
-        wordLimit: String(settings.wordLimit),
-        cpuThreads: String(settings.cpuThreads),
-        beamSize: String(settings.beamSize),
-        bestOf: String(settings.bestOf),
-        temperature: String(settings.temperature),
-      });
-    });
-  }, [settings.whisperEngine, settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled, settings.subtitleCorrectionPrompt]);
-
-  const updateForm = (updates: Partial<TranscriptionDraft>) => {
-    setForm((current) => ({ ...current, ...updates }));
-    setFieldHint('有未保存的转写设置。');
-  };
-
-  const saveForm = () => {
-    const next = { ...form };
-    updateSettings(next);
-    setSaved(true);
-    setFieldHint('转写设置已保存，后续新任务会使用这些参数。');
-    setTimeout(() => setSaved(false), 1500);
-  };
-
-  const syncNumberDrafts = (updates: Partial<TranscriptionDraft>) => {
-    setDrafts((current) => ({
-      ...current,
-      ...(updates.wordLimit !== undefined ? { wordLimit: String(updates.wordLimit) } : {}),
-      ...(updates.cpuThreads !== undefined ? { cpuThreads: String(updates.cpuThreads) } : {}),
-      ...(updates.beamSize !== undefined ? { beamSize: String(updates.beamSize) } : {}),
-      ...(updates.bestOf !== undefined ? { bestOf: String(updates.bestOf) } : {}),
-      ...(updates.temperature !== undefined ? { temperature: String(updates.temperature) } : {}),
-    }));
-  };
-
-  const applyPreset = (updates: Partial<TranscriptionDraft>, hint: string) => {
-    updateForm(updates);
-    syncNumberDrafts(updates);
-    setFieldHint(hint);
-  };
-
-  const setNumberDraft = (key: keyof NumberDrafts, value: string) => {
-    setDrafts((current) => ({ ...current, [key]: value }));
-  };
-
-  const commitNumber = (
-    key: keyof NumberDrafts,
-    storeKey: keyof Pick<TranscriptionDraft, 'wordLimit' | 'cpuThreads' | 'beamSize' | 'bestOf' | 'temperature'>,
-    min: number,
-    max: number,
-    label: string,
-    integer = true
-  ) => {
-    const raw = drafts[key].trim();
-    const parsed = Number(raw);
-    if (!raw || !Number.isFinite(parsed)) {
-      setDrafts((current) => ({ ...current, [key]: String(form[storeKey]) }));
-      setFieldHint(`${label} 需要输入数字，已恢复为当前值。`);
-      return;
-    }
-    const clamped = Math.max(min, Math.min(max, integer ? Math.round(parsed) : parsed));
-    updateForm({ [storeKey]: clamped });
-    setDrafts((current) => ({ ...current, [key]: String(clamped) }));
-    setFieldHint(clamped !== parsed ? `${label} 范围是 ${min}-${max}，已自动修正为 ${clamped}，保存后生效。` : '有未保存的转写设置。');
-  };
-
-  const handleNumberKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.currentTarget.blur();
-    }
-  };
-
-  const clearJobs = async () => {
-    setClearingJobs(true);
-    setClearMsg('');
-    try {
-      const result = await clearActiveAiJobs();
-      setClearMsg(`已清理 ${result.cleared} 个任务`);
-    } catch (err) {
-      setClearMsg(err instanceof Error ? err.message : '清理失败');
-    } finally {
-      setClearingJobs(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-xs font-medium text-[#6b7280] mb-1.5">转写引擎</label>
-        <select
-          value={form.whisperEngine}
-          onChange={(e) => updateForm({ whisperEngine: e.target.value })}
-          className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-        >
-          <option value="faster-whisper">faster-whisper CPU（稳定默认）</option>
-          <option value="whisper.cpp">whisper.cpp 外部引擎（可接 Vulkan/HIP）</option>
-        </select>
-        <p className="text-[10px] text-[#9ca3af] mt-1">7800 XT 路线建议先用 whisper.cpp 的 Vulkan/HIP 版本单独验证，再在后端 .env 配置可执行文件和模型路径。</p>
-      </div>
-
-      <div>
-        <label className="block text-xs font-medium text-[#6b7280] mb-1.5">Whisper 模型</label>
-        <select
-          value={form.whisperModel}
-          onChange={(e) => updateForm({ whisperModel: e.target.value })}
-          className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-        >
-          {WHISPER_MODELS.map((model) => (
-            <option key={model.id} value={model.id}>{model.name} - {model.desc}</option>
-          ))}
-        </select>
-        <p className="text-[10px] text-[#9ca3af] mt-1">常用推荐：`medium` 或 `large-v3`。越大越准，越慢，越吃内存。</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">识别语言</label>
-          <input
-            value={form.language}
-            onChange={(e) => updateForm({ language: e.target.value })}
-            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">总结字数</label>
-          <input
-            inputMode="numeric"
-            value={drafts.wordLimit}
-            onChange={(e) => setNumberDraft('wordLimit', e.target.value)}
-            onBlur={() => commitNumber('wordLimit', 'wordLimit', 50, 2000, '总结字数')}
-            onKeyDown={handleNumberKeyDown}
-            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">CPU 线程</label>
-          <input
-            inputMode="numeric"
-            value={drafts.cpuThreads}
-            onChange={(e) => setNumberDraft('cpuThreads', e.target.value)}
-            onBlur={() => commitNumber('cpuThreads', 'cpuThreads', 1, 128, 'CPU 线程')}
-            onKeyDown={handleNumberKeyDown}
-            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-          />
-          <p className="text-[10px] text-[#9ca3af] mt-1">这个会直接传给转写任务。你改 `.env` 不生效时，通常是因为后端没重启。</p>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">compute_type</label>
-          <select
-            value={form.computeType}
-            onChange={(e) => updateForm({ computeType: e.target.value })}
-            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-          >
-            {['int8', 'int8_float16', 'int16', 'float16', 'float32'].map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">beam_size</label>
-          <input
-            inputMode="numeric"
-            value={drafts.beamSize}
-            onChange={(e) => setNumberDraft('beamSize', e.target.value)}
-            onBlur={() => commitNumber('beamSize', 'beamSize', 1, 10, 'beam_size')}
-            onKeyDown={handleNumberKeyDown}
-            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">best_of</label>
-          <input
-            inputMode="numeric"
-            value={drafts.bestOf}
-            onChange={(e) => setNumberDraft('bestOf', e.target.value)}
-            onBlur={() => commitNumber('bestOf', 'bestOf', 1, 10, 'best_of')}
-            onKeyDown={handleNumberKeyDown}
-            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">temperature</label>
-          <input
-            inputMode="decimal"
-            value={drafts.temperature}
-            onChange={(e) => setNumberDraft('temperature', e.target.value)}
-            onBlur={() => commitNumber('temperature', 'temperature', 0, 1, 'temperature', false)}
-            onKeyDown={handleNumberKeyDown}
-            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm"
-          />
-        </div>
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <p className="text-sm font-medium text-[#1a1a1a]">VAD 过滤</p>
-            <p className="text-xs text-[#9ca3af]">去掉长静音，更稳一点</p>
-          </div>
-          <button
-            onClick={() => updateForm({ vadFilter: !form.vadFilter })}
-            className={`relative w-10 h-5 rounded-full transition-colors ${form.vadFilter ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
-          >
-            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.vadFilter ? 'left-[22px]' : 'left-0.5'}`} />
-          </button>
-        </div>
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <p className="text-sm font-medium text-[#1a1a1a]">字幕自动校对</p>
-            <p className="text-xs text-[#9ca3af]">字幕生成后先过一遍本地 AI 修正</p>
-          </div>
-          <button
-            onClick={() => updateForm({ subtitleCorrectionEnabled: !form.subtitleCorrectionEnabled })}
-            className={`relative w-10 h-5 rounded-full transition-colors ${form.subtitleCorrectionEnabled ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
-          >
-            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.subtitleCorrectionEnabled ? 'left-[22px]' : 'left-0.5'}`} />
-          </button>
-        </div>
-        <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-[#6b7280] mb-1.5">字幕校对提示词模板</label>
-          <textarea
-            value={form.subtitleCorrectionPrompt}
-            onChange={(e) => updateForm({ subtitleCorrectionPrompt: e.target.value })}
-            rows={4}
-            className="w-full px-3 py-2 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm leading-6 outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10"
-            placeholder="写入术语表、课程上下文、常见误识别修正规则。保存后新任务生效。"
-          />
-          <p className="text-[10px] text-[#9ca3af] mt-1">这里只影响字幕校对阶段，不会改时间轴，不会合并或拆分字幕。</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => applyPreset(
-            {
-              whisperEngine: 'faster-whisper',
-              cpuThreads: 4,
-              computeType: 'int8',
-              beamSize: 1,
-              bestOf: 1,
-              temperature: 0,
-              vadFilter: true,
-              subtitleCorrectionEnabled: false,
-            },
-            '低占用模式：4 线程、低搜索参数、关闭字幕自动校对。'
-          )}
-          className="px-4 py-2 text-sm font-medium text-[#6b7280] border border-[#e5e2dd] rounded-lg hover:bg-[#f3f2ef]"
-        >
-          低占用模式
-        </button>
-        <button
-          onClick={() => {
-            const maxThreads = Math.max(1, Math.min(128, navigator.hardwareConcurrency || 8));
-            applyPreset(
-              {
-                whisperModel: 'large-v3',
-                whisperEngine: 'faster-whisper',
-                cpuThreads: maxThreads,
-                computeType: 'int8',
-                beamSize: 5,
-                bestOf: 5,
-                temperature: 0,
-                vadFilter: true,
-                subtitleCorrectionEnabled: true,
-              },
-              `高性能模式：large-v3 模型，使用浏览器检测到的 ${maxThreads} 个 CPU 逻辑线程。`
-            );
-          }}
-          className="px-4 py-2 text-sm font-medium text-white bg-[#c87d2f] border border-[#c87d2f] rounded-lg hover:bg-[#b06d20]"
-        >
-          高性能模式
-        </button>
-        <button
-          onClick={() => {
-            setForm(DEFAULT_TRANSCRIPTION_SETTINGS);
-            syncNumberDrafts(DEFAULT_TRANSCRIPTION_SETTINGS);
-            setFieldHint('已恢复默认草稿，保存后生效。');
-          }}
-          className="px-4 py-2 text-sm font-medium text-[#6b7280] border border-[#e5e2dd] rounded-lg hover:bg-[#f3f2ef]"
-        >
-          恢复默认
-        </button>
-        <button
-          onClick={saveForm}
-          className="px-4 py-2 text-sm font-medium text-white bg-[#1a1a1a] border border-[#1a1a1a] rounded-lg hover:bg-[#2f2f2f]"
-        >
-          保存转写设置
-        </button>
-        <button
-          onClick={() => void clearJobs()}
-          disabled={clearingJobs}
-          className="px-4 py-2 text-sm font-medium text-[#dc3545] border border-[#fecaca] rounded-lg hover:bg-[#fef2f2] disabled:opacity-50"
-        >
-          {clearingJobs ? '清理中...' : '清理排队任务'}
-        </button>
-        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
-        {fieldHint && <span className="text-xs text-[#c87d2f]">{fieldHint}</span>}
-        {clearMsg && <span className="text-xs text-[#6b7280]">{clearMsg}</span>}
-      </div>
     </div>
   );
 }

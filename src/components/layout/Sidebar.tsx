@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, RotateCcw, Eye, RefreshCw, X, GripVertical }
 import { useUIStore, usePomodoroStore } from '../../stores';
 import { PAGE_MAP } from '../../config/pageRegistry';
 import type { ActiveView } from '../../stores/uiStore';
+import { useDragResize } from '../../hooks/useDragResize';
 
 const HEADER_STYLE = { height: '56px' };
 const COLLAPSED_WIDTH = 64;
@@ -28,28 +29,13 @@ export const Sidebar: React.FC = () => {
   const [overId, setOverId] = useState<ActiveView | null>(null);
   const [showRestorePanel, setShowRestorePanel] = useState(false);
   const dragRef = useRef<HTMLDivElement>(null);
-
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    if (!sidebarOpen) return;
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-
-    const handleMove = (event: MouseEvent) => {
-      setSidebarWidth(startWidth + event.clientX - startX);
-    };
-    const handleUp = () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  }, [setSidebarWidth, sidebarOpen, sidebarWidth]);
+  const { width: liveSidebarWidth, startResize: startSidebarResize } = useDragResize({
+    initialWidth: sidebarWidth,
+    minWidth: 160,
+    maxWidth: 320,
+    side: 'right',
+    onWidthChange: setSidebarWidth,
+  });
 
   const handleDragStart = useCallback((e: React.DragEvent, id: ActiveView) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -100,8 +86,8 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className="theme-sidebar border-r transition-[width] duration-200 relative shrink-0"
-      style={{ width: sidebarOpen ? sidebarWidth : COLLAPSED_WIDTH }}
+      className="theme-sidebar border-r relative shrink-0"
+      style={{ width: sidebarOpen ? liveSidebarWidth : COLLAPSED_WIDTH }}
     >
       <div className="flex flex-col h-full">
         <div className="px-2 pb-1 flex items-center gap-1" style={HEADER_STYLE}>
@@ -247,7 +233,7 @@ export const Sidebar: React.FC = () => {
       {sidebarOpen && (
         <button
           type="button"
-          onMouseDown={handleResizeStart}
+          onMouseDown={(e) => { e.preventDefault(); startSidebarResize(e.clientX); }}
           className="absolute top-0 right-[-5px] h-full w-2 cursor-col-resize text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)]/60 transition-colors"
           title="拖动调整左侧栏宽度"
         >

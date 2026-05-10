@@ -16,39 +16,69 @@ export interface Note {
   updatedAt: string;
 }
 
-interface NotesState {
-  notes: Note[];
-  addNote: (data: Partial<Note> & { title: string }) => string;
-  updateNote: (id: string, updates: Partial<Note>) => void;
-  deleteNote: (id: string) => void;
-  togglePin: (id: string) => void;
+export interface TrashedNote {
+  note: Note;
+  deletedAt: string;
 }
 
+interface NotesState {
+  notes: Note[];
+  trash: Record<string, TrashedNote>;
+  addNote: (data: Partial<Note> & { title: string }) => string;
+  upsertTodayAiNote: () => string;
+  updateNote: (id: string, updates: Partial<Note>) => void;
+  deleteNote: (id: string) => void;
+  restoreNote: (id: string) => void;
+  permanentDeleteNote: (id: string) => void;
+  clearTrash: () => void;
+  togglePin: (id: string) => void;
+  renameTag: (fromTag: string, toTag: string) => void;
+  deleteTag: (tag: string) => void;
+  setTagColor: (tag: string, color: NoteColor) => void;
+  recolorNotes: (fromColor: NoteColor, toColor: NoteColor) => void;
+  getTrashedNotes: () => TrashedNote[];
+}
+
+export const NOTE_COLOR_OPTIONS: { value: NoteColor; label: string; dot: string }[] = [
+  { value: 'sticky-yellow', label: '黄色', dot: '#f59e0b' },
+  { value: 'sticky-pink', label: '粉色', dot: '#ec4899' },
+  { value: 'sticky-blue', label: '蓝色', dot: '#3b82f6' },
+  { value: 'sticky-green', label: '绿色', dot: '#22c55e' },
+  { value: 'sticky-orange', label: '橙色', dot: '#f97316' },
+  { value: 'sticky-purple', label: '紫色', dot: '#a855f7' },
+];
+
 const now = () => new Date().toISOString();
+export const cleanNoteTag = (tag?: string) => (tag || '').trim().replace(/^#+/, '').trim();
+
+const HASHTAG_RE = /(^|[\s,，。；;:：()[\]{}"'“”‘’])#([\p{L}\p{N}_-]{1,32})/gu;
+
+export function extractNoteHashtags(text?: string): string[] {
+  const source = text || '';
+  const tags: string[] = [];
+  let match: RegExpExecArray | null;
+  HASHTAG_RE.lastIndex = 0;
+  while ((match = HASHTAG_RE.exec(source))) {
+    const tag = cleanNoteTag(match[2]);
+    if (tag && !tags.includes(tag)) tags.push(tag);
+  }
+  return tags;
+}
+
+export function getNoteTags(note: Pick<Note, 'title' | 'content' | 'tag'>): string[] {
+  const tags = [
+    cleanNoteTag(note.tag),
+    ...extractNoteHashtags(note.title),
+    ...extractNoteHashtags(note.content),
+  ].filter(Boolean);
+  return Array.from(new Set(tags));
+}
 
 const SEED_NOTES: Note[] = [
   {
     id: 'note-1',
     title: 'React 性能优化笔记',
-    content: `## useMemo vs useCallback
-
-useMemo 缓存**计算结果**，useCallback 缓存**函数引用**。
-
-\`\`\`tsx
-// useMemo - 缓存昂贵计算
-const sorted = useMemo(() => items.sort(compareFn), [items]);
-
-// useCallback - 缓存函数引用，避免子组件重渲染
-const handleClick = useCallback(() => setCount(c => c + 1), []);
-\`\`\`
-
-## React.memo 使用场景
-- 组件渲染开销大
-- props 变化频率低
-- 父组件频繁重渲染
-
-## 虚拟列表
-大数据量用 \`react-window\` 或 \`@tanstack/virtual\``,
+    content: 'useMemo 缓存计算结果，useCallback 缓存函数引用。真正需要优化时，再结合 React.memo 和虚拟列表。',
     color: 'sticky-yellow',
     pinned: true,
     tag: 'React',
@@ -57,26 +87,8 @@ const handleClick = useCallback(() => setCount(c => c + 1), []);
   },
   {
     id: 'note-2',
-    title: '项目架构设计',
-    content: `## P2M 双层架构
-
-**zustand** → 响应式状态管理
-**Dexie (IndexedDB)** → 持久化存储
-
-### 数据流
-1. 启动时从 Dexie 加载 → zustand store
-2. 用户操作 → zustand set
-3. set 后异步写入 Dexie (debounce 500ms)
-
-### 为什么不用 Redux？
-- P2M 是个人工具，不需要复杂中间件
-- zustand API 更简洁，TypeScript 友好
-- 无 provider 包裹，任意组件直接调用
-
-### 为什么选 IndexedDB？
-- 浏览器原生，无需 WASM
-- 支持大容量存储（>localStorage 5MB）
-- 支持索引查询`,
+    title: '项目架构记录',
+    content: '个人工具优先保持状态流清晰：本地 store 管交互，后端服务管视频、字幕和 AI 任务。',
     color: 'sticky-blue',
     pinned: true,
     tag: '架构',
@@ -85,134 +97,21 @@ const handleClick = useCallback(() => setCount(c => c + 1), []);
   },
   {
     id: 'note-3',
-    title: 'CSS Grid 速查表',
-    content: `## 基础网格
-\`\`\`css
-grid-template-columns: repeat(12, 1fr);
-gap: 14px;
-\`\`\`
-
-## 响应式断点
-| 断点 | 列数 | 用途 |
-|------|------|------|
-| >1024 | 12列 | 桌面 3卡片/行 |
-| 768-1024 | 6列 | 平板 |
-| ≤768 | 2列 | 手机横屏 |
-| ≤480 | 1列 | 手机竖屏 |
-
-## 自动填充
-\`\`\`css
-grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-\`\`\`
-
-## 子项跨列
-\`\`\`css
-grid-column: span 4; /* 占4列 */
-\`\`\``,
-    color: 'sticky-green',
-    pinned: false,
-    tag: 'CSS',
-    createdAt: '2026-05-04T09:00:00Z',
-    updatedAt: '2026-05-04T09:00:00Z',
-  },
-  {
-    id: 'note-4',
-    title: 'Git 高级用法',
-    content: `## 交互式变基
-\`\`\`bash
-git rebase -i HEAD~3  # 合并最近3个提交
-# pick → 保留, squash → 合并, reword → 改消息
-\`\`\`
-
-## Cherry-pick
-\`\`\`bash
-git cherry-pick abc123  # 把某个提交搬到当前分支
-\`\`\`
-
-## Stash 进阶
-\`\`\`bash
-git stash push -m "描述" -- src/only.ts  # 只暂存特定文件
-git stash list
-git stash pop stash@{0}
-\`\`\`
-
-## 找回丢失的提交
-\`\`\`bash
-git reflog  # 找到 commit hash
-git cherry-pick <hash>
-\`\`\`
-
-## .gitignore 不生效？
-\`\`\`bash
-git rm -r --cached .  # 清除缓存
-git add .
-\`\`\``,
+    title: 'Git 常用命令',
+    content: 'reflog 用来找回丢失提交；stash push 可以只暂存指定文件；rebase 前先确认工作区干净。',
     color: 'sticky-pink',
     pinned: false,
     tag: 'Git',
     createdAt: '2026-05-03T16:00:00Z',
     updatedAt: '2026-05-03T16:00:00Z',
   },
-  {
-    id: 'note-5',
-    title: '面试高频题速记',
-    content: `## 闭包
-函数 + 它能访问的外部变量。用途：数据私有化、函数工厂、柯里化。
-
-## Event Loop
-宏任务 → 微任务(Promise.then) → 渲染 → 宏任务...
-
-## this 指向
-- 普通函数：调用时决定
-- 箭头函数：定义时决定（继承外层）
-- class 方法：实例对象
-
-## TypeScript 类型体操
-\`\`\`ts
-type DeepReadonly<T> = {
-  readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K];
-};
-\`\`\`
-
-## React Fiber
-把渲染拆成小单元，可中断可恢复。requestIdleCallback 思想。`,
-    color: 'sticky-orange',
-    pinned: false,
-    tag: '面试',
-    createdAt: '2026-05-02T11:00:00Z',
-    updatedAt: '2026-05-02T11:00:00Z',
-  },
-  {
-    id: 'note-6',
-    title: '读书笔记：重构',
-    content: `## 代码坏味道
-- **重复代码** → 提取函数
-- **过长函数** → 拆分成小函数
-- **过大类** → 拆分成多个类
-- **过长参数列表** → 引入参数对象
-- **发散式变化** → 一个类只因一种原因变化
-- **散弹式修改** → 把相关修改集中到一处
-
-## 重构原则
-> 重构不是重写。重构是在不改变外部行为的前提下改善内部结构。
-
-## 小步前进
-每次只做一个小改动，跑测试，确认通过，再继续。
-
-## Martin Fowler 说
-"任何傻瓜都能写出计算机能理解的代码，唯有写出人类能理解的代码才是优秀的程序员。"`,
-    color: 'sticky-purple',
-    pinned: false,
-    tag: '读书',
-    createdAt: '2026-05-01T20:00:00Z',
-    updatedAt: '2026-05-01T20:00:00Z',
-  },
 ];
 
 export const useNotesStore = create<NotesState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       notes: SEED_NOTES,
+      trash: {},
 
       addNote: (data) => {
         const id = generateId();
@@ -223,7 +122,7 @@ export const useNotesStore = create<NotesState>()(
           content: data.content || '',
           color: data.color || 'sticky-yellow',
           pinned: data.pinned ?? false,
-          tag: data.tag || '',
+          tag: cleanNoteTag(data.tag),
           createdAt: ts,
           updatedAt: ts,
         };
@@ -231,30 +130,149 @@ export const useNotesStore = create<NotesState>()(
         return id;
       },
 
+      upsertTodayAiNote: () => {
+        const ts = now();
+        const today = new Date().toLocaleDateString('zh-CN');
+        const title = `今日 AI 笔记 - ${today}`;
+        const content = [
+          '# 今日 AI 笔记',
+          '',
+          '> 施工中：这里以后会一键汇总今日待办、视频学习、日历和 AI 对话内容。',
+          '',
+          '## 今日摘要',
+          '- 暂未接入自动生成。',
+          '',
+          '## 待整理',
+          '- 可以先手动补充今天的重点。',
+        ].join('\n');
+        let noteId = '';
+        set((state) => {
+          const existing = state.notes.find((note) => note.tag === 'AI日报' && note.title === title);
+          if (existing) {
+            noteId = existing.id;
+            return {
+              notes: [
+                { ...existing, content, color: 'sticky-purple' as NoteColor, pinned: true, updatedAt: ts },
+                ...state.notes.filter((note) => note.id !== existing.id),
+              ],
+            };
+          }
+          noteId = generateId();
+          const note: Note = {
+            id: noteId,
+            title,
+            content,
+            color: 'sticky-purple',
+            pinned: true,
+            tag: 'AI日报',
+            createdAt: ts,
+            updatedAt: ts,
+          };
+          return { notes: [note, ...state.notes] };
+        });
+        return noteId;
+      },
+
       updateNote: (id, updates) => {
         set((state) => ({
-          notes: state.notes.map((n) =>
-            n.id === id ? { ...n, ...updates, updatedAt: now() } : n
+          notes: state.notes.map((note) =>
+            note.id === id
+              ? { ...note, ...updates, tag: updates.tag === undefined ? note.tag : cleanNoteTag(updates.tag), updatedAt: now() }
+              : note
           ),
         }));
       },
 
       deleteNote: (id) => {
-        set((state) => ({ notes: state.notes.filter((n) => n.id !== id) }));
+        set((state) => {
+          const note = state.notes.find((item) => item.id === id);
+          if (!note) return state;
+          return {
+            notes: state.notes.filter((item) => item.id !== id),
+            trash: { ...state.trash, [id]: { note, deletedAt: now() } },
+          };
+        });
       },
+
+      restoreNote: (id) => {
+        set((state) => {
+          const trashed = state.trash[id];
+          if (!trashed) return state;
+          const trash = { ...state.trash };
+          delete trash[id];
+          return {
+            notes: [trashed.note, ...state.notes],
+            trash,
+          };
+        });
+      },
+
+      permanentDeleteNote: (id) => {
+        set((state) => {
+          const trash = { ...state.trash };
+          delete trash[id];
+          return { trash };
+        });
+      },
+
+      clearTrash: () => set({ trash: {} }),
 
       togglePin: (id) => {
         set((state) => ({
-          notes: state.notes.map((n) =>
-            n.id === id ? { ...n, pinned: !n.pinned, updatedAt: now() } : n
+          notes: state.notes.map((note) =>
+            note.id === id ? { ...note, pinned: !note.pinned, updatedAt: now() } : note
           ),
         }));
       },
+
+      renameTag: (fromTag, toTag) => {
+        const from = cleanNoteTag(fromTag);
+        const to = cleanNoteTag(toTag);
+        if (!from || !to || from === to) return;
+        set((state) => ({
+          notes: state.notes.map((note) =>
+            note.tag === from ? { ...note, tag: to, updatedAt: now() } : note
+          ),
+        }));
+      },
+
+      deleteTag: (tag) => {
+        const target = cleanNoteTag(tag);
+        if (!target) return;
+        set((state) => ({
+          notes: state.notes.map((note) =>
+            note.tag === target ? { ...note, tag: '', updatedAt: now() } : note
+          ),
+        }));
+      },
+
+      setTagColor: (tag, color) => {
+        const target = cleanNoteTag(tag);
+        if (!target) return;
+        set((state) => ({
+          notes: state.notes.map((note) =>
+            note.tag === target ? { ...note, color, updatedAt: now() } : note
+          ),
+        }));
+      },
+
+      recolorNotes: (fromColor, toColor) => {
+        if (fromColor === toColor) return;
+        set((state) => ({
+          notes: state.notes.map((note) =>
+            note.color === fromColor ? { ...note, color: toColor, updatedAt: now() } : note
+          ),
+        }));
+      },
+
+      getTrashedNotes: () => Object.values(get().trash).sort(
+        (a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime()
+      ),
     }),
     {
       name: 'p2m-notes-storage',
       storage: createJSONStorage(() => idbStorage),
-      partialize: (state) => ({ notes: state.notes }),
+      partialize: (state) => ({ notes: state.notes, trash: state.trash }),
     }
   )
 );

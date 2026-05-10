@@ -67,6 +67,14 @@ function VideoPlayerView() {
     togglePlaylistScope,
   } = useVideoPlaylist({ currentVideo, selectVideo, currentCategoryId });
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const videoUrl = currentVideo ? getVideoStreamUrl(currentVideo.id) : '';
   const subtitleUrl = currentVideo && (currentVideo.subtitle_url || currentVideo.subtitle_path)
     ? getSubtitleFileUrl(currentVideo.id)
@@ -144,6 +152,30 @@ function VideoPlayerView() {
       v.pause();
     }
   }, []);
+
+  // Mobile: keep simple tap-to-play behavior and let the browser handle native playback mode.
+  const touchHandledRef = useRef(false);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !isMobile) return;
+    let startX = 0;
+    let startY = 0;
+    const onStart = (e: TouchEvent) => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; };
+    const onEnd = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      if (Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 10) return;
+      e.preventDefault();
+      touchHandledRef.current = true;
+      setTimeout(() => { touchHandledRef.current = false; }, 300);
+      togglePlay();
+    };
+    v.addEventListener('touchstart', onStart, { passive: true });
+    v.addEventListener('touchend', onEnd, { passive: false });
+    return () => {
+      v.removeEventListener('touchstart', onStart);
+      v.removeEventListener('touchend', onEnd);
+    };
+  }, [isMobile, togglePlay, videoKey]);
 
   const seekBy = useCallback((seconds: number) => {
     const v = videoRef.current;
@@ -290,6 +322,17 @@ function VideoPlayerView() {
     setProgress(next);
   }, [videoDuration]);
 
+  const handleProgressTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (!videoDuration) return;
+    setDragging(true);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
+    const next = pct * videoDuration;
+    if (videoRef.current) videoRef.current.currentTime = next;
+    setProgress(next);
+  }, [videoDuration]);
+
   const stopControlClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
   }, []);
@@ -311,10 +354,12 @@ function VideoPlayerView() {
   useEffect(() => {
     if (!dragging) return;
     const bar = progressBarRef.current;
-    const handleMove = (e: MouseEvent) => {
+    const getClientX = (e: MouseEvent | TouchEvent) => 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
       if (!bar || !videoRef.current) return;
       const rect = bar.getBoundingClientRect();
-      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const pct = Math.max(0, Math.min(1, (getClientX(e) - rect.left) / rect.width));
       const next = pct * videoDuration;
       videoRef.current.currentTime = next;
       setProgress(next);
@@ -322,9 +367,13 @@ function VideoPlayerView() {
     const handleUp = () => setDragging(false);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleUp);
     return () => {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
     };
   }, [dragging, videoDuration]);
 
@@ -332,8 +381,8 @@ function VideoPlayerView() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
+      {/* Header - hidden on mobile */}
+      <div className="hidden md:flex items-center gap-3">
         <button onClick={clearSelection} className="p-2 rounded-lg hover:bg-[#f3f2ef] text-[#6b7280] transition-colors">
           <ArrowLeft size={18} />
         </button>
@@ -343,13 +392,20 @@ function VideoPlayerView() {
         </div>
       </div>
 
+      {/* Mobile: back button */}
+      {isMobile && (
+        <button onClick={clearSelection} className="p-1.5 text-[#6b7280] hover:text-[#1a1a1a] transition-colors" title="返回列表">
+          <ArrowLeft size={18} />
+        </button>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Player column */}
         <div className="min-w-0 flex-1 space-y-3">
           {/* Video container with overlay controls */}
           <div
             ref={videoContainerRef}
-            className="aspect-video bg-black rounded-xl overflow-hidden relative select-none"
+            className="aspect-video bg-black md:rounded-xl rounded-lg overflow-hidden relative select-none"
             onMouseMove={resetHideTimer}
             onMouseLeave={() => { if (isPlaying) setShowControls(false); }}
             style={{ cursor: showControls ? 'default' : 'none' }}
@@ -359,6 +415,8 @@ function VideoPlayerView() {
                 ref={videoRef}
                 src={videoUrl}
                 className="w-full h-full"
+                playsInline
+                webkit-playsinline="true"
                 onTimeUpdate={handleTimeUpdate}
               onCanPlay={() => setMediaError('')}
               onError={(e) => {
@@ -405,8 +463,8 @@ function VideoPlayerView() {
                 setIsMuted(video.muted || video.volume === 0);
                 if (video.volume > 0) lastVolumeRef.current = video.volume;
               }}
-              onClick={togglePlay}
-              onDoubleClick={toggleFullscreen}
+              onClick={() => { if (!touchHandledRef.current) togglePlay(); }}
+              onDoubleClick={() => { if (!isMobile) toggleFullscreen(); }}
             />
 
             <MediaErrorOverlay message={mediaError} />
@@ -415,6 +473,7 @@ function VideoPlayerView() {
 
             <VideoPlayerControls
               showControls={showControls}
+              isMobile={isMobile}
               videoId={currentVideo.id}
               videoDuration={videoDuration}
               progress={progress}
@@ -436,6 +495,7 @@ function VideoPlayerView() {
               isFullscreen={isFullscreen}
               onStopControlClick={stopControlClick}
               onProgressMouseDown={handleProgressMouseDown}
+              onProgressTouchStart={handleProgressTouchStart}
               onProgressMouseMove={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -486,7 +546,7 @@ function VideoPlayerView() {
           onToggleAutoPlay={() => setAutoPlay(!autoPlay)}
           onToggleScope={togglePlaylistScope}
           onSelectItem={(item) => { void selectPlaylistItem(item); }}
-          footer={<VideoAiJobCenter {...aiJobCenterProps} />}
+          footer={!isMobile ? <VideoAiJobCenter {...aiJobCenterProps} /> : undefined}
         />
       </div>
     </div>

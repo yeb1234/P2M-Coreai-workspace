@@ -41,8 +41,8 @@ export function PausedOverlay({ isPlaying }: { isPlaying: boolean }) {
   if (isPlaying) return null;
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-      <div className="w-16 h-16 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center">
-        <Play size={28} className="text-white ml-1" />
+      <div className="w-12 h-12 md:w-16 md:h-16 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center">
+        <Play size={20} className="text-white ml-0.5" />
       </div>
     </div>
   );

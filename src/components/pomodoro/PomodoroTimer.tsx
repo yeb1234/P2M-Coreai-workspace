@@ -70,15 +70,15 @@ export const PomodoroTimer: React.FC = () => {
   }, [ambientSound]);
 
   return (
-    <div className="flex flex-col items-center p-8 bg-[#fef7ed] rounded-2xl shadow-sm border border-[#e5e2dd]">
+    <div className="flex flex-col items-center p-4 md:p-8 bg-[#fef7ed] rounded-2xl shadow-sm border border-[#e5e2dd]">
       {linkedTodo && (
-        <div className="mb-5 px-3 py-1.5 bg-[#f3f2ef] rounded-lg">
+        <div className="mb-3 md:mb-5 px-3 py-1.5 bg-[#f3f2ef] rounded-lg">
           <p className="text-[10px] text-[#9ca3af]">当前专注</p>
           <p className="text-sm font-medium text-[#1a1a1a]">{linkedTodo.title}</p>
         </div>
       )}
 
-      <div className="relative w-72 h-72 mb-6">
+      <div className="relative w-48 h-48 md:w-72 md:h-72 mb-4 md:mb-6">
         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e2dd" strokeWidth="5" />
           <circle
@@ -91,49 +91,49 @@ export const PomodoroTimer: React.FC = () => {
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-6xl font-bold font-mono ${PHASE_COLORS[timer.phase]}`}>
+          <span className={`text-4xl md:text-6xl font-bold font-mono ${PHASE_COLORS[timer.phase]}`}>
             {formatTime(timer.timeRemaining)}
           </span>
-          <span className={`mt-1.5 text-sm font-medium ${PHASE_COLORS[timer.phase]}`}>
+          <span className={`mt-1 text-xs md:text-sm font-medium ${PHASE_COLORS[timer.phase]}`}>
             {PHASE_LABELS[timer.phase]}
           </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-3 mb-3 md:mb-4">
         {timer.status === 'idle' || timer.status === 'paused' ? (
           <button
             onClick={handleStart}
-            className={`flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-medium transition-colors ${PHASE_BG_COLORS[timer.phase]} hover:opacity-90`}
+            className={`flex items-center gap-2 px-5 py-3 md:py-2.5 text-white rounded-xl font-medium transition-colors ${PHASE_BG_COLORS[timer.phase]} hover:opacity-90`}
           >
-            <Play size={20} />
+            <Play size={22} />
             {timer.status === 'idle' ? '开始' : '继续'}
           </button>
         ) : (
           <button
             onClick={pauseTimer}
-            className="flex items-center gap-2 px-5 py-2.5 text-white bg-[#6b7280] rounded-xl font-medium hover:bg-[#4b5563] transition-colors"
+            className="flex items-center gap-2 px-5 py-3 md:py-2.5 text-white bg-[#6b7280] rounded-xl font-medium hover:bg-[#4b5563] transition-colors"
           >
-            <Pause size={20} />
+            <Pause size={22} />
             暂停
           </button>
         )}
 
         <button
           onClick={handleReset}
-          className="p-2.5 text-[#9ca3af] hover:text-[#6b7280] hover:bg-[#f3f2ef] rounded-xl transition-colors"
+          className="p-3 md:p-2.5 text-[#9ca3af] hover:text-[#6b7280] hover:bg-[#f3f2ef] rounded-xl transition-colors"
           title="重置"
         >
-          <RotateCcw size={18} />
+          <RotateCcw size={20} />
         </button>
 
         {timer.status === 'running' && (
           <button
             onClick={completePhase}
-            className="p-2.5 text-[#9ca3af] hover:text-[#6b7280] hover:bg-[#f3f2ef] rounded-xl transition-colors"
+            className="p-3 md:p-2.5 text-[#9ca3af] hover:text-[#6b7280] hover:bg-[#f3f2ef] rounded-xl transition-colors"
             title="跳过"
           >
-            <SkipForward size={18} />
+            <SkipForward size={20} />
           </button>
         )}
       </div>
@@ -152,7 +152,7 @@ export const PomodoroTimer: React.FC = () => {
             <button
               key={sound}
               onClick={() => handleAmbientToggle(sound)}
-              className={`p-1.5 rounded-md transition-colors ${
+              className={`p-2 md:p-1.5 rounded-md transition-colors ${
                 ambientSound === sound
                   ? 'bg-[#fef7ed] text-[#c87d2f]'
                   : 'text-[#b8b4ac] hover:text-[#6b7280] hover:bg-[#f3f2ef]'

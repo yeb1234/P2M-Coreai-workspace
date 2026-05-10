@@ -4,92 +4,10 @@ import { useTodoStore } from '../../stores';
 import { TodoItem } from './TodoItem';
 import { TodoForm } from './TodoForm';
 import { TodoFilters } from './TodoFilters';
+import { InlineAddInput } from './InlineAddInput';
 import { Modal, EmptyState, PageTitle, ConfirmDialog } from '../shared';
-import type { Todo, TodoPriority } from '../../types';
-import { PRIORITY_COLORS } from '../../types';
-
-const PRIORITY_SHORTCUTS: Record<string, TodoPriority> = {
-  '/g': 'green',
-  '/p': 'high',
-  '/y': 'medium',
-  '/b': 'low',
-};
-
-const InlineAddInput: React.FC = () => {
-  const addTodo = useTodoStore((s) => s.addTodo);
-  const [active, setActive] = useState(false);
-  const [value, setValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (active && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [active]);
-
-  const handleSubmit = useCallback(() => {
-    let title = value.trim();
-    let priority: TodoPriority = 'green';
-    for (const [shortcut, p] of Object.entries(PRIORITY_SHORTCUTS)) {
-      if (title.endsWith(shortcut)) {
-        title = title.slice(0, -shortcut.length).trim();
-        priority = p;
-        break;
-      }
-    }
-    if (title) {
-      addTodo({ title, description: '', priority, dueDate: null });
-    }
-    setValue('');
-    setActive(false);
-  }, [value, addTodo]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit();
-    } else if (e.key === 'Escape') {
-      setValue('');
-      setActive(false);
-    }
-  }, [handleSubmit]);
-
-  if (!active) {
-    return (
-      <button
-        onClick={() => setActive(true)}
-        className="w-full flex items-center gap-3 px-3 py-3 text-sm text-[#b8b4ac] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-all group"
-      >
-        <div className="w-4 flex-shrink-0" />
-        <div className="w-5 h-5 border-2 border-dashed border-[#d1cdc6] rounded-full flex items-center justify-center group-hover:border-[#c87d2f] transition-colors flex-shrink-0">
-          <Plus size={12} />
-        </div>
-        <span className="flex-1 text-left">新提醒事项</span>
-        <div className="w-[76px] flex-shrink-0" />
-      </button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-3 px-3 py-3 rounded-lg border border-[#c87d2f] bg-[#faf9f7] shadow-sm">
-      <div className="w-4 flex-shrink-0" />
-      <div className="w-5 h-5 border-2 border-[#c87d2f] rounded-full flex items-center justify-center flex-shrink-0">
-        <div className="w-2 h-2 bg-[#c87d2f] rounded-full" />
-      </div>
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={handleSubmit}
-        onKeyDown={handleKeyDown}
-        className="flex-1 text-sm text-[#1a1a1a] bg-transparent outline-none placeholder:text-[#d1cdc6]"
-        placeholder="输入待办...（/g绿色 /p粉色）"
-      />
-      <div className="w-[76px] flex-shrink-0" />
-    </div>
-  );
-};
+import type { Todo } from '../../types';
+import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
 
 export const TodoList: React.FC = () => {
   // Subscribe to raw data so component re-renders on changes
@@ -101,6 +19,7 @@ export const TodoList: React.FC = () => {
   const getTrashedTodos = useTodoStore((s) => s.getTrashedTodos);
   const reorderTodos = useTodoStore((s) => s.reorderTodos);
   const clearAllTodos = useTodoStore((s) => s.clearAllTodos);
+  const trashCompletedTodos = useTodoStore((s) => s.trashCompletedTodos);
   const restoreTodo = useTodoStore((s) => s.restoreTodo);
   const permanentDeleteTodo = useTodoStore((s) => s.permanentDeleteTodo);
   const clearTrash = useTodoStore((s) => s.clearTrash);
@@ -128,7 +47,28 @@ export const TodoList: React.FC = () => {
   const trashedTodos = getTrashedTodos();
 
   const activeTodos = useMemo(() => filteredTodos.filter((t) => t.status !== 'completed'), [filteredTodos]);
-  const completedTodos = useMemo(() => filteredTodos.filter((t) => t.status === 'completed'), [filteredTodos]);
+  const completedTodos = useMemo(() => {
+    return filteredTodos
+      .filter((t) => t.status === 'completed')
+      .sort((a, b) => {
+        const aTime = new Date(a.completedAt ?? a.updatedAt ?? a.createdAt).getTime();
+        const bTime = new Date(b.completedAt ?? b.updatedAt ?? b.createdAt).getTime();
+        return bTime - aTime;
+      });
+  }, [filteredTodos]);
+
+  const filter = useTodoStore((s) => s.filter);
+  const activeFilterSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (filter.status && filter.status !== 'all') {
+      const labels: Record<string, string> = { pending: '待处理', in_progress: '进行中', completed: '已完成' };
+      parts.push(labels[filter.status] || filter.status);
+    }
+    if (filter.priority) {
+      parts.push(PRIORITY_LABELS[filter.priority]);
+    }
+    return parts.length > 0 ? parts.join('/') : '全部';
+  }, [filter]);
 
   useEffect(() => {
     if (pendingTodoDate) {
@@ -182,59 +122,91 @@ export const TodoList: React.FC = () => {
     setOverId(null);
   }, []);
 
+  const moveCompletedToTrash = useCallback(() => {
+    const moved = trashCompletedTodos(completedTodos.map((todo) => todo.id));
+    if (moved > 0) {
+      setShowTrash(true);
+      setCollapsedTrash(false);
+    }
+  }, [completedTodos, trashCompletedTodos]);
+
   return (
     <div className="space-y-4">
-      <PageTitle
-        title="待办事项"
-        subtitle="拖动左侧手柄调整顺序"
-        icon={<CheckSquare size={22} />}
-        action={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowToolbar(!showToolbar)}
-              className={`p-2 rounded-lg transition-colors ${showToolbar ? 'text-[#c87d2f] bg-[#fef7ed]' : 'text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed]'}`}
-              title="筛选/统计"
-            >
-              <SlidersHorizontal size={16} />
+      {/* Mobile compact header */}
+      <div className="md:hidden mb-1 pb-1 border-b border-[#e5e2dd]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <CheckSquare size={16} className="text-[#c87d2f]" />
+            <h2 className="text-sm font-bold text-[#1a1a1a]">待办</h2>
+            <span className="text-[10px] text-[#9ca3af]">({activeTodos.length + completedTodos.length})</span>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => setShowToolbar(!showToolbar)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] transition-colors ${showToolbar ? 'text-[#c87d2f] bg-[#fef7ed]' : 'text-[#9ca3af]'}`} title="筛选">
+              <SlidersHorizontal size={13} />
+              <span>{activeFilterSummary}</span>
             </button>
-            <button
-              onClick={undo}
-              className="p-2 text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
-              title="撤销 (Ctrl+Z)"
-            >
-              <Undo2 size={16} />
-            </button>
-            <button
-              onClick={redo}
-              className="p-2 text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
-              title="重做 (Ctrl+Y)"
-            >
-              <RotateCw size={16} />
-            </button>
-            <button
-              onClick={() => setShowTrash(!showTrash)}
-              className={`p-2 rounded-lg transition-colors relative ${
-                showTrash ? 'text-[#dc3545] bg-[#fef2f2]' : 'text-[#9ca3af] hover:text-[#dc3545] hover:bg-[#fef2f2]'
-              }`}
-              title="垃圾箱"
-            >
-              <Trash2 size={16} />
-              {trashedTodos.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#dc3545] text-white text-[9px] rounded-full flex items-center justify-center">
-                  {trashedTodos.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] transition-colors"
-            >
-              <Plus size={16} />
-              新建
+            <button onClick={() => setShowTrash(!showTrash)} className={`p-1.5 rounded-lg relative ${showTrash ? 'text-[#dc3545] bg-[#fef2f2]' : 'text-[#9ca3af]'}`} title="垃圾箱">
+              <Trash2 size={14} />
+              {trashedTodos.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#dc3545] text-white text-[7px] rounded-full flex items-center justify-center">{trashedTodos.length}</span>}
             </button>
           </div>
-        }
-      />
+        </div>
+      </div>
+
+      {/* Desktop header */}
+      <div className="hidden md:block">
+        <PageTitle
+          title="待办事项"
+          subtitle="拖动左侧手柄调整顺序"
+          icon={<CheckSquare size={22} />}
+          action={
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowToolbar(!showToolbar)}
+                className={`p-2 rounded-lg transition-colors ${showToolbar ? 'text-[#c87d2f] bg-[#fef7ed]' : 'text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed]'}`}
+                title="筛选/统计"
+              >
+                <SlidersHorizontal size={16} />
+              </button>
+              <button
+                onClick={undo}
+                className="p-2 text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
+                title="撤销 (Ctrl+Z)"
+              >
+                <Undo2 size={16} />
+              </button>
+              <button
+                onClick={redo}
+                className="p-2 text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
+                title="重做 (Ctrl+Y)"
+              >
+                <RotateCw size={16} />
+              </button>
+              <button
+                onClick={() => setShowTrash(!showTrash)}
+                className={`p-2 rounded-lg transition-colors relative ${
+                  showTrash ? 'text-[#dc3545] bg-[#fef2f2]' : 'text-[#9ca3af] hover:text-[#dc3545] hover:bg-[#fef2f2]'
+                }`}
+                title="垃圾箱"
+              >
+                <Trash2 size={16} />
+                {trashedTodos.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#dc3545] text-white text-[9px] rounded-full flex items-center justify-center">
+                    {trashedTodos.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] transition-colors"
+              >
+                <Plus size={16} />
+                新建
+              </button>
+            </div>
+          }
+        />
+      </div>
 
       {showToolbar && (
         <TodoFilters
@@ -372,6 +344,16 @@ export const TodoList: React.FC = () => {
                   dropPosition={overId === todo.id ? dropPosition : 'bottom'}
                 />
               ))}
+              <div className="flex justify-end">
+                <button
+                  onClick={moveCompletedToTrash}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#dc3545] border border-[#fecaca] rounded-lg hover:bg-[#fef2f2] transition-colors"
+                  title="把当前列表里已完成的待办移动到垃圾箱，可恢复"
+                >
+                  <Trash2 size={13} />
+                  进垃圾箱（{completedTodos.length}）
+                </button>
+              </div>
             </div>
           )}
         </>

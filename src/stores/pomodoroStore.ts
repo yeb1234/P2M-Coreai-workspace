@@ -40,7 +40,7 @@ interface PomodoroState {
 const initialTimerState: PomodoroTimerState = {
   status: 'idle',
   phase: 'work',
-  timeRemaining: DEFAULT_CONFIG.workDuration * 60,
+  timeRemaining: 0,
   sessionsCompleted: 0,
   currentSessionId: null,
   linkedTodoId: null,
@@ -50,7 +50,7 @@ export const usePomodoroStore = create<PomodoroState>()(
   persist(
     (set, get) => ({
       config: { ...DEFAULT_CONFIG },
-      timer: { ...initialTimerState },
+      timer: { ...initialTimerState, timeRemaining: DEFAULT_CONFIG.workDuration * 60 },
       sessions: {},
       _lastTickTimestamp: null,
 
@@ -111,6 +111,7 @@ export const usePomodoroStore = create<PomodoroState>()(
         set({
           timer: {
             ...initialTimerState,
+            timeRemaining: state.config.workDuration * 60,
             linkedTodoId: state.timer.linkedTodoId,
           },
         });
@@ -234,14 +235,12 @@ export const usePomodoroStore = create<PomodoroState>()(
         set((state) => {
           const newConfig = { ...state.config, ...config };
           let timer = state.timer;
-          if (timer.status === 'idle') {
-            const phase = timer.phase;
-            let duration: number;
-            if (phase === 'work') duration = newConfig.workDuration;
-            else if (phase === 'short_break') duration = newConfig.shortBreakDuration;
-            else duration = newConfig.longBreakDuration;
-            timer = { ...timer, timeRemaining: duration * 60 };
-          }
+          const phase = timer.phase;
+          let duration: number;
+          if (phase === 'work') duration = newConfig.workDuration;
+          else if (phase === 'short_break') duration = newConfig.shortBreakDuration;
+          else duration = newConfig.longBreakDuration;
+          timer = { ...timer, timeRemaining: duration * 60 };
           return { config: newConfig, timer };
         });
       },
