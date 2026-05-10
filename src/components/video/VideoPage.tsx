@@ -1,9 +1,9 @@
-﻿import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { PlayCircle, ArrowLeft } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { useVideoStore } from '../../stores/videoStore';
-import { useTranscriptionStore } from '../../stores/transcriptionStore';
-import { getVideoStreamUrl, getSubtitleFileUrl, fetchAiJobs, saveWatchHistory, type AiJobListOut, type TranscriptSegment } from '../../lib/videoApi';
+import { getVideoStreamUrl, getSubtitleFileUrl, saveWatchHistory, type TranscriptSegment } from '../../lib/videoApi';
+import { useAiJobCenter } from '../../hooks/useAiJobCenter';
 import { VideoList } from './VideoList';
 import { VideoAiSummaryPanel } from './VideoAiSummaryPanel';
 import { MediaErrorOverlay, PausedOverlay, SubtitleOverlay } from './VideoOverlays';
@@ -18,23 +18,9 @@ import { useVideoControlChrome } from './useVideoControlChrome';
 import { useVideoKeyboardShortcuts } from './useVideoKeyboardShortcuts';
 import { useVideoPlaylist } from './useVideoPlaylist';
 
-// ── Video Player ──
-
 function VideoPlayerView() {
-  const { currentVideo, currentSegments, jobStatus, jobStage, triggerAi, clearSelection, selectVideo, loadCurrentVideo } = useVideoStore();
-  const whisperEngine = useTranscriptionStore((s) => s.whisperEngine);
-  const whisperModel = useTranscriptionStore((s) => s.whisperModel);
-  const transcriptionLanguage = useTranscriptionStore((s) => s.language);
-  const doSummary = useTranscriptionStore((s) => s.doSummary);
-  const wordLimit = useTranscriptionStore((s) => s.wordLimit);
-  const cpuThreads = useTranscriptionStore((s) => s.cpuThreads);
-  const computeType = useTranscriptionStore((s) => s.computeType);
-  const beamSize = useTranscriptionStore((s) => s.beamSize);
-  const bestOf = useTranscriptionStore((s) => s.bestOf);
-  const temperature = useTranscriptionStore((s) => s.temperature);
-  const vadFilter = useTranscriptionStore((s) => s.vadFilter);
-  const subtitleCorrectionEnabled = useTranscriptionStore((s) => s.subtitleCorrectionEnabled);
-  const subtitleCorrectionPrompt = useTranscriptionStore((s) => s.subtitleCorrectionPrompt);
+  const { currentVideo, currentSegments, jobStatus, jobStage, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -63,10 +49,6 @@ function VideoPlayerView() {
   const [isMuted, setIsMuted] = useState(initialSettings.muted);
   const [dragging, setDragging] = useState(false);
   const [mediaError, setMediaError] = useState('');
-  const [aiJobs, setAiJobs] = useState<AiJobListOut | null>(null);
-  const [aiJobsLoading, setAiJobsLoading] = useState(false);
-  const [aiJobStatusFilter, setAiJobStatusFilter] = useState<string | null>(null);
-  const [batchingFolder, setBatchingFolder] = useState(false);
   const {
     showControls,
     setShowControls,
@@ -78,10 +60,12 @@ function VideoPlayerView() {
   } = useVideoControlChrome(isPlaying);
   const {
     playlist,
+    playlistScope,
     playAfterLoadRef,
     selectPlaylistItem,
     playNextFromPlaylist,
-  } = useVideoPlaylist({ currentVideo, selectVideo });
+    togglePlaylistScope,
+  } = useVideoPlaylist({ currentVideo, selectVideo, currentCategoryId });
 
   const videoUrl = currentVideo ? getVideoStreamUrl(currentVideo.id) : '';
   const subtitleUrl = currentVideo && (currentVideo.subtitle_url || currentVideo.subtitle_path)
@@ -103,74 +87,13 @@ function VideoPlayerView() {
     currentVideo?.transcription
   );
 
-  const loadAiJobs = useCallback(async () => {
-    setAiJobsLoading(true);
-    try {
-      setAiJobs(await fetchAiJobs(12, aiJobStatusFilter ?? undefined));
-    } catch {
-      // The job center is diagnostic UI; playback should not depend on it.
-    } finally {
-      setAiJobsLoading(false);
-    }
-  }, [aiJobStatusFilter]);
+  // AI Job Center - all logic extracted to hook
+  const { triggerSingleVideo, triggerCorrection, ...aiJobCenterProps } = useAiJobCenter(playlist, currentVideoId, loadCurrentVideo);
 
-  const aiJobOptions = useMemo(() => ({
-    whisper_engine: whisperEngine,
-    whisper_model: whisperModel,
-    language: transcriptionLanguage,
-    do_summary: doSummary,
-    word_limit: wordLimit,
-    cpu_threads: cpuThreads,
-    compute_type: computeType,
-    beam_size: beamSize,
-    best_of: bestOf,
-    temperature,
-    vad_filter: vadFilter,
-    subtitle_correction_enabled: subtitleCorrectionEnabled,
-    subtitle_correction_prompt: subtitleCorrectionPrompt,
-  }), [
-    whisperModel,
-    whisperEngine,
-    transcriptionLanguage,
-    doSummary,
-    wordLimit,
-    cpuThreads,
-    computeType,
-    beamSize,
-    bestOf,
-    temperature,
-    vadFilter,
-    subtitleCorrectionEnabled,
-    subtitleCorrectionPrompt,
-  ]);
+  const isProcessing = jobStatus === 'running' || jobStatus === 'queued';
+  const progressPct = videoDuration > 0 ? (progress / videoDuration) * 100 : 0;
 
-  const batchCurrentFolder = useCallback(async () => {
-    if (!playlist.length || batchingFolder) return;
-    setBatchingFolder(true);
-    try {
-      for (const item of playlist) {
-        await triggerAi(item.id, aiJobOptions);
-      }
-      await loadAiJobs();
-    } finally {
-      setBatchingFolder(false);
-    }
-  }, [aiJobOptions, batchingFolder, loadAiJobs, playlist, triggerAi]);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void loadAiJobs();
-    });
-  }, [loadAiJobs]);
-
-  useEffect(() => {
-    if (jobStatus !== 'running' && jobStatus !== 'queued') return;
-    const timer = window.setInterval(() => {
-      void loadAiJobs();
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [jobStatus, loadAiJobs]);
-
+  // Load video details if missing
   useEffect(() => {
     if (!currentVideoId || hasVideoDetails) return;
     void loadCurrentVideo(currentVideoId);
@@ -405,25 +328,6 @@ function VideoPlayerView() {
     };
   }, [dragging, videoDuration]);
 
-  const isProcessing = jobStatus === 'running' || jobStatus === 'queued';
-  const progressPct = videoDuration > 0 ? (progress / videoDuration) * 100 : 0;
-  const batchProgress = useMemo(() => {
-    const ids = new Set(playlist.map((item) => item.id));
-    const folderJobs = (aiJobs?.items ?? []).filter((job) => ids.has(job.video_id));
-    const latestByVideo = new Map<number, (typeof folderJobs)[number]>();
-    for (const job of folderJobs) {
-      if (!latestByVideo.has(job.video_id)) latestByVideo.set(job.video_id, job);
-    }
-    const values = [...latestByVideo.values()];
-    return {
-      total: playlist.length,
-      completed: values.filter((job) => job.status === 'completed').length,
-      running: values.filter((job) => job.status === 'running').length,
-      queued: values.filter((job) => job.status === 'queued').length,
-      failed: values.filter((job) => job.status === 'failed').length,
-    };
-  }, [aiJobs?.items, playlist]);
-
   if (!currentVideo) return null;
 
   return (
@@ -570,43 +474,45 @@ function VideoPlayerView() {
         <VideoPlaylistPanel
           currentVideo={currentVideo}
           playlist={playlist}
+          playlistScope={playlistScope}
           width={playlistPanelWidth}
           isPlaying={isPlaying}
           isProcessing={isProcessing}
           jobStatus={jobStatus}
           autoPlay={autoPlay}
           onResizeStart={startPlaylistResize}
-          onTriggerAi={() => triggerAi(currentVideo.id, aiJobOptions)}
+          onTriggerAi={() => triggerSingleVideo(currentVideo.id)}
+          onCorrectSubtitles={() => triggerCorrection(currentVideo.id)}
           onToggleAutoPlay={() => setAutoPlay(!autoPlay)}
+          onToggleScope={togglePlaylistScope}
           onSelectItem={(item) => { void selectPlaylistItem(item); }}
-          footer={
-            <VideoAiJobCenter
-              jobs={aiJobs}
-              loading={aiJobsLoading}
-              selectedStatus={aiJobStatusFilter}
-              batchCount={playlist.length}
-              batchLoading={batchingFolder}
-              batchProgress={batchProgress}
-              onStatusChange={setAiJobStatusFilter}
-              onBatchFolder={() => void batchCurrentFolder()}
-              onRefresh={() => void loadAiJobs()}
-            />
-          }
+          footer={<VideoAiJobCenter {...aiJobCenterProps} />}
         />
       </div>
     </div>
   );
 }
 
-// ── Main Page ──
-
 export const VideoPage: React.FC = () => {
   const currentVideo = useVideoStore((s) => s.currentVideo);
   const restoreCurrentVideo = useVideoStore((s) => s.restoreCurrentVideo);
+  const loadCurrentVideo = useVideoStore((s) => s.loadCurrentVideo);
 
   useEffect(() => {
     restoreCurrentVideo();
   }, [restoreCurrentVideo]);
+
+  // Listen for video play events from AI chat recommendations
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.videoId) {
+        void loadCurrentVideo(detail.videoId);
+      }
+    };
+    window.addEventListener('p2m:play-video', handler);
+    return () => window.removeEventListener('p2m:play-video', handler);
+  }, [loadCurrentVideo]);
 
   return (
     <div className="w-full pt-2 space-y-6">

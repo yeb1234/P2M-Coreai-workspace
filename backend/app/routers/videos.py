@@ -1,5 +1,6 @@
 import json
 import math
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -18,7 +19,7 @@ from app.schemas import (
     VideoPage,
     WatchHistoryIn,
 )
-from app.services.ai_jobs import create_ai_job, ensure_video_note
+from app.services.ai_jobs import create_ai_job_from_payload, ensure_video_note
 from app.services.sprite import get_or_generate_sprite, get_sprite_meta_path, get_sprite_path, has_sprite
 from app.utils.serialization import load_segments, to_output_url
 
@@ -49,6 +50,7 @@ def serialize_video(
     active_job: AiJob | None = None,
     category_path: str | None = None,
     include_segments: bool = True,
+    include_details: bool = True,
 ) -> VideoOut:
     return VideoOut(
         id=video.id,
@@ -61,10 +63,10 @@ def serialize_video(
         tags=video.tags,
         category_id=video.category_id,
         category_path=category_path,
-        transcription=video.transcription,
+        transcription=video.transcription if include_details else None,
         transcript_segments=load_segments(video.transcript_segments) if include_segments else [],
-        summary=video.summary,
-        markdown_path=video.markdown_path,
+        summary=video.summary if include_details else None,
+        markdown_path=video.markdown_path if include_details else None,
         subtitle_path=video.subtitle_path,
         subtitle_url=to_output_url(video.subtitle_path),
         ai_status=video.ai_status or "idle",
@@ -162,12 +164,7 @@ def search_segments(
     )
 
     if not rows:
-        rows = (
-            db.query(SubtitleSegment, Video)
-            .join(Video, Video.id == SubtitleSegment.video_id)
-            .limit(limit * 3)
-            .all()
-        )
+        return []
 
     for segment, video in rows:
         text_lower = segment.text.lower()
@@ -191,24 +188,43 @@ def search_segments(
     return results[:limit]
 
 
+def _collect_descendant_ids(db: Session, category_id: int) -> list[int]:
+    """Collect the given category ID and all its descendant category IDs."""
+    ids = [category_id]
+    children = db.query(Category.id).filter(Category.parent_id == category_id).all()
+    for (child_id,) in children:
+        ids.extend(_collect_descendant_ids(db, child_id))
+    return ids
+
+
 @router.get("", response_model=VideoPage)
 def get_videos(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     category_id: int | None = None,
+    category_ids: str | None = None,
     search: str | None = None,
     db: Session = Depends(get_db),
 ):
     query = db.query(Video)
-    if category_id:
-        query = query.filter(Video.category_id == category_id)
+    if category_ids:
+        ids = [int(x) for x in category_ids.split(",") if x.strip()]
+        all_ids: list[int] = []
+        for cid in ids:
+            all_ids.extend(_collect_descendant_ids(db, cid))
+        query = query.filter(Video.category_id.in_(set(all_ids)))
+    elif category_id:
+        all_ids = _collect_descendant_ids(db, category_id)
+        query = query.filter(Video.category_id.in_(all_ids))
     if search:
         query = query.filter(Video.title.contains(search))
 
     total = query.count()
     offset = (page - 1) * page_size
     selected = (
-        query.order_by(Video.sort_key.asc().nullslast(), Video.id.asc())
+        query
+        .join(Category, Video.category_id == Category.id, isouter=True)
+        .order_by(Category.path.asc().nullslast(), Video.sort_key.asc().nullslast(), Video.id.asc())
         .offset(offset)
         .limit(page_size)
         .all()
@@ -225,6 +241,7 @@ def get_videos(
                 job_map.get(item.id),
                 category_map.get(item.category_id),
                 include_segments=False,
+                include_details=False,
             )
             for item in selected
         ],
@@ -253,7 +270,7 @@ def get_continue_video(db: Session = Depends(get_db)):
     if video.category_id:
         category = db.query(Category).filter(Category.id == video.category_id).first()
         category_path = category.path if category else None
-    return serialize_video(video, history, job_map.get(video.id), category_path)
+    return serialize_video(video, history, job_map.get(video.id), category_path, include_segments=False, include_details=False)
 
 
 @router.get("/history/recent", response_model=list[VideoOut])
@@ -290,7 +307,7 @@ def get_recent_history(
         video = videos.get(history.video_id)
         if not video:
             continue
-        result.append(serialize_video(video, history, job_map.get(video.id), categories.get(video.category_id)))
+        result.append(serialize_video(video, history, job_map.get(video.id), categories.get(video.category_id), include_segments=False, include_details=False))
     return result
 
 
@@ -314,7 +331,7 @@ def get_recent_videos(
     category_ids = {video.category_id for video in videos if video.category_id}
     categories = {c.id: c.path for c in db.query(Category).filter(Category.id.in_(category_ids)).all()} if category_ids else {}
     return [
-        serialize_video(video, watch_map.get(video.id), job_map.get(video.id), categories.get(video.category_id), include_segments=False)
+        serialize_video(video, watch_map.get(video.id), job_map.get(video.id), categories.get(video.category_id), include_segments=False, include_details=False)
         for video in videos
     ]
 
@@ -418,13 +435,28 @@ def save_watch_history(payload: WatchHistoryIn, db: Session = Depends(get_db)):
         video.duration = payload.duration
 
     completed = bool(payload.duration and payload.progress / payload.duration >= 0.9)
-    history = WatchHistory(
-        video_id=payload.video_id,
-        progress=payload.progress,
-        duration=payload.duration,
-        completed=completed,
+    latest = (
+        db.query(WatchHistory)
+        .filter(WatchHistory.video_id == payload.video_id)
+        .order_by(WatchHistory.watched_at.desc())
+        .first()
     )
-    db.add(history)
+    now = datetime.now()
+    if latest and latest.watched_at and now - latest.watched_at <= timedelta(minutes=2):
+        latest.progress = payload.progress
+        latest.duration = payload.duration
+        latest.completed = completed
+        latest.watched_at = now
+    else:
+        db.add(
+            WatchHistory(
+                video_id=payload.video_id,
+                progress=payload.progress,
+                duration=payload.duration,
+                completed=completed,
+                watched_at=now,
+            )
+        )
     db.commit()
     return {"status": "ok", "completed": completed}
 
@@ -435,44 +467,33 @@ def start_ai_job(video_id: int, payload: AiJobCreate, db: Session = Depends(get_
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    job = create_ai_job(
-        video_id=video_id,
-        whisper_model=payload.whisper_model,
-        whisper_engine=payload.whisper_engine,
-        language=payload.language,
-        do_summary=payload.do_summary,
-        word_limit=payload.word_limit,
-        ollama_model=payload.ollama_model,
-        cpu_threads=payload.cpu_threads,
-        compute_type=payload.compute_type,
-        beam_size=payload.beam_size,
-        best_of=payload.best_of,
-        temperature=payload.temperature,
-        vad_filter=payload.vad_filter,
-        subtitle_correction_enabled=payload.subtitle_correction_enabled,
-        subtitle_correction_prompt=payload.subtitle_correction_prompt,
-    )
+    job = create_ai_job_from_payload(db, video_id, payload)
     return {"job_id": job.id, "status": job.status, "stage": job.stage}
 
 
 @router.get("/{video_id}/playlist")
-def get_playlist(video_id: int, db: Session = Depends(get_db)):
+def get_playlist(video_id: int, scope: str = "leaf", category_id: int | None = None, db: Session = Depends(get_db)):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
     query = db.query(Video)
-    if video.category_id:
+    if scope == "descendants" and category_id:
+        # Use the browsing context (the folder user clicked into)
+        all_ids = _collect_descendant_ids(db, category_id)
+        query = query.filter(Video.category_id.in_(all_ids))
+        query = query.join(Category, Video.category_id == Category.id, isouter=True)
+        query = query.order_by(Category.path.asc().nullslast(), Video.sort_key.asc().nullslast(), Video.id.asc())
+    elif video.category_id:
         query = query.filter(Video.category_id == video.category_id)
-    videos = query.order_by(Video.sort_key.asc().nullslast(), Video.id.asc()).all()
+        query = query.order_by(Video.sort_key.asc().nullslast(), Video.id.asc())
+    videos = query.all()
     watch_map = latest_watch_map(db, [item.id for item in videos])
 
     items = []
     current_index = 0
-    category_path = None
-    if video.category_id:
-        category = db.query(Category).filter(Category.id == video.category_id).first()
-        category_path = category.path if category else None
+    category_ids = {item.category_id for item in videos if item.category_id}
+    category_map = {c.id: c.path for c in db.query(Category).filter(Category.id.in_(category_ids)).all()} if category_ids else {}
     for index, item in enumerate(videos):
         last_watch = watch_map.get(item.id)
         if item.id == video_id:
@@ -482,7 +503,7 @@ def get_playlist(video_id: int, db: Session = Depends(get_db)):
                 "id": item.id,
                 "title": item.title,
                 "thumbnail": item.thumbnail,
-                "category_path": category_path if item.id == video_id else (db.query(Category).filter(Category.id == item.category_id).first().path if item.category_id else None),
+                "category_path": category_map.get(item.category_id),
                 "watch_progress": last_watch.progress if last_watch else None,
                 "completed": bool(last_watch.completed) if last_watch else False,
                 "subtitle_url": to_output_url(item.subtitle_path),

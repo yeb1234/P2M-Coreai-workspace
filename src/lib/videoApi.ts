@@ -121,6 +121,7 @@ export interface AiJobListItem {
   cpu_threads: number | null;
   compute_type: string | null;
   subtitle_correction_enabled: boolean | null;
+  subtitle_correction_scope: 'full' | 'off' | null;
   subtitle_correction_prompt: string | null;
   summary_error: string | null;
   created_at: string;
@@ -130,6 +131,31 @@ export interface AiJobListItem {
 export interface AiJobListOut {
   items: AiJobListItem[];
   total: number;
+  running: number;
+  queued: number;
+  failed: number;
+  completed: number;
+}
+
+export type AiJobBatchMode = 'unfinished' | 'missing_subtitles' | 'missing_summary' | 'failed_only' | 'all';
+
+export interface AiJobBatchOut {
+  mode: AiJobBatchMode;
+  requested: number;
+  eligible: number;
+  enqueued: number;
+  skipped: number;
+  active: number;
+  already_done: number;
+  failed: number;
+  limited: boolean;
+  max_enqueue: number;
+  job_ids: string[];
+  skipped_items: Array<{ video_id: number; title: string; reason: string }>;
+}
+
+export interface AiQueueState {
+  paused: boolean;
   running: number;
   queued: number;
   failed: number;
@@ -146,6 +172,36 @@ export interface BackendHealthCheck {
 export interface BackendHealthOut {
   ok: boolean;
   checks: BackendHealthCheck[];
+}
+
+export interface WhisperModelStatus {
+  id: string;
+  filename: string;
+  installed: boolean;
+  path: string;
+  size: number | null;
+}
+
+export interface WhisperModelsOut {
+  model_dir: string;
+  items: WhisperModelStatus[];
+}
+
+export interface TranscriptionSettingsDto {
+  whisper_engine: string;
+  whisper_model: string;
+  language: string;
+  do_summary: boolean;
+  word_limit: number;
+  cpu_threads: number;
+  compute_type: string;
+  beam_size: number;
+  best_of: number;
+  temperature: number;
+  vad_filter: boolean;
+  subtitle_correction_enabled: boolean;
+  subtitle_correction_scope: 'full' | 'off';
+  subtitle_correction_prompt: string;
 }
 
 export interface PlaylistItem {
@@ -193,9 +249,13 @@ export interface SpriteMeta {
   duration: number;
 }
 
-export async function fetchVideos(page = 1, pageSize = 20, categoryId?: number, search?: string): Promise<VideoPage> {
+export async function fetchVideos(page = 1, pageSize = 20, categoryId?: number, search?: string, categoryIds?: number[]): Promise<VideoPage> {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
-  if (categoryId) params.set('category_id', String(categoryId));
+  if (categoryIds && categoryIds.length > 0) {
+    params.set('category_ids', categoryIds.join(','));
+  } else if (categoryId) {
+    params.set('category_id', String(categoryId));
+  }
   if (search) params.set('search', search);
   return apiFetch<VideoPage>(`/api/videos?${params}`);
 }
@@ -227,8 +287,10 @@ export async function fetchRecentVideos(limit = 8, categoryId?: number | null): 
   }
 }
 
-export async function fetchPlaylist(videoId: number): Promise<Playlist> {
-  return apiFetch<Playlist>(`/api/videos/${videoId}/playlist`);
+export async function fetchPlaylist(videoId: number, scope: 'leaf' | 'descendants' = 'leaf', categoryId?: number | null): Promise<Playlist> {
+  const params = new URLSearchParams({ scope });
+  if (categoryId) params.set('category_id', String(categoryId));
+  return apiFetch<Playlist>(`/api/videos/${videoId}/playlist?${params}`);
 }
 
 export async function fetchSegments(videoId: number): Promise<SubtitleSegmentOut[]> {
@@ -263,6 +325,7 @@ export async function startAiJob(
     temperature?: number;
     vad_filter?: boolean;
     subtitle_correction_enabled?: boolean;
+    subtitle_correction_scope?: 'full' | 'off';
     subtitle_correction_prompt?: string;
   }
 ): Promise<{ job_id: string; status: string; stage: string }> {
@@ -282,6 +345,7 @@ export async function startAiJob(
       temperature: opts?.temperature,
       vad_filter: opts?.vad_filter,
       subtitle_correction_enabled: opts?.subtitle_correction_enabled,
+      subtitle_correction_scope: opts?.subtitle_correction_scope,
       subtitle_correction_prompt: opts?.subtitle_correction_prompt,
     }),
   });
@@ -295,6 +359,40 @@ export async function fetchAiJobs(limit = 20, status?: string): Promise<AiJobLis
   const params = new URLSearchParams({ limit: String(limit) });
   if (status) params.set('status', status);
   return apiFetch<AiJobListOut>(`/api/ai-jobs?${params}`);
+}
+
+export async function batchAiJobs(
+  videoIds: number[],
+  opts: Parameters<typeof startAiJob>[1] & {
+    mode?: AiJobBatchMode;
+    max_enqueue?: number;
+    dry_run?: boolean;
+  } = {}
+): Promise<AiJobBatchOut> {
+  return apiFetch<AiJobBatchOut>('/api/ai-jobs/batch', {
+    method: 'POST',
+    body: JSON.stringify({
+      video_ids: videoIds,
+      mode: opts.mode ?? 'missing_subtitles',
+      max_enqueue: opts.max_enqueue ?? 20,
+      dry_run: opts.dry_run ?? true,
+      whisper_engine: opts.whisper_engine,
+      whisper_model: opts.whisper_model ?? '',
+      language: opts.language ?? 'zh',
+      do_summary: opts.do_summary ?? true,
+      word_limit: opts.word_limit ?? 200,
+      ollama_model: opts.ollama_model ?? null,
+      cpu_threads: opts.cpu_threads,
+      compute_type: opts.compute_type,
+      beam_size: opts.beam_size,
+      best_of: opts.best_of,
+      temperature: opts.temperature,
+      vad_filter: opts.vad_filter,
+      subtitle_correction_enabled: opts.subtitle_correction_enabled,
+      subtitle_correction_scope: opts.subtitle_correction_scope,
+      subtitle_correction_prompt: opts.subtitle_correction_prompt,
+    }),
+  });
 }
 
 // ── Category Tree ──
@@ -319,6 +417,68 @@ export async function clearActiveAiJobs(): Promise<{ cleared: number }> {
   return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-active', { method: 'POST' });
 }
 
+export async function clearQueuedAiJobs(): Promise<{ cleared: number }> {
+  return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-queued', { method: 'POST' });
+}
+
+export async function clearFinishedAiJobs(): Promise<{ cleared: number }> {
+  return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-history', { method: 'POST' });
+}
+
+export async function clearCompletedAiJobs(): Promise<{ cleared: number }> {
+  return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-completed', { method: 'POST' });
+}
+
+export async function clearAllAiJobs(): Promise<{ cleared: number }> {
+  return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-all', { method: 'POST' });
+}
+
+export async function recoverStuckAiJobs(minutes = 60, correctionMinutes = 15, force = false): Promise<{ recovered: number; cutoff_minutes: number; correction_cutoff_minutes?: number }> {
+  return apiFetch<{ recovered: number; cutoff_minutes: number; correction_cutoff_minutes?: number }>(
+    `/api/admin/ai-jobs/recover-stuck?minutes=${minutes}&correction_minutes=${correctionMinutes}&force=${force ? 'true' : 'false'}`,
+    { method: 'POST' }
+  );
+}
+
+export async function fetchAiQueueState(): Promise<AiQueueState> {
+  return apiFetch<AiQueueState>('/api/admin/ai-jobs/queue');
+}
+
+export async function pauseAiQueue(): Promise<{ paused: boolean }> {
+  return apiFetch<{ paused: boolean }>('/api/admin/ai-jobs/pause', { method: 'POST' });
+}
+
+export async function resumeAiQueue(): Promise<{ paused: boolean }> {
+  return apiFetch<{ paused: boolean }>('/api/admin/ai-jobs/resume', { method: 'POST' });
+}
+
+export async function cancelAiJob(jobId: string): Promise<{ cancelled: boolean; reason?: string }> {
+  return apiFetch<{ cancelled: boolean; reason?: string }>(`/api/admin/ai-jobs/${jobId}/cancel`, { method: 'POST' });
+}
+
+export async function resumeAiJob(jobId: string): Promise<{ resumed: boolean; reason?: string; job_id?: string }> {
+  return apiFetch<{ resumed: boolean; reason?: string; job_id?: string }>(`/api/admin/ai-jobs/${jobId}/resume`, { method: 'POST' });
+}
+
+export async function syncQueuedAiJobSettings(): Promise<{ updated: number }> {
+  return apiFetch<{ updated: number }>('/api/admin/ai-jobs/sync-queued-settings', { method: 'POST' });
+}
+
 export async function fetchBackendHealth(): Promise<BackendHealthOut> {
   return apiFetch<BackendHealthOut>('/api/admin/health');
+}
+
+export async function fetchWhisperModels(): Promise<WhisperModelsOut> {
+  return apiFetch<WhisperModelsOut>('/api/admin/whisper-models');
+}
+
+export async function fetchTranscriptionSettings(): Promise<TranscriptionSettingsDto> {
+  return apiFetch<TranscriptionSettingsDto>('/api/admin/transcription-settings');
+}
+
+export async function saveTranscriptionSettings(settings: TranscriptionSettingsDto): Promise<TranscriptionSettingsDto> {
+  return apiFetch<TranscriptionSettingsDto>('/api/admin/transcription-settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
 }

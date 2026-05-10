@@ -1,8 +1,35 @@
 import { create } from 'zustand';
 import type { VideoItem, SegmentSearchResult, TranscriptSegment, CategoryTree } from '../lib/videoApi';
-import { fetchVideos, fetchVideo, searchSegments, startAiJob, fetchAiJob, fetchCategoryTree } from '../lib/videoApi';
+import { fetchVideos, fetchVideo, searchSegments, startAiJob, fetchCategoryTree } from '../lib/videoApi';
 
 const VIDEO_ID_KEY = 'p2m_current_video_id';
+const NAV_STATE_KEY = 'p2m_video_nav_state';
+
+interface SavedNavState {
+  categoryId: number | null;
+  breadcrumb: { id: number | null; name: string }[];
+  searchQuery: string;
+  page: number;
+}
+
+function saveNavState(state: { currentCategoryId: number | null; breadcrumb: { id: number | null; name: string }[]; searchQuery: string; page: number }) {
+  try {
+    localStorage.setItem(NAV_STATE_KEY, JSON.stringify({
+      categoryId: state.currentCategoryId,
+      breadcrumb: state.breadcrumb,
+      searchQuery: state.searchQuery,
+      page: state.page,
+    }));
+  } catch { /* quota exceeded, ignore */ }
+}
+
+function loadNavState(): SavedNavState | null {
+  try {
+    const raw = localStorage.getItem(NAV_STATE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SavedNavState;
+  } catch { return null; }
+}
 
 let currentVideoRequestSeq = 0;
 
@@ -37,9 +64,10 @@ interface VideoState {
   categoryTree: CategoryTree[];
   currentCategoryId: number | null;
   breadcrumb: { id: number | null; name: string }[];
+  selectedFolderIds: number[];
 
   // Actions
-  loadVideos: (page?: number, search?: string) => Promise<void>;
+  loadVideos: (page?: number, search?: string, categoryIds?: number[]) => Promise<void>;
   selectVideo: (video: VideoItem) => void;
   loadCurrentVideo: (videoId: number) => Promise<void>;
   clearSelection: () => void;
@@ -60,13 +88,16 @@ interface VideoState {
       temperature?: number;
       vad_filter?: boolean;
       subtitle_correction_enabled?: boolean;
+      subtitle_correction_scope?: 'full' | 'off';
+      subtitle_correction_prompt?: string;
     }) => Promise<void>;
-  pollJob: (jobId: string) => Promise<void>;
   refreshCurrent: () => Promise<void>;
   loadCategoryTree: () => Promise<void>;
   enterCategory: (id: number | null, name: string) => void;
   goToBreadcrumb: (id: number | null) => void;
   getCurrentChildren: () => CategoryTree[];
+  restoreNavigation: () => void;
+  setSelectedFolderIds: (ids: number[]) => void;
 }
 
 export const useVideoStore = create<VideoState>()((set, get) => ({
@@ -89,12 +120,13 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   categoryTree: [],
   currentCategoryId: null,
   breadcrumb: [{ id: null, name: '全部视频' }],
+  selectedFolderIds: [],
 
-  loadVideos: async (page = 1, search) => {
+  loadVideos: async (page = 1, search, categoryIds?: number[]) => {
     set({ loading: true, error: null });
     try {
       const categoryId = get().currentCategoryId ?? undefined;
-      const data = await fetchVideos(page, 20, categoryId, search);
+      const data = await fetchVideos(page, 20, categoryId, search, categoryIds);
       set({
         videos: data.items,
         total: data.total,
@@ -102,6 +134,8 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         totalPages: data.total_pages,
         loading: false,
       });
+      const { currentCategoryId, breadcrumb, searchQuery } = get();
+      saveNavState({ currentCategoryId, breadcrumb, searchQuery, page: data.page });
     } catch (e: unknown) {
       set({ error: e instanceof Error ? e.message : String(e), loading: false });
     }
@@ -159,7 +193,11 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     }
   },
 
-  setSearchQuery: (q) => set({ searchQuery: q }),
+  setSearchQuery: (q) => {
+    set({ searchQuery: q });
+    const { currentCategoryId, breadcrumb, page } = get();
+    saveNavState({ currentCategoryId, breadcrumb, searchQuery: q, page });
+  },
 
   doSearch: async (q) => {
     if (!q.trim()) { set({ searchResults: [] }); return; }
@@ -187,74 +225,17 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
           temperature: opts?.temperature,
           vad_filter: opts?.vad_filter,
           subtitle_correction_enabled: opts?.subtitle_correction_enabled,
+          subtitle_correction_scope: opts?.subtitle_correction_scope,
+          subtitle_correction_prompt: opts?.subtitle_correction_prompt,
         });
-        set({ activeJobId: res.job_id, jobStatus: res.status, jobStage: res.stage });
-        get().pollJob(res.job_id);
+        // Update local state; polling is handled by useAiJobCenter
+        if (get().currentVideo?.id === videoId) {
+          set({ activeJobId: res.job_id, jobStatus: res.status, jobStage: res.stage });
+        }
       } catch (e: unknown) {
-      set({ error: e instanceof Error ? e.message : String(e) });
-    }
-  },
-
-  pollJob: async (jobId) => {
-    const poll = async () => {
-      try {
-        const job = await fetchAiJob(jobId);
-        const currentAtPoll = get().currentVideo;
-        const jobBelongsToCurrentVideo = currentAtPoll?.id === job.video_id;
-        if (jobBelongsToCurrentVideo) {
-          set({ jobStatus: job.status, jobStage: job.stage });
-        }
-        if (job.status === 'completed' || job.status === 'failed') {
-          try {
-            const fresh = await fetchVideo(job.video_id);
-            if (get().currentVideo?.id === job.video_id) {
-                set({
-                  currentVideo: fresh,
-                  currentSegments: fresh.transcript_segments || [],
-                  activeJobId: fresh.active_job_id || null,
-                  jobStatus: fresh.ai_status || 'idle',
-                  jobStage: fresh.ai_stage || null,
-                });
-            }
-          } catch {
-            const currentVideo = get().currentVideo;
-            if (job.status === 'completed' && currentVideo?.id === job.video_id) {
-                const updated = {
-                  ...currentVideo,
-                  summary: job.summary ?? currentVideo.summary,
-                  transcription: job.transcript ?? currentVideo.transcription,
-                  transcript_segments: job.transcript_segments?.length ? job.transcript_segments : currentVideo.transcript_segments,
-                  subtitle_path: job.subtitle_path ?? currentVideo.subtitle_path,
-                  subtitle_url: job.subtitle_url ?? currentVideo.subtitle_url,
-                  markdown_path: job.markdown_path ?? currentVideo.markdown_path,
-                  ai_status: 'completed',
-                  ai_stage: 'completed',
-                  ai_error: null,
-                };
-                set({
-                  currentVideo: updated,
-                  currentSegments: updated.transcript_segments || [],
-                  jobStatus: 'completed',
-                  jobStage: 'completed',
-                });
-            }
-          }
-          try {
-            const { page, searchQuery, currentCategoryId } = get();
-            const data = await fetchVideos(page, 20, currentCategoryId ?? undefined, searchQuery || undefined);
-            set({ videos: data.items, total: data.total });
-          } catch {
-            // list refresh is best-effort
-          }
-          return;
-        }
-        setTimeout(poll, 2000);
-      } catch {
-        // ignore poll errors
+        set({ error: e instanceof Error ? e.message : String(e) });
       }
-    };
-    poll();
-  },
+    },
 
   refreshCurrent: async () => {
     const { currentVideo } = get();
@@ -288,12 +269,15 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
 
   enterCategory: (id, name) => {
     const { breadcrumb } = get();
+    const nextBreadcrumb = [...breadcrumb, { id, name }];
     set({
       currentCategoryId: id,
-      breadcrumb: [...breadcrumb, { id, name }],
+      breadcrumb: nextBreadcrumb,
       videos: [],
       page: 1,
+      searchQuery: '',
     });
+    saveNavState({ currentCategoryId: id, breadcrumb: nextBreadcrumb, searchQuery: '', page: 1 });
     get().loadVideos(1);
   },
 
@@ -301,13 +285,28 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     const { breadcrumb } = get();
     const idx = breadcrumb.findIndex((b) => b.id === id);
     if (idx < 0) return;
+    const nextBreadcrumb = breadcrumb.slice(0, idx + 1);
     set({
       currentCategoryId: id,
-      breadcrumb: breadcrumb.slice(0, idx + 1),
+      breadcrumb: nextBreadcrumb,
       videos: [],
       page: 1,
+      searchQuery: '',
     });
+    saveNavState({ currentCategoryId: id, breadcrumb: nextBreadcrumb, searchQuery: '', page: 1 });
     get().loadVideos(1);
+  },
+
+  restoreNavigation: () => {
+    const saved = loadNavState();
+    if (!saved) return;
+    set({
+      currentCategoryId: saved.categoryId,
+      breadcrumb: saved.breadcrumb.length > 0 ? saved.breadcrumb : [{ id: null, name: '全部视频' }],
+      searchQuery: saved.searchQuery,
+      page: saved.page,
+    });
+    get().loadVideos(saved.page, saved.searchQuery || undefined);
   },
 
   getCurrentChildren: () => {
@@ -322,5 +321,9 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       return null;
     };
     return findNode(categoryTree)?.children ?? [];
+  },
+
+  setSelectedFolderIds: (ids) => {
+    set({ selectedFolderIds: ids });
   },
 }));

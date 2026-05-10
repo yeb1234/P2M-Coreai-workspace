@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Film, Loader2, PlayCircle, Sparkles } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { Film, Loader2, PlayCircle, Sparkles, ArrowDownWideNarrow, ArrowUpWideNarrow, Clock } from 'lucide-react';
 import { getThumbnailUrl, type VideoItem } from '../../lib/videoApi';
 import { formatVideoDuration } from './videoFormat';
 
 export type VideoGridMode = 'normal' | 'history' | 'latest';
+export type HistorySortMode = 'newest' | 'oldest' | 'longest';
 
 export function Pagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
   const [jumpVal, setJumpVal] = useState('');
@@ -84,6 +85,7 @@ export function VideoNavigationCards({
   onPlay,
 }: VideoNavigationCardsProps) {
   const toggleMode = (mode: VideoGridMode) => onGridModeChange(gridMode === mode ? 'normal' : mode);
+  const [historySort, setHistorySort] = useState<HistorySortMode>('newest');
 
   return (
     <div className="space-y-2">
@@ -128,6 +130,8 @@ export function VideoNavigationCards({
           videos={historyVideos}
           active={gridMode === 'history'}
           emptyText="暂无历史记录"
+          sortMode={historySort}
+          onSortChange={setHistorySort}
           onToggle={() => toggleMode('history')}
           onPlay={onPlay}
           meta={(video) => video.completed ? '已看完' : `${formatVideoDuration(video.watch_progress)} / ${formatVideoDuration(video.duration)}`}
@@ -168,6 +172,8 @@ function CompactVideoListCard({
   active,
   emptyText,
   footnote,
+  sortMode,
+  onSortChange,
   onToggle,
   onPlay,
   meta,
@@ -177,20 +183,50 @@ function CompactVideoListCard({
   active: boolean;
   emptyText: string;
   footnote?: string;
+  sortMode?: HistorySortMode;
+  onSortChange?: (mode: HistorySortMode) => void;
   onToggle: () => void;
   onPlay: (videoId: number) => void;
   meta: (video: VideoItem) => string;
 }) {
+  const sortedVideos = useMemo(() => {
+    if (!sortMode || sortMode === 'newest') return videos;
+    const sorted = [...videos];
+    if (sortMode === 'oldest') sorted.reverse();
+    if (sortMode === 'longest') sorted.sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0));
+    return sorted;
+  }, [videos, sortMode]);
+
   return (
     <div className="min-w-0 rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-[#1a1a1a]">{title}</span>
-        <button onClick={onToggle} disabled={videos.length === 0} className="text-[10px] text-[#9ca3af] hover:text-[#c87d2f]">
-          {videos.length === 0 ? '0 个' : (active ? '收起' : `${videos.length} 个 查看`)}
-        </button>
+        <div className="flex items-center gap-1">
+          {sortMode !== undefined && onSortChange && (
+            <div className="flex items-center gap-0.5 mr-1">
+              {([
+                { mode: 'newest' as const, icon: ArrowDownWideNarrow, tip: '从新到旧' },
+                { mode: 'oldest' as const, icon: ArrowUpWideNarrow, tip: '从旧到新' },
+                { mode: 'longest' as const, icon: Clock, tip: '时长最长' },
+              ]).map(({ mode, icon: Icon, tip }) => (
+                <button
+                  key={mode}
+                  onClick={(e) => { e.stopPropagation(); onSortChange(mode); }}
+                  className={`p-0.5 rounded transition-colors ${sortMode === mode ? 'text-[#c87d2f]' : 'text-[#b8b4ac] hover:text-[#6b7280]'}`}
+                  title={tip}
+                >
+                  <Icon size={11} />
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={onToggle} disabled={videos.length === 0} className="text-[10px] text-[#9ca3af] hover:text-[#c87d2f]">
+            {videos.length === 0 ? '0 个' : (active ? '收起' : `${videos.length} 个 查看`)}
+          </button>
+        </div>
       </div>
       <div className="space-y-1.5">
-        {videos.slice(0, 3).map((video) => (
+        {(active ? sortedVideos : sortedVideos.slice(0, 3)).map((video) => (
           <button key={video.id} onClick={() => onPlay(video.id)} className="flex w-full min-w-0 items-center gap-2 rounded-lg p-1.5 text-left hover:bg-[#f3f2ef] transition-colors">
             <div className="relative h-8 w-12 shrink-0 overflow-hidden rounded bg-[#e5e2dd]">
               {video.thumbnail ? (
@@ -206,7 +242,7 @@ function CompactVideoListCard({
           </button>
         ))}
         {footnote && <p className="pt-1 text-[10px] leading-4 text-[#9ca3af]">{footnote}</p>}
-        {videos.length === 0 && <p className="rounded-lg border border-dashed border-[#e5e2dd] px-2 py-4 text-center text-xs text-[#9ca3af]">{emptyText}</p>}
+        {sortedVideos.length === 0 && <p className="rounded-lg border border-dashed border-[#e5e2dd] px-2 py-4 text-center text-xs text-[#9ca3af]">{emptyText}</p>}
       </div>
     </div>
   );
@@ -217,6 +253,7 @@ interface VideoGridSectionProps {
   videos: VideoItem[];
   gridMode: VideoGridMode;
   gridTitle: string;
+  filesLabel?: string;
   isSearching: boolean;
   currentCategoryId: number | null;
   total: number;
@@ -233,6 +270,7 @@ export function VideoGridSection({
   videos,
   gridMode,
   gridTitle,
+  filesLabel,
   isSearching,
   currentCategoryId,
   total,
@@ -243,6 +281,22 @@ export function VideoGridSection({
   onReturnToNormal,
   onPageChange,
 }: VideoGridSectionProps) {
+  const CLIENT_PAGE_SIZE = 20;
+  const [historyPage, setHistoryPage] = useState(1);
+  const clientTotalPages = Math.max(1, Math.ceil(videos.length / CLIENT_PAGE_SIZE));
+
+  // Reset page when gridMode changes or videos change
+  const prevRef = useRef({ gridMode, len: videos.length });
+  if (prevRef.current.gridMode !== gridMode || prevRef.current.len !== videos.length) {
+    prevRef.current = { gridMode, len: videos.length };
+    if (historyPage !== 1) setHistoryPage(1);
+  }
+
+  const showPagination = gridMode === 'normal' ? totalPages > 1 : clientTotalPages > 1;
+  const displayVideos = gridMode === 'normal'
+    ? videos
+    : videos.slice((historyPage - 1) * CLIENT_PAGE_SIZE, historyPage * CLIENT_PAGE_SIZE);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-[#9ca3af]">
@@ -273,11 +327,12 @@ export function VideoGridSection({
       ) : (
         <>
           {isSearching && <p className="text-xs text-[#9ca3af]">匹配的视频</p>}
-          {!isSearching && !currentCategoryId && <p className="text-xs text-[#9ca3af]">共 {total} 个视频</p>}
+          {!isSearching && filesLabel && <p className="text-xs text-[#9ca3af]">{filesLabel}</p>}
+          {!isSearching && !filesLabel && !currentCategoryId && <p className="text-xs text-[#9ca3af]">共 {total} 个视频</p>}
         </>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-        {videos.map((v) => (
+        {displayVideos.map((v) => (
           <div key={v.id} onClick={() => onPlay(v.id)} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer group">
             <div className="aspect-video bg-gradient-to-br from-[#f3f2ef] to-[#e5e2dd] flex items-center justify-center relative overflow-hidden">
               {v.thumbnail ? (
@@ -299,8 +354,15 @@ export function VideoGridSection({
           </div>
         ))}
       </div>
-      {gridMode === 'normal' && totalPages > 1 && (
-        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => onPageChange(p, searchQuery || undefined)} />
+      {showPagination && (
+        <Pagination
+          page={gridMode === 'normal' ? page : historyPage}
+          totalPages={gridMode === 'normal' ? totalPages : clientTotalPages}
+          onPageChange={(p) => {
+            if (gridMode === 'normal') onPageChange(p, searchQuery || undefined);
+            else setHistoryPage(p);
+          }}
+        />
       )}
     </>
   );

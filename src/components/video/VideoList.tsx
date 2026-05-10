@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { AlertCircle, ChevronRight, Folder, RefreshCw, Search } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, CheckSquare, ChevronRight, Folder, RefreshCw, Search, Square } from 'lucide-react';
 import { useVideoStore } from '../../stores/videoStore';
 import {
   fetchContinueVideo,
@@ -15,16 +15,36 @@ export function VideoList() {
     videos, total, page, totalPages, loading, error, loadVideos, loadCurrentVideo,
     searchQuery, setSearchQuery, categoryTree, breadcrumb, currentCategoryId,
     loadCategoryTree, enterCategory, goToBreadcrumb, getCurrentChildren,
+    restoreNavigation, selectedFolderIds, setSelectedFolderIds,
   } = useVideoStore();
   const [inputVal, setInputVal] = useState('');
+  const [navRestored, setNavRestored] = useState(false);
   const [continueVideo, setContinueVideo] = useState<VideoItem | null>(null);
   const [historyVideos, setHistoryVideos] = useState<VideoItem[]>([]);
   const [recentVideos, setRecentVideos] = useState<VideoItem[]>([]);
   const [recentVideosFallback, setRecentVideosFallback] = useState(false);
   const [gridMode, setGridMode] = useState<VideoGridMode>('normal');
+  const selectedFolderIdSet = useMemo(() => new Set(selectedFolderIds), [selectedFolderIds]);
+  const selectionChangedRef = React.useRef(false);
+
+  const toggleFolderSelection = (id: number) => {
+    selectionChangedRef.current = true;
+    const next = selectedFolderIdSet.has(id)
+      ? selectedFolderIds.filter((x) => x !== id)
+      : [...selectedFolderIds, id];
+    setSelectedFolderIds(next);
+  };
 
   useEffect(() => { loadCategoryTree(); }, [loadCategoryTree]);
-  useEffect(() => { loadVideos(); }, [loadVideos]);
+  useEffect(() => {
+    restoreNavigation();
+    setNavRestored(true);
+  }, [restoreNavigation]);
+  useEffect(() => { selectionChangedRef.current = false; setSelectedFolderIds([]); }, [currentCategoryId, setSelectedFolderIds]);
+
+  useEffect(() => {
+    if (navRestored && searchQuery) setInputVal(searchQuery);
+  }, [navRestored, searchQuery]);
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
@@ -38,10 +58,10 @@ export function VideoList() {
     fetchContinueVideo()
       .then((video) => { if (!cancelled) setContinueVideo(video); })
       .catch(() => { if (!cancelled) setContinueVideo(null); });
-    fetchRecentHistory(8)
+    fetchRecentHistory(60)
       .then((history) => { if (!cancelled) setHistoryVideos(history); })
       .catch(() => { if (!cancelled) setHistoryVideos([]); });
-    fetchRecentVideos(8, currentCategoryId)
+    fetchRecentVideos(20, currentCategoryId)
       .then((recent) => {
         if (!cancelled) {
           setRecentVideos(recent.items);
@@ -66,6 +86,8 @@ export function VideoList() {
   const handleSearch = () => {
     setGridMode('normal');
     setSearchQuery(inputVal);
+    selectionChangedRef.current = false;
+    setSelectedFolderIds([]);
     loadVideos(1, inputVal || undefined);
   };
 
@@ -84,10 +106,21 @@ export function VideoList() {
   };
 
   const matchedFolders = isSearching ? searchFolders(inputVal) : [];
-  const gridVideos = gridMode === 'history' ? historyVideos : gridMode === 'latest' ? recentVideos : videos;
+
+  // Reload videos from backend when folder selection changes
+  useEffect(() => {
+    if (!selectionChangedRef.current) return;
+    const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;
+    loadVideos(1, undefined, ids);
+  }, [selectedFolderIds, loadVideos]);
+
+  const baseGridVideos = gridMode === 'history' ? historyVideos : gridMode === 'latest' ? recentVideos : videos;
   const gridTitle = gridMode === 'history'
     ? '最近观看（从新到旧）'
     : recentVideosFallback ? '当前列表' : '最新视频（从新到旧）';
+  const filesLabel = gridMode === 'normal' && currentCategoryId && selectedFolderIds.length > 0
+    ? `文件夹列表（${total} 个视频）`
+    : undefined;
 
   return (
     <div className="space-y-4">
@@ -128,14 +161,27 @@ export function VideoList() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {children.map((cat) => {
             const displayName = cat.name.includes(' / ') ? cat.name.split(' / ').pop()! : cat.name;
+            const checked = selectedFolderIdSet.has(cat.id);
             return (
-              <button key={cat.id} onClick={() => { setGridMode('normal'); enterCategory(cat.id, displayName); }} className="flex items-center gap-3 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all text-left group">
-                <Folder size={20} className="text-[#c87d2f] shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
-                  <p className="text-[10px] text-[#9ca3af]">{cat.video_count} 个视频</p>
-                </div>
-              </button>
+              <div key={cat.id} className="flex items-center gap-2 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all group">
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleFolderSelection(cat.id); }}
+                  className="shrink-0"
+                  title={checked ? '取消筛选' : '筛选此文件夹'}
+                >
+                  {checked
+                    ? <CheckSquare size={16} className="text-[#c87d2f]" />
+                    : <Square size={16} className="text-[#b8b4ac] group-hover:text-[#6b7280]" />
+                  }
+                </button>
+                <button onClick={() => { setGridMode('normal'); enterCategory(cat.id, displayName); }} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+                  <Folder size={20} className="text-[#c87d2f] shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
+                    <p className="text-[10px] text-[#9ca3af]">{cat.video_count} 个视频</p>
+                  </div>
+                </button>
+              </div>
             );
           })}
         </div>
@@ -185,9 +231,10 @@ export function VideoList() {
 
       <VideoGridSection
         loading={loading}
-        videos={gridVideos}
+        videos={baseGridVideos}
         gridMode={gridMode}
         gridTitle={gridTitle}
+        filesLabel={filesLabel}
         isSearching={isSearching}
         currentCategoryId={currentCategoryId}
         total={total}
@@ -196,7 +243,10 @@ export function VideoList() {
         searchQuery={searchQuery}
         onPlay={(videoId) => { void loadCurrentVideo(videoId); }}
         onReturnToNormal={() => setGridMode('normal')}
-        onPageChange={(p, query) => loadVideos(p, query)}
+        onPageChange={(p, query) => {
+          const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;
+          loadVideos(p, query, ids);
+        }}
       />
     </div>
   );
