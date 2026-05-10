@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: siteyeb-backend
+    restart: unless-stopped
+    ports:
+      - "5200:5200"
+    volumes:
+      # Persistent data
+      - siteyeb-db:/data/db
+      - siteyeb-output:/data/output
+      - siteyeb-thumbnails:/data/thumbnails
+      - siteyeb-sprites:/data/sprites
+      # Mount your video folder (edit the left side to your path)
+      - D:/ITJC:/videos:ro
+      # Mount whisper models (edit to your path)
+      - D:/SiteYeb/tools/models:/models:ro
+    environment:
+      - DATABASE_URL=sqlite:////data/db/learning_os.db
+      - VIDEO_FOLDER=/videos
+      - WORK_DIR=/data/work
+      - OUTPUT_DIR=/data/output
+      - THUMBNAIL_DIR=/data/thumbnails
+      - SPRITE_DIR=/data/sprites
+      - WHISPER_CPP_EXE=/models/whisper.cpp/whisper-cli.exe
+      - WHISPER_CPP_MODEL=/models/whisper/ggml-large-v3.bin
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OPENAI_BASE_URL=http://host.docker.internal:1234/v1
+      - EXTERNAL_LLM_BASE_URL=${EXTERNAL_LLM_BASE_URL}
+      - EXTERNAL_LLM_API_KEY=${EXTERNAL_LLM_API_KEY}
+      - EXTERNAL_LLM_MODEL=${EXTERNAL_LLM_MODEL}
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: siteyeb-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  siteyeb-db:
+  siteyeb-output:
+  siteyeb-thumbnails:
+  siteyeb-sprites:
