@@ -2,6 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 import { THEME_PRESETS } from '../../src/lib/themes';
 
 const TEST_NOW_ISO = '2026-05-11T07:30:00+08:00';
+const onePixelPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 const mockVideo = {
   id: 101,
@@ -190,6 +194,25 @@ async function mockApi(page: Page) {
   await page.route('**/api/videos/101/file', async (route) => {
     await route.fulfill({ status: 404, body: '' });
   });
+  await page.route('**/api/videos/101/sprite', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'X-Sprite-Meta': JSON.stringify({
+          video_id: 101,
+          cols: 2,
+          rows: 1,
+          frame_width: 1,
+          frame_height: 1,
+          frame_interval: 90,
+          total_frames: 2,
+          duration: 180,
+        }),
+      },
+      body: onePixelPng,
+    });
+  });
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -236,6 +259,21 @@ test.describe('layout regression', () => {
     await expect(page.locator('.video-card-grid').first()).toBeVisible({ timeout: 10_000 });
     await expectNoHorizontalOverflow(page);
     await expect(page.locator('main.app-main')).toHaveScreenshot('video-list-layout.png');
+  });
+
+  test('video card sprite preview loads only after hover', async ({ page }) => {
+    let spriteRequests = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('/api/videos/101/sprite')) spriteRequests += 1;
+    });
+
+    await prepareApp(page, '/#/video');
+    await expect(page.locator('.video-card-grid').first()).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(600);
+    expect(spriteRequests).toBe(0);
+
+    await page.locator('.video-card-grid .theme-card .theme-progress-track').first().hover();
+    await expect.poll(() => spriteRequests, { timeout: 2_000 }).toBeGreaterThan(0);
   });
 
   test('time center plugin fits desktop layout', async ({ page }) => {

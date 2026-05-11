@@ -136,6 +136,7 @@ const lastLocalValues = new Map<string, string>();
 const lastLocalWriteAt = new Map<string, number>();
 const DEBOUNCE_MS = 3000;
 const LOCAL_MAX_WAIT_MS = 15000;
+const IMMEDIATE_LOCAL_STORAGE_NAMES = new Set(['p2m-pomodoro-storage']);
 
 function scheduleWrite(name: string, value: string) {
   const existing = pendingWrites.get(name);
@@ -188,6 +189,14 @@ async function doLocalWrite(name: string, value: string) {
 
 function scopedLocalName(name: string): string {
   return currentUser ? `${currentUser}:${name}` : name;
+}
+
+function baseLocalName(name: string): string {
+  return name.includes(':') ? name.slice(name.lastIndexOf(':') + 1) : name;
+}
+
+function shouldWriteLocalImmediately(name: string): boolean {
+  return IMMEDIATE_LOCAL_STORAGE_NAMES.has(baseLocalName(name));
 }
 
 function flushLocalWrites() {
@@ -253,7 +262,16 @@ export const localOnlyStorage: StateStorage = {
     return row?.value ?? null;
   },
   setItem: async (name: string, value: string) => {
-    scheduleLocalWrite(scopedLocalName(name), value);
+    const scopedName = scopedLocalName(name);
+    if (shouldWriteLocalImmediately(scopedName)) {
+      const existing = pendingLocalWrites.get(scopedName);
+      if (existing) { clearTimeout(existing); pendingLocalWrites.delete(scopedName); }
+      lastLocalValues.set(scopedName, value);
+      lastLocalWriteAt.set(scopedName, Date.now());
+      await doLocalWrite(scopedName, value);
+      return;
+    }
+    scheduleLocalWrite(scopedName, value);
   },
   removeItem: async (name: string) => {
     const scopedName = scopedLocalName(name);

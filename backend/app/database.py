@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     thumbnail_background_idle_cycles: int = 10
     thumbnail_background_limit: int = 1
     sprite_background_enabled: bool = False
+    sprite_frame_width: int = 320
+    sprite_frame_interval: int = 5
+    sprite_columns: int = 10
+    sprite_jpeg_quality: int = 2
     whisper_cpu_threads: int = min(6, max(1, (os.cpu_count() or 4) - 2))
     whisper_compute_type: str = "int8"
     whisper_beam_size: int = 5

@@ -4,9 +4,9 @@ import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
 import { useCrossModuleSync } from './hooks';
 import { registerAllPlugins } from './plugins';
-import { useAuthStore, useUIStore, useNotificationStore } from './stores';
-import { THEME_PRESETS, applyTheme } from './lib/themes';
+import { useAuthStore, useNotificationStore } from './stores';
 import { useRehydrateStores } from './hooks/useRehydrateStores';
+import { useApplyStoredTheme } from './hooks/useApplyStoredTheme';
 
 registerAllPlugins();
 
@@ -41,26 +41,14 @@ function App() {
 
   // Rehydrate all stores with user-prefixed keys after login
   useRehydrateStores(currentUser);
+  useApplyStoredTheme(initialized && Boolean(currentUser));
 
-  // Apply theme when user logs in
   useEffect(() => {
     if (initialized && currentUser) {
       queueMicrotask(() => {
         setShowWelcome(true);
         setReady(false);
       });
-
-      // Small delay to let stores rehydrate first
-      const t = setTimeout(() => {
-        const { themeId, customTheme } = useUIStore.getState();
-        if (themeId === 'custom' && customTheme) {
-          applyTheme('custom', customTheme);
-        } else {
-          const preset = THEME_PRESETS.find((th) => th.id === themeId);
-          if (preset) applyTheme(preset.id, preset.vars);
-        }
-      }, 100);
-      return () => clearTimeout(t);
     } else if (initialized && !currentUser) {
       queueMicrotask(() => setReady(true));
     }

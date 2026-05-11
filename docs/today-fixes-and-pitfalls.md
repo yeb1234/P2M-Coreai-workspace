@@ -607,3 +607,88 @@ python -m compileall backend/app
 - `npm test`：16 个测试文件，90 个测试通过。
 - `npm run build`：通过。
 - `npx playwright test tests/e2e/layout.spec.ts --project=chromium-desktop`：15 个通过，1 个移动端用例在桌面项目中跳过。
+
+# 2026-05-11 2.6 追加：番茄钟持久化与雪碧图质量
+
+## 番茄钟重置后刷新残留
+
+现象：
+
+- 点击“重置”或“跳过”后界面已经回到初始态。
+- 立即刷新浏览器，旧的专注倒计时又恢复。
+
+原因：
+
+- 番茄钟运行态写入 IndexedDB 原本走 `localOnlyStorage` 的延迟写入。
+- 用户立即刷新时，新状态可能还没落盘，恢复逻辑读到了旧 timer。
+- `resetTimer` 和部分 `completePhase` 兜底分支没有统一清 `_lastTickTimestamp`。
+
+处理：
+
+- `p2m-pomodoro-storage` 改为本地即时写入。
+- `resetTimer` 删除当前未完成 session，并清理 `_lastTickTimestamp`。
+- `completePhase` 兜底停止分支写回完整初始 work 时长，并清理 `_lastTickTimestamp`。
+- 扩展 `pomodoroStore.test.ts`，覆盖 running、paused、expired running、reset、skip 和旧版本迁移。
+
+维护原则：
+
+- 番茄钟 running timer 是本地运行态，可以刷新恢复，但不能跨设备强同步。
+- completed session 是历史，后续如果要跨设备同步，只同步 completed，不同步 running timer。
+- 运行态存储不能走延迟写入，否则重置、跳过、刷新会出现旧状态回流。
+
+## 主题刷新恢复
+
+现象：
+
+- 切换主题后刷新，可能回到默认皮肤。
+
+原因：
+
+- 主题应用时机依赖延迟执行，可能早于 UI store hydrate。
+
+处理：
+
+- 新增 `useApplyStoredTheme`。
+- `App.tsx` 在 `initialized && Boolean(currentUser)` 后应用 `themeId/customTheme`。
+- 契约测试禁止回到 `setTimeout` 应用主题。
+
+维护原则：
+
+- 持久化 UI 状态必须等 hydrate 后再应用。
+- 不要用固定延迟猜异步恢复时机。
+
+## 雪碧图预览和清晰度
+
+现象：
+
+- 播放器进度条雪碧图有时无反馈。
+- 视频主界面没有 hover 动态缩略预览。
+- 现有雪碧图很糊。
+
+原因：
+
+- 后端雪碧图元数据在 CORS 下没有暴露，前端读不到 `X-Sprite-Meta`。
+- 前端原来用 `<img objectPosition>` 定位帧，不如背景定位稳定。
+- 后端单帧写死 `160x90`，在当前 UI 中被放大后必然糊。
+
+处理：
+
+- 后端 CORS 暴露 `X-Sprite-Meta`。
+- 新增 `useSpriteMeta`，统一读取雪碧图元数据。
+- 播放器预览改为 `backgroundImage/backgroundPosition`。
+- 视频主列表 hover 450ms 后才请求雪碧图，移动端禁用。
+- 后端雪碧图默认提升为 `320x180`。
+- 新增 `.env` 配置：`SPRITE_FRAME_WIDTH`、`SPRITE_FRAME_INTERVAL`、`SPRITE_COLUMNS`、`SPRITE_JPEG_QUALITY`。
+- 旧低清雪碧图 meta 会被视为过期，下次访问自动重建。
+
+维护原则：
+
+- 雪碧图不能列表首屏批量请求，必须 hover 后按需加载。
+- ffmpeg 类生成任务要允许失败回退，不能阻塞主 UI。
+- 清晰度调高会增加生成耗时和文件体积，后续应做媒体素材队列和质量档位 UI。
+
+本轮验证：
+
+- `npm run build`：通过。
+- `npm test`：104 个测试通过。
+- `python -m unittest discover -s backend/tests`：8 个后端测试通过。

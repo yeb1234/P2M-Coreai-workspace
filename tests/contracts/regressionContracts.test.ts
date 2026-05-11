@@ -99,6 +99,18 @@ describe('regression contracts', () => {
     expect(contextHook).toContain('getAssistantPageContext()');
   });
 
+  it('keeps stored theme applied from hydrated UI state', () => {
+    const app = readRepoFile('src/App.tsx');
+    const themeHook = readRepoFile('src/hooks/useApplyStoredTheme.ts');
+
+    expect(app).toContain('useApplyStoredTheme(initialized && Boolean(currentUser))');
+    expect(app).not.toContain('setTimeout(() =>');
+    expect(themeHook).toContain('useUIStore');
+    expect(themeHook).toContain('themeId');
+    expect(themeHook).toContain('customTheme');
+    expect(themeHook).toContain('applyTheme');
+  });
+
   it('keeps todo list filtering memoized from subscribed state', () => {
     const todoList = readRepoFile('src/components/todo/TodoList.tsx');
 
@@ -204,6 +216,37 @@ describe('regression contracts', () => {
     expect(videoPage).not.toContain('code === 1 ?');
   });
 
+  it('keeps sprite previews visible and browser-readable', () => {
+    const spritePreview = readRepoFile('src/components/video/SpritePreview.tsx');
+    const spriteMetaHook = readRepoFile('src/components/video/useSpriteMeta.ts');
+    const backendMain = readRepoFile('backend/app/main.py');
+    const backendSprite = readRepoFile('backend/app/services/sprite.py');
+
+    expect(backendMain).toContain('expose_headers=["X-Sprite-Meta"]');
+    expect(backendSprite).toContain('settings.sprite_frame_width');
+    expect(backendSprite).toContain('FRAME_WIDTH = max(160');
+    expect(backendSprite).toContain('"jpeg_quality": JPEG_QUALITY');
+    expect(backendSprite).toContain('return generate_sprite(video_path, video_id)');
+    expect(spritePreview).toContain('生成预览中');
+    expect(spritePreview).toContain('暂无雪碧图');
+    expect(spritePreview).toContain('getFixedSpriteFrameStyle');
+    expect(spriteMetaHook).toContain('backgroundImage');
+    expect(spriteMetaHook).toContain('backgroundPosition');
+    expect(spriteMetaHook).toContain('X-Sprite-Meta');
+    expect(spritePreview).not.toContain('objectPosition');
+  });
+
+  it('keeps video card sprite previews hover-gated', () => {
+    const videoListSections = readRepoFile('src/components/video/VideoListSections.tsx');
+
+    expect(videoListSections).toContain('VideoCardThumbnail');
+    expect(videoListSections).toContain('useSpriteMeta(previewEnabled ? video.id : null');
+    expect(videoListSections).toContain('onMouseEnter={startHoverPreview}');
+    expect(videoListSections).toContain('onMouseLeave={stopHoverPreview}');
+    expect(videoListSections).toContain('setInterval');
+    expect(videoListSections).toContain('enableSpritePreview={!isMobile}');
+  });
+
   it('keeps desktop main padding at the tuned compact value', () => {
     const css = readRepoFile('src/index.css');
     const desktopMainBlock = css.match(/@media \(min-width: 768px\)\s*\{\s*\.app-main\s*\{[\s\S]*?\}\s*\}/)?.[0] ?? '';
@@ -218,6 +261,19 @@ describe('regression contracts', () => {
     expect(pomodoroTimer).toContain('width: \'calc((100% - 12px) * var(--ambient-volume-ratio))\'');
     expect(pomodoroTimer).toContain('left: \'calc(6px + (100% - 12px) * var(--ambient-volume-ratio))\'');
     expect(pomodoroTimer).not.toContain('ambientVolume / 100})`');
+  });
+
+  it('keeps pomodoro runtime local-only and immediately persisted', () => {
+    const pomodoroStore = readRepoFile('src/stores/pomodoroStore.ts');
+    const idbStorage = readRepoFile('src/lib/idbStorage.ts');
+
+    expect(pomodoroStore).toContain('storage: createJSONStorage(() => localOnlyStorage)');
+    expect(pomodoroStore).toContain('timer: state.timer');
+    expect(pomodoroStore).toContain('_lastTickTimestamp: state._lastTickTimestamp');
+    expect(pomodoroStore).toContain('migratePomodoroPersistedState');
+    expect(idbStorage).toContain('IMMEDIATE_LOCAL_STORAGE_NAMES');
+    expect(idbStorage).toContain('p2m-pomodoro-storage');
+    expect(idbStorage).toContain('await doLocalWrite(scopedName, value)');
   });
 
   it('keeps admin router as a thin HTTP layer', () => {

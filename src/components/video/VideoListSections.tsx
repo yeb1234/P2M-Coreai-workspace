@@ -1,7 +1,9 @@
-import React, { useCallback, useState, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Film, Loader2, PlayCircle, Sparkles, ArrowDownWideNarrow, ArrowUpWideNarrow, Clock, Columns3, Star } from 'lucide-react';
 import { getThumbnailUrl, type VideoItem } from '../../lib/videoApi';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { formatVideoDuration, formatWatchProgress, getWatchProgressPercent } from './videoFormat';
+import { getResponsiveSpriteFrameStyle, useSpriteMeta } from './useSpriteMeta';
 
 export type VideoGridMode = 'normal' | 'history' | 'latest';
 export type HistorySortMode = 'newest' | 'oldest' | 'longest';
@@ -10,22 +12,20 @@ const VideoCard = React.memo(function VideoCard({
   video,
   onPlay,
   onToggleFavorite,
+  enableSpritePreview,
 }: {
   video: VideoItem;
   onPlay: (videoId: number) => void;
   onToggleFavorite?: (videoId: number, nextFavorite: boolean) => void;
+  enableSpritePreview: boolean;
 }) {
   const progressPercent = getWatchProgressPercent(video.watch_progress, video.duration);
 
   return (
     <div onClick={() => onPlay(video.id)} className="theme-card overflow-hidden rounded-lg transition-all hover:shadow-md cursor-pointer group">
-      <div className="theme-progress-track aspect-video flex items-center justify-center relative overflow-hidden">
-        {video.thumbnail ? (
-          <img src={getThumbnailUrl(video.id)} alt={video.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-        ) : (
-          <PlayCircle size={28} className="text-[var(--border-medium)] transition-colors group-hover:text-[var(--accent)]" />
-        )}
-        <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] text-white">{formatVideoDuration(video.duration)}</span>
+      <VideoCardPreviewFrame video={video} enableSpritePreview={enableSpritePreview}>
+        <VideoCardThumbnail video={video} />
+        <span className="absolute bottom-1 right-1 z-10 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] text-white">{formatVideoDuration(video.duration)}</span>
         {onToggleFavorite && (
           <button
             type="button"
@@ -33,7 +33,7 @@ const VideoCard = React.memo(function VideoCard({
               event.stopPropagation();
               onToggleFavorite(video.id, !video.is_favorite);
             }}
-            className={`absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md border border-white/20 bg-black/45 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/65 ${
+            className={`absolute right-1 top-1 z-20 grid h-6 w-6 place-items-center rounded-md border border-white/20 bg-black/45 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/65 ${
               video.is_favorite ? 'text-[#fbbf24]' : 'text-white/80'
             }`}
             title={video.is_favorite ? '取消收藏' : '收藏视频'}
@@ -42,19 +42,97 @@ const VideoCard = React.memo(function VideoCard({
             <Star size={13} fill={video.is_favorite ? 'currentColor' : 'none'} />
           </button>
         )}
-        {video.completed && <span className="absolute left-1 top-1 rounded bg-[var(--success)] px-1 py-0.5 text-[9px] text-white">✓</span>}
+        {video.completed && <span className="absolute left-1 top-1 z-10 rounded bg-[var(--success)] px-1 py-0.5 text-[9px] text-white">✓</span>}
         {progressPercent !== null && !video.completed && (
-          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20">
+          <div className="absolute bottom-0 left-0 right-0 z-10 h-0.5 bg-black/20">
             <div className="theme-progress-fill h-full" style={{ width: `${progressPercent}%` }} />
           </div>
         )}
-      </div>
+      </VideoCardPreviewFrame>
       <div className="px-2 py-1.5">
         <h4 className="theme-text-primary truncate text-xs font-medium transition-colors group-hover:text-[var(--accent)]">{video.title}</h4>
       </div>
     </div>
   );
 });
+
+function VideoCardPreviewFrame({
+  video,
+  enableSpritePreview,
+  children,
+}: {
+  video: VideoItem;
+  enableSpritePreview: boolean;
+  children: React.ReactNode;
+}) {
+  const [previewEnabled, setPreviewEnabled] = useState(false);
+  const [frame, setFrame] = useState(0);
+  const hoverDelayRef = useRef<number | null>(null);
+  const { status, meta } = useSpriteMeta(previewEnabled ? video.id : null, enableSpritePreview);
+  const showSprite = enableSpritePreview && previewEnabled && status === 'ready' && meta;
+
+  useEffect(() => {
+    if (!showSprite) {
+      setFrame(0);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setFrame((current) => (current + 1) % meta.total_frames);
+    }, 450);
+
+    return () => window.clearInterval(interval);
+  }, [meta, showSprite]);
+
+  const stopHoverPreview = useCallback(() => {
+    if (hoverDelayRef.current !== null) {
+      window.clearTimeout(hoverDelayRef.current);
+      hoverDelayRef.current = null;
+    }
+    setPreviewEnabled(false);
+  }, []);
+
+  const startHoverPreview = useCallback(() => {
+    if (!enableSpritePreview) return;
+    if (hoverDelayRef.current !== null) window.clearTimeout(hoverDelayRef.current);
+    hoverDelayRef.current = window.setTimeout(() => {
+      hoverDelayRef.current = null;
+      setPreviewEnabled(true);
+    }, 450);
+  }, [enableSpritePreview]);
+
+  useEffect(() => stopHoverPreview, [stopHoverPreview]);
+
+  return (
+    <div
+      className="theme-progress-track aspect-video flex items-center justify-center relative overflow-hidden"
+      onMouseEnter={startHoverPreview}
+      onMouseLeave={stopHoverPreview}
+    >
+      {children}
+      {showSprite && (
+        <div
+          aria-label="视频缩略预览"
+          role="img"
+          className="pointer-events-none absolute inset-0 bg-black bg-cover"
+          style={getResponsiveSpriteFrameStyle(video.id, meta, frame)}
+        />
+      )}
+    </div>
+  );
+}
+
+function VideoCardThumbnail({ video }: { video: VideoItem }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      {video.thumbnail ? (
+        <img src={getThumbnailUrl(video.id)} alt={video.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+      ) : (
+        <PlayCircle size={28} className="text-[var(--border-medium)] transition-colors group-hover:text-[var(--accent)]" />
+      )}
+    </div>
+  );
+}
 
 export function Pagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
   const [jumpVal, setJumpVal] = useState('');
@@ -355,6 +433,7 @@ export function VideoGridSection({
 }: VideoGridSectionProps) {
   const CLIENT_PAGE_SIZE = 20;
   const [historyPage, setHistoryPage] = useState(1);
+  const isMobile = useIsMobile();
   const clientTotalPages = Math.max(1, Math.ceil(videos.length / CLIENT_PAGE_SIZE));
 
   // Reset page when gridMode changes or videos change
@@ -428,6 +507,7 @@ export function VideoGridSection({
             video={v}
             onPlay={onPlay}
             onToggleFavorite={onToggleFavorite}
+            enableSpritePreview={!isMobile}
           />
         ))}
       </div>

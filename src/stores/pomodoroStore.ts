@@ -59,14 +59,95 @@ export function completedPomodoroSessionsOnly(sessions: Record<ID, PomodoroSessi
   );
 }
 
+function getPhaseDurationSeconds(config: PomodoroConfig, phase: PomodoroPhase): number {
+  if (phase === 'work') return config.workDuration * 60;
+  if (phase === 'short_break') return config.shortBreakDuration * 60;
+  return config.longBreakDuration * 60;
+}
+
+function getRestorableSessions(sessions: Record<ID, PomodoroSession>, timer: PomodoroTimerState): Record<ID, PomodoroSession> {
+  const completed = completedPomodoroSessionsOnly(sessions);
+  if (!timer.currentSessionId) return completed;
+
+  const activeSession = sessions[timer.currentSessionId];
+  if (!activeSession || activeSession.completed) return completed;
+
+  return {
+    ...completed,
+    [activeSession.id]: activeSession,
+  };
+}
+
+export function restorePomodoroRuntimeState(
+  config: PomodoroConfig,
+  timer: PomodoroTimerState | undefined,
+  lastTickTimestamp: number | null | undefined,
+): { timer: PomodoroTimerState; lastTickTimestamp: number | null } {
+  if (!timer || timer.status === 'idle') {
+    return { timer: createPomodoroInitialTimer(config), lastTickTimestamp: null };
+  }
+
+  const maxRemaining = getPhaseDurationSeconds(config, timer.phase);
+  const baseRemaining = Math.max(0, Math.min(timer.timeRemaining || maxRemaining, maxRemaining));
+
+  if (timer.status === 'paused') {
+    return {
+      timer: { ...timer, timeRemaining: baseRemaining },
+      lastTickTimestamp: null,
+    };
+  }
+
+  const now = Date.now();
+  const elapsed = lastTickTimestamp ? Math.max(0, Math.floor((now - lastTickTimestamp) / 1000)) : 0;
+  const timeRemaining = Math.max(0, baseRemaining - elapsed);
+
+  if (timeRemaining <= 0) {
+    return {
+      timer: { ...timer, status: 'paused', timeRemaining: 0 },
+      lastTickTimestamp: null,
+    };
+  }
+
+  return {
+    timer: { ...timer, status: 'running', timeRemaining },
+    lastTickTimestamp: now,
+  };
+}
+
 export function sanitizePomodoroPersistedState(data: Partial<PomodoroState>): Pick<PomodoroState, 'config' | 'sessions' | 'timer' | '_lastTickTimestamp'> {
   const config = { ...DEFAULT_CONFIG, ...(data.config || {}) };
+  const timer = data.timer || createPomodoroInitialTimer(config);
+  const restored = restorePomodoroRuntimeState(config, timer, data._lastTickTimestamp);
   return {
     config,
-    sessions: completedPomodoroSessionsOnly((data.sessions || {}) as Record<ID, PomodoroSession>),
-    timer: createPomodoroInitialTimer(config),
-    _lastTickTimestamp: null,
+    sessions: getRestorableSessions((data.sessions || {}) as Record<ID, PomodoroSession>, restored.timer),
+    timer: restored.timer,
+    _lastTickTimestamp: restored.lastTickTimestamp,
   };
+}
+
+export function migratePomodoroPersistedState(persisted: unknown, version: number): Pick<PomodoroState, 'config' | 'sessions' | 'timer' | '_lastTickTimestamp'> {
+  const data = persisted as Record<string, unknown>;
+  const config = data.config && typeof data.config === 'object'
+    ? { ...DEFAULT_CONFIG, ...data.config } as PomodoroConfig
+    : { ...DEFAULT_CONFIG };
+  const timer = data.timer && typeof data.timer === 'object'
+    ? { ...(data.timer as PomodoroTimerState) }
+    : undefined;
+
+  // Older storage saved timeRemaining in minutes. Convert before sanitize clamps and restores runtime.
+  if (version < 2 && timer && typeof timer.timeRemaining === 'number' && timer.timeRemaining < 120) {
+    timer.timeRemaining = (timer.timeRemaining || config.workDuration) * 60;
+  }
+
+  return sanitizePomodoroPersistedState({
+    ...data,
+    config,
+    timer,
+    sessions: data.sessions && typeof data.sessions === 'object'
+      ? data.sessions as Record<ID, PomodoroSession>
+      : {},
+  } as Partial<PomodoroState>);
 }
 
 export const usePomodoroStore = create<PomodoroState>()(
@@ -121,24 +202,25 @@ export const usePomodoroStore = create<PomodoroState>()(
       resetTimer: () => {
         const state = get();
         const { currentSessionId } = state.timer;
+        let sessions = state.sessions;
 
         if (currentSessionId) {
           const session = state.sessions[currentSessionId];
           if (session && !session.completed) {
             const updatedSessions = { ...state.sessions };
             delete updatedSessions[currentSessionId];
-            set({
-              sessions: updatedSessions,
-            });
+            sessions = updatedSessions;
           }
         }
 
         set({
+          sessions,
           timer: {
             ...initialTimerState,
             timeRemaining: state.config.workDuration * 60,
             linkedTodoId: state.timer.linkedTodoId,
           },
+          _lastTickTimestamp: null,
         });
       },
 
@@ -263,8 +345,10 @@ export const usePomodoroStore = create<PomodoroState>()(
         set({
           timer: {
             ...initialTimerState,
+            timeRemaining: state.config.workDuration * 60,
             linkedTodoId,
           },
+          _lastTickTimestamp: null,
         });
       },
 
@@ -378,13 +462,19 @@ export const usePomodoroStore = create<PomodoroState>()(
       },
 
       clearHistory: () => {
-        set({ sessions: {} });
+        set((state) => ({
+          sessions: state.timer.currentSessionId
+            ? Object.fromEntries(
+                Object.entries(state.sessions).filter(([id]) => id === state.timer.currentSessionId),
+              )
+            : {},
+        }));
       },
 
       restoreTimer: () => {
         const state = get();
-        if (state.timer.status === 'idle' && !state._lastTickTimestamp) return;
-        set({ timer: createPomodoroInitialTimer(state.config), _lastTickTimestamp: null });
+        const restored = restorePomodoroRuntimeState(state.config, state.timer, state._lastTickTimestamp);
+        set({ timer: restored.timer, _lastTickTimestamp: restored.lastTickTimestamp });
       },
     }),
     {
@@ -392,29 +482,13 @@ export const usePomodoroStore = create<PomodoroState>()(
       storage: createJSONStorage(() => localOnlyStorage),
       version: 3,
       migrate: (persisted: unknown, version: number) => {
-        const data = persisted as Record<string, unknown>;
-        const config = data.config && typeof data.config === 'object'
-          ? { ...DEFAULT_CONFIG, ...data.config } as PomodoroConfig
-          : { ...DEFAULT_CONFIG };
-        const safe: Record<string, unknown> = sanitizePomodoroPersistedState({
-          ...data,
-          config,
-          sessions: data.sessions && typeof data.sessions === 'object'
-            ? data.sessions as Record<ID, PomodoroSession>
-            : {},
-        } as Partial<PomodoroState>);
-        // Fix timeRemaining that was saved in minutes instead of seconds
-        if (version < 2 && data.timer && typeof data.timer === 'object') {
-          const timer = data.timer as Record<string, unknown>;
-          if (typeof timer.timeRemaining === 'number' && timer.timeRemaining < 120) {
-            timer.timeRemaining = (timer.timeRemaining || config.workDuration) * 60;
-          }
-        }
-        return safe;
+        return migratePomodoroPersistedState(persisted, version);
       },
       partialize: (state) => ({
         config: state.config,
-        sessions: completedPomodoroSessionsOnly(state.sessions),
+        sessions: getRestorableSessions(state.sessions, state.timer),
+        timer: state.timer,
+        _lastTickTimestamp: state._lastTickTimestamp,
       }),
       merge: (persisted, current) => {
         const saved = sanitizePomodoroPersistedState(persisted as Partial<PomodoroState>);

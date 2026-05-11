@@ -1,43 +1,34 @@
-import { useEffect, useState } from 'react';
-import { getSpriteUrl, type SpriteMeta } from '../../lib/videoApi';
+import { getFixedSpriteFrameStyle, useSpriteMeta } from './useSpriteMeta';
 
-function useSpriteMeta(videoId: number | null) {
-  const [meta, setMeta] = useState<SpriteMeta | null>(null);
-  useEffect(() => {
-    if (!videoId) return;
-    let cancelled = false;
-    fetch(getSpriteUrl(videoId))
-      .then((r) => {
-        const raw = r.headers.get('X-Sprite-Meta');
-        if (raw && !cancelled) setMeta(JSON.parse(raw));
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [videoId]);
-  return videoId ? meta : null;
-}
+const PREVIEW_WIDTH = 180;
 
 export function SpritePreview({ videoId, time }: { videoId: number; time: number }) {
-  const meta = useSpriteMeta(videoId);
-  if (!meta) return null;
+  const { status, meta } = useSpriteMeta(videoId);
 
-  const frameIdx = Math.floor(time / meta.frame_interval);
-  const col = frameIdx % meta.cols;
-  const row = Math.floor(frameIdx / meta.cols);
-  const scale = 3;
+  if (status === 'loading') {
+    return (
+      <div className="grid h-[102px] w-[180px] place-items-center rounded-lg border border-white/20 bg-black/80 text-[10px] text-white/70 shadow-2xl">
+        生成预览中...
+      </div>
+    );
+  }
+
+  if (status === 'error' || !meta) {
+    return (
+      <div className="grid h-[102px] w-[180px] place-items-center rounded-lg border border-white/20 bg-black/80 px-2 text-center text-[10px] text-white/60 shadow-2xl">
+        暂无雪碧图
+      </div>
+    );
+  }
+
+  const frameIdx = Math.max(0, Math.min(meta.total_frames - 1, Math.floor(time / meta.frame_interval)));
 
   return (
     <div className="bg-black rounded-lg overflow-hidden shadow-2xl border border-white/20">
-      <img
-        src={getSpriteUrl(videoId)}
-        alt=""
-        style={{
-          width: meta.frame_width * scale,
-          height: meta.frame_height * scale,
-          objectFit: 'none',
-          objectPosition: `-${col * meta.frame_width * scale}px -${row * meta.frame_height * scale}px`,
-        }}
-        draggable={false}
+      <div
+        aria-label="视频预览画面"
+        role="img"
+        style={getFixedSpriteFrameStyle(videoId, meta, frameIdx, PREVIEW_WIDTH)}
       />
     </div>
   );

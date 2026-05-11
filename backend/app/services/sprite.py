@@ -16,9 +16,10 @@ SPRITE_FOLDER = Path(settings.sprite_dir)
 SPRITE_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # Sprite sheet config
-FRAME_WIDTH = 160
-FRAME_INTERVAL = 5  # seconds between frames
-COLS = 10
+FRAME_WIDTH = max(160, int(settings.sprite_frame_width or 320))
+FRAME_INTERVAL = max(1, int(settings.sprite_frame_interval or 5))  # seconds between frames
+COLS = max(1, int(settings.sprite_columns or 10))
+JPEG_QUALITY = min(31, max(1, int(settings.sprite_jpeg_quality or 2)))
 
 
 def _get_video_duration(video_path: str) -> float | None:
@@ -52,7 +53,18 @@ def get_sprite_meta_path(video_id: int) -> Path:
 
 
 def has_sprite(video_id: int) -> bool:
-    return get_sprite_path(video_id).exists() and get_sprite_meta_path(video_id).exists()
+    if not get_sprite_path(video_id).exists() or not get_sprite_meta_path(video_id).exists():
+        return False
+    try:
+        meta = json.loads(get_sprite_meta_path(video_id).read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    return (
+        int(meta.get("frame_width") or 0) == FRAME_WIDTH
+        and int(meta.get("frame_interval") or 0) == FRAME_INTERVAL
+        and int(meta.get("cols") or 0) == COLS
+        and int(meta.get("jpeg_quality") or 0) == JPEG_QUALITY
+    )
 
 
 def generate_sprite(video_path: str, video_id: int) -> dict | None:
@@ -84,7 +96,7 @@ def generate_sprite(video_path: str, video_id: int) -> dict | None:
         "-i", video_path,
         "-vf", vf,
         "-frames:v", "1",
-        "-q:v", "3",
+        "-q:v", str(JPEG_QUALITY),
         str(output_path),
     ]
 
@@ -111,6 +123,8 @@ def generate_sprite(video_path: str, video_id: int) -> dict | None:
         "frame_interval": FRAME_INTERVAL,
         "total_frames": total_frames,
         "duration": duration,
+        "jpeg_quality": JPEG_QUALITY,
+        "version": 2,
     }
     meta_path.write_text(json.dumps(meta), encoding="utf-8")
     logger.info("Sprite generated: %s (%dx%d, %d frames)", output_path, COLS, rows, total_frames)
@@ -119,7 +133,7 @@ def generate_sprite(video_path: str, video_id: int) -> dict | None:
 
 def get_or_generate_sprite(video_path: str, video_id: int) -> dict | None:
     meta_path = get_sprite_meta_path(video_id)
-    if meta_path.exists():
+    if has_sprite(video_id) and meta_path.exists():
         try:
             return json.loads(meta_path.read_text(encoding="utf-8"))
         except Exception:

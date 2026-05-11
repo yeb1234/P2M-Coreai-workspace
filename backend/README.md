@@ -33,6 +33,17 @@ OPENAI_API_KEY=lm-studio
 OPENAI_MODEL=qwen3-4b
 ```
 
+雪碧图预览质量也可以通过 `.env` 调整：
+
+```env
+SPRITE_FRAME_WIDTH=320
+SPRITE_FRAME_INTERVAL=5
+SPRITE_COLUMNS=10
+SPRITE_JPEG_QUALITY=2
+```
+
+默认 `320x180` 适合当前播放器和视频卡片预览。如果想更清晰，可以提高 `SPRITE_FRAME_WIDTH`，但会增加生成时间和图片体积。
+
 ## API 端点
 
 | 方法 | 路径 | 说明 |

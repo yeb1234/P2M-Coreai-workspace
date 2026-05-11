@@ -16,6 +16,8 @@ import { Slider } from './VideoSlider';
 import { PLAYER_SPEED_MAX, PLAYER_SPEED_MIN, PLAYER_SPEED_STEP, clampPlaybackRate, formatTime } from './videoPlayerUtils';
 import { playInteractionSound } from '../../lib/sounds';
 
+const SPRITE_PREVIEW_HALF_WIDTH = 90;
+
 interface VideoPlayerControlsProps {
   showControls: boolean;
   isMobile: boolean;
@@ -119,7 +121,7 @@ export function VideoPlayerControls({
             {hoverTime !== null && (
               <div
                 className="absolute bottom-full mb-3 pointer-events-none z-30"
-                style={{ left: Math.max(84, Math.min(hoverX, playerWidth - 84)), transform: 'translateX(-50%)' }}
+                style={{ left: Math.max(SPRITE_PREVIEW_HALF_WIDTH, Math.min(hoverX, playerWidth - SPRITE_PREVIEW_HALF_WIDTH)), transform: 'translateX(-50%)' }}
               >
                 <SpritePreview videoId={videoId} time={hoverTime} />
                 <div className="text-center text-[10px] text-white mt-1 font-mono bg-black/70 rounded px-1">{formatTime(hoverTime)}</div>
