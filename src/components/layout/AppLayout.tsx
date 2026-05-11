@@ -9,6 +9,7 @@ import { PAGES } from '../../config/pageRegistry';
 import { useHashSync } from '../../hooks/useHashSync';
 import { GlobalAmbientSoundController } from '../pomodoro/GlobalAmbientSoundController';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { TodoReminderPopup } from './TodoReminderPopup';
 
 export const AppLayout: React.FC = () => {
   const { fontSize, compactMode } = useUIStore();
@@ -19,6 +20,7 @@ export const AppLayout: React.FC = () => {
     return (
       <>
         <GlobalAmbientSoundController />
+        <TodoReminderPopup />
         <MobileLayout />
       </>
     );
@@ -27,6 +29,7 @@ export const AppLayout: React.FC = () => {
   return (
     <div className="flex flex-col h-screen" data-font-size={fontSize} data-compact={compactMode ? 'true' : 'false'}>
       <GlobalAmbientSoundController />
+      <TodoReminderPopup />
       <div className="flex-1 m-1 md:m-2 wood-texture rounded-lg p-1 md:p-2 overflow-hidden flex flex-col">
         <div className="flex-1 paper-surface flex flex-col overflow-hidden">
           <Header />

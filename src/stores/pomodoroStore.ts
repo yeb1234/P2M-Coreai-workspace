@@ -356,12 +356,13 @@ export const usePomodoroStore = create<PomodoroState>()(
         set((state) => {
           const newConfig = { ...state.config, ...config };
           let timer = state.timer;
-          const phase = timer.phase;
-          let duration: number;
-          if (phase === 'work') duration = newConfig.workDuration;
-          else if (phase === 'short_break') duration = newConfig.shortBreakDuration;
-          else duration = newConfig.longBreakDuration;
-          timer = { ...timer, timeRemaining: duration * 60 };
+          const changesCurrentPhaseDuration =
+            (timer.phase === 'work' && config.workDuration !== undefined && config.workDuration !== state.config.workDuration) ||
+            (timer.phase === 'short_break' && config.shortBreakDuration !== undefined && config.shortBreakDuration !== state.config.shortBreakDuration) ||
+            (timer.phase === 'long_break' && config.longBreakDuration !== undefined && config.longBreakDuration !== state.config.longBreakDuration);
+          if (changesCurrentPhaseDuration) {
+            timer = { ...timer, timeRemaining: getPhaseDurationSeconds(newConfig, timer.phase) };
+          }
           return { config: newConfig, timer };
         });
       },

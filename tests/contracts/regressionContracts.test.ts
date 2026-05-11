@@ -48,11 +48,17 @@ describe('regression contracts', () => {
   it('keeps todo reminders scheduled without fixed polling', () => {
     const syncHook = readRepoFile('src/hooks/useCrossModuleSync.ts');
     const reminderBlock = syncHook.match(/const runReminderCheck = \(\) => \{[\s\S]*?const unsubTodos = useTodoStore\.subscribe/)?.[0] ?? '';
+    const appLayout = readRepoFile('src/components/layout/AppLayout.tsx');
+    const popup = readRepoFile('src/components/layout/TodoReminderPopup.tsx');
 
     expect(reminderBlock).toContain('nextReminderAt');
     expect(reminderBlock).toContain('setTimeout(runReminderCheck');
     expect(reminderBlock).not.toContain('setInterval');
     expect(syncHook).not.toContain('15000');
+    expect(appLayout).toContain('TodoReminderPopup');
+    expect(popup).toContain("item.type === 'todo' && item.title === '待办提醒' && !item.read");
+    expect(popup).toContain('activeReminder.message');
+    expect(popup).toContain('markAsRead(activeReminder.id)');
   });
 
   it('keeps todo to calendar sync planned outside the effect hook', () => {

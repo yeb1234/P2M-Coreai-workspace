@@ -5,6 +5,7 @@ import {
   migratePomodoroPersistedState,
   restorePomodoroRuntimeState,
   sanitizePomodoroPersistedState,
+  usePomodoroStore,
 } from '../stores/pomodoroStore';
 import { DEFAULT_CONFIG, type PomodoroSession } from '../types';
 
@@ -258,5 +259,30 @@ describe('pomodoro persistence boundaries', () => {
     });
 
     expect(sanitized.sessions).toEqual({ [completedSession.id]: completedSession });
+  });
+
+  it('does not reset current timer when saving non-duration config fields', () => {
+    usePomodoroStore.setState({
+      config: { ...DEFAULT_CONFIG, ambientPlaybackMode: 'focus' },
+      timer: {
+        status: 'running',
+        phase: 'work',
+        timeRemaining: 777,
+        sessionsCompleted: 1,
+        currentSessionId: 'active',
+        linkedTodoId: null,
+      },
+      sessions: {},
+      _lastTickTimestamp: 123,
+    });
+
+    usePomodoroStore.getState().updateConfig({
+      ...DEFAULT_CONFIG,
+      ambientPlaybackMode: 'manual',
+    });
+
+    expect(usePomodoroStore.getState().timer.timeRemaining).toBe(777);
+    expect(usePomodoroStore.getState().timer.status).toBe('running');
+    expect(usePomodoroStore.getState().config.ambientPlaybackMode).toBe('manual');
   });
 });
