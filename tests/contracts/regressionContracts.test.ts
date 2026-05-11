@@ -33,6 +33,177 @@ describe('regression contracts', () => {
     expect(css).toContain('grid-template-columns: 1fr');
   });
 
+  it('keeps plugin pages lazy loaded with hover preloading', () => {
+    const registry = readRepoFile('src/config/pageRegistry.tsx');
+    const sidebar = readRepoFile('src/components/layout/Sidebar.tsx');
+    const mobileTabBar = readRepoFile('src/components/layout/MobileTabBar.tsx');
+
+    expect(registry).toContain('React.lazy');
+    expect(registry).toContain('preloadPage');
+    expect(registry).toContain('PAGE_LOADERS');
+    expect(sidebar).toContain('onMouseEnter={() => preloadPage(id)}');
+    expect(mobileTabBar).toContain('onTouchStart={() => preloadPage(tab.id)}');
+  });
+
+  it('keeps todo reminders scheduled without fixed polling', () => {
+    const syncHook = readRepoFile('src/hooks/useCrossModuleSync.ts');
+    const reminderBlock = syncHook.match(/const runReminderCheck = \(\) => \{[\s\S]*?const unsubTodos = useTodoStore\.subscribe/)?.[0] ?? '';
+
+    expect(reminderBlock).toContain('nextReminderAt');
+    expect(reminderBlock).toContain('setTimeout(runReminderCheck');
+    expect(reminderBlock).not.toContain('setInterval');
+    expect(syncHook).not.toContain('15000');
+  });
+
+  it('keeps todo to calendar sync planned outside the effect hook', () => {
+    const syncHook = readRepoFile('src/hooks/useCrossModuleSync.ts');
+    const syncPlan = readRepoFile('src/hooks/todoCalendarSyncPlan.ts');
+
+    expect(syncHook).toContain('buildTodoCalendarSyncPlan');
+    expect(syncHook).toContain('plan.add.forEach');
+    expect(syncPlan).toContain('export function buildTodoCalendarSyncPlan');
+    expect(syncPlan).toContain('TODO_DUE_MARKER');
+    expect(syncPlan).toContain('TODO_REMINDER_MARKER');
+    expect(syncHook).not.toContain('const dueData =');
+    expect(syncHook).not.toContain('const reminderData =');
+  });
+
+  it('keeps time center on the shared clock without an extra stopwatch interval', () => {
+    const timeCenter = readRepoFile('src/components/timecenter/TimeCenterPage.tsx');
+
+    expect(timeCenter).toContain('useClockNow');
+    expect(timeCenter).not.toContain('setInterval');
+    expect(timeCenter).toContain('stopwatchBaseElapsed');
+    expect(timeCenter).toContain('pauseStopwatch');
+  });
+
+  it('keeps AI job polling adaptive to page visibility', () => {
+    const aiJobCenter = readRepoFile('src/hooks/useAiJobCenter.ts');
+
+    expect(aiJobCenter).toContain('document.visibilityState === \'visible\' ? 3000 : 10000');
+    expect(aiJobCenter).toContain('document.addEventListener(\'visibilitychange\'');
+    expect(aiJobCenter).toContain('window.setTimeout(tick');
+    expect(aiJobCenter).not.toContain('window.setInterval');
+  });
+
+  it('keeps assistant page context updates state-driven', () => {
+    const chatPanel = readRepoFile('src/components/layout/AIChatPanel.tsx');
+    const contextHook = readRepoFile('src/hooks/useAssistantPageContext.ts');
+
+    expect(chatPanel).toContain('useAssistantPageContext(chatOpen)');
+    expect(chatPanel).not.toContain('window.setInterval');
+    expect(chatPanel).not.toContain('1500');
+    expect(contextHook).toContain('useVideoStore');
+    expect(contextHook).toContain('useNotesStore');
+    expect(contextHook).toContain('useUIStore');
+    expect(contextHook).toContain('getAssistantPageContext()');
+  });
+
+  it('keeps todo list filtering memoized from subscribed state', () => {
+    const todoList = readRepoFile('src/components/todo/TodoList.tsx');
+
+    expect(todoList).toContain('const filteredTodos = useMemo');
+    expect(todoList).toContain('const orderIndex = new Map');
+    expect(todoList).toContain('const trashedTodos = useMemo');
+    expect(todoList).not.toContain('getFilteredTodos()');
+    expect(todoList).not.toContain('getTrashedTodos()');
+  });
+
+  it('keeps todo items from rerendering on every pomodoro tick', () => {
+    const todoItem = readRepoFile('src/components/todo/TodoItem.tsx');
+
+    expect(todoItem).toContain('timer.status');
+    expect(todoItem).toContain('timer.linkedTodoId');
+    expect(todoItem).toContain('linkedTodoTitle');
+    expect(todoItem).not.toContain('const timer = usePomodoroStore');
+    expect(todoItem).not.toContain('const todos = useTodoStore');
+  });
+
+  it('keeps calendar todo/event derived data centralized', () => {
+    const helper = readRepoFile('src/components/calendar/calendarDerivedData.ts');
+    const calendarGrid = readRepoFile('src/components/calendar/CalendarGrid.tsx');
+    const weekView = readRepoFile('src/components/calendar/WeekView.tsx');
+    const calendarPage = readRepoFile('src/components/calendar/CalendarPage.tsx');
+
+    expect(helper).toContain('createCompletedTodoLookup');
+    expect(helper).toContain('groupTodosByCalendarDate');
+    expect(helper).toContain('shouldShowCalendarEvent');
+    expect(helper).toContain('getEventsForCalendarMonth');
+    expect(helper).toContain('getEventsForCalendarDates');
+    expect(helper).toContain('getEventsForCalendarDate');
+    expect(calendarGrid).toContain('calendarEvents');
+    expect(calendarGrid).toContain('groupTodosByCalendarDate');
+    expect(weekView).toContain('calendarEvents');
+    expect(weekView).toContain('groupTodosByCalendarDate');
+    expect(calendarPage).toContain('getEventsForCalendarDate');
+    expect(calendarPage).not.toContain('Object.values(calendarEvents)');
+    expect(calendarGrid).toContain('useMemo(() => getMonthDays(currentMonth)');
+    expect(weekView).toContain('useMemo(() => getWeekDays(currentMonth)');
+  });
+
+  it('keeps media query listeners centralized in shared hooks', () => {
+    const mediaHook = readRepoFile('src/hooks/useMediaQuery.ts');
+    const appLayout = readRepoFile('src/components/layout/AppLayout.tsx');
+    const calendarGrid = readRepoFile('src/components/calendar/CalendarGrid.tsx');
+    const todoFilters = readRepoFile('src/components/todo/TodoFilters.tsx');
+    const videoPage = readRepoFile('src/components/video/VideoPage.tsx');
+    const playlistPanel = readRepoFile('src/components/video/VideoPlaylistPanel.tsx');
+
+    expect(mediaHook).toContain('export function useMediaQuery');
+    expect(mediaHook).toContain('export function useIsMobile');
+    expect(mediaHook).toContain('export function useWindowWidth');
+    expect(appLayout).toContain('useIsMobile');
+    expect(calendarGrid).toContain('useIsMobile');
+    expect(todoFilters).toContain('useIsMobile');
+    expect(videoPage).toContain('useWindowWidth');
+    expect(playlistPanel).toContain('useIsMobile(1024)');
+    expect(appLayout).not.toContain('window.matchMedia');
+    expect(calendarGrid).not.toContain('window.innerWidth');
+    expect(todoFilters).not.toContain('window.matchMedia');
+    expect(videoPage).not.toContain('window.matchMedia');
+    expect(playlistPanel).not.toContain('window.matchMedia');
+  });
+
+  it('keeps notification panel positioning in small pure helpers', () => {
+    const notificationPanel = readRepoFile('src/components/layout/NotificationPanel.tsx');
+    const positionHelper = readRepoFile('src/components/layout/notificationPanelPosition.ts');
+
+    expect(positionHelper).toContain('export function getPanelOpenPosition');
+    expect(positionHelper).toContain('export function clampPanelPosition');
+    expect(positionHelper).toContain('NOTIFICATION_PANEL_WIDTH = 384');
+    expect(notificationPanel).toContain('from \'./notificationPanelPosition\'');
+    expect(notificationPanel).toContain('setPosition(getPanelOpenPosition');
+    expect(notificationPanel).toContain('setPosition(clampPanelPosition');
+  });
+
+  it('keeps video progress scrubbing in a focused hook', () => {
+    const videoPage = readRepoFile('src/components/video/VideoPage.tsx');
+    const scrubberHook = readRepoFile('src/components/video/useVideoProgressScrubber.ts');
+
+    expect(scrubberHook).toContain('export function useVideoProgressScrubber');
+    expect(scrubberHook).toContain('getRatioFromClientX');
+    expect(scrubberHook).toContain('touchmove');
+    expect(videoPage).toContain('useVideoProgressScrubber');
+    expect(videoPage).toContain('onProgressMouseDown={startScrub}');
+    expect(videoPage).toContain('onProgressMouseMove={updateHover}');
+    expect(videoPage).not.toContain('const handleProgressMouseDown');
+    expect(videoPage).not.toContain('const handleProgressTouchStart');
+  });
+
+  it('keeps video element media events outside the page JSX', () => {
+    const videoPage = readRepoFile('src/components/video/VideoPage.tsx');
+    const eventsHook = readRepoFile('src/components/video/useVideoElementEvents.ts');
+
+    expect(eventsHook).toContain('export function useVideoElementEvents');
+    expect(eventsHook).toContain('handleLoadedMetadata');
+    expect(eventsHook).toContain('handleVolumeSync');
+    expect(eventsHook).toContain('getVideoErrorLabel');
+    expect(videoPage).toContain('useVideoElementEvents');
+    expect(videoPage).toContain('onLoadedMetadata={videoElementEvents.handleLoadedMetadata}');
+    expect(videoPage).toContain('onVolumeChange={videoElementEvents.handleVolumeSync}');
+    expect(videoPage).not.toContain('code === 1 ?');
+  });
+
   it('keeps desktop main padding at the tuned compact value', () => {
     const css = readRepoFile('src/index.css');
     const desktopMainBlock = css.match(/@media \(min-width: 768px\)\s*\{\s*\.app-main\s*\{[\s\S]*?\}\s*\}/)?.[0] ?? '';

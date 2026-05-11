@@ -1,8 +1,9 @@
-import React, { useState, useEffect, type ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import { Filter, Search } from 'lucide-react';
 import type { TodoPriority, TodoStatus } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
 import { useTodoStore } from '../../stores';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 interface TodoFiltersProps {
   collapsed: boolean;
@@ -12,13 +13,7 @@ interface TodoFiltersProps {
 
 export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children }) => {
   const { filter, setFilter } = useTodoStore();
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
+  const isMobile = useIsMobile();
 
   const statuses: { value: TodoStatus | 'all'; label: string }[] = [
     { value: 'all', label: '全部' },

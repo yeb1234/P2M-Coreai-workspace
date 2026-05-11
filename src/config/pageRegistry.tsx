@@ -6,40 +6,85 @@ import {
   AlarmClock,
 } from 'lucide-react';
 import type { ActiveView } from '../stores/uiStore';
-import { DashboardPage } from '../components/dashboard/DashboardPage';
-import { TodoPage } from '../components/todo/TodoPage';
-import { CalendarPage } from '../components/calendar/CalendarPage';
-import { PomodoroPage } from '../components/pomodoro/PomodoroPage';
-import { TimeCenterPage } from '../components/timecenter/TimeCenterPage';
-import { VideoPage } from '../components/video/VideoPage';
-import { NotesPage } from '../components/notes/NotesPage';
-import { StatsPage } from '../components/stats/StatsPage';
-import { ReaderPage } from '../components/reader/ReaderPage';
-import { SnippetsPage } from '../components/snippets/SnippetsPage';
-import { HabitsPage } from '../components/habits/HabitsPage';
-import { FlashcardsPage } from '../components/flashcards/FlashcardsPage';
-import { BookmarksPage } from '../components/bookmarks/BookmarksPage';
-import { HealthPage } from '../components/health/HealthPage';
-import { ComparePage } from '../components/compare/ComparePage';
-import { ShopPage } from '../components/shop/ShopPage';
-import { EsportsPage } from '../components/esports/EsportsPage';
-import { TokensPage } from '../components/tokens/TokensPage';
-import { LeetcodePage } from '../components/leetcode/LeetcodePage';
-import { InterviewPage } from '../components/interview/InterviewPage';
-import { CodeNavPage } from '../components/codenav/CodeNavPage';
-import { AIAgentPage } from '../components/aiagent/AIAgentPage';
-import { OpenClawPage } from '../components/openclaw/OpenClawPage';
-import { HermesPage } from '../components/hermes/HermesPage';
-import { SettingsPage } from '../components/settings/SettingsPage';
+
+function lazyPage<T extends React.ComponentType>(loader: () => Promise<Record<string, T>>, exportName: string): React.LazyExoticComponent<T> {
+  return React.lazy(async () => {
+    const module = await loader();
+    return { default: module[exportName] };
+  });
+}
+
+const DashboardPage = lazyPage(() => import('../components/dashboard/DashboardPage'), 'DashboardPage');
+const TodoPage = lazyPage(() => import('../components/todo/TodoPage'), 'TodoPage');
+const CalendarPage = lazyPage(() => import('../components/calendar/CalendarPage'), 'CalendarPage');
+const NotesPage = lazyPage(() => import('../components/notes/NotesPage'), 'NotesPage');
+const PomodoroPage = lazyPage(() => import('../components/pomodoro/PomodoroPage'), 'PomodoroPage');
+const TimeCenterPage = lazyPage(() => import('../components/timecenter/TimeCenterPage'), 'TimeCenterPage');
+const VideoPage = lazyPage(() => import('../components/video/VideoPage'), 'VideoPage');
+const HealthPage = lazyPage(() => import('../components/health/HealthPage'), 'HealthPage');
+const ComparePage = lazyPage(() => import('../components/compare/ComparePage'), 'ComparePage');
+const ShopPage = lazyPage(() => import('../components/shop/ShopPage'), 'ShopPage');
+const EsportsPage = lazyPage(() => import('../components/esports/EsportsPage'), 'EsportsPage');
+const StatsPage = lazyPage(() => import('../components/stats/StatsPage'), 'StatsPage');
+const ReaderPage = lazyPage(() => import('../components/reader/ReaderPage'), 'ReaderPage');
+const SnippetsPage = lazyPage(() => import('../components/snippets/SnippetsPage'), 'SnippetsPage');
+const HabitsPage = lazyPage(() => import('../components/habits/HabitsPage'), 'HabitsPage');
+const FlashcardsPage = lazyPage(() => import('../components/flashcards/FlashcardsPage'), 'FlashcardsPage');
+const BookmarksPage = lazyPage(() => import('../components/bookmarks/BookmarksPage'), 'BookmarksPage');
+const TokensPage = lazyPage(() => import('../components/tokens/TokensPage'), 'TokensPage');
+const LeetcodePage = lazyPage(() => import('../components/leetcode/LeetcodePage'), 'LeetcodePage');
+const InterviewPage = lazyPage(() => import('../components/interview/InterviewPage'), 'InterviewPage');
+const CodeNavPage = lazyPage(() => import('../components/codenav/CodeNavPage'), 'CodeNavPage');
+const AIAgentPage = lazyPage(() => import('../components/aiagent/AIAgentPage'), 'AIAgentPage');
+const OpenClawPage = lazyPage(() => import('../components/openclaw/OpenClawPage'), 'OpenClawPage');
+const HermesPage = lazyPage(() => import('../components/hermes/HermesPage'), 'HermesPage');
+const SettingsPage = lazyPage(() => import('../components/settings/SettingsPage'), 'SettingsPage');
 
 export interface PageEntry {
   id: ActiveView;
   path: string;
-  component: React.ComponentType;
+  component: React.ComponentType | React.LazyExoticComponent<React.ComponentType>;
+  preload?: () => Promise<unknown>;
   label: string;
   icon: React.ReactNode;
   color: string;
   dev?: boolean;
+}
+
+const PAGE_LOADERS: Record<ActiveView, () => Promise<unknown>> = {
+  dashboard: () => import('../components/dashboard/DashboardPage'),
+  todo: () => import('../components/todo/TodoPage'),
+  calendar: () => import('../components/calendar/CalendarPage'),
+  notes: () => import('../components/notes/NotesPage'),
+  pomodoro: () => import('../components/pomodoro/PomodoroPage'),
+  timecenter: () => import('../components/timecenter/TimeCenterPage'),
+  video: () => import('../components/video/VideoPage'),
+  health: () => import('../components/health/HealthPage'),
+  compare: () => import('../components/compare/ComparePage'),
+  shop: () => import('../components/shop/ShopPage'),
+  esports: () => import('../components/esports/EsportsPage'),
+  stats: () => import('../components/stats/StatsPage'),
+  reader: () => import('../components/reader/ReaderPage'),
+  snippets: () => import('../components/snippets/SnippetsPage'),
+  habits: () => import('../components/habits/HabitsPage'),
+  flashcards: () => import('../components/flashcards/FlashcardsPage'),
+  bookmarks: () => import('../components/bookmarks/BookmarksPage'),
+  tokens: () => import('../components/tokens/TokensPage'),
+  leetcode: () => import('../components/leetcode/LeetcodePage'),
+  interview: () => import('../components/interview/InterviewPage'),
+  codenav: () => import('../components/codenav/CodeNavPage'),
+  aiagent: () => import('../components/aiagent/AIAgentPage'),
+  openclaw: () => import('../components/openclaw/OpenClawPage'),
+  hermes: () => import('../components/hermes/HermesPage'),
+  settings: () => import('../components/settings/SettingsPage'),
+};
+
+const preloadedPages = new Set<ActiveView>();
+
+export function preloadPage(id: ActiveView): void {
+  if (preloadedPages.has(id)) return;
+  preloadedPages.add(id);
+  void PAGE_LOADERS[id]?.();
 }
 
 export const PAGES: PageEntry[] = [
@@ -49,7 +94,7 @@ export const PAGES: PageEntry[] = [
   { id: 'notes', path: 'notes', component: NotesPage, label: '笔记', icon: <StickyNote size={20} />, color: 'text-[#f59e0b]' },
   { id: 'pomodoro', path: 'pomodoro', component: PomodoroPage, label: '番茄钟', icon: <Timer size={20} />, color: 'text-[var(--accent)]' },
   { id: 'timecenter', path: 'timecenter', component: TimeCenterPage, label: '时间中心', icon: <AlarmClock size={20} />, color: 'text-[var(--accent)]' },
-  { id: 'video', path: 'video', component: VideoPage, label: '视频站', icon: <PlayCircle size={20} />, color: 'text-[#ec4899]' },
+  { id: 'video', path: 'video', component: VideoPage, label: 'IT视频站', icon: <PlayCircle size={20} />, color: 'text-[#ec4899]' },
   { id: 'health', path: 'health', component: HealthPage, label: '健康助手', icon: <Heart size={20} />, color: 'text-[#ec4899]', dev: true },
   { id: 'compare', path: 'compare', component: ComparePage, label: '产品对比', icon: <GitCompare size={20} />, color: 'text-[#06b6d4]', dev: true },
   { id: 'shop', path: 'shop', component: ShopPage, label: '电商中心', icon: <ShoppingCart size={20} />, color: 'text-[#f59e0b]', dev: true },
@@ -69,6 +114,10 @@ export const PAGES: PageEntry[] = [
   { id: 'hermes', path: 'hermes', component: HermesPage, label: 'Hermes', icon: <Workflow size={20} />, color: 'text-[#c87d2f]', dev: true },
   { id: 'settings', path: 'settings', component: SettingsPage, label: '设置', icon: <Settings size={20} />, color: 'text-[#6b7280]' },
 ];
+
+PAGES.forEach((page) => {
+  page.preload = () => PAGE_LOADERS[page.id]?.();
+});
 
 export const VIEW_PATH: Record<ActiveView, string> = Object.fromEntries(
   PAGES.map((p) => [p.id, p.path])

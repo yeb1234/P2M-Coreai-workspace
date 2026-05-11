@@ -1,7 +1,7 @@
 import React from 'react';
 import { ListTodo, Calendar, StickyNote, Timer, PlayCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { VIEW_PATH } from '../../config/pageRegistry';
+import { VIEW_PATH, preloadPage } from '../../config/pageRegistry';
 import type { ActiveView } from '../../stores/uiStore';
 
 interface Tab {
@@ -15,7 +15,7 @@ const TABS: Tab[] = [
   { id: 'calendar', label: '日历', icon: <Calendar size={24} /> },
   { id: 'notes', label: '笔记', icon: <StickyNote size={24} /> },
   { id: 'pomodoro', label: '番茄钟', icon: <Timer size={24} /> },
-  { id: 'video', label: '视频站', icon: <PlayCircle size={24} /> },
+  { id: 'video', label: 'IT视频站', icon: <PlayCircle size={24} /> },
 ];
 
 export const MobileTabBar: React.FC = () => {
@@ -34,6 +34,8 @@ export const MobileTabBar: React.FC = () => {
           <button
             key={tab.id}
             onClick={() => navigate(`/${tabPath}`)}
+            onTouchStart={() => preloadPage(tab.id)}
+            onFocus={() => preloadPage(tab.id)}
             className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 transition-colors ${
               isActive
                 ? 'bg-[var(--accent-bg)] text-[var(--accent)]'

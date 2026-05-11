@@ -1,16 +1,12 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Bell, Settings, Clock, LogOut, Bot } from 'lucide-react';
 import { usePomodoroStore, useTodoStore, useUIStore, useNotificationStore, useAuthStore, useAIStore } from '../../stores';
 import { NotificationPanel } from './NotificationPanel';
 import { toLocalDateString } from '../../lib/date';
+import { useClockNow } from '../../hooks/useClockNow';
 
 function LiveClock({ active, onClick }: { active: boolean; onClick: () => void }) {
-  const [time, setTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const time = useClockNow();
 
   const h = String(time.getHours()).padStart(2, '0');
   const m = String(time.getMinutes()).padStart(2, '0');

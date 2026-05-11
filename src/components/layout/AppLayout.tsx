@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -8,17 +8,7 @@ import { useUIStore } from '../../stores';
 import { PAGES } from '../../config/pageRegistry';
 import { useHashSync } from '../../hooks/useHashSync';
 import { GlobalAmbientSoundController } from '../pomodoro/GlobalAmbientSoundController';
-
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [breakpoint]);
-  return isMobile;
-}
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 export const AppLayout: React.FC = () => {
   const { fontSize, compactMode } = useUIStore();
@@ -43,16 +33,18 @@ export const AppLayout: React.FC = () => {
           <div className="flex flex-1 overflow-hidden">
             <Sidebar />
             <main className="app-main min-w-0 flex-1 overflow-y-auto">
-              <Routes>
-                {PAGES.map((page) => (
-                  <Route
-                    key={page.id}
-                    path={page.path === '' ? '/' : page.path}
-                    element={<page.component />}
-                  />
-                ))}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              <Suspense fallback={<div className="py-10 text-center text-sm text-[var(--text-muted)]">正在载入页面...</div>}>
+                <Routes>
+                  {PAGES.map((page) => (
+                    <Route
+                      key={page.id}
+                      path={page.path === '' ? '/' : page.path}
+                      element={<page.component />}
+                    />
+                  ))}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
             </main>
             <AIChatPanel />
           </div>

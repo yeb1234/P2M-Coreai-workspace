@@ -1,23 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { useTodoStore, useCalendarStore, usePomodoroStore, useNotificationStore } from '../stores';
-import { PRIORITY_COLORS, type Todo, type PomodoroSession } from '../types';
+import { type PomodoroSession } from '../types';
 import { playBreakSound, playPomodoroCue, playNotificationSound } from '../lib/sounds';
 import { toLocalDateString } from '../lib/date';
-
-const TODO_DUE_MARKER = 'todo:due';
-const TODO_REMINDER_MARKER = 'todo:reminder';
-
-function splitReminderDateTime(reminderAt: string): { date: string; time: string } {
-  const date = new Date(reminderAt);
-  return {
-    date: toLocalDateString(date),
-    time: `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
-  };
-}
+import { buildTodoCalendarSyncPlan } from './todoCalendarSyncPlan';
 
 export const useCrossModuleSync = () => {
   const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
   const todoReminderRef = useRef<Set<string>>(new Set());
+  const todoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const todoReminderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Restore timer on app load (adjust for elapsed time while page was closed)
   useEffect(() => {
@@ -80,13 +72,19 @@ export const useCrossModuleSync = () => {
   }, []);
 
   useEffect(() => {
-    const reminderTimer = setInterval(() => {
+    const runReminderCheck = () => {
       const now = Date.now();
       const notificationStore = useNotificationStore.getState();
+      let nextReminderAt = Number.POSITIVE_INFINITY;
       Object.values(useTodoStore.getState().todos).forEach((todo) => {
         if (!todo.reminderAt || todo.status === 'completed') return;
         if (todoReminderRef.current.has(todo.id)) return;
-        if (new Date(todo.reminderAt).getTime() > now) return;
+        const reminderTime = new Date(todo.reminderAt).getTime();
+        if (!Number.isFinite(reminderTime)) return;
+        if (reminderTime > now) {
+          nextReminderAt = Math.min(nextReminderAt, reminderTime);
+          return;
+        }
         todoReminderRef.current.add(todo.id);
         playNotificationSound();
         notificationStore.addNotification({
@@ -95,72 +93,43 @@ export const useCrossModuleSync = () => {
           message: todo.title,
         });
       });
-    }, 15000);
-    return () => clearInterval(reminderTimer);
+
+      if (todoReminderTimerRef.current) clearTimeout(todoReminderTimerRef.current);
+      if (Number.isFinite(nextReminderAt)) {
+        const delay = Math.max(1000, Math.min(nextReminderAt - Date.now(), 60_000));
+        todoReminderTimerRef.current = setTimeout(runReminderCheck, delay);
+      }
+    };
+
+    runReminderCheck();
+    const unsubTodos = useTodoStore.subscribe(() => {
+      if (todoReminderTimerRef.current) clearTimeout(todoReminderTimerRef.current);
+      todoReminderTimerRef.current = setTimeout(runReminderCheck, 250);
+    });
+
+    return () => {
+      unsubTodos();
+      if (todoReminderTimerRef.current) clearTimeout(todoReminderTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
-    // Subscribe to todo changes
-    const unsubTodos = useTodoStore.subscribe((state) => {
-      const todos = state.todos;
+    const syncTodosToCalendar = () => {
+      const todos = useTodoStore.getState().todos;
       const calendarStore = useCalendarStore.getState();
-      const activeTodoIds = new Set(Object.keys(todos));
+      const plan = buildTodoCalendarSyncPlan(todos, calendarStore.events);
 
-      Object.values(todos).forEach((todo: Todo) => {
-        const existingEvents = calendarStore.getEventsByTodoId(todo.id);
-        const dueEvent = existingEvents.find((event) => event.description === TODO_DUE_MARKER);
-        const reminderEvent = existingEvents.find((event) => event.description === TODO_REMINDER_MARKER);
+      plan.add.forEach((data) => calendarStore.addEvent(data));
+      plan.update.forEach(({ id, data }) => calendarStore.updateEvent(id, data));
+      plan.delete.forEach((id) => calendarStore.deleteEvent(id));
+    };
 
-        if (todo.dueDate) {
-          const dueData = {
-            title: todo.title,
-            date: todo.dueDate,
-            type: 'todo' as const,
-            color: PRIORITY_COLORS[todo.priority],
-            todoId: todo.id,
-            pomodoroSessionId: null,
-            description: TODO_DUE_MARKER,
-          };
-          if (dueEvent) {
-            calendarStore.updateEvent(dueEvent.id, dueData);
-          } else {
-            calendarStore.addEvent({
-              ...dueData,
-            });
-          }
-        } else if (dueEvent) {
-          calendarStore.deleteEvent(dueEvent.id);
-        }
+    syncTodosToCalendar();
 
-        if (todo.reminderAt) {
-          const { date, time } = splitReminderDateTime(todo.reminderAt);
-          const reminderData = {
-            title: `提醒：${todo.title}`,
-            date,
-            startTime: time,
-            type: 'reminder' as const,
-            color: '#f59e0b',
-            todoId: todo.id,
-            pomodoroSessionId: null,
-            description: TODO_REMINDER_MARKER,
-          };
-          if (reminderEvent) {
-            calendarStore.updateEvent(reminderEvent.id, reminderData);
-          } else {
-            calendarStore.addEvent({
-              ...reminderData,
-            });
-          }
-        } else if (reminderEvent) {
-          calendarStore.deleteEvent(reminderEvent.id);
-        }
-      });
-
-      Object.values(calendarStore.events).forEach((event) => {
-        if (!event.todoId || activeTodoIds.has(event.todoId)) return;
-        if (event.description !== TODO_DUE_MARKER && event.description !== TODO_REMINDER_MARKER) return;
-        calendarStore.deleteEvent(event.id);
-      });
+    // Subscribe to todo changes
+    const unsubTodos = useTodoStore.subscribe(() => {
+      if (todoSyncTimerRef.current) clearTimeout(todoSyncTimerRef.current);
+      todoSyncTimerRef.current = setTimeout(syncTodosToCalendar, 120);
     });
 
     // Subscribe to pomodoro session changes - defer mutations to avoid cascading re-renders
@@ -198,6 +167,7 @@ export const useCrossModuleSync = () => {
 
     return () => {
       unsubTodos();
+      if (todoSyncTimerRef.current) clearTimeout(todoSyncTimerRef.current);
       unsubSessions();
     };
   }, []);

@@ -1,25 +1,78 @@
-import { useState, useMemo, useRef } from 'react';
+import React, { useCallback, useState, useMemo, useRef } from 'react';
 import { Film, Loader2, PlayCircle, Sparkles, ArrowDownWideNarrow, ArrowUpWideNarrow, Clock, Columns3, Star } from 'lucide-react';
 import { getThumbnailUrl, type VideoItem } from '../../lib/videoApi';
-import { formatVideoDuration } from './videoFormat';
+import { formatVideoDuration, formatWatchProgress, getWatchProgressPercent } from './videoFormat';
 
 export type VideoGridMode = 'normal' | 'history' | 'latest';
 export type HistorySortMode = 'newest' | 'oldest' | 'longest';
 
+const VideoCard = React.memo(function VideoCard({
+  video,
+  onPlay,
+  onToggleFavorite,
+}: {
+  video: VideoItem;
+  onPlay: (videoId: number) => void;
+  onToggleFavorite?: (videoId: number, nextFavorite: boolean) => void;
+}) {
+  const progressPercent = getWatchProgressPercent(video.watch_progress, video.duration);
+
+  return (
+    <div onClick={() => onPlay(video.id)} className="theme-card overflow-hidden rounded-lg transition-all hover:shadow-md cursor-pointer group">
+      <div className="theme-progress-track aspect-video flex items-center justify-center relative overflow-hidden">
+        {video.thumbnail ? (
+          <img src={getThumbnailUrl(video.id)} alt={video.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+        ) : (
+          <PlayCircle size={28} className="text-[var(--border-medium)] transition-colors group-hover:text-[var(--accent)]" />
+        )}
+        <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] text-white">{formatVideoDuration(video.duration)}</span>
+        {onToggleFavorite && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleFavorite(video.id, !video.is_favorite);
+            }}
+            className={`absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md border border-white/20 bg-black/45 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/65 ${
+              video.is_favorite ? 'text-[#fbbf24]' : 'text-white/80'
+            }`}
+            title={video.is_favorite ? '取消收藏' : '收藏视频'}
+            aria-label={video.is_favorite ? '取消收藏' : '收藏视频'}
+          >
+            <Star size={13} fill={video.is_favorite ? 'currentColor' : 'none'} />
+          </button>
+        )}
+        {video.completed && <span className="absolute left-1 top-1 rounded bg-[var(--success)] px-1 py-0.5 text-[9px] text-white">✓</span>}
+        {progressPercent !== null && !video.completed && (
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20">
+            <div className="theme-progress-fill h-full" style={{ width: `${progressPercent}%` }} />
+          </div>
+        )}
+      </div>
+      <div className="px-2 py-1.5">
+        <h4 className="theme-text-primary truncate text-xs font-medium transition-colors group-hover:text-[var(--accent)]">{video.title}</h4>
+      </div>
+    </div>
+  );
+});
+
 export function Pagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
   const [jumpVal, setJumpVal] = useState('');
-  const pages: (number | '...')[] = [];
-  if (totalPages <= 11) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (page > 4) pages.push('...');
-    const start = Math.max(2, page - 2);
-    const end = Math.min(totalPages - 1, page + 2);
-    for (let i = start; i <= end; i++) pages.push(i);
-    if (page < totalPages - 3) pages.push('...');
-    pages.push(totalPages);
-  }
+  const pages = useMemo<(number | '...')[]>(() => {
+    const next: (number | '...')[] = [];
+    if (totalPages <= 11) {
+      for (let i = 1; i <= totalPages; i++) next.push(i);
+    } else {
+      next.push(1);
+      if (page > 4) next.push('...');
+      const start = Math.max(2, page - 2);
+      const end = Math.min(totalPages - 1, page + 2);
+      for (let i = start; i <= end; i++) next.push(i);
+      if (page < totalPages - 3) next.push('...');
+      next.push(totalPages);
+    }
+    return next;
+  }, [page, totalPages]);
 
   const handleJump = () => {
     const p = parseInt(jumpVal, 10);
@@ -77,7 +130,7 @@ interface VideoNavigationCardsProps {
   onPlay: (videoId: number) => void;
 }
 
-export function VideoNavigationCards({
+export const VideoNavigationCards = React.memo(function VideoNavigationCards({
   continueVideo,
   historyVideos,
   latestVideos,
@@ -88,7 +141,17 @@ export function VideoNavigationCards({
   onHistorySortChange,
   onPlay,
 }: VideoNavigationCardsProps) {
-  const showMode = (mode: VideoGridMode) => onGridModeChange(mode);
+  const continueProgressPercent = getWatchProgressPercent(continueVideo?.watch_progress, continueVideo?.duration);
+  const showHistory = useCallback(() => onGridModeChange('history'), [onGridModeChange]);
+  const showLatest = useCallback(() => onGridModeChange('latest'), [onGridModeChange]);
+  const playContinue = useCallback(() => {
+    if (continueVideo) onPlay(continueVideo.id);
+  }, [continueVideo, onPlay]);
+  const historyMeta = useCallback(
+    (video: VideoItem) => video.completed ? '已看完' : formatWatchProgress(video.watch_progress, video.duration),
+    [],
+  );
+  const latestMeta = useCallback((video: VideoItem) => video.category_path || '全部视频', []);
 
   return (
     <div className="space-y-2">
@@ -100,7 +163,7 @@ export function VideoNavigationCards({
       </div>
       <div className="video-navigation-grid">
         <button
-          onClick={() => { if (continueVideo) onPlay(continueVideo.id); }}
+          onClick={playContinue}
           disabled={!continueVideo}
           className="theme-card min-w-0 overflow-hidden rounded-xl p-3 text-left transition-all hover:border-[var(--accent)]/50 hover:shadow-md disabled:cursor-default disabled:opacity-70"
         >
@@ -113,7 +176,7 @@ export function VideoNavigationCards({
               )}
               {continueVideo && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
-                  <div className="theme-progress-fill h-full" style={{ width: `${continueVideo.duration ? Math.min(100, ((continueVideo.watch_progress || 0) / continueVideo.duration) * 100) : 0}%` }} />
+                  <div className="theme-progress-fill h-full" style={{ width: `${continueProgressPercent ?? 0}%` }} />
                 </div>
               )}
             </div>
@@ -121,7 +184,7 @@ export function VideoNavigationCards({
               <p className="text-[10px] font-medium text-[var(--accent)]">继续观看</p>
               <p className="theme-text-primary truncate text-sm font-semibold">{continueVideo?.title || '暂无未看完的视频'}</p>
               <p className="theme-text-muted mt-1 line-clamp-2 text-xs leading-4">
-                {continueVideo ? `已看到 ${formatVideoDuration(continueVideo.watch_progress)} / ${formatVideoDuration(continueVideo.duration)}` : '开始播放后会自动记录进度'}
+                {continueVideo ? `已看到 ${formatWatchProgress(continueVideo.watch_progress, continueVideo.duration)}` : '开始播放后会自动记录进度'}
               </p>
             </div>
             <PlayCircle size={22} className="shrink-0 text-[var(--accent)]" />
@@ -135,9 +198,9 @@ export function VideoNavigationCards({
           emptyText="暂无历史记录"
           sortMode={historySort}
           onSortChange={onHistorySortChange}
-          onShow={() => showMode('history')}
+          onShow={showHistory}
           onPlay={onPlay}
-          meta={(video) => video.completed ? '已看完' : `${formatVideoDuration(video.watch_progress)} / ${formatVideoDuration(video.duration)}`}
+          meta={historyMeta}
         />
 
         <CompactVideoListCard
@@ -146,9 +209,9 @@ export function VideoNavigationCards({
           active={gridMode === 'latest'}
           emptyText={latestFallback ? '暂无当前列表视频' : '暂无最新视频'}
           footnote={latestFallback && latestVideos.length > 0 ? '后端重启后会按最新入库排序。' : undefined}
-          onShow={() => showMode('latest')}
+          onShow={showLatest}
           onPlay={onPlay}
-          meta={(video) => video.category_path || '全部视频'}
+          meta={latestMeta}
         />
 
         <div className="min-w-0 rounded-xl border border-dashed border-[#e5e2dd] bg-[#faf9f7] p-3">
@@ -167,7 +230,7 @@ export function VideoNavigationCards({
       </div>
     </div>
   );
-}
+});
 
 function CompactVideoListCard({
   title,
@@ -360,41 +423,12 @@ export function VideoGridSection({
         style={{ '--video-grid-columns': columnsPerRow } as React.CSSProperties}
       >
         {displayVideos.map((v) => (
-          <div key={v.id} onClick={() => onPlay(v.id)} className="theme-card overflow-hidden rounded-lg transition-all hover:shadow-md cursor-pointer group">
-            <div className="theme-progress-track aspect-video flex items-center justify-center relative overflow-hidden">
-              {v.thumbnail ? (
-                <img src={getThumbnailUrl(v.id)} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-              ) : (
-                <PlayCircle size={28} className="text-[var(--border-medium)] transition-colors group-hover:text-[var(--accent)]" />
-              )}
-              <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] text-white">{formatVideoDuration(v.duration)}</span>
-              {onToggleFavorite && (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggleFavorite(v.id, !v.is_favorite);
-                  }}
-                  className={`absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md border border-white/20 bg-black/45 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/65 ${
-                    v.is_favorite ? 'text-[#fbbf24]' : 'text-white/80'
-                  }`}
-                  title={v.is_favorite ? '取消收藏' : '收藏视频'}
-                  aria-label={v.is_favorite ? '取消收藏' : '收藏视频'}
-                >
-                  <Star size={13} fill={v.is_favorite ? 'currentColor' : 'none'} />
-                </button>
-              )}
-              {v.completed && <span className="absolute left-1 top-1 rounded bg-[var(--success)] px-1 py-0.5 text-[9px] text-white">✓</span>}
-              {v.watch_progress != null && v.duration && !v.completed && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20">
-                  <div className="theme-progress-fill h-full" style={{ width: `${Math.min(100, (v.watch_progress / v.duration) * 100)}%` }} />
-                </div>
-              )}
-            </div>
-            <div className="px-2 py-1.5">
-              <h4 className="theme-text-primary truncate text-xs font-medium transition-colors group-hover:text-[var(--accent)]">{v.title}</h4>
-            </div>
-          </div>
+          <VideoCard
+            key={v.id}
+            video={v}
+            onPlay={onPlay}
+            onToggleFavorite={onToggleFavorite}
+          />
         ))}
       </div>
       {showPagination && (

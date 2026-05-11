@@ -1,9 +1,10 @@
 import type React from 'react';
-import { useState, useEffect } from 'react';
 import { CheckCircle2, FolderTree, List, Loader2, PlayCircle, RotateCcw, Sparkles } from 'lucide-react';
 import { getThumbnailUrl, type PlaylistItem, type VideoItem } from '../../lib/videoApi';
 import { getVideoAiCompletion } from '../../lib/videoAiStatus';
 import type { PlaylistScope } from './useVideoPlaylist';
+import { useIsMobile } from '../../hooks/useMediaQuery';
+import { getWatchProgressPercent } from './videoFormat';
 
 interface VideoPlaylistPanelProps {
   currentVideo: VideoItem;
@@ -23,6 +24,55 @@ interface VideoPlaylistPanelProps {
   footer?: React.ReactNode;
 }
 
+interface PlaylistRowProps {
+  item: PlaylistItem;
+  currentVideo: VideoItem;
+  isPlaying: boolean;
+  onSelectItem: (item: PlaylistItem) => void;
+}
+
+function PlaylistRow({ item, currentVideo, isPlaying, onSelectItem }: PlaylistRowProps) {
+  const isCurrent = item.id === currentVideo.id;
+  const progressPercent = getWatchProgressPercent(item.watch_progress, isCurrent ? currentVideo.duration : null);
+
+  return (
+    <div
+      onClick={() => onSelectItem(item)}
+      className={`flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors ${
+        isCurrent ? 'theme-chip-active' : 'hover:bg-[var(--bg-accent)]'
+      }`}
+    >
+      <div className="theme-progress-track relative h-12 w-20 shrink-0 overflow-hidden rounded">
+        {item.thumbnail ? (
+          <img src={getThumbnailUrl(item.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <PlayCircle size={16} className="absolute inset-0 m-auto text-[#b8b4ac]" />
+        )}
+        {isCurrent && isPlaying && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <div className="flex gap-0.5">
+              <div className="h-3 w-0.5 animate-pulse rounded bg-white" />
+              <div className="h-4 w-0.5 animate-pulse rounded bg-white" style={{ animationDelay: '0.15s' }} />
+              <div className="h-2 w-0.5 animate-pulse rounded bg-white" style={{ animationDelay: '0.3s' }} />
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className={`truncate text-xs ${isCurrent ? 'font-medium text-[var(--accent)]' : 'theme-text-primary'}`}>
+          {item.title}
+        </p>
+        {item.completed && <span className="text-[9px] text-[#16a34a]">已看完</span>}
+        {progressPercent !== null && !item.completed && (
+          <div className="theme-progress-track mt-1 h-0.5 overflow-hidden rounded-full">
+            <div className="theme-progress-fill h-full rounded-full" style={{ width: `${progressPercent}%` }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function VideoPlaylistPanel({
   currentVideo,
   playlist,
@@ -40,13 +90,7 @@ export function VideoPlaylistPanel({
   onSelectItem,
   footer,
 }: VideoPlaylistPanelProps) {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1023px)');
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
+  const isMobile = useIsMobile(1024);
   const aiCompletion = getVideoAiCompletion(currentVideo);
 
   const playlistMaxHeight = isMobile ? 'max-h-[35vh]' : 'max-h-[min(42vh,420px)]';
@@ -139,41 +183,13 @@ export function VideoPlaylistPanel({
 
       <div className={`${playlistMaxHeight} min-h-0 space-y-1 overflow-y-auto pr-1`}>
         {playlist.map((item) => (
-          <div
+          <PlaylistRow
             key={item.id}
-            onClick={() => onSelectItem(item)}
-            className={`flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors ${
-              item.id === currentVideo.id ? 'theme-chip-active' : 'hover:bg-[var(--bg-accent)]'
-            }`}
-          >
-            <div className="theme-progress-track relative h-12 w-20 shrink-0 overflow-hidden rounded">
-              {item.thumbnail ? (
-                <img src={getThumbnailUrl(item.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
-              ) : (
-                <PlayCircle size={16} className="absolute inset-0 m-auto text-[#b8b4ac]" />
-              )}
-              {item.id === currentVideo.id && isPlaying && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <div className="flex gap-0.5">
-                    <div className="h-3 w-0.5 animate-pulse rounded bg-white" />
-                    <div className="h-4 w-0.5 animate-pulse rounded bg-white" style={{ animationDelay: '0.15s' }} />
-                    <div className="h-2 w-0.5 animate-pulse rounded bg-white" style={{ animationDelay: '0.3s' }} />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className={`truncate text-xs ${item.id === currentVideo.id ? 'font-medium text-[var(--accent)]' : 'theme-text-primary'}`}>
-                {item.title}
-              </p>
-              {item.completed && <span className="text-[9px] text-[#16a34a]">已看完</span>}
-              {item.watch_progress != null && !item.completed && (
-                <div className="theme-progress-track mt-1 h-0.5 overflow-hidden rounded-full">
-                  <div className="theme-progress-fill h-full rounded-full" style={{ width: `${Math.min(100, (item.watch_progress / (item.watch_progress + 60)) * 100)}%` }} />
-                </div>
-              )}
-            </div>
-          </div>
+            item={item}
+            currentVideo={currentVideo}
+            isPlaying={isPlaying}
+            onSelectItem={onSelectItem}
+          />
         ))}
       </div>
       {footer}

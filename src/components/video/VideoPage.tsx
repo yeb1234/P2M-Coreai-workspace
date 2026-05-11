@@ -18,28 +18,28 @@ import { useVideoPlaylist } from './useVideoPlaylist';
 import { useVideoPlayerMedia } from './useVideoPlayerMedia';
 import { useVideoPlayerSettings } from './useVideoPlayerSettings';
 import { useVideoPlayback } from './useVideoPlayback';
+import { useVideoElementEvents } from './useVideoElementEvents';
+import { useVideoProgressScrubber } from './useVideoProgressScrubber';
 import { useVideoSubtitles } from './useVideoSubtitles';
 import { useVideoSelection } from './useVideoSelection';
+import { useIsMobile, useWindowWidth } from '../../hooks/useMediaQuery';
 
 function VideoPlayerView() {
   const { currentVideo, currentSegments, jobStatus, jobStage, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
-  const progressBarRef = useRef<HTMLDivElement>(null);
   const isPlayingRef = useRef(false);
   const currentTimeRef = useRef(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [hoverTime, setHoverTime] = useState<number | null>(null);
-  const [hoverX, setHoverX] = useState(0);
-  const [playerWidth, setPlayerWidth] = useState(800);
   const [videoDuration, setVideoDuration] = useState(0);
   const { width: playlistPanelWidth, startResize: startPlaylistResize } = usePlaylistResize(300);
-  const [dragging, setDragging] = useState(false);
   const [mediaError, setMediaError] = useState('');
+  const isMobile = useIsMobile();
+  const windowWidth = useWindowWidth();
   const {
     showSubtitles,
     setShowSubtitles,
@@ -93,14 +93,6 @@ function VideoPlayerView() {
     togglePlaylistScope,
   } = useVideoPlaylist({ currentVideo, selectVideo, currentCategoryId });
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
   const {
     videoUrl,
     subtitleUrl,
@@ -131,6 +123,37 @@ function VideoPlayerView() {
 
   const isProcessing = jobStatus === 'running' || jobStatus === 'queued';
   const progressPct = videoDuration > 0 ? (progress / videoDuration) * 100 : 0;
+  const {
+    progressBarRef,
+    hoverTime,
+    hoverX,
+    playerWidth,
+    startScrub,
+    updateHover,
+    clearHover,
+  } = useVideoProgressScrubber({
+    videoRef,
+    videoContainerRef,
+    duration: videoDuration,
+    onProgressChange: setProgress,
+  });
+  const videoElementEvents = useVideoElementEvents({
+    currentVideo,
+    videoRef,
+    playbackRate,
+    volume,
+    isMuted,
+    subtitleUrl,
+    playAfterLoadRef,
+    lastVolumeRef,
+    setVideoDuration,
+    setProgress,
+    setVolume,
+    setIsMuted,
+    setMediaError,
+    setShowControls,
+    hideCurrentTextTracks,
+  });
 
   // Load video details if missing
   useEffect(() => {
@@ -144,7 +167,7 @@ function VideoPlayerView() {
       setProgress(0);
       setVideoDuration(0);
       setIsPlaying(false);
-      setHoverTime(null);
+      clearHover();
       resetActiveSubtitle();
       setPlaybackRate(settingsRef.current.playbackRate);
       setMediaError('');
@@ -216,29 +239,6 @@ function VideoPlayerView() {
     playNextFromPlaylist();
   }, [autoPlay, playNextFromPlaylist]);
 
-  const handleProgressMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!videoDuration) return;
-    setDragging(true);
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const next = pct * videoDuration;
-    if (videoRef.current) videoRef.current.currentTime = next;
-    setProgress(next);
-  }, [videoDuration]);
-
-  const handleProgressTouchStart = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    if (!videoDuration) return;
-    setDragging(true);
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
-    const next = pct * videoDuration;
-    if (videoRef.current) videoRef.current.currentTime = next;
-    setProgress(next);
-  }, [videoDuration]);
-
   const stopControlClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
   }, []);
@@ -256,32 +256,6 @@ function VideoPlayerView() {
     onTogglePip: togglePip,
     onToggleSubtitles: toggleSubtitles,
   });
-
-  useEffect(() => {
-    if (!dragging) return;
-    const bar = progressBarRef.current;
-    const getClientX = (e: MouseEvent | TouchEvent) => 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-      e.preventDefault();
-      if (!bar || !videoRef.current) return;
-      const rect = bar.getBoundingClientRect();
-      const pct = Math.max(0, Math.min(1, (getClientX(e) - rect.left) / rect.width));
-      const next = pct * videoDuration;
-      videoRef.current.currentTime = next;
-      setProgress(next);
-    };
-    const handleUp = () => setDragging(false);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('touchend', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-      window.removeEventListener('touchmove', handleMove);
-      window.removeEventListener('touchend', handleUp);
-    };
-  }, [dragging, videoDuration]);
 
   if (!currentVideo) return null;
 
@@ -324,47 +298,13 @@ function VideoPlayerView() {
                 playsInline
                 webkit-playsinline="true"
                 onTimeUpdate={handleTimeUpdate}
-              onCanPlay={() => setMediaError('')}
-              onError={(e) => {
-                const video = e.currentTarget;
-                const code = video.error?.code;
-                const label = code === 1 ? '加载被中止' : code === 2 ? '网络错误' : code === 3 ? '解码失败' : code === 4 ? '格式不支持或文件不可用' : '未知错误';
-                setMediaError(`视频播放失败：${label}${code ? `（${code}）` : ''}`);
-              }}
+              onCanPlay={videoElementEvents.handleCanPlay}
+              onError={videoElementEvents.handleError}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onEnded={handleEnded}
-              onLoadedMetadata={(e) => {
-                  const video = e.target as HTMLVideoElement;
-                  const dur = Number.isFinite(video.duration) ? video.duration : 0;
-                  setVideoDuration(dur);
-                  video.playbackRate = playbackRate;
-                  video.volume = isMuted ? 0 : volume;
-                  video.muted = isMuted || volume === 0;
-                  setVolume(video.volume);
-                  setIsMuted(video.muted);
-                  if (video.volume > 0) lastVolumeRef.current = video.volume;
-                  if (!playAfterLoadRef.current && currentVideo.watch_progress && videoRef.current) {
-                    videoRef.current.currentTime = currentVideo.watch_progress;
-                    setProgress(currentVideo.watch_progress);
-                  }
-                if (currentVideo.duration) {
-                  setVideoDuration(currentVideo.duration);
-                }
-                if (subtitleUrl) hideCurrentTextTracks();
-                if (playAfterLoadRef.current) {
-                  playAfterLoadRef.current = false;
-                  video.play().catch(() => {
-                    setShowControls(true);
-                  });
-                }
-              }}
-              onVolumeChange={(e) => {
-                const video = e.target as HTMLVideoElement;
-                setVolume(video.volume);
-                setIsMuted(video.muted || video.volume === 0);
-                if (video.volume > 0) lastVolumeRef.current = video.volume;
-              }}
+              onLoadedMetadata={videoElementEvents.handleLoadedMetadata}
+              onVolumeChange={videoElementEvents.handleVolumeSync}
               onClick={() => { if (!touchHandledRef.current) togglePlay(); }}
               onDoubleClick={() => { if (!isMobile) toggleFullscreen(); }}
             />
@@ -396,17 +336,10 @@ function VideoPlayerView() {
               playbackRate={playbackRate}
               isFullscreen={isFullscreen}
               onStopControlClick={stopControlClick}
-              onProgressMouseDown={handleProgressMouseDown}
-              onProgressTouchStart={handleProgressTouchStart}
-              onProgressMouseMove={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                setHoverTime(pct * videoDuration);
-                const containerRect = videoContainerRef.current?.getBoundingClientRect();
-                setPlayerWidth(containerRect?.width ?? 800);
-                setHoverX(e.clientX - (containerRect?.left ?? 0));
-              }}
-              onProgressMouseLeave={() => setHoverTime(null)}
+              onProgressMouseDown={startScrub}
+              onProgressTouchStart={startScrub}
+              onProgressMouseMove={updateHover}
+              onProgressMouseLeave={clearHover}
               onTogglePlay={togglePlay}
               onSeekBy={seekBy}
               onToggleMute={toggleMute}
@@ -437,7 +370,7 @@ function VideoPlayerView() {
           currentVideo={currentVideo}
           playlist={playlist}
           playlistScope={playlistScope}
-          width={Math.min(playlistPanelWidth, Math.max(250, window.innerWidth * 0.32))}
+          width={Math.min(playlistPanelWidth, Math.max(250, windowWidth * 0.32))}
           isPlaying={isPlaying}
           isProcessing={isProcessing}
           jobStatus={jobStatus}
@@ -462,7 +395,7 @@ export const VideoPage: React.FC = () => {
     <div className={`w-full pt-2 space-y-6 ${currentVideo ? '' : 'px-1 lg:px-1.5'}`}>
       {!currentVideo && (
         <PageTitle
-          title="视频站"
+          title="IT视频站"
           subtitle="本地视频学习，AI 字幕转录 + 智能总结"
           icon={<PlayCircle size={22} />}
         />

@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { THEME_PRESETS } from '../../src/lib/themes';
 
+const TEST_NOW_ISO = '2026-05-11T07:30:00+08:00';
+
 const mockVideo = {
   id: 101,
   title: '布局回归测试视频',
@@ -34,12 +36,31 @@ const mockVideo = {
 
 async function prepareApp(page: Page, route = '/') {
   await mockApi(page);
-  await page.addInitScript(() => {
+  await page.addInitScript((testNowIso) => {
     window.localStorage.setItem('p2m-current-user', 'Playwright');
-  });
+    const fixedTime = new Date(testNowIso).getTime();
+    const NativeDate = Date;
+    class FixedDate extends NativeDate {
+      constructor(...args: ConstructorParameters<typeof Date>) {
+        super(...(args.length > 0 ? args : [fixedTime]));
+      }
+
+      static now() {
+        return fixedTime;
+      }
+    }
+    FixedDate.UTC = NativeDate.UTC;
+    FixedDate.parse = NativeDate.parse;
+    FixedDate.prototype = NativeDate.prototype;
+    window.Date = FixedDate as DateConstructor;
+  }, TEST_NOW_ISO);
   await page.goto(route);
-  if (await page.getByRole('button', { name: '登录' }).isVisible().catch(() => false)) {
-    await page.getByText('去注册').click();
+  const registerLink = page.getByText('去注册');
+  if (
+    await page.getByRole('button', { name: '登录' }).isVisible().catch(() => false)
+    && await registerLink.isVisible({ timeout: 1000 }).catch(() => false)
+  ) {
+    await registerLink.click();
     await page.getByPlaceholder('输入用户名').fill(`e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`);
     await page.getByPlaceholder('输入密码', { exact: true }).fill('e2e-password');
     await page.getByPlaceholder('再次输入密码').fill('e2e-password');
@@ -211,7 +232,7 @@ test.describe('layout regression', () => {
 
   test('video page list uses adaptive grids without overflow', async ({ page }) => {
     await prepareApp(page, '/#/video');
-    await expect(page.getByText('视频站').first()).toBeVisible();
+    await expect(page.getByText('IT视频站').first()).toBeVisible();
     await expect(page.locator('.video-card-grid').first()).toBeVisible({ timeout: 10_000 });
     await expectNoHorizontalOverflow(page);
     await expect(page.locator('main.app-main')).toHaveScreenshot('video-list-layout.png');
@@ -267,7 +288,7 @@ test.describe('dark theme visual comparison', () => {
       await page.goto('/#/video');
       await page.waitForLoadState('networkidle');
       await applyThemePreset(page, themeId);
-      await expect(page.getByText('视频站').first()).toBeVisible();
+      await expect(page.getByText('IT视频站').first()).toBeVisible();
       await expect(page.locator('.video-card-grid').first()).toBeVisible({ timeout: 10_000 });
       await expectNoHorizontalOverflow(page);
       await expect(page.locator('main.app-main')).toHaveScreenshot(`dark-${themeId}-video.png`);
@@ -295,7 +316,7 @@ test.describe('mobile layout regression', () => {
 
     await page.goto('/#/video');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText('视频站').first()).toBeVisible();
+    await expect(page.getByText('IT视频站').first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expect(page.locator('main')).toHaveScreenshot('mobile-video-list.png');
   });

@@ -1,36 +1,26 @@
 import React, { useMemo } from 'react';
 import { useCalendarStore, useTodoStore } from '../../stores';
 import { getWeekDays, getWeekDayNames, isTodayCheck, toISODateString } from '../../lib/date';
-import type { Todo } from '../../types';
+import { createCompletedTodoLookup, getEventsForCalendarDates, groupTodosByCalendarDate } from './calendarDerivedData';
 
 export const WeekView: React.FC = () => {
   const rawMonth = useCalendarStore((s) => s.currentMonth);
   const currentMonth = rawMonth instanceof Date ? rawMonth : new Date(rawMonth);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
-  const getEventsForDate = useCalendarStore((s) => s.getEventsForDate);
+  const calendarEvents = useCalendarStore((s) => s.events);
   const todos = useTodoStore((s) => s.todos);
 
-  const completedTodoSet = useMemo(() => {
-    const completed = Object.values(todos).filter((t) => t.status === 'completed');
-    return {
-      ids: new Set(completed.map((t) => t.id)),
-      titles: new Set(completed.map((t) => t.title)),
-    };
-  }, [todos]);
+  const completedTodoLookup = useMemo(() => createCompletedTodoLookup(todos), [todos]);
+  const { pendingByDate: pendingTodosByDate } = useMemo(() => groupTodosByCalendarDate(todos), [todos]);
 
-  const weekDays = getWeekDays(currentMonth);
-  const dayNames = getWeekDayNames();
-
-  const pendingTodosByDate = useMemo(() => {
-    const byDate: Record<string, Todo[]> = {};
-    Object.values(todos).forEach((todo) => {
-      if (todo.status === 'completed' || !todo.dueDate) return;
-      if (!byDate[todo.dueDate]) byDate[todo.dueDate] = [];
-      byDate[todo.dueDate].push(todo);
-    });
-    return byDate;
-  }, [todos]);
+  const weekDays = useMemo(() => getWeekDays(currentMonth), [currentMonth]);
+  const dayNames = useMemo(() => getWeekDayNames(), []);
+  const weekDateStrings = useMemo(() => weekDays.map((date) => toISODateString(date)), [weekDays]);
+  const eventsByDate = useMemo(
+    () => getEventsForCalendarDates(calendarEvents, weekDateStrings, completedTodoLookup),
+    [calendarEvents, completedTodoLookup, weekDateStrings],
+  );
 
   return (
     <div className="space-y-3 md:grid md:grid-cols-7 md:gap-2 md:space-y-0">
@@ -38,12 +28,7 @@ export const WeekView: React.FC = () => {
       <div className="grid grid-cols-4 gap-1.5 md:hidden">
         {weekDays.map((date, idx) => {
           const dateStr = toISODateString(date);
-          const events = getEventsForDate(dateStr).filter((e) => {
-            if (e.type !== 'todo') return true;
-            if (e.todoId && completedTodoSet.ids.has(e.todoId)) return false;
-            if (!e.todoId && completedTodoSet.titles.has(e.title)) return false;
-            return true;
-          });
+          const events = eventsByDate[dateStr] || [];
           const todos = pendingTodosByDate[dateStr] || [];
           const isToday = isTodayCheck(date);
           const isSelected = selectedDate === dateStr;
@@ -90,12 +75,7 @@ export const WeekView: React.FC = () => {
       <div className="space-y-2 md:hidden">
         {weekDays.map((date, idx) => {
           const dateStr = toISODateString(date);
-          const events = getEventsForDate(dateStr).filter((e) => {
-            if (e.type !== 'todo') return true;
-            if (e.todoId && completedTodoSet.ids.has(e.todoId)) return false;
-            if (!e.todoId && completedTodoSet.titles.has(e.title)) return false;
-            return true;
-          });
+          const events = eventsByDate[dateStr] || [];
           const todos = pendingTodosByDate[dateStr] || [];
           const isToday = isTodayCheck(date);
           const isSelected = selectedDate === dateStr;
@@ -173,12 +153,7 @@ export const WeekView: React.FC = () => {
       {/* Desktop: vertical card grid */}
       {weekDays.map((date, idx) => {
         const dateStr = toISODateString(date);
-        const events = getEventsForDate(dateStr).filter((e) => {
-          if (e.type !== 'todo') return true;
-          if (e.todoId && completedTodoSet.ids.has(e.todoId)) return false;
-          if (!e.todoId && completedTodoSet.titles.has(e.title)) return false;
-          return true;
-        });
+        const events = eventsByDate[dateStr] || [];
         const isToday = isTodayCheck(date);
         const isSelected = selectedDate === dateStr;
 

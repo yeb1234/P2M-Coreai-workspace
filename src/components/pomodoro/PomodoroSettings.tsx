@@ -122,8 +122,8 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
               onClick={() => { updateConfig({ longBreakDuration: min }); playInteractionSound('save'); }}
               className={`h-7 text-xs rounded-md border transition-all ${
                 config.longBreakDuration === min
-                  ? 'bg-[var(--warning)] text-white border-[var(--warning)] shadow-sm'
-                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--warning)]'
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--accent)]'
               }`}
             >
               {min}

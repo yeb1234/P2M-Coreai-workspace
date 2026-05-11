@@ -7,6 +7,7 @@ import { Modal, PageTitle } from '../shared';
 import { useCalendarStore, useTodoStore, useUIStore } from '../../stores';
 import { toISODateString } from '../../lib/date';
 import type { ISODateString } from '../../types';
+import { createCompletedTodoLookup, getEventsForCalendarDate } from './calendarDerivedData';
 
 export const CalendarPage: React.FC = () => {
   const { selectedDate } = useCalendarStore();
@@ -67,22 +68,16 @@ export const CalendarPage: React.FC = () => {
 };
 
 const SelectedDateEvents: React.FC = () => {
-  const { selectedDate, getEventsForDate } = useCalendarStore();
+  const selectedDate = useCalendarStore((s) => s.selectedDate);
+  const calendarEvents = useCalendarStore((s) => s.events);
   const todos = useTodoStore((s) => s.todos);
-  const completedTodoSet = useMemo(() => {
-    const completed = Object.values(todos).filter((t) => t.status === 'completed');
-    return {
-      ids: new Set(completed.map((t) => t.id)),
-      titles: new Set(completed.map((t) => t.title)),
-    };
-  }, [todos]);
-  const allEvents = selectedDate ? getEventsForDate(selectedDate) : [];
-  const events = allEvents.filter((e) => {
-    if (e.type !== 'todo') return true;
-    if (e.todoId && completedTodoSet.ids.has(e.todoId)) return false;
-    if (!e.todoId && completedTodoSet.titles.has(e.title)) return false;
-    return true;
-  });
+  const completedTodoLookup = useMemo(() => createCompletedTodoLookup(todos), [todos]);
+  const events = useMemo(
+    () => selectedDate
+      ? getEventsForCalendarDate(calendarEvents, selectedDate, completedTodoLookup)
+      : [],
+    [calendarEvents, completedTodoLookup, selectedDate],
+  );
 
   if (!selectedDate || events.length === 0) return null;
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckSquare, ChevronRight, Folder, RefreshCw, Search, Square, Scan } from 'lucide-react';
 import { useVideoStore } from '../../stores/videoStore';
 import {
@@ -15,6 +15,7 @@ import { playInteractionSound } from '../../lib/sounds';
 
 const VIDEO_GRID_COLUMNS_KEY = 'p2m_video_grid_columns';
 const DEFAULT_VIDEO_GRID_COLUMNS = 5;
+const MAX_THUMBNAIL_BATCH_SIZE = 12;
 
 function loadVideoGridColumns(): number {
   try {
@@ -82,6 +83,102 @@ function groupFoldersByParent(items: CategoryTree[], allFolders: CategoryTree[])
   });
 }
 
+const FolderTile = React.memo(function FolderTile({
+  category,
+  checked,
+  onSelect,
+  onEnter,
+}: {
+  category: CategoryTree;
+  checked: boolean;
+  onSelect: (id: number) => void;
+  onEnter: (id: number, name: string) => void;
+}) {
+  const displayName = folderDisplayName(category);
+
+  return (
+    <div className="flex items-center gap-2 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all group">
+      <button
+        onClick={(e) => { e.stopPropagation(); onSelect(category.id); }}
+        className="shrink-0"
+        title={checked ? '取消筛选' : '筛选此文件夹'}
+      >
+        {checked
+          ? <CheckSquare size={16} className="text-[#c87d2f]" />
+          : <Square size={16} className="text-[#b8b4ac] group-hover:text-[#6b7280]" />
+        }
+      </button>
+      <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+        <Folder size={20} className="text-[#c87d2f] shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
+          <p className="text-[10px] text-[#9ca3af]">{category.video_count} 个视频</p>
+        </div>
+      </button>
+    </div>
+  );
+});
+
+const SearchFolderTile = React.memo(function SearchFolderTile({
+  category,
+  onEnter,
+}: {
+  category: CategoryTree;
+  onEnter: (id: number, name: string) => void;
+}) {
+  const displayName = folderDisplayName(category);
+  const parentPath = folderParentPath(category);
+
+  return (
+    <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-3 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all text-left group">
+      <Folder size={20} className="text-[#c87d2f] shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
+        {parentPath && <p className="text-[10px] text-[#b8b4ac] truncate">{parentPath}</p>}
+        <p className="text-[10px] text-[#9ca3af]">{category.video_count} 个视频</p>
+      </div>
+    </button>
+  );
+});
+
+const FolderSearchGroupCard = React.memo(function FolderSearchGroupCard({
+  group,
+  onEnterParent,
+  onEnterFolder,
+}: {
+  group: FolderSearchGroup;
+  onEnterParent: (id: number, name: string) => void;
+  onEnterFolder: (id: number, name: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7]/60 p-2.5">
+      <div className="mb-2 flex items-center gap-2">
+        <Folder size={15} className="shrink-0 text-[#c87d2f]" />
+        {group.parent ? (
+          <button
+            type="button"
+            onClick={() => onEnterParent(group.parent!.id, group.parentLabel)}
+            className="min-w-0 text-left"
+          >
+            <span className="block truncate text-xs font-semibold text-[#1a1a1a] hover:text-[#c87d2f]">{group.parentLabel}</span>
+            {group.parentPath && <span className="block truncate text-[10px] text-[#9ca3af]">{group.parentPath}</span>}
+          </button>
+        ) : (
+          <div className="min-w-0">
+            <span className="block truncate text-xs font-semibold text-[#1a1a1a]">{group.parentLabel}</span>
+            <span className="block truncate text-[10px] text-[#9ca3af]">视频目录根层级</span>
+          </div>
+        )}
+      </div>
+      <div className="ml-0 auto-grid-video sm:ml-5">
+        {group.items.map((cat) => (
+          <SearchFolderTile key={cat.id} category={cat} onEnter={onEnterFolder} />
+        ))}
+      </div>
+    </div>
+  );
+});
+
 export function VideoList() {
   const {
     videos, total, page, totalPages, loading, error, loadVideos, loadCurrentVideo,
@@ -103,15 +200,15 @@ export function VideoList() {
   const selectedFolderIdSet = useMemo(() => new Set(selectedFolderIds), [selectedFolderIds]);
   const selectionChangedRef = React.useRef(false);
 
-  const toggleFolderSelection = (id: number) => {
+  const toggleFolderSelection = useCallback((id: number) => {
     selectionChangedRef.current = true;
     const next = selectedFolderIdSet.has(id)
       ? selectedFolderIds.filter((x) => x !== id)
       : [...selectedFolderIds, id];
     setSelectedFolderIds(next);
-  };
+  }, [selectedFolderIdSet, selectedFolderIds, setSelectedFolderIds]);
 
-  const handleRescan = async () => {
+  const handleRescan = useCallback(async () => {
     setRescanLoading(true);
     setRescanMsg('');
     try {
@@ -128,9 +225,9 @@ export function VideoList() {
       setRescanLoading(false);
       setTimeout(() => setRescanMsg(''), 4000);
     }
-  };
+  }, [currentCategoryId, loadCategoryTree, loadVideos, searchQuery, selectedFolderIds]);
 
-  const handleRefreshFolders = () => {
+  const handleRefreshFolders = useCallback(() => {
     void loadCategoryTree();
     const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;
     loadVideos(page, searchQuery || undefined, ids);
@@ -141,7 +238,7 @@ export function VideoList() {
       })
       .catch(() => {});
     fetchRecentHistory(30).then((history) => setHistoryVideos(history)).catch(() => {});
-  };
+  }, [currentCategoryId, loadCategoryTree, loadVideos, page, searchQuery, selectedFolderIds]);
 
   useEffect(() => { loadCategoryTree(); }, [loadCategoryTree]);
   useEffect(() => {
@@ -203,7 +300,10 @@ export function VideoList() {
   useEffect(() => {
     const all = [...videos, ...historyVideos, ...recentVideos];
     if (continueVideo) all.push(continueVideo);
-    const ids = all.filter((v) => !v.thumbnail && !thumbRequestedRef.current.has(v.id)).map((v) => v.id);
+    const ids = all
+      .filter((v) => !v.thumbnail && !thumbRequestedRef.current.has(v.id))
+      .slice(0, MAX_THUMBNAIL_BATCH_SIZE)
+      .map((v) => v.id);
     if (ids.length === 0) return;
     ids.forEach((id) => thumbRequestedRef.current.add(id));
     generateThumbnails(ids).catch(() => {});
@@ -218,20 +318,23 @@ export function VideoList() {
       fetchRecentVideos(20, currentCategoryId).then((r) => { setRecentVideos(r.items); setRecentVideosFallback(r.fallback); }).catch(() => {});
     }, 8000);
     return () => { clearTimeout(timer); };
-  }, [videos, historyVideos, recentVideos, continueVideo]);
+  }, [videos, historyVideos, recentVideos, continueVideo, selectedFolderIds, loadVideos, searchQuery, currentCategoryId]);
 
-  const children = getCurrentChildren();
+  const children = useMemo(() => getCurrentChildren(), [getCurrentChildren, categoryTree, currentCategoryId]);
   const isSearching = !!inputVal.trim();
 
-  const handleSearch = () => {
+  const handleSearch = useCallback(() => {
+    const query = inputVal.trim();
+    const previousQuery = searchQuery.trim();
+    if (query === previousQuery && selectedFolderIds.length === 0) return;
     setGridMode('normal');
-    setSearchQuery(inputVal);
+    setSearchQuery(query);
     selectionChangedRef.current = false;
     setSelectedFolderIds([]);
-    loadVideos(1, inputVal || undefined);
-  };
+    loadVideos(1, query || undefined);
+  }, [inputVal, loadVideos, searchQuery, selectedFolderIds.length, setSearchQuery, setSelectedFolderIds]);
 
-  const handleColumnsPerRowChange = (columns: number) => {
+  const handleColumnsPerRowChange = useCallback((columns: number) => {
     const next = Math.max(2, Math.min(8, columns));
     setColumnsPerRow(next);
     try {
@@ -239,23 +342,33 @@ export function VideoList() {
     } catch {
       // ignore storage quota or private mode failures
     }
-  };
+  }, []);
 
-  const searchFolders = (q: string): CategoryTree[] => {
+  const enterFolderFromList = useCallback((id: number, name: string) => {
+    setGridMode('normal');
+    enterCategory(id, name);
+  }, [enterCategory]);
+
+  const enterFolderFromSearch = useCallback((id: number, name: string) => {
+    setGridMode('normal');
+    setInputVal('');
+    enterCategory(id, name);
+  }, [enterCategory]);
+
+  const matchedFolders = useMemo(() => {
+    const query = inputVal.trim().toLowerCase();
+    if (!query) return [];
     const results: CategoryTree[] = [];
-    const lower = q.toLowerCase();
     const walk = (nodes: CategoryTree[]) => {
       for (const n of nodes) {
         const displayName = n.name.includes(' / ') ? n.name.split(' / ').pop()! : n.name;
-        if (displayName.toLowerCase().includes(lower)) results.push(n);
+        if (displayName.toLowerCase().includes(query)) results.push(n);
         walk(n.children);
       }
     };
     walk(categoryTree);
     return results;
-  };
-
-  const matchedFolders = isSearching ? searchFolders(inputVal) : [];
+  }, [categoryTree, inputVal]);
   const groupedMatchedFolders = useMemo(
     () => groupFoldersByParent(matchedFolders, categoryTree),
     [matchedFolders, categoryTree]
@@ -283,6 +396,17 @@ export function VideoList() {
   const filesLabel = gridMode === 'normal' && currentCategoryId && selectedFolderIds.length > 0
     ? `文件夹列表（${total} 个视频）`
     : undefined;
+  const playVideo = useCallback((videoId: number) => {
+    void loadCurrentVideo(videoId);
+  }, [loadCurrentVideo]);
+  const toggleVideoFavorite = useCallback((videoId: number, nextFavorite: boolean) => {
+    void toggleFavorite(videoId, nextFavorite);
+  }, [toggleFavorite]);
+  const returnToNormalGrid = useCallback(() => setGridMode('normal'), []);
+  const handlePageChange = useCallback((p: number, query?: string) => {
+    const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;
+    loadVideos(p, query, ids);
+  }, [loadVideos, selectedFolderIds]);
 
   return (
     <div className="space-y-4">
@@ -332,31 +456,15 @@ export function VideoList() {
 
       {!isSearching && children.length > 0 && (
         <div className="auto-grid-video">
-          {children.map((cat) => {
-            const displayName = cat.name.includes(' / ') ? cat.name.split(' / ').pop()! : cat.name;
-            const checked = selectedFolderIdSet.has(cat.id);
-            return (
-              <div key={cat.id} className="flex items-center gap-2 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all group">
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleFolderSelection(cat.id); }}
-                  className="shrink-0"
-                  title={checked ? '取消筛选' : '筛选此文件夹'}
-                >
-                  {checked
-                    ? <CheckSquare size={16} className="text-[#c87d2f]" />
-                    : <Square size={16} className="text-[#b8b4ac] group-hover:text-[#6b7280]" />
-                  }
-                </button>
-                <button onClick={() => { setGridMode('normal'); enterCategory(cat.id, displayName); }} className="flex items-center gap-2 min-w-0 flex-1 text-left">
-                  <Folder size={20} className="text-[#c87d2f] shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
-                    <p className="text-[10px] text-[#9ca3af]">{cat.video_count} 个视频</p>
-                  </div>
-                </button>
-              </div>
-            );
-          })}
+          {children.map((cat) => (
+            <FolderTile
+              key={cat.id}
+              category={cat}
+              checked={selectedFolderIdSet.has(cat.id)}
+              onSelect={toggleFolderSelection}
+              onEnter={enterFolderFromList}
+            />
+          ))}
         </div>
       )}
 
@@ -365,42 +473,12 @@ export function VideoList() {
           <p className="text-xs text-[#9ca3af] mb-2">匹配的文件夹 ({matchedFolders.length})</p>
           <div className="space-y-3">
             {groupedMatchedFolders.map((group) => (
-              <div key={group.key} className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7]/60 p-2.5">
-                <div className="mb-2 flex items-center gap-2">
-                  <Folder size={15} className="shrink-0 text-[#c87d2f]" />
-                  {group.parent ? (
-                    <button
-                      type="button"
-                      onClick={() => { setGridMode('normal'); setInputVal(''); enterCategory(group.parent!.id, group.parentLabel); }}
-                      className="min-w-0 text-left"
-                    >
-                      <span className="block truncate text-xs font-semibold text-[#1a1a1a] hover:text-[#c87d2f]">{group.parentLabel}</span>
-                      {group.parentPath && <span className="block truncate text-[10px] text-[#9ca3af]">{group.parentPath}</span>}
-                    </button>
-                  ) : (
-                    <div className="min-w-0">
-                      <span className="block truncate text-xs font-semibold text-[#1a1a1a]">{group.parentLabel}</span>
-                      <span className="block truncate text-[10px] text-[#9ca3af]">视频目录根层级</span>
-                    </div>
-                  )}
-                </div>
-                <div className="ml-0 auto-grid-video sm:ml-5">
-                  {group.items.map((cat) => {
-                    const displayName = folderDisplayName(cat);
-                    const parentPath = folderParentPath(cat);
-                    return (
-                      <button key={cat.id} onClick={() => { setGridMode('normal'); setInputVal(''); enterCategory(cat.id, displayName); }} className="flex items-center gap-3 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all text-left group">
-                        <Folder size={20} className="text-[#c87d2f] shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
-                          {parentPath && <p className="text-[10px] text-[#b8b4ac] truncate">{parentPath}</p>}
-                          <p className="text-[10px] text-[#9ca3af]">{cat.video_count} 个视频</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <FolderSearchGroupCard
+                key={group.key}
+                group={group}
+                onEnterParent={enterFolderFromSearch}
+                onEnterFolder={enterFolderFromSearch}
+              />
             ))}
           </div>
         </div>
@@ -416,7 +494,7 @@ export function VideoList() {
           historySort={historySort}
           onGridModeChange={setGridMode}
           onHistorySortChange={setHistorySort}
-          onPlay={(videoId) => { void loadCurrentVideo(videoId); }}
+          onPlay={playVideo}
         />
       )}
 
@@ -441,13 +519,10 @@ export function VideoList() {
         page={page}
         totalPages={totalPages}
         searchQuery={searchQuery}
-        onPlay={(videoId) => { void loadCurrentVideo(videoId); }}
-        onToggleFavorite={(videoId, nextFavorite) => { void toggleFavorite(videoId, nextFavorite); }}
-        onReturnToNormal={() => setGridMode('normal')}
-        onPageChange={(p, query) => {
-          const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;
-          loadVideos(p, query, ids);
-        }}
+        onPlay={playVideo}
+        onToggleFavorite={toggleVideoFavorite}
+        onReturnToNormal={returnToNormalGrid}
+        onPageChange={handlePageChange}
       />
     </div>
   );

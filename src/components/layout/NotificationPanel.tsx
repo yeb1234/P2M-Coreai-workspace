@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Bell, CheckCheck, Trash2, Timer, ListTodo, Info, X, GripHorizontal } from 'lucide-react';
 import { useNotificationStore } from '../../stores';
 import type { Notification, NotificationType } from '../../stores/notificationStore';
+import { clampPanelPosition, getPanelOpenPosition } from './notificationPanelPosition';
+import { formatNotificationTimeAgo } from './notificationTime';
 
 const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
   pomodoro: <Timer size={14} className="text-[#16a34a]" />,
@@ -15,16 +17,6 @@ const TYPE_BG: Record<NotificationType, string> = {
   todo: 'bg-[#eff6ff]',
   system: 'bg-[#f3f2ef]',
 };
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return `${mins}分钟前`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}小时前`;
-  return new Date(iso).toLocaleDateString('zh-CN');
-}
 
 interface NotificationPanelProps {
   isOpen: boolean;
@@ -47,11 +39,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
       queueMicrotask(() => {
         const main = document.querySelector('main');
         const rect = main?.getBoundingClientRect();
-        const rightEdge = rect ? rect.right : window.innerWidth - 60;
-        setPosition({
-          x: Math.max(16, rightEdge - 400),
-          y: 64,
-        });
+        setPosition(getPanelOpenPosition(rect, window.innerWidth));
       });
     }
   }, [isOpen]);
@@ -81,13 +69,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
     const handleMouseMove = (e: MouseEvent) => {
       const newX = e.clientX - dragOffset.current.x;
       const newY = e.clientY - dragOffset.current.y;
-      // Clamp to viewport
-      const maxX = window.innerWidth - 384; // w-96 = 384px
-      const maxY = window.innerHeight - 100;
-      setPosition({
-        x: Math.max(0, Math.min(newX, maxX)),
-        y: Math.max(0, Math.min(newY, maxY)),
-      });
+      setPosition(clampPanelPosition({ x: newX, y: newY }, window.innerWidth, window.innerHeight));
     };
     const handleMouseUp = () => setIsDragging(false);
     document.addEventListener('mousemove', handleMouseMove);
@@ -177,7 +159,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[#1a1a1a]">{n.title}</p>
                 <p className="text-xs text-[#6b7280] mt-0.5">{n.message}</p>
-                <p className="text-[10px] text-[#b8b4ac] mt-1">{timeAgo(n.createdAt)}</p>
+                <p className="text-[10px] text-[#b8b4ac] mt-1">{formatNotificationTimeAgo(n.createdAt)}</p>
               </div>
               {!n.read && (
                 <div className="w-2 h-2 bg-[#c87d2f] rounded-full flex-shrink-0 mt-2" />

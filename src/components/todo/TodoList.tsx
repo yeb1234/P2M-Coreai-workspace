@@ -11,13 +11,10 @@ import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
 import { playInteractionSound } from '../../lib/sounds';
 
 export const TodoList: React.FC = () => {
-  // Subscribe to raw data so component re-renders on changes
   const todos = useTodoStore((s) => s.todos);
-  useTodoStore((s) => s.todoOrder);
-  useTodoStore((s) => s.filter);
-  useTodoStore((s) => s.trash);
-  const getFilteredTodos = useTodoStore((s) => s.getFilteredTodos);
-  const getTrashedTodos = useTodoStore((s) => s.getTrashedTodos);
+  const todoOrder = useTodoStore((s) => s.todoOrder);
+  const filter = useTodoStore((s) => s.filter);
+  const trash = useTodoStore((s) => s.trash);
   const reorderTodos = useTodoStore((s) => s.reorderTodos);
   const clearAllTodos = useTodoStore((s) => s.clearAllTodos);
   const trashCompletedTodos = useTodoStore((s) => s.trashCompletedTodos);
@@ -43,9 +40,32 @@ export const TodoList: React.FC = () => {
   const trashRef = useRef<HTMLDivElement>(null);
   const [collapsedFilters, setCollapsedFilters] = useState(false);
 
-  // Call getters now that we subscribe to the underlying data
-  const filteredTodos = getFilteredTodos();
-  const trashedTodos = getTrashedTodos();
+  const filteredTodos = useMemo(() => {
+    const query = filter.searchQuery.trim().toLowerCase();
+    const orderIndex = new Map(todoOrder.map((id, index) => [id, index]));
+    const priorityOrder: Record<Todo['priority'], number> = { high: 0, medium: 1, low: 2, green: 3 };
+
+    return Object.values(todos)
+      .filter((todo) => {
+        if (filter.priority && todo.priority !== filter.priority) return false;
+        if (filter.status !== 'all' && todo.status !== filter.status) return false;
+        if (filter.tags.length > 0 && !filter.tags.some((tagId) => todo.tags.includes(tagId))) return false;
+        if (!query) return true;
+        return todo.title.toLowerCase().includes(query) || todo.description.toLowerCase().includes(query);
+      })
+      .sort((a, b) => {
+        if (a.status === 'completed' && b.status !== 'completed') return 1;
+        if (a.status !== 'completed' && b.status === 'completed') return -1;
+        const orderDiff = (orderIndex.get(a.id) ?? Number.POSITIVE_INFINITY) - (orderIndex.get(b.id) ?? Number.POSITIVE_INFINITY);
+        if (orderDiff !== 0) return orderDiff;
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      });
+  }, [filter, todoOrder, todos]);
+
+  const trashedTodos = useMemo(
+    () => Object.values(trash).sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime()),
+    [trash]
+  );
 
   const activeTodos = useMemo(() => filteredTodos.filter((t) => t.status !== 'completed'), [filteredTodos]);
   const completedTodos = useMemo(() => {
@@ -58,7 +78,6 @@ export const TodoList: React.FC = () => {
       });
   }, [filteredTodos]);
 
-  const filter = useTodoStore((s) => s.filter);
   const activeFilterSummary = useMemo(() => {
     const parts: string[] = [];
     if (filter.status && filter.status !== 'all') {

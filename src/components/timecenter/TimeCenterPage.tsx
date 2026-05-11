@@ -7,6 +7,7 @@ import { PageTitle } from '../shared';
 import { useNotificationStore, useTimeCenterStore, useTodoStore } from '../../stores';
 import { playNotificationSound } from '../../lib/sounds';
 import { toLocalDateString } from '../../lib/date';
+import { useClockNow } from '../../hooks/useClockNow';
 
 type TaskType = 'stopwatch' | 'countdown' | 'alarm' | 'reminder' | 'todo';
 
@@ -95,14 +96,15 @@ function CountdownDisplay({
 }
 
 export const TimeCenterPage: React.FC = () => {
-  const [now, setNow] = useState(new Date());
+  const now = useClockNow();
+  const nowMs = now.getTime();
   const [taskType, setTaskType] = useState<TaskType>('countdown');
   const [taskTitle, setTaskTitle] = useState('新的时间任务');
   const [taskMinutes, setTaskMinutes] = useState(5);
   const [taskTime, setTaskTime] = useState('09:00');
   const [taskAt, setTaskAt] = useState(() => toDateTimeInput(new Date(Date.now() + 30 * 60 * 1000)));
   const [stopwatchRunning, setStopwatchRunning] = useState(false);
-  const [stopwatchElapsed, setStopwatchElapsed] = useState(0);
+  const [stopwatchBaseElapsed, setStopwatchBaseElapsed] = useState(0);
   const [zoneLabel, setZoneLabel] = useState('');
   const [zoneValue, setZoneValue] = useState('Asia/Shanghai');
   const stopwatchStartRef = useRef<number | null>(null);
@@ -132,20 +134,9 @@ export const TimeCenterPage: React.FC = () => {
   const addTodo = useTodoStore((s) => s.addTodo);
   const addNotification = useNotificationStore((s) => s.addNotification);
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (stopwatchRunning && stopwatchStartRef.current != null) {
-        setStopwatchElapsed(Math.floor((Date.now() - stopwatchStartRef.current) / 1000));
-      }
-
-    }, 250);
-    return () => clearInterval(timer);
-  }, [stopwatchRunning]);
+  const stopwatchElapsed = stopwatchRunning && stopwatchStartRef.current != null
+    ? Math.max(0, Math.floor((nowMs - stopwatchStartRef.current) / 1000))
+    : stopwatchBaseElapsed;
 
   useEffect(() => {
     const today = now.toISOString().slice(0, 10);
@@ -216,12 +207,19 @@ export const TimeCenterPage: React.FC = () => {
   }, [alarms, countdownEndById, countdownPresets, reminders, stopwatchElapsed, stopwatchRunning, todos]);
 
   const startStopwatch = () => {
-    stopwatchStartRef.current = Date.now() - stopwatchElapsed * 1000;
+    stopwatchStartRef.current = Date.now() - stopwatchBaseElapsed * 1000;
     setStopwatchRunning(true);
+  };
+  const pauseStopwatch = () => {
+    if (stopwatchStartRef.current != null) {
+      setStopwatchBaseElapsed(Math.max(0, Math.floor((Date.now() - stopwatchStartRef.current) / 1000)));
+    }
+    stopwatchStartRef.current = null;
+    setStopwatchRunning(false);
   };
   const resetStopwatch = () => {
     stopwatchStartRef.current = null;
-    setStopwatchElapsed(0);
+    setStopwatchBaseElapsed(0);
     setStopwatchRunning(false);
   };
   const startCountdown = (id: string, seconds: number) => {
@@ -313,7 +311,7 @@ export const TimeCenterPage: React.FC = () => {
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-4">
               {worldClocks.map((clock) => (
-                <div key={clock.id} className="group flex items-center justify-between gap-2 rounded-lg bg-[var(--bg-elevated)] px-3 py-2">
+                <div key={clock.id} className="group relative flex items-center justify-between gap-2 rounded-lg bg-[var(--bg-elevated)] px-3 py-2">
                   <div className="min-w-0 flex-1">
                     {clock.id === 'local' ? (
                       <>
@@ -350,7 +348,7 @@ export const TimeCenterPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => removeWorldClock(clock.id)}
-                        className="rounded p-1 text-[var(--text-muted)] opacity-0 transition hover:bg-[var(--bg-card)] hover:text-[var(--danger)] group-hover:opacity-100"
+                        className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded text-[var(--text-muted)] opacity-0 transition hover:bg-[var(--bg-card)] hover:text-[var(--danger)] group-hover:opacity-100"
                         title="删除时区"
                       >
                         <X size={12} />
@@ -429,7 +427,7 @@ export const TimeCenterPage: React.FC = () => {
                     <div className="flex justify-end gap-1">
                       {row.type === 'stopwatch' && (
                         <>
-                          <button onClick={stopwatchRunning ? () => setStopwatchRunning(false) : startStopwatch} className="rounded-md bg-[var(--accent)] px-2 py-1 text-white">{stopwatchRunning ? <Pause size={13} /> : <Play size={13} />}</button>
+                          <button onClick={stopwatchRunning ? pauseStopwatch : startStopwatch} className="rounded-md bg-[var(--accent)] px-2 py-1 text-white">{stopwatchRunning ? <Pause size={13} /> : <Play size={13} />}</button>
                           <button onClick={resetStopwatch} className="rounded-md bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)]"><RotateCcw size={13} /></button>
                         </>
                       )}

@@ -8,9 +8,10 @@ import {
   type SegmentSearchResult,
 } from '../../lib/videoApi';
 import { useDragResize } from '../../hooks/useDragResize';
-import { getAssistantPageContext, type AssistantPageContext } from '../../lib/assistantPageContext';
+import { getAssistantPageContext } from '../../lib/assistantPageContext';
 import { buildAIRequestSystemPrompt } from '../../lib/aiPromptDefaults';
 import { playInteractionSound } from '../../lib/sounds';
+import { useAssistantPageContext } from '../../hooks/useAssistantPageContext';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const PENDING_RECOMMENDED_VIDEO_KEY = 'p2m_pending_recommended_video_id';
@@ -61,7 +62,7 @@ export const AIChatPanel: React.FC = () => {
   const [error, setError] = useState('');
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [videoResults, setVideoResults] = useState<SegmentSearchResult[]>([]);
-  const [pageContext, setPageContext] = useState<AssistantPageContext>(() => getAssistantPageContext());
+  const [pageContext, setPageContext] = useAssistantPageContext(chatOpen);
   const [runtimeModelLabel, setRuntimeModelLabel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -77,14 +78,6 @@ export const AIChatPanel: React.FC = () => {
     () => [...new Map(videoResults.filter((item) => item.score_hint > 0).map((item) => [item.video_id, item])).values()].slice(0, 5),
     [videoResults]
   );
-
-  useEffect(() => {
-    if (!chatOpen) return;
-    const refreshContext = () => setPageContext(getAssistantPageContext());
-    refreshContext();
-    const timer = window.setInterval(refreshContext, 1500);
-    return () => window.clearInterval(timer);
-  }, [chatOpen]);
 
   useEffect(() => {
     if (!chatOpen) return;

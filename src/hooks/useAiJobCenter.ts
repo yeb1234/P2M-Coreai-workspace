@@ -349,13 +349,37 @@ export function useAiJobCenter(
   useEffect(() => {
     const hasActiveAiJobs = (aiJobs?.running ?? 0) + (aiJobs?.queued ?? 0) > 0;
     if (!hasActiveAiJobs) return;
-    const timer = window.setInterval(() => {
+    let timer: number | null = null;
+
+    const clearTimer = () => {
+      if (timer) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    const schedule = () => {
+      clearTimer();
+      const delay = document.visibilityState === 'visible' ? 3000 : 10000;
+      timer = window.setTimeout(tick, delay);
+    };
+
+    const tick = () => {
       void loadAiJobs();
-      if (currentVideoId) {
+      if (currentVideoId && document.visibilityState === 'visible') {
         void loadCurrentVideo(currentVideoId);
       }
-    }, 2000);
-    return () => window.clearInterval(timer);
+      schedule();
+    };
+
+    const handleVisibilityChange = () => schedule();
+
+    schedule();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearTimer();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [aiJobs?.queued, aiJobs?.running, currentVideoId, loadAiJobs, loadCurrentVideo]);
 
   // Status chips are filters, so the visible list should update immediately when they change.

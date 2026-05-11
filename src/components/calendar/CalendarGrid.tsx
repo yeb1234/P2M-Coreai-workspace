@@ -1,10 +1,18 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { X, CheckCircle2, ListTodo } from 'lucide-react';
 import { useCalendarStore, useTodoStore } from '../../stores';
-import { getMonthDays, getWeekDayNames, isCurrentMonth, toISODateString, toLocalDateString } from '../../lib/date';
+import { getMonthDays, getWeekDayNames, isCurrentMonth, toISODateString } from '../../lib/date';
 import { DayCell } from './DayCell';
 import { WeekView } from './WeekView';
-import type { CalendarEvent, ISODateString, Todo } from '../../types';
+import type { ISODateString } from '../../types';
+import {
+  createCompletedTodoLookup,
+  getEventsForCalendarMonth,
+  getPomodoroHeatMapForMonth,
+  groupCalendarEventsByDate,
+  groupTodosByCalendarDate,
+} from './calendarDerivedData';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 interface CalendarGridProps {
   onDayDoubleClick?: (date: ISODateString) => void;
@@ -16,83 +24,47 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) 
   const currentView = useCalendarStore((s) => s.currentView);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
-  const getEventsForMonth = useCalendarStore((s) => s.getEventsForMonth);
-  const getPomodoroHeatMap = useCalendarStore((s) => s.getPomodoroHeatMap);
+  const calendarEvents = useCalendarStore((s) => s.events);
   const todos = useTodoStore((s) => s.todos);
+  const isMobile = useIsMobile();
 
-  // Hooks must be called BEFORE any early returns (Rules of Hooks)
-  const completedTodoSet = useMemo(() => {
-    const completed = Object.values(todos).filter((t) => t.status === 'completed');
-    return {
-      ids: new Set(completed.map((t) => t.id)),
-      titles: new Set(completed.map((t) => t.title)),
-    };
-  }, [todos]);
+  const completedTodoLookup = useMemo(() => createCompletedTodoLookup(todos), [todos]);
+  const { pendingByDate: pendingTodosByDate, completedByDate: completedTodosByDate } = useMemo(
+    () => groupTodosByCalendarDate(todos),
+    [todos],
+  );
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
 
-  const rawEvents = getEventsForMonth(year, month);
+  const rawEvents = useMemo(
+    () => getEventsForCalendarMonth(calendarEvents, year, month),
+    [calendarEvents, year, month],
+  );
 
-  const eventsByDate = useMemo(() => {
-    const map: Record<string, CalendarEvent[]> = {};
-    rawEvents.forEach((event) => {
-      if (event.type === 'pomodoro') return;
-      if (event.type === 'todo') {
-        if (event.todoId && completedTodoSet.ids.has(event.todoId)) return;
-        if (!event.todoId && completedTodoSet.titles.has(event.title)) return;
-      }
-      if (!map[event.date]) map[event.date] = [];
-      map[event.date].push(event);
-    });
-    return map;
-  }, [rawEvents, completedTodoSet]);
-
-  const completedTodosByDate = useMemo(() => {
-    const byDate: Record<string, Todo[]> = {};
-    Object.values(todos).forEach((todo) => {
-      if (todo.status !== 'completed') return;
-      const date = todo.dueDate ?? (todo.completedAt ? toLocalDateString(todo.completedAt) : null);
-      if (!date) return;
-      if (!byDate[date]) byDate[date] = [];
-      byDate[date].push(todo);
-    });
-    Object.values(byDate).forEach((items) => {
-      items.sort((a, b) => {
-        const aTime = new Date(a.completedAt ?? a.updatedAt ?? a.createdAt).getTime();
-        const bTime = new Date(b.completedAt ?? b.updatedAt ?? b.createdAt).getTime();
-        return bTime - aTime;
-      });
-    });
-    return byDate;
-  }, [todos]);
-
-  const pendingTodosByDate = useMemo(() => {
-    const byDate: Record<string, Todo[]> = {};
-    Object.values(todos).forEach((todo) => {
-      if (todo.status === 'completed' || !todo.dueDate) return;
-      if (!byDate[todo.dueDate]) byDate[todo.dueDate] = [];
-      byDate[todo.dueDate].push(todo);
-    });
-    return byDate;
-  }, [todos]);
+  const eventsByDate = useMemo(
+    () => groupCalendarEventsByDate(rawEvents, completedTodoLookup),
+    [rawEvents, completedTodoLookup],
+  );
+  const days = useMemo(() => getMonthDays(currentMonth), [currentMonth]);
+  const weekDays = useMemo(() => getWeekDayNames(), []);
+  const heatMap = useMemo(
+    () => getPomodoroHeatMapForMonth(calendarEvents, year, month),
+    [calendarEvents, year, month],
+  );
 
   const handleEventClick = useCallback(() => {}, []);
 
   const [popupDate, setPopupDate] = useState<ISODateString | null>(null);
   const handleDaySelect = useCallback((dateStr: ISODateString) => {
     setSelectedDate(dateStr);
-    if (window.innerWidth < 768) setPopupDate(dateStr);
-  }, [setSelectedDate]);
+    if (isMobile) setPopupDate(dateStr);
+  }, [isMobile, setSelectedDate]);
 
   // Now safe to branch
   if (currentView === 'week') {
     return <WeekView />;
   }
-
-  const days = getMonthDays(currentMonth);
-  const weekDays = getWeekDayNames();
-  const heatMap = getPomodoroHeatMap(year, month);
 
   return (
     <div>

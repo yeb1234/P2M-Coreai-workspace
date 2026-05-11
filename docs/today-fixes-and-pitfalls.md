@@ -570,3 +570,40 @@ python -m compileall backend/app
 - 默认 e2e 走 mock API，保证截图稳定。
 - 真实后端联调应该另开 smoke 测试，并通过环境变量提供账号，不写入测试源码。
 - 具体视频页测试优先断言布局关键区域，例如播放器、AI 总结、AI 任务中心、无横向溢出；本地媒体文件是否能播放不要作为布局测试前置条件。
+
+## 2.5 性能和结构收尾
+
+现象：
+
+- 多个页面各自监听 `matchMedia` 或读取 `window.innerWidth`，窗口变化逻辑分散。
+- 日历月视图、周视图、详情弹层重复做事件过滤和待办分组。
+- 视频播放器页面仍然把进度拖动、触摸拖动、悬停预览、媒体加载和错误处理堆在 JSX 附近。
+- 灵境小助手为了刷新当前页面上下文，每 1.5 秒固定扫一次状态。
+- Todo 到日历同步逻辑直接写在跨模块 effect 里，后续查重复事件或串数据会很难。
+- 播放列表没有真实总时长时，用 `watch_progress + 60` 凑进度比例，视觉上像真实进度但不准确。
+
+处理：
+
+- 新增 `useMediaQuery`、`useIsMobile`、`useWindowWidth`，把媒体查询监听集中到一个 hook。
+- 新增 `calendarDerivedData.ts`，集中处理日历事件过滤、待办按日期分组、番茄热力和周/月事件选择。
+- 新增 `notificationPanelPosition.ts` 和 `notificationTime.ts`，通知面板定位和时间文案都变成可测纯逻辑。
+- 新增 `useVideoProgressScrubber`，统一视频进度条鼠标、触摸、拖动和悬停预览计算。
+- 新增 `useVideoElementEvents`，统一视频加载、播放错误、音量同步和续播逻辑。
+- 新增 `getWatchProgressPercent` 和 `formatWatchProgress`，视频列表只在有真实总时长时显示真实进度。
+- 新增 `useAssistantPageContext`，灵境小助手上下文改为订阅页面、视频、笔记变化。
+- 新增 `todoCalendarSyncPlan.ts`，Todo 到日历同步先生成 add/update/delete 计划，再执行 store 写入。
+- 补充 `notificationPanelPosition`、`notificationTime`、`videoFormat`、`todoCalendarSyncPlan` 单元测试。
+- 扩展 `regressionContracts.test.ts`，锁住懒加载、共享时钟、媒体查询、通知定位、视频进度、AI 上下文、Todo 日历同步这些结构边界。
+
+维护原则：
+
+- 只有真正需要时间推进的功能才使用固定 tick，例如正在运行的番茄钟。
+- 页面上下文、列表过滤、日历同步、通知定位这类逻辑优先做成状态驱动或纯函数。
+- 如果 UI 里出现“看起来能用但数据不完整”的展示，比如没有总时长却画进度条，应宁可不展示，也不要显示猜测值。
+- 每次拆大组件后至少跑 `npm test`、`npm run build`；影响布局时再跑 Playwright 对应场景。
+
+本轮验证：
+
+- `npm test`：16 个测试文件，90 个测试通过。
+- `npm run build`：通过。
+- `npx playwright test tests/e2e/layout.spec.ts --project=chromium-desktop`：15 个通过，1 个移动端用例在桌面项目中跳过。

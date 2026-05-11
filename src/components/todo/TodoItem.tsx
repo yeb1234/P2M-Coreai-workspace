@@ -41,8 +41,9 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
   const linkToTodo = usePomodoroStore((s) => s.linkToTodo);
   const resetTimer = usePomodoroStore((s) => s.resetTimer);
   const config = usePomodoroStore((s) => s.config);
-  const timer = usePomodoroStore((s) => s.timer);
-  const todos = useTodoStore((s) => s.todos);
+  const timerStatus = usePomodoroStore((s) => s.timer.status);
+  const linkedTodoId = usePomodoroStore((s) => s.timer.linkedTodoId);
+  const linkedTodoTitle = useTodoStore((s) => linkedTodoId ? s.todos[linkedTodoId]?.title : undefined);
 
 
   useEffect(() => {
@@ -102,8 +103,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
   }, [todo.id, todo.status, linkToTodo, startTimer, updateTodo]);
 
   const handleStartPomodoro = useCallback(() => {
-    const isRunning = timer.status === 'running';
-    const linkedTodoId = timer.linkedTodoId;
+    const isRunning = timerStatus === 'running';
     const isRunningOnDifferentTodo = isRunning && linkedTodoId && linkedTodoId !== todo.id;
 
     if (isRunningOnDifferentTodo) {
@@ -113,7 +113,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
     } else {
       doStartPomodoro();
     }
-  }, [todo.pomodoroCount, todo.id, timer.status, timer.linkedTodoId, doStartPomodoro]);
+  }, [todo.pomodoroCount, todo.id, timerStatus, linkedTodoId, doStartPomodoro]);
 
   const handleConfirmReset = useCallback(() => {
     resetTimer();
@@ -329,7 +329,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
         onClose={() => setShowOverrideConfirm(false)}
         onConfirm={handleConfirmOverride}
         title="替换当前番茄钟"
-        message={`当前正在「${timer.linkedTodoId ? todos[timer.linkedTodoId]?.title || '其他待办' : '未关联待办'}」上专注，确认替换为「${todo.title}」？`}
+        message={`当前正在「${linkedTodoId ? linkedTodoTitle || '其他待办' : '未关联待办'}」上专注，确认替换为「${todo.title}」？`}
         confirmText="替换并开始"
         variant="warning"
       />

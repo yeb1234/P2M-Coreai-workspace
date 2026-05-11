@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, RotateCcw, Eye, RefreshCw, X, GripVertical } from 'lucide-react';
 import { useUIStore, usePomodoroStore } from '../../stores';
-import { PAGE_MAP } from '../../config/pageRegistry';
+import { PAGE_MAP, preloadPage } from '../../config/pageRegistry';
 import type { ActiveView } from '../../stores/uiStore';
 import { useDragResize } from '../../hooks/useDragResize';
 
@@ -157,6 +157,8 @@ export const Sidebar: React.FC = () => {
                 onDrop={(e) => handleDrop(e, id)}
                 onDragEnd={handleDragEnd}
                 onClick={() => handleClick(id)}
+                onMouseEnter={() => preloadPage(id)}
+                onFocus={() => preloadPage(id)}
                 className={`group w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all cursor-pointer select-none ${
                   isDragging ? 'opacity-30' : ''
                 } ${isDropTarget ? 'ring-2 ring-[var(--accent)] ring-offset-1' : ''} ${
