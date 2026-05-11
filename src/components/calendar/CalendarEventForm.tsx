@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCalendarStore, useTodoStore } from '../../stores';
+import { playInteractionSound } from '../../lib/sounds';
 
 interface CalendarEventFormProps {
   date: string;
@@ -40,6 +41,7 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
       });
     }
 
+    playInteractionSound('success');
     onClose();
   };
 

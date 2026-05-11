@@ -25,7 +25,7 @@ export const InterviewPage: React.FC = () => {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="auto-grid-compact">
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
           <BookOpen size={20} className="text-[#2563eb] mx-auto mb-2" />
           <p className="text-xl font-bold text-[#1a1a1a]">156</p>

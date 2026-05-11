@@ -138,7 +138,9 @@ def search_segments(
     if fts_rows:
         for row in fts_rows:
             text_lower = (row.text or "").lower()
-            score_hint = sum(1 for keyword in keywords if keyword in text_lower) or 0.5
+            score_hint = sum(1 for keyword in keywords if keyword in text_lower)
+            if score_hint <= 0:
+                continue
             results.append(
                 SegmentSearchResult(
                     video_id=row.video_id,
@@ -152,7 +154,8 @@ def search_segments(
                 )
             )
         results.sort(key=lambda item: item.score_hint, reverse=True)
-        return results[:limit]
+        if results:
+            return results[:limit]
 
     filters = [SubtitleSegment.text.contains(keyword) for keyword in keywords]
     rows = (
@@ -275,7 +278,7 @@ def get_continue_video(db: Session = Depends(get_db)):
 
 @router.get("/history/recent", response_model=list[VideoOut])
 def get_recent_history(
-    limit: int = Query(8, ge=1, le=30),
+    limit: int = Query(8, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     latest_rows = (
@@ -420,9 +423,16 @@ def get_thumbnail(video_id: int, db: Session = Depends(get_db)):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    if not video.thumbnail or not Path(video.thumbnail).exists():
-        raise HTTPException(status_code=404, detail="Thumbnail not found")
-    return FileResponse(video.thumbnail, media_type="image/jpeg")
+    if video.thumbnail and Path(video.thumbnail).exists():
+        return FileResponse(video.thumbnail, media_type="image/jpeg")
+    # Clear stale path from DB so frontend can detect missing thumbnail
+    if video.thumbnail:
+        video.thumbnail = None
+        db.commit()
+    placeholder = Path(__file__).parent.parent / "static" / "placeholder.png"
+    if placeholder.exists():
+        return FileResponse(str(placeholder), media_type="image/png")
+    raise HTTPException(status_code=404, detail="Thumbnail not found")
 
 
 @router.post("/history")
@@ -487,6 +497,8 @@ def get_playlist(video_id: int, scope: str = "leaf", category_id: int | None = N
     elif video.category_id:
         query = query.filter(Video.category_id == video.category_id)
         query = query.order_by(Video.sort_key.asc().nullslast(), Video.id.asc())
+    else:
+        query = query.filter(Video.id == video.id)
     videos = query.all()
     watch_map = latest_watch_map(db, [item.id for item in videos])
 

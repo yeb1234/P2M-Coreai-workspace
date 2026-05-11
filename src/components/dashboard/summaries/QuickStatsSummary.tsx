@@ -35,11 +35,11 @@ export const QuickStatsSummary: React.FC = () => {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="auto-grid-compact">
       {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)]">
-          <span style={{ color: item.color }}>{item.icon}</span>
-          <div>
+        <div key={item.label} className="flex min-w-0 items-center gap-2 p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)]">
+          <span className="shrink-0" style={{ color: item.color }}>{item.icon}</span>
+          <div className="min-w-0">
             <p className="text-sm font-bold text-[var(--text-primary)]">{item.value}</p>
             <p className="text-[10px] text-[var(--text-muted)]">{item.label}</p>
           </div>

@@ -4,15 +4,9 @@ import json
 from typing import Any
 
 from app.services.llm_client import OpenAICompatibleClient
+from app.services.prompts import SUBTITLE_CORRECTION_SYSTEM
 
-
-SYSTEM_PROMPT = (
-    "/no_thinking\n"
-    "你是字幕校对助手。只修正每条字幕 text 中明显的语音识别错误、错别字、专有名词和大小写。\n"
-    "不要总结，不要扩写，不要翻译，不要合并或拆分字幕，不要改时间。\n"
-    "不要输出思考过程、解释、Markdown 或代码块。只返回严格 JSON 数组，格式为 "
-    "[{\"index\": 0, \"text\": \"修正后的字幕\"}]。"
-)
+SYSTEM_PROMPT = SUBTITLE_CORRECTION_SYSTEM
 
 
 def _extract_json_array(content: str) -> list[Any]:

@@ -4,6 +4,7 @@ import type { Todo, TodoPriority } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
 import { usePomodoroStore, useTodoStore } from '../../stores';
 import { toISODateString } from '../../lib/date';
+import { playInteractionSound } from '../../lib/sounds';
 
 const PRIORITY_SHORTCUTS: Record<string, TodoPriority> = {
   '/g': 'green',
@@ -147,8 +148,13 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       pomodoroRounds,
     };
 
-    if (todo) updateTodo(todo.id, data);
-    else addTodo(data);
+    if (todo) {
+      updateTodo(todo.id, data);
+      playInteractionSound('save');
+    } else {
+      addTodo(data);
+      playInteractionSound('success');
+    }
     onClose();
   };
 

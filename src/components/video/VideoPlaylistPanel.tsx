@@ -62,12 +62,12 @@ export function VideoPlaylistPanel({
         }}
         title="拖动调整文件夹视频宽度"
       >
-        <div className="h-full w-px bg-[#e5e2dd] group-hover:bg-[#c87d2f]" />
-        <div className="absolute h-12 w-1 rounded-full bg-[#d1cdc6] opacity-70 group-hover:bg-[#c87d2f] group-hover:opacity-100" />
+        <div className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-[color-mix(in_srgb,var(--border-light)_62%,transparent)] to-transparent opacity-55 transition-all group-hover:via-[color-mix(in_srgb,var(--accent)_42%,var(--border-light))] group-hover:opacity-90" />
+        <div className="absolute h-14 w-1.5 rounded-full border border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-card)_72%,var(--border-light))] shadow-sm opacity-85 transition-all group-hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-light))] group-hover:bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-card))] group-hover:opacity-100" />
       </div>
 
       <div className="theme-surface rounded-xl border p-2">
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="auto-grid-compact">
           {!isProcessing ? (
             <>
               <button
@@ -81,7 +81,7 @@ export function VideoPlaylistPanel({
               <button
                 onClick={onCorrectSubtitles}
                 className="flex min-w-0 items-center justify-center gap-1 rounded-lg border border-[#c87d2f] bg-white px-2 py-1.5 text-xs font-medium text-[#a95f17] transition-colors hover:bg-[#fff7ed]"
-                title="使用 large-v3 重新生成并交给本地 AI 校对。"
+                title="使用 large-v3 重新生成并交给灵境小助手校对。"
               >
                 <CheckCircle2 size={13} className="shrink-0" />
                 <span className="truncate">校对字幕</span>

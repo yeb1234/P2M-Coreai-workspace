@@ -7,12 +7,14 @@ interface UseDragResizeOptions {
   /** 'left' = resize from left edge (panel on right side), 'right' = resize from right edge (panel on left side) */
   side: 'left' | 'right';
   onWidthChange?: (width: number) => void;
+  onResizeEnd?: (width: number) => void;
 }
 
-export function useDragResize({ initialWidth, minWidth, maxWidth, side, onWidthChange }: UseDragResizeOptions) {
+export function useDragResize({ initialWidth, minWidth, maxWidth, side, onWidthChange, onResizeEnd }: UseDragResizeOptions) {
   const dragRef = useRef({ active: false, startX: 0, startWidth: initialWidth });
   const frameRef = useRef<number | null>(null);
   const liveRef = useRef(initialWidth);
+  const rawLiveRef = useRef(initialWidth);
   const [width, setWidth] = useState(initialWidth);
 
   useEffect(() => {
@@ -36,7 +38,8 @@ export function useDragResize({ initialWidth, minWidth, maxWidth, side, onWidthC
       const delta = side === 'left'
         ? dragRef.current.startX - clientX
         : clientX - dragRef.current.startX;
-      liveRef.current = Math.max(minWidth, Math.min(maxWidth, Math.round(dragRef.current.startWidth + delta)));
+      rawLiveRef.current = Math.round(dragRef.current.startWidth + delta);
+      liveRef.current = Math.max(minWidth, Math.min(maxWidth, rawLiveRef.current));
       if (frameRef.current === null) {
         frameRef.current = window.requestAnimationFrame(() => {
           frameRef.current = null;
@@ -54,6 +57,7 @@ export function useDragResize({ initialWidth, minWidth, maxWidth, side, onWidthC
       }
       setWidth(liveRef.current);
       onWidthChange?.(liveRef.current);
+      onResizeEnd?.(rawLiveRef.current);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
@@ -70,7 +74,7 @@ export function useDragResize({ initialWidth, minWidth, maxWidth, side, onWidthC
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [minWidth, maxWidth, side, onWidthChange]);
+  }, [minWidth, maxWidth, side, onWidthChange, onResizeEnd]);
 
   return { width, startResize };
 }

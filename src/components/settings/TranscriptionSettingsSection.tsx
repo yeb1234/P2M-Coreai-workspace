@@ -4,6 +4,7 @@ import { useTranscriptionStore, WHISPER_MODELS, DEFAULT_TRANSCRIPTION_SETTINGS, 
 import { clearActiveAiJobs, fetchBackendHealth, fetchTranscriptionSettings, fetchWhisperModels, saveTranscriptionSettings, type WhisperModelsOut } from '../../lib/videoApi';
 import type { TranscriptionDraft, NumberDrafts } from './types';
 import { transcriptionFormToDto, transcriptionDtoToForm, TRANSCRIPTION_PARAM_HELP } from './types';
+import { playInteractionSound } from '../../lib/sounds';
 
 export function TranscriptionSettings() {
   const settings = useTranscriptionStore();
@@ -30,6 +31,7 @@ export function TranscriptionSettings() {
     subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
     subtitleCorrectionScope: settings.subtitleCorrectionScope,
     subtitleCorrectionPrompt: settings.subtitleCorrectionPrompt,
+    llmUsagePolicy: settings.llmUsagePolicy,
   });
   const [drafts, setDrafts] = useState<NumberDrafts>({
     wordLimit: String(settings.wordLimit),
@@ -58,6 +60,7 @@ export function TranscriptionSettings() {
         subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
         subtitleCorrectionScope: settings.subtitleCorrectionScope,
         subtitleCorrectionPrompt: settings.subtitleCorrectionPrompt,
+        llmUsagePolicy: settings.llmUsagePolicy,
       });
       setDrafts({
         wordLimit: String(settings.wordLimit),
@@ -67,7 +70,7 @@ export function TranscriptionSettings() {
         temperature: String(settings.temperature),
       });
     });
-  }, [settings.whisperEngine, settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled, settings.subtitleCorrectionScope, settings.subtitleCorrectionPrompt]);
+  }, [settings.whisperEngine, settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled, settings.subtitleCorrectionScope, settings.subtitleCorrectionPrompt, settings.llmUsagePolicy]);
 
   const updateForm = (updates: Partial<TranscriptionDraft>) => {
     setForm((current) => ({ ...current, ...updates }));
@@ -84,10 +87,12 @@ export function TranscriptionSettings() {
       setForm(normalized);
       syncNumberDrafts(normalized);
       setSaved(true);
+      playInteractionSound('save');
       setFieldHint('转写设置已保存到本机数据库，后续新任务会使用这些参数。');
       setTimeout(() => setSaved(false), 1500);
     } catch (err) {
       updateSettings(next);
+      playInteractionSound('error');
       setFieldHint(err instanceof Error ? `后端保存失败，已保存到浏览器：${err.message}` : '后端保存失败，已保存到浏览器。');
     } finally {
       setSavingSettings(false);
@@ -176,8 +181,10 @@ export function TranscriptionSettings() {
     setClearMsg('');
     try {
       const result = await clearActiveAiJobs();
+      playInteractionSound('delete');
       setClearMsg(`已清理 ${result.cleared} 个任务`);
     } catch (err) {
+      playInteractionSound('error');
       setClearMsg(err instanceof Error ? err.message : '清理失败');
     } finally {
       setClearingJobs(false);
@@ -192,7 +199,9 @@ export function TranscriptionSettings() {
         ['ffmpeg', 'whisper.cpp 可执行文件', 'whisper.cpp 模型', 'LM Studio / OpenAI 兼容接口', 'Ollama', '转写默认配置'].includes(c.name)
       );
       setEnvChecks(relevant);
+      playInteractionSound(health.ok ? 'success' : 'error');
     } catch (err) {
+      playInteractionSound('error');
       setEnvChecks([{ name: '检测失败', ok: false, message: err instanceof Error ? err.message : '未知错误' }]);
     } finally {
       setEnvLoading(false);
@@ -208,7 +217,7 @@ export function TranscriptionSettings() {
             <p className="mt-0.5 text-[11px] text-[#8a8178]">先选预设，再按需微调参数，最后点保存转写设置。</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="auto-grid-panels">
           <button
             onClick={() => applyPreset(
               {
@@ -304,8 +313,8 @@ export function TranscriptionSettings() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="auto-grid-wide items-start">
+        <div className="auto-grid-panels">
           <div>
             <label className="block text-xs font-medium text-[#6b7280] mb-1.5">识别语言</label>
             <input
@@ -410,7 +419,7 @@ export function TranscriptionSettings() {
           <div className="flex items-center justify-between py-2 sm:col-span-2">
             <div>
               <p className="text-sm font-medium text-[#1a1a1a]">字幕校对</p>
-              <p className="text-xs text-[#9ca3af]">字幕生成后整份交给本地 AI 校对，不改时间轴。</p>
+              <p className="text-xs text-[#9ca3af]">字幕生成后整份交给 AI 校对，不改时间轴。</p>
             </div>
             <button
               onClick={() => updateForm({
@@ -421,6 +430,32 @@ export function TranscriptionSettings() {
             >
               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.subtitleCorrectionEnabled ? 'left-[22px]' : 'left-0.5'}`} />
             </button>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-[#6b7280] mb-1.5">LLM 使用策略</label>
+            <div className="auto-grid-compact">
+              {[
+                { value: 'local_first', label: '先本地', desc: '本地失败再用外部' },
+                { value: 'external_first', label: '先外部', desc: '外部失败再用本地' },
+                { value: 'local_only', label: '只本地', desc: '不访问外部接口' },
+                { value: 'external_only', label: '只外部', desc: '不尝试本地模型' },
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => updateForm({ llmUsagePolicy: item.value as TranscriptionDraft['llmUsagePolicy'] })}
+                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                    form.llmUsagePolicy === item.value
+                      ? 'border-[#c87d2f] bg-[#fff7ed] text-[#9a5a1e]'
+                      : 'border-[#e5e2dd] bg-white text-[#5f5a52] hover:border-[#c87d2f]/50'
+                  }`}
+                >
+                  <p className="text-sm font-medium">{item.label}</p>
+                  <p className="mt-1 text-[10px] leading-4">{item.desc}</p>
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] text-[#9ca3af]">影响新的视频总结、字幕校对和右侧灵境小助手。保存后生效。</p>
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-[#6b7280] mb-1.5">字幕校对提示词模板</label>
@@ -486,7 +521,7 @@ export function TranscriptionSettings() {
         {clearMsg && <span className="text-xs text-[#6b7280]">{clearMsg}</span>}
       </div>
       {envChecks && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="auto-grid-compact">
           {envChecks.map((check) => (
             <div key={check.name} className="flex items-start gap-2 rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-2">
               {check.ok ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[#16a34a]" /> : <XCircle size={14} className="mt-0.5 shrink-0 text-[#dc3545]" />}

@@ -30,7 +30,7 @@ export const AppLayout: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen" data-font-size={fontSize} data-compact={compactMode ? 'true' : 'false'}>
-      <div className="flex-1 m-3 md:m-5 wood-texture rounded-xl p-3 md:p-4 overflow-hidden flex flex-col">
+      <div className="flex-1 m-1 md:m-2 wood-texture rounded-lg p-1 md:p-2 overflow-hidden flex flex-col">
         <div className="flex-1 paper-surface flex flex-col overflow-hidden">
           <Header />
           <div className="flex flex-1 overflow-hidden">

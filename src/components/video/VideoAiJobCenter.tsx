@@ -21,6 +21,7 @@ interface VideoAiJobCenterProps {
   loading: boolean;
   selectedStatus: string | null;
   batchCount?: number;
+  batchScope?: 'leaf' | 'descendants';
   batchLoading?: boolean;
   batchProgress?: { completed: number; running: number; queued: number; failed: number; total: number };
   batchMode?: AiJobBatchMode;
@@ -220,6 +221,7 @@ export function VideoAiJobCenter({
   loading,
   selectedStatus,
   batchCount = 0,
+  batchScope = 'leaf',
   batchLoading = false,
   batchProgress,
   batchMode = 'unfinished',
@@ -250,6 +252,7 @@ export function VideoAiJobCenter({
 
   const items = jobs?.items ?? [];
   const previewEnqueueCount = batchPreview ? Math.min(batchPreview.eligible, batchPreview.max_enqueue) : batchLimit;
+  const batchScopeLabel = batchScope === 'descendants' ? '全部视频范围' : '当前文件夹';
   const totalActive = (jobs?.running ?? 0) + (jobs?.queued ?? 0);
   const hasQueuedOrRunningJobs = totalActive > 0;
   const canToggleQueue = queuePaused || hasQueuedOrRunningJobs;
@@ -268,11 +271,11 @@ export function VideoAiJobCenter({
 
   return (
     <div className="theme-surface min-w-0 overflow-hidden rounded-xl border px-4 py-3">
-      <div className="flex min-w-0 items-start gap-2">
+      <div className={`flex min-w-0 gap-2 ${collapsed ? 'items-center' : 'items-start'}`}>
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
-          className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]"
           title={collapsed ? '展开 AI 任务中心' : '收起 AI 任务中心'}
           aria-label={collapsed ? '展开 AI 任务中心' : '收起 AI 任务中心'}
         >
@@ -280,9 +283,9 @@ export function VideoAiJobCenter({
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">AI 任务中心</h3>
-            <span className="text-[11px] text-[var(--text-muted)]">
+          <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <h3 className="shrink-0 text-sm font-semibold leading-5 text-[var(--text-primary)]">AI 任务中心</h3>
+            <span className="text-[11px] leading-5 text-[var(--text-muted)]">
               {totalActive > 0 ? `${jobs?.running ?? 0} 运行 / ${jobs?.queued ?? 0} 排队` : '队列空闲'}
             </span>
             {queuePaused && (
@@ -324,9 +327,9 @@ export function VideoAiJobCenter({
           <div className="min-w-0 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] p-3">
             <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-xs font-medium text-[var(--text-primary)]">批处理当前文件夹</p>
+                <p className="truncate text-xs font-medium text-[var(--text-primary)]">批处理{batchScopeLabel}</p>
                 <p className="truncate text-[11px] text-[var(--text-muted)]">
-                  当前列表 {batchCount} 个视频，预计新增 {previewEnqueueCount} 个任务
+                  {batchScopeLabel} {batchCount} 个视频，预计新增 {previewEnqueueCount} 个任务
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -351,7 +354,7 @@ export function VideoAiJobCenter({
               </div>
             </div>
 
-            <div className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-2">
+            <div className="auto-grid-compact">
               {BATCH_MODES.map((mode) => (
                 <button
                   key={mode.value}

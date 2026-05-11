@@ -25,7 +25,7 @@ export const ShopPage: React.FC = () => {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="auto-grid-cards">
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#16a34a] mb-2">
             <DollarSign size={16} />

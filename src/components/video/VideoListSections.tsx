@@ -71,7 +71,9 @@ interface VideoNavigationCardsProps {
   latestVideos: VideoItem[];
   latestFallback: boolean;
   gridMode: VideoGridMode;
+  historySort: HistorySortMode;
   onGridModeChange: (mode: VideoGridMode) => void;
+  onHistorySortChange: (mode: HistorySortMode) => void;
   onPlay: (videoId: number) => void;
 }
 
@@ -81,11 +83,12 @@ export function VideoNavigationCards({
   latestVideos,
   latestFallback,
   gridMode,
+  historySort,
   onGridModeChange,
+  onHistorySortChange,
   onPlay,
 }: VideoNavigationCardsProps) {
-  const toggleMode = (mode: VideoGridMode) => onGridModeChange(gridMode === mode ? 'normal' : mode);
-  const [historySort, setHistorySort] = useState<HistorySortMode>('newest');
+  const showMode = (mode: VideoGridMode) => onGridModeChange(mode);
 
   return (
     <div className="space-y-2">
@@ -95,7 +98,7 @@ export function VideoNavigationCards({
           <span className="text-[10px] text-[#9ca3af]">继续观看、历史记录与推荐</span>
         </div>
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr_1fr_0.9fr] gap-2">
+      <div className="auto-grid-video">
         <button
           onClick={() => { if (continueVideo) onPlay(continueVideo.id); }}
           disabled={!continueVideo}
@@ -131,8 +134,8 @@ export function VideoNavigationCards({
           active={gridMode === 'history'}
           emptyText="暂无历史记录"
           sortMode={historySort}
-          onSortChange={setHistorySort}
-          onToggle={() => toggleMode('history')}
+          onSortChange={onHistorySortChange}
+          onShow={() => showMode('history')}
           onPlay={onPlay}
           meta={(video) => video.completed ? '已看完' : `${formatVideoDuration(video.watch_progress)} / ${formatVideoDuration(video.duration)}`}
         />
@@ -143,7 +146,7 @@ export function VideoNavigationCards({
           active={gridMode === 'latest'}
           emptyText={latestFallback ? '暂无当前列表视频' : '暂无最新视频'}
           footnote={latestFallback && latestVideos.length > 0 ? '后端重启后会按最新入库排序。' : undefined}
-          onToggle={() => toggleMode('latest')}
+          onShow={() => showMode('latest')}
           onPlay={onPlay}
           meta={(video) => video.category_path || '全部视频'}
         />
@@ -151,13 +154,13 @@ export function VideoNavigationCards({
         <div className="min-w-0 rounded-xl border border-dashed border-[#e5e2dd] bg-[#faf9f7] p-3">
           <div className="mb-2 flex items-center gap-2">
             <Sparkles size={14} className="text-[#c87d2f]" />
-            <span className="text-xs font-semibold text-[#1a1a1a]">AI 推荐</span>
+            <span className="text-xs font-semibold text-[#1a1a1a]">小助手推荐</span>
             <span className="rounded-full bg-[#f3f2ef] px-1.5 py-0.5 text-[9px] text-[#9ca3af]">占位</span>
           </div>
           <div className="rounded-lg bg-[#f3f2ef] px-3 py-4">
             <p className="text-xs font-medium text-[#1a1a1a]">稍后根据观看历史推荐</p>
             <p className="mt-1 text-[10px] leading-4 text-[#9ca3af]">
-              这里预留给本地 AI：可按最近观看、字幕关键词、文件夹上下文推荐下一个视频。
+              这里预留给灵境小助手：可按最近观看、字幕关键词、文件夹上下文推荐下一个视频。
             </p>
           </div>
         </div>
@@ -174,7 +177,7 @@ function CompactVideoListCard({
   footnote,
   sortMode,
   onSortChange,
-  onToggle,
+  onShow,
   onPlay,
   meta,
 }: {
@@ -185,7 +188,7 @@ function CompactVideoListCard({
   footnote?: string;
   sortMode?: HistorySortMode;
   onSortChange?: (mode: HistorySortMode) => void;
-  onToggle: () => void;
+  onShow: () => void;
   onPlay: (videoId: number) => void;
   meta: (video: VideoItem) => string;
 }) {
@@ -220,13 +223,13 @@ function CompactVideoListCard({
               ))}
             </div>
           )}
-          <button onClick={onToggle} disabled={videos.length === 0} className="text-[10px] text-[#9ca3af] hover:text-[#c87d2f]">
-            {videos.length === 0 ? '0 个' : (active ? '收起' : `${videos.length} 个 查看`)}
+          <button onClick={onShow} disabled={videos.length === 0} className={`text-[10px] ${active ? 'text-[#c87d2f]' : 'text-[#9ca3af] hover:text-[#c87d2f]'}`}>
+            {videos.length === 0 ? '0 个' : `${videos.length} 个 查看`}
           </button>
         </div>
       </div>
       <div className="space-y-1.5">
-        {(active ? sortedVideos : sortedVideos.slice(0, 3)).map((video) => (
+        {sortedVideos.slice(0, 3).map((video) => (
           <button key={video.id} onClick={() => onPlay(video.id)} className="flex w-full min-w-0 items-center gap-2 rounded-lg p-1.5 text-left hover:bg-[#f3f2ef] transition-colors">
             <div className="relative h-8 w-12 shrink-0 overflow-hidden rounded bg-[#e5e2dd]">
               {video.thumbnail ? (
@@ -331,7 +334,7 @@ export function VideoGridSection({
           {!isSearching && !filesLabel && !currentCategoryId && <p className="text-xs text-[#9ca3af]">共 {total} 个视频</p>}
         </>
       )}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+      <div className="auto-grid-video">
         {displayVideos.map((v) => (
           <div key={v.id} onClick={() => onPlay(v.id)} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer group">
             <div className="aspect-video bg-gradient-to-br from-[#f3f2ef] to-[#e5e2dd] flex items-center justify-center relative overflow-hidden">

@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+import { API_BASE, resolveApiPath } from './apiBase';
 
 export function resolveApiUrl(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -6,11 +6,30 @@ export function resolveApiUrl(url: string | null | undefined): string | null {
   return `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`;
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-    ...init,
-  });
+type ApiFetchInit = RequestInit & { timeoutMs?: number };
+
+async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
+  const { timeoutMs = 60000, signal, ...fetchInit } = init ?? {};
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(resolveApiPath(path), {
+      headers: { 'Content-Type': 'application/json', ...fetchInit.headers },
+      ...fetchInit,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) throw new Error(`API timeout: ${path}`);
+    throw err;
+  } finally {
+    window.clearTimeout(timeout);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
@@ -79,6 +98,33 @@ export interface SegmentSearchResult {
   text: string;
   subtitle_url: string | null;
   score_hint: number;
+}
+
+export interface AssistantReference {
+  video_id: number;
+  video_title: string;
+  start_sec: number;
+  end_sec: number;
+  text: string;
+  score_hint: number;
+}
+
+export interface AssistantChatOut {
+  session_id: string;
+  answer: string;
+  mode: string;
+  depth: string;
+  rag_enabled: boolean;
+  web_search_enabled: boolean;
+  deep_research_enabled: boolean;
+  references: AssistantReference[];
+}
+
+export interface AssistantConnectionTestOut {
+  status: string;
+  content_type: string;
+  answer: string;
+  received_text: boolean;
 }
 
 export interface AiJobOut {
@@ -202,6 +248,19 @@ export interface TranscriptionSettingsDto {
   subtitle_correction_enabled: boolean;
   subtitle_correction_scope: 'full' | 'off';
   subtitle_correction_prompt: string;
+  llm_usage_policy: 'local_first' | 'external_first' | 'local_only' | 'external_only';
+}
+
+export type LlmUsagePolicy = 'local_first' | 'external_first' | 'local_only' | 'external_only';
+
+export interface AssistantRuntimeSettingsDto {
+  local_base_url: string;
+  local_api_key: string;
+  local_model: string;
+  external_base_url: string;
+  external_api_key: string;
+  external_model: string;
+  llm_usage_policy: LlmUsagePolicy;
 }
 
 export interface PlaylistItem {
@@ -257,7 +316,7 @@ export async function fetchVideos(page = 1, pageSize = 20, categoryId?: number, 
     params.set('category_id', String(categoryId));
   }
   if (search) params.set('search', search);
-  return apiFetch<VideoPage>(`/api/videos?${params}`);
+  return apiFetch<VideoPage>(`/api/videos?${params}`, { timeoutMs: 15000 });
 }
 
 export async function fetchVideo(videoId: number): Promise<VideoItem> {
@@ -270,6 +329,17 @@ export async function fetchContinueVideo(): Promise<VideoItem | null> {
   } catch {
     return null;
   }
+}
+
+export async function rescanVideos(): Promise<{ added: number; removed: number; total: number }> {
+  return apiFetch<{ added: number; removed: number; total: number }>('/api/admin/rescan', { method: 'POST' });
+}
+
+export async function generateThumbnails(videoIds: number[]): Promise<{ generated: number; total: number }> {
+  return apiFetch<{ generated: number; total: number }>('/api/admin/generate-thumbnails', {
+    method: 'POST',
+    body: JSON.stringify({ video_ids: videoIds }),
+  });
 }
 
 export async function fetchRecentHistory(limit = 8): Promise<VideoItem[]> {
@@ -300,6 +370,47 @@ export async function fetchSegments(videoId: number): Promise<SubtitleSegmentOut
 export async function searchSegments(q: string, limit = 20): Promise<SegmentSearchResult[]> {
   const params = new URLSearchParams({ q, limit: String(limit) });
   return apiFetch<SegmentSearchResult[]>(`/api/videos/search/segments?${params}`);
+}
+
+export async function sendAssistantChat(
+  message: string,
+  limit = 5,
+  pageContext = '',
+  systemPrompt = ''
+): Promise<AssistantChatOut> {
+  return apiFetch<AssistantChatOut>('/api/assistant/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message, limit, page_context: pageContext, system_prompt: systemPrompt }),
+  });
+}
+
+export async function fetchAssistantModels(baseUrl: string, apiKey = ''): Promise<string[]> {
+  const data = await apiFetch<{ models: string[] }>('/api/assistant/models', {
+    method: 'POST',
+    body: JSON.stringify({ base_url: baseUrl, api_key: apiKey }),
+  });
+  return data.models;
+}
+
+export async function testAssistantConnection(options: {
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+  message: string;
+  systemPrompt?: string;
+  temperature?: number;
+}): Promise<AssistantConnectionTestOut> {
+  return apiFetch<AssistantConnectionTestOut>('/api/assistant/connection-test', {
+    method: 'POST',
+    body: JSON.stringify({
+      base_url: options.baseUrl,
+      model: options.model,
+      api_key: options.apiKey ?? '',
+      message: options.message,
+      system_prompt: options.systemPrompt ?? '',
+      temperature: options.temperature ?? 0.2,
+    }),
+  });
 }
 
 export async function saveWatchHistory(videoId: number, progress: number, duration: number): Promise<void> {
@@ -478,6 +589,17 @@ export async function fetchTranscriptionSettings(): Promise<TranscriptionSetting
 
 export async function saveTranscriptionSettings(settings: TranscriptionSettingsDto): Promise<TranscriptionSettingsDto> {
   return apiFetch<TranscriptionSettingsDto>('/api/admin/transcription-settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+}
+
+export async function fetchAssistantRuntimeSettings(): Promise<AssistantRuntimeSettingsDto> {
+  return apiFetch<AssistantRuntimeSettingsDto>('/api/admin/assistant-settings');
+}
+
+export async function saveAssistantRuntimeSettings(settings: AssistantRuntimeSettingsDto): Promise<AssistantRuntimeSettingsDto> {
+  return apiFetch<AssistantRuntimeSettingsDto>('/api/admin/assistant-settings', {
     method: 'PUT',
     body: JSON.stringify(settings),
   });

@@ -6,11 +6,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -r
 WORKDIR /app
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
-COPY . .
+COPY backend/ .
+COPY prompts/ ./prompts/
 
 # Create directories for runtime data
 RUN mkdir -p /data/output /data/thumbnails /data/sprites /data/work /data/db

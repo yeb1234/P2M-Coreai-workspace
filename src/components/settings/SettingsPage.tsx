@@ -10,13 +10,14 @@ import type { PomodoroConfig } from '../../types';
 import { STORAGE_KEYS } from './types';
 import { AISettings } from './AISettingsSection';
 import { TranscriptionSettings } from './TranscriptionSettingsSection';
+import { playInteractionSound } from '../../lib/sounds';
 
 const SECTIONS = [
   { id: 'pomodoro', label: '番茄钟', icon: <Timer size={16} /> },
   { id: 'profile', label: '个人信息', icon: <User size={16} /> },
   { id: 'notifications', label: '通知', icon: <Bell size={16} /> },
   { id: 'appearance', label: '外观', icon: <Palette size={16} /> },
-  { id: 'ai', label: 'AI 助手', icon: <Bot size={16} /> },
+  { id: 'ai', label: '灵境小助手', icon: <Bot size={16} /> },
   { id: 'transcription', label: '转写设置', icon: <Database size={16} /> },
   { id: 'backend', label: '后端状态', icon: <CheckCircle2 size={16} /> },
   { id: 'privacy', label: '隐私', icon: <Shield size={16} /> },
@@ -36,12 +37,13 @@ function PomodoroSettings() {
 
   const handleSave = () => {
     updateConfig(form);
+    playInteractionSound('save');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const sessionCount = Object.values(sessions).filter((s) => s.completed).length;
-  const numberFields: Array<{ key: keyof PomodoroConfig; label: string; min: number; max: number }> = [
+  const numberFields: Array<{ key: keyof Pick<PomodoroConfig, 'workDuration' | 'shortBreakDuration' | 'longBreakDuration' | 'longBreakInterval' | 'dailyGoal'>; label: string; min: number; max: number }> = [
     { key: 'workDuration', label: '专注时长（分钟）', min: 1, max: 120 },
     { key: 'shortBreakDuration', label: '短休息（分钟）', min: 1, max: 30 },
     { key: 'longBreakDuration', label: '长休息（分钟）', min: 1, max: 60 },
@@ -51,7 +53,7 @@ function PomodoroSettings() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="auto-grid-panels">
         {numberFields.map(({ key, label, min, max }) => (
           <div key={key}>
             <label className="block text-xs font-medium text-[#6b7280] mb-1.5">{label}</label>
@@ -66,6 +68,29 @@ function PomodoroSettings() {
           </div>
         ))}
       </div>
+      <div>
+        <label className="block text-xs font-medium text-[#6b7280] mb-2">背景音模式</label>
+        <div className="auto-grid-compact">
+          {[
+            { value: 'manual' as const, label: '手动', desc: '背景音由番茄钟面板手动开关。' },
+            { value: 'focus' as const, label: '专注', desc: '只在专注阶段计时时自动播放。' },
+          ].map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, ambientPlaybackMode: item.value }))}
+              className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                (form.ambientPlaybackMode ?? 'manual') === item.value
+                  ? 'border-[#c87d2f] bg-[#fff7ed] text-[#9a5a1e]'
+                  : 'border-[#e5e2dd] bg-[#faf9f7] text-[#5f5a52] hover:border-[#c87d2f]/50'
+              }`}
+            >
+              <p className="text-sm font-medium">{item.label}</p>
+              <p className="mt-1 text-[10px] leading-4">{item.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="flex items-center gap-3">
         <button onClick={handleSave} className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d24] transition-colors">
           <Save size={14} /> 保存设置
@@ -75,7 +100,7 @@ function PomodoroSettings() {
       <div className="border-t border-[#e5e2dd] pt-4">
         <h4 className="text-sm font-medium text-[#1a1a1a] mb-2">历史数据</h4>
         <p className="text-xs text-[#9ca3af] mb-3">共 {sessionCount} 个已完成的番茄记录</p>
-        <button onClick={() => { if (window.confirm('确定清除所有番茄历史记录？此操作不可撤销。')) clearHistory(); }} className="theme-danger-button px-3 py-1.5 text-xs rounded-lg transition-colors">
+        <button onClick={() => { if (window.confirm('确定清除所有番茄历史记录？此操作不可撤销。')) { clearHistory(); playInteractionSound('delete'); } }} className="theme-danger-button px-3 py-1.5 text-xs rounded-lg transition-colors">
           清除历史记录
         </button>
       </div>
@@ -98,6 +123,7 @@ function ProfileSettings() {
 
   const handleSave = () => {
     setDisplayName(name.trim());
+    playInteractionSound('save');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -113,6 +139,7 @@ function ProfileSettings() {
     if (!user || user.passwordHash !== oldHash) { setPwMsg('原密码错误'); setPwError(true); return; }
     const newHash = await hashPassword(pwNew);
     await upsertUser(currentUser!, newHash);
+    playInteractionSound('success');
     setPwMsg('密码已修改');
     setPwError(false);
     setPwOld(''); setPwNew(''); setPwConfirm('');
@@ -180,6 +207,7 @@ function NotificationSettings() {
 
   const handleSave = () => {
     updateSettings(draft);
+    playInteractionSound('save');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -228,6 +256,32 @@ function AppearanceSettings() {
   const setTheme = useUIStore((s) => s.setTheme);
   const setCustomTheme = useUIStore((s) => s.setCustomTheme);
   const importRef = useRef<HTMLInputElement>(null);
+  const builtInThemeIds = new Set(['warm-wood', 'morning', 'corporate', 'meadow', 'lavender', 'night']);
+  const themeGroups = [
+    { title: '主题风格', items: THEME_PRESETS.filter((theme) => builtInThemeIds.has(theme.id)) },
+    { title: '自定义风格', items: THEME_PRESETS.filter((theme) => !builtInThemeIds.has(theme.id)) },
+  ];
+
+  const renderThemeButton = (t: (typeof THEME_PRESETS)[number]) => (
+    <button
+      key={t.id}
+      onClick={() => {
+        setTheme(t.id);
+        applyTheme(t.id, t.vars);
+      }}
+      className={`relative px-3 py-3 rounded-lg text-left border transition-all ${
+        themeId === t.id
+          ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20'
+          : 'border-[#e5e2dd] hover:border-[#d1cdc6]'
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-3 h-3 rounded-full" style={{ background: t.vars['--accent'] }} />
+        <span className="text-xs font-medium text-[#1a1a1a]">{t.name}</span>
+      </div>
+      <p className="text-[10px] text-[#9ca3af]">{t.description}</p>
+    </button>
+  );
 
   const handleExportTheme = () => {
     const preset = THEME_PRESETS.find((t) => t.id === themeId);
@@ -239,6 +293,7 @@ function AppearanceSettings() {
     a.download = `p2m-theme-${themeId}.css`;
     a.click();
     URL.revokeObjectURL(url);
+    playInteractionSound('success');
   };
 
   const handleImportTheme = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -261,6 +316,7 @@ function AppearanceSettings() {
         if (vars['--bg-body'] && vars['--accent']) {
           setCustomTheme(vars as ThemeVars);
           applyTheme('custom', vars as ThemeVars);
+          playInteractionSound('success');
         }
       } catch { /* ignore invalid */ }
     };
@@ -273,26 +329,17 @@ function AppearanceSettings() {
       {/* Theme selection */}
       <div>
         <label className="block text-xs font-medium text-[#6b7280] mb-3">主题风格</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {THEME_PRESETS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => {
-                setTheme(t.id);
-                applyTheme(t.id, t.vars);
-              }}
-              className={`relative px-3 py-3 rounded-lg text-left border transition-all ${
-                themeId === t.id
-                  ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20'
-                  : 'border-[#e5e2dd] hover:border-[#d1cdc6]'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-3 h-3 rounded-full" style={{ background: t.vars['--accent'] }} />
-                <span className="text-xs font-medium text-[#1a1a1a]">{t.name}</span>
+        <div className="space-y-5">
+          {themeGroups.map((group) => (
+            <section key={group.title} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-semibold text-[#1a1a1a]">{group.title}</h4>
+                <span className="text-[10px] text-[#9ca3af]">{group.items.length} 个</span>
               </div>
-              <p className="text-[10px] text-[#9ca3af]">{t.description}</p>
-            </button>
+              <div className="auto-grid-cards">
+                {group.items.map(renderThemeButton)}
+              </div>
+            </section>
           ))}
         </div>
         <div className="flex items-center gap-2 mt-3">
@@ -318,6 +365,7 @@ function PrivacySettings() {
 
   const handleClearNotifications = () => {
     clearAllNotifications();
+    playInteractionSound('delete');
     setCleared('通知');
     setTimeout(() => setCleared(''), 2000);
   };
@@ -326,6 +374,7 @@ function PrivacySettings() {
     for (const key of STORAGE_KEYS) {
       await idbStorage.removeItem(key);
     }
+    playInteractionSound('delete');
     setShowWipeConfirm(false);
     window.location.reload();
   };
@@ -373,9 +422,12 @@ function BackendHealthSettings() {
     setLoading(true);
     setError('');
     try {
-      setHealth(await fetchBackendHealth());
+      const result = await fetchBackendHealth();
+      setHealth(result);
+      playInteractionSound(result.ok ? 'success' : 'error');
     } catch (err) {
       setError(err instanceof Error ? err.message : '后端健康检查失败');
+      playInteractionSound('error');
     } finally {
       setLoading(false);
     }
@@ -406,7 +458,7 @@ function BackendHealthSettings() {
         {error && <span className="text-xs text-[#dc3545]">{error}</span>}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="auto-grid-panels">
         {(health?.checks ?? []).map((check) => (
           <div key={check.name} className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-3">
             <div className="flex items-start gap-2">
@@ -461,6 +513,7 @@ function DataSettings() {
     a.download = `p2m-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    playInteractionSound('success');
     setExported(true);
     setTimeout(() => setExported(false), 2000);
   };
@@ -477,9 +530,11 @@ function DataSettings() {
             await idbStorage.setItem(key, JSON.stringify(value));
           }
         }
+        playInteractionSound('success');
         setImported(true);
         setTimeout(() => { setImported(false); window.location.reload(); }, 1000);
       } catch {
+        playInteractionSound('error');
         alert('导入失败：文件格式不正确');
       }
     };
@@ -491,7 +546,7 @@ function DataSettings() {
     <div className="space-y-6">
       <div>
         <h4 className="text-sm font-medium text-[#1a1a1a] mb-3">数据概览</h4>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="auto-grid-compact">
           {Object.entries(stats).map(([label, count]) => (
             <div key={label} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-lg p-3 text-center">
               <p className="text-lg font-bold text-[#c87d2f]">{count}</p>
@@ -533,7 +588,7 @@ export const SettingsPage: React.FC = () => {
       case 'appearance':
         return <div><h3 className="text-sm font-semibold text-[#1a1a1a] mb-4">外观设置</h3><AppearanceSettings /></div>;
       case 'ai':
-        return <div><h3 className="text-sm font-semibold text-[#1a1a1a] mb-4">AI 助手</h3><AISettings /></div>;
+        return <div><h3 className="text-sm font-semibold text-[#1a1a1a] mb-4">灵境小助手</h3><AISettings /></div>;
       case 'transcription':
         return <div><h3 className="text-sm font-semibold text-[#1a1a1a] mb-4">转写设置</h3><TranscriptionSettings /></div>;
       case 'backend':

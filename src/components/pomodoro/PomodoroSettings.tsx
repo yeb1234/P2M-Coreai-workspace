@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings } from 'lucide-react';
 import { usePomodoroStore } from '../../stores';
+import { playInteractionSound } from '../../lib/sounds';
 
 const WORK_PRESETS = [25, 30, 35, 45, 60];
 const BREAK_PRESETS = [5, 10, 15, 20];
@@ -9,11 +10,12 @@ const LONG_BREAK_PRESETS = [15, 20, 25, 30];
 export const PomodoroSettings: React.FC = () => {
   const { config, updateConfig } = usePomodoroStore();
   const [open, setOpen] = useState(false);
+  const ambientMode = config.ambientPlaybackMode ?? 'manual';
 
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { setOpen(true); playInteractionSound('tap'); }}
         className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6b7280] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
       >
         <Settings size={16} />
@@ -30,7 +32,7 @@ export const PomodoroSettings: React.FC = () => {
           番茄钟设置
         </h3>
         <button
-          onClick={() => setOpen(false)}
+          onClick={() => { setOpen(false); playInteractionSound('tap'); }}
           className="text-xs text-[#9ca3af] hover:text-[#6b7280] transition-colors"
         >
           收起
@@ -44,7 +46,7 @@ export const PomodoroSettings: React.FC = () => {
           {WORK_PRESETS.map((min) => (
             <button
               key={min}
-              onClick={() => updateConfig({ workDuration: min })}
+              onClick={() => { updateConfig({ workDuration: min }); playInteractionSound('save'); }}
               className={`flex-1 py-2 text-sm rounded-lg border transition-all ${
                 config.workDuration === min
                   ? 'bg-[#c87d2f] text-white border-[#c87d2f] shadow-sm'
@@ -64,7 +66,7 @@ export const PomodoroSettings: React.FC = () => {
           {BREAK_PRESETS.map((min) => (
             <button
               key={min}
-              onClick={() => updateConfig({ shortBreakDuration: min })}
+              onClick={() => { updateConfig({ shortBreakDuration: min }); playInteractionSound('save'); }}
               className={`flex-1 py-2 text-sm rounded-lg border transition-all ${
                 config.shortBreakDuration === min
                   ? 'bg-[#16a34a] text-white border-[#16a34a] shadow-sm'
@@ -84,7 +86,7 @@ export const PomodoroSettings: React.FC = () => {
           {LONG_BREAK_PRESETS.map((min) => (
             <button
               key={min}
-              onClick={() => updateConfig({ longBreakDuration: min })}
+              onClick={() => { updateConfig({ longBreakDuration: min }); playInteractionSound('save'); }}
               className={`flex-1 py-2 text-sm rounded-lg border transition-all ${
                 config.longBreakDuration === min
                   ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-sm'
@@ -104,7 +106,7 @@ export const PomodoroSettings: React.FC = () => {
           {[3, 4, 5, 6].map((n) => (
             <button
               key={n}
-              onClick={() => updateConfig({ longBreakInterval: n })}
+              onClick={() => { updateConfig({ longBreakInterval: n }); playInteractionSound('save'); }}
               className={`flex-1 py-2 text-sm rounded-lg border transition-all ${
                 config.longBreakInterval === n
                   ? 'bg-[#c87d2f] text-white border-[#c87d2f] shadow-sm'
@@ -112,6 +114,30 @@ export const PomodoroSettings: React.FC = () => {
               }`}
             >
               {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-[#6b7280] mb-2">背景音模式</label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {[
+            { value: 'manual' as const, label: '手动', desc: '自己开关背景音' },
+            { value: 'focus' as const, label: '专注', desc: '只在专注计时时播放' },
+          ].map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => { updateConfig({ ambientPlaybackMode: item.value }); playInteractionSound('save'); }}
+              className={`rounded-lg border px-3 py-2 text-left transition-all ${
+                ambientMode === item.value
+                  ? 'border-[#c87d2f] bg-[#fef7ed] text-[#9a5a1e]'
+                  : 'border-[#e5e2dd] bg-[#f3f2ef] text-[#6b7280] hover:border-[#c87d2f]'
+              }`}
+            >
+              <p className="text-sm font-medium">{item.label}</p>
+              <p className="mt-0.5 text-[10px] leading-4">{item.desc}</p>
             </button>
           ))}
         </div>

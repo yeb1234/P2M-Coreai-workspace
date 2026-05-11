@@ -1,4 +1,8 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+import { resolveApiPath } from './apiBase';
+
+export function hasAuthToken(): boolean {
+  return !!localStorage.getItem('p2m-auth-token');
+}
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('p2m-auth-token');
@@ -6,7 +10,7 @@ function authHeaders(): Record<string, string> {
 }
 
 export async function authFetch(path: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(resolveApiPath(path), {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -14,14 +18,15 @@ export async function authFetch(path: string, init?: RequestInit): Promise<Respo
       ...init?.headers,
     },
   });
-  if (res.status === 401) {
+  if (res.status === 401 && localStorage.getItem('p2m-auth-token')) {
     localStorage.removeItem('p2m-auth-token');
+    window.dispatchEvent(new CustomEvent('auth:expired'));
   }
   return res;
 }
 
 export async function loginUser(username: string, password: string) {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
+  const res = await fetch(resolveApiPath('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -31,7 +36,7 @@ export async function loginUser(username: string, password: string) {
 }
 
 export async function registerUser(username: string, password: string) {
-  const res = await fetch(`${API_BASE}/api/auth/register`, {
+  const res = await fetch(resolveApiPath('/api/auth/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -47,7 +52,7 @@ export async function getMe() {
 }
 
 export async function migrateFromIDB(users: { username: string; passwordHash: string; displayName?: string }[], kvData: Record<string, string>) {
-  const res = await fetch(`${API_BASE}/api/auth/migrate`, {
+  const res = await fetch(resolveApiPath('/api/auth/migrate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ users, kv_data: kvData }),

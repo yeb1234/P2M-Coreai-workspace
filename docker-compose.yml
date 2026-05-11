@@ -3,8 +3,8 @@ version: "3.8"
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: siteyeb-backend
     restart: unless-stopped
     volumes:
@@ -16,7 +16,7 @@ services:
       # Mount your video folder (edit the left side to your path)
       - D:/ITJC:/videos:ro
       # Mount whisper models (edit to your path)
-      - D:/SiteYeb/tools/models:/models:ro
+      - C:/SiteYeb/tools/models:/models:ro
     environment:
       - DATABASE_URL=sqlite:////data/db/learning_os.db
       - VIDEO_FOLDER=/videos

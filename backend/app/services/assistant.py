@@ -6,7 +6,39 @@ from sqlalchemy import desc, or_, text
 from app.database import SessionLocal, settings
 from app.models import ChatMessage, ChatSession, SubtitleSegment, Video
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
+from app.services.prompts import (
+    ASSISTANT_SYSTEM_DEFAULT,
+    build_assistant_learning_prompt,
+    build_contextual_user_message,
+)
 from app.utils.files import unique_suffix
+
+
+def llm_usage_policy() -> str:
+    try:
+        from app.routers.admin import load_assistant_runtime_settings, load_transcription_settings
+
+        value = load_assistant_runtime_settings().get("llm_usage_policy") or load_transcription_settings().get("llm_usage_policy")
+    except Exception:
+        value = settings.llm_usage_policy
+    return value if value in {"local_first", "external_first", "local_only", "external_only"} else "local_first"
+
+
+def assistant_runtime_settings() -> dict:
+    try:
+        from app.routers.admin import load_assistant_runtime_settings
+
+        return load_assistant_runtime_settings()
+    except Exception:
+        return {
+            "local_base_url": settings.openai_base_url,
+            "local_api_key": settings.openai_api_key,
+            "local_model": settings.openai_model,
+            "external_base_url": settings.external_llm_base_url,
+            "external_api_key": settings.external_llm_api_key,
+            "external_model": settings.external_llm_model,
+            "llm_usage_policy": settings.llm_usage_policy,
+        }
 
 
 def build_reference(segment: SubtitleSegment, video: Video, score_hint: float) -> dict:
@@ -156,9 +188,11 @@ def compose_reference_context(references: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def answer_with_ollama(message: str, references: list[dict], depth: str = "basic") -> str:
+def answer_with_ollama(message: str, references: list[dict], depth: str = "basic", system_prompt: str = "") -> str:
     context = compose_reference_context(references)
-    prompt = build_learning_prompt(message, context, depth=depth)
+    prompt = build_assistant_learning_prompt(message, context, depth=depth)
+    if system_prompt.strip():
+        prompt = f"{system_prompt.strip()}\n\n{prompt}"
     return OllamaClient(base_url=settings.ollama_base_url, timeout_s=180).generate(
         model=settings.ollama_model,
         prompt=prompt,
@@ -166,43 +200,23 @@ def answer_with_ollama(message: str, references: list[dict], depth: str = "basic
     )
 
 
-def build_learning_prompt(message: str, context: str, depth: str = "basic") -> str:
-    depth_instruction = (
-        "Give a compact first-pass answer and invite the user to ask for deeper analysis."
-        if depth == "basic"
-        else "Give a deeper answer with a learning path, prerequisites, and concrete next study steps."
-    )
-    return f"""You are a practical learning assistant for a personal video library.
-Answer the user's study question using only the referenced transcript snippets.
-When recommending lessons, mention the video title and the timestamp in seconds.
-If the snippets are not enough, say what is missing and suggest generating more subtitles.
-Keep the answer concise, concrete, and learning-oriented.
-Depth instruction: {depth_instruction}
-
-User question:
-{message}
-
-Referenced snippets:
-{context}
-"""
-
-
-def answer_with_external_llm(message: str, references: list[dict], depth: str = "deepen") -> str:
-    if not settings.external_llm_api_key:
+def answer_with_external_llm(message: str, references: list[dict], depth: str = "deepen", system_prompt: str = "") -> str:
+    runtime = assistant_runtime_settings()
+    if not runtime["external_api_key"] or not runtime["external_base_url"] or not runtime["external_model"]:
         raise RuntimeError("External LLM API key is not configured")
 
     context = compose_reference_context(references)
-    prompt = build_learning_prompt(message, context, depth=depth)
+    prompt = build_assistant_learning_prompt(message, context, depth=depth)
     return OpenAICompatibleClient(
-        base_url=settings.external_llm_base_url,
-        api_key=settings.external_llm_api_key,
+        base_url=runtime["external_base_url"],
+        api_key=runtime["external_api_key"],
         timeout_s=180,
     ).chat_completion(
-        model=settings.external_llm_model,
+        model=runtime["external_model"],
         messages=[
             {
                 "role": "system",
-                "content": "You answer study questions using cited video transcript snippets and timestamp recommendations.",
+                "content": system_prompt.strip() or ASSISTANT_SYSTEM_DEFAULT,
             },
             {"role": "user", "content": prompt},
         ],
@@ -210,26 +224,61 @@ def answer_with_external_llm(message: str, references: list[dict], depth: str = 
     )
 
 
-def answer_with_configured_llm(message: str, references: list[dict], depth: str = "basic") -> tuple[str, str]:
+def answer_with_openai_compatible_llm(message: str, references: list[dict], depth: str = "basic", system_prompt: str = "") -> str:
+    runtime = assistant_runtime_settings()
+    context = compose_reference_context(references)
+    prompt = build_assistant_learning_prompt(message, context, depth=depth)
+    return OpenAICompatibleClient(
+        base_url=runtime["local_base_url"],
+        api_key=runtime["local_api_key"],
+        timeout_s=180,
+    ).chat_completion(
+        model=runtime["local_model"],
+        messages=[
+            {
+                "role": "system",
+                "content": system_prompt.strip() or ASSISTANT_SYSTEM_DEFAULT,
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.2,
+    )
+
+
+def answer_with_configured_llm(
+    message: str,
+    references: list[dict],
+    depth: str = "basic",
+    system_prompt: str = "",
+) -> tuple[str, str]:
     provider = (settings.assistant_llm_provider or "local").lower()
+    policy = llm_usage_policy()
     errors = []
 
-    if depth == "deepen":
-        try:
-            return answer_with_external_llm(message, references, depth=depth), "external"
-        except Exception as exc:
-            errors.append(f"external failed: {exc}")
+    def answer_with_local() -> str:
+        if provider in ("openai", "lmstudio"):
+            return answer_with_openai_compatible_llm(message, references, depth=depth, system_prompt=system_prompt)
+        return answer_with_ollama(message, references, depth=depth, system_prompt=system_prompt)
 
-    try:
-        return answer_with_ollama(message, references, depth=depth), "ollama"
-    except Exception as exc:
-        errors.append(f"ollama failed: {exc}")
+    def answer_with_external() -> str:
+        return answer_with_external_llm(message, references, depth=depth, system_prompt=system_prompt)
 
-    if provider == "external":
+    attempts = [("local", answer_with_local), ("external", answer_with_external)]
+    if policy == "external_first" or depth == "deepen":
+        attempts.reverse()
+    elif policy == "local_only":
+        attempts = [("local", answer_with_local)]
+    elif policy == "external_only":
+        attempts = [("external", answer_with_external)]
+
+    for label, runner in attempts:
         try:
-            return answer_with_external_llm(message, references, depth=depth), "external"
+            answer = runner()
+            if label == "local":
+                return answer, "openai" if provider in ("openai", "lmstudio") else "ollama"
+            return answer, "external"
         except Exception as exc:
-            errors.append(f"external failed: {exc}")
+            errors.append(f"{label} failed: {exc}")
 
     fallback = build_fallback_answer(message, references)
     if errors:
@@ -239,19 +288,21 @@ def answer_with_configured_llm(message: str, references: list[dict], depth: str 
 
 def build_fallback_answer(message: str, references: list[dict]) -> str:
     if not references:
-        return "I could not find a matching transcript segment yet. Generate subtitles for more videos first."
+        return "我还没有找到匹配的字幕片段。建议先为更多视频生成或补全字幕。"
 
-    lines = [f"I found these lesson segments related to: {message}", ""]
+    lines = [f"我找到了这些和“{message}”相关的学习片段：", ""]
     for ref in references[:3]:
         minute = int(ref["start_sec"] // 60)
         second = int(ref["start_sec"] % 60)
-        lines.append(f"- {ref['video_title']} at {minute}:{second:02d}: {ref['text'][:120]}")
+        lines.append(f"- {ref['video_title']}，{minute}:{second:02d}：{ref['text'][:120]}")
     return "\n".join(lines)
 
 
 def run_assistant_chat(
     *,
     message: str,
+    page_context: str = "",
+    system_prompt: str = "",
     session_id: str | None = None,
     video_id: int | None = None,
     depth: str = "basic",
@@ -265,7 +316,13 @@ def run_assistant_chat(
     store_message(session.id, "user", message)
 
     safe_depth = "deepen" if depth == "deepen" else "basic"
-    answer, mode = answer_with_configured_llm(message, references, depth=safe_depth)
+    llm_message = build_contextual_user_message(message, page_context)
+    answer, mode = answer_with_configured_llm(
+        llm_message,
+        references,
+        depth=safe_depth,
+        system_prompt=system_prompt,
+    )
 
     store_message(session.id, "assistant", answer, references=references)
     return {

@@ -5,6 +5,48 @@ import { fetchVideos, fetchVideo, searchSegments, startAiJob, fetchCategoryTree 
 const VIDEO_ID_KEY = 'p2m_current_video_id';
 const NAV_STATE_KEY = 'p2m_video_nav_state';
 
+function videoHashForCategory(categoryId: number | null): string {
+  return categoryId ? `/video?category=${categoryId}` : '/video';
+}
+
+function parseVideoCategoryFromHash(): number | null | undefined {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const [path, query = ''] = hash.split('?');
+  if (path !== 'video') return undefined;
+  const raw = new URLSearchParams(query).get('category');
+  if (!raw) return null;
+  const id = Number(raw);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function pushVideoCategoryHash(categoryId: number | null) {
+  const next = `#${videoHashForCategory(categoryId)}`;
+  if (window.location.hash !== next) {
+    window.location.hash = next;
+  }
+}
+
+function replaceVideoCategoryHash(categoryId: number | null) {
+  const next = `#${videoHashForCategory(categoryId)}`;
+  if (window.location.hash !== next) {
+    window.history.replaceState(null, '', next);
+  }
+}
+
+function displayCategoryName(name: string): string {
+  return name.includes(' / ') ? name.split(' / ').pop()! : name;
+}
+
+function findCategoryBreadcrumb(nodes: CategoryTree[], id: number, trail: { id: number | null; name: string }[] = [{ id: null, name: '全部视频' }]): { id: number | null; name: string }[] | null {
+  for (const node of nodes) {
+    const nextTrail = [...trail, { id: node.id, name: displayCategoryName(node.name) }];
+    if (node.id === id) return nextTrail;
+    const found = findCategoryBreadcrumb(node.children, id, nextTrail);
+    if (found) return found;
+  }
+  return null;
+}
+
 interface SavedNavState {
   categoryId: number | null;
   breadcrumb: { id: number | null; name: string }[];
@@ -32,6 +74,7 @@ function loadNavState(): SavedNavState | null {
 }
 
 let currentVideoRequestSeq = 0;
+let videoListRequestSeq = 0;
 
 function applyCurrentVideo(set: (partial: Partial<VideoState>) => void, video: VideoItem) {
   set({
@@ -123,10 +166,12 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   selectedFolderIds: [],
 
   loadVideos: async (page = 1, search, categoryIds?: number[]) => {
+    const requestSeq = ++videoListRequestSeq;
     set({ loading: true, error: null });
     try {
       const categoryId = get().currentCategoryId ?? undefined;
       const data = await fetchVideos(page, 20, categoryId, search, categoryIds);
+      if (requestSeq !== videoListRequestSeq) return;
       set({
         videos: data.items,
         total: data.total,
@@ -137,6 +182,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       const { currentCategoryId, breadcrumb, searchQuery } = get();
       saveNavState({ currentCategoryId, breadcrumb, searchQuery, page: data.page });
     } catch (e: unknown) {
+      if (requestSeq !== videoListRequestSeq) return;
       set({ error: e instanceof Error ? e.message : String(e), loading: false });
     }
   },
@@ -262,6 +308,15 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     try {
       const tree = await fetchCategoryTree();
       set({ categoryTree: tree });
+      const urlCategoryId = parseVideoCategoryFromHash();
+      if (urlCategoryId) {
+        const breadcrumb = findCategoryBreadcrumb(tree, urlCategoryId);
+        if (breadcrumb) {
+          set({ breadcrumb });
+          const { searchQuery, page } = get();
+          saveNavState({ currentCategoryId: urlCategoryId, breadcrumb, searchQuery, page });
+        }
+      }
     } catch {
       // ignore
     }
@@ -270,6 +325,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   enterCategory: (id, name) => {
     const { breadcrumb } = get();
     const nextBreadcrumb = [...breadcrumb, { id, name }];
+    pushVideoCategoryHash(id);
     set({
       currentCategoryId: id,
       breadcrumb: nextBreadcrumb,
@@ -286,6 +342,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     const idx = breadcrumb.findIndex((b) => b.id === id);
     if (idx < 0) return;
     const nextBreadcrumb = breadcrumb.slice(0, idx + 1);
+    pushVideoCategoryHash(id);
     set({
       currentCategoryId: id,
       breadcrumb: nextBreadcrumb,
@@ -298,8 +355,36 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   },
 
   restoreNavigation: () => {
+    const urlCategoryId = parseVideoCategoryFromHash();
     const saved = loadNavState();
-    if (!saved) return;
+    if (urlCategoryId !== undefined) {
+      const savedMatchesUrl = saved?.categoryId === urlCategoryId;
+      const treeBreadcrumb = urlCategoryId ? findCategoryBreadcrumb(get().categoryTree, urlCategoryId) : [{ id: null, name: '全部视频' }];
+      const breadcrumb = treeBreadcrumb || (savedMatchesUrl && saved.breadcrumb.length > 0
+        ? saved.breadcrumb
+        : [{ id: null, name: '全部视频' }, ...(urlCategoryId ? [{ id: urlCategoryId, name: `文件夹 ${urlCategoryId}` }] : [])]);
+      set({
+        currentCategoryId: urlCategoryId,
+        breadcrumb,
+        searchQuery: savedMatchesUrl ? saved.searchQuery : '',
+        page: savedMatchesUrl ? saved.page : 1,
+      });
+      saveNavState({ currentCategoryId: urlCategoryId, breadcrumb, searchQuery: savedMatchesUrl ? saved.searchQuery : '', page: savedMatchesUrl ? saved.page : 1 });
+      get().loadVideos(savedMatchesUrl ? saved.page : 1, savedMatchesUrl ? saved.searchQuery || undefined : undefined);
+      return;
+    }
+    if (!saved) {
+      set({
+        currentCategoryId: null,
+        breadcrumb: [{ id: null, name: '全部视频' }],
+        searchQuery: '',
+        page: 1,
+      });
+      replaceVideoCategoryHash(null);
+      get().loadVideos(1);
+      return;
+    }
+    replaceVideoCategoryHash(saved.categoryId);
     set({
       currentCategoryId: saved.categoryId,
       breadcrumb: saved.breadcrumb.length > 0 ? saved.breadcrumb : [{ id: null, name: '全部视频' }],

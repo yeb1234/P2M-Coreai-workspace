@@ -8,4 +8,5 @@ export { useNotificationStore } from './notificationStore';
 export { useAuthStore } from './authStore';
 export { useVideoStore } from './videoStore';
 export { useAIStore } from './aiStore';
-export { DEFAULT_SUBTITLE_CORRECTION_PROMPT, DEFAULT_TRANSCRIPTION_SETTINGS, useTranscriptionStore, WHISPER_MODELS } from './transcriptionStore';
+export { DEFAULT_TRANSCRIPTION_SETTINGS, useTranscriptionStore, WHISPER_MODELS } from './transcriptionStore';
+export { DEFAULT_SUBTITLE_CORRECTION_PROMPT } from '../lib/aiPromptDefaults';

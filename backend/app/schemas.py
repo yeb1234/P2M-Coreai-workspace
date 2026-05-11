@@ -201,6 +201,7 @@ class TranscriptionSettingsOut(BaseModel):
     subtitle_correction_enabled: bool
     subtitle_correction_scope: Literal["full", "off"]
     subtitle_correction_prompt: str
+    llm_usage_policy: Literal["local_first", "external_first", "local_only", "external_only"]
 
 
 class TranscriptionSettingsIn(BaseModel):
@@ -218,6 +219,27 @@ class TranscriptionSettingsIn(BaseModel):
     subtitle_correction_enabled: Optional[bool] = None
     subtitle_correction_scope: Optional[Literal["full", "off"]] = None
     subtitle_correction_prompt: Optional[str] = None
+    llm_usage_policy: Optional[Literal["local_first", "external_first", "local_only", "external_only"]] = None
+
+
+class AssistantRuntimeSettingsOut(BaseModel):
+    local_base_url: str
+    local_api_key: str
+    local_model: str
+    external_base_url: str
+    external_api_key: str
+    external_model: str
+    llm_usage_policy: Literal["local_first", "external_first", "local_only", "external_only"]
+
+
+class AssistantRuntimeSettingsIn(BaseModel):
+    local_base_url: Optional[str] = None
+    local_api_key: Optional[str] = None
+    local_model: Optional[str] = None
+    external_base_url: Optional[str] = None
+    external_api_key: Optional[str] = None
+    external_model: Optional[str] = None
+    llm_usage_policy: Optional[Literal["local_first", "external_first", "local_only", "external_only"]] = None
 
 
 class NoteOut(BaseModel):
@@ -266,6 +288,8 @@ class SegmentSearchResult(BaseModel):
 
 class AssistantChatCreate(BaseModel):
     message: str = Field(min_length=1)
+    page_context: str = ""
+    system_prompt: str = ""
     session_id: str | None = None
     video_id: int | None = None
     depth: str = "basic"
@@ -293,6 +317,31 @@ class AssistantChatOut(BaseModel):
     web_search_enabled: bool = False
     deep_research_enabled: bool = False
     references: list[AssistantReference] = Field(default_factory=list)
+
+
+class AssistantModelListCreate(BaseModel):
+    base_url: str
+    api_key: str = ""
+
+
+class AssistantModelListOut(BaseModel):
+    models: list[str] = Field(default_factory=list)
+
+
+class AssistantConnectionTestCreate(BaseModel):
+    base_url: str
+    model: str
+    api_key: str = ""
+    message: str = Field(min_length=1)
+    system_prompt: str = ""
+    temperature: float = 0.2
+
+
+class AssistantConnectionTestOut(BaseModel):
+    status: str
+    content_type: str = "application/json"
+    answer: str = ""
+    received_text: bool = False
 
 
 class UserRegister(BaseModel):

@@ -6,7 +6,8 @@ import type { ActiveView } from '../../stores/uiStore';
 import { useDragResize } from '../../hooks/useDragResize';
 
 const HEADER_STYLE = { height: '56px' };
-const COLLAPSED_WIDTH = 64;
+const COLLAPSED_WIDTH = 56;
+const AUTO_COLLAPSE_WIDTH = 132;
 
 export const Sidebar: React.FC = () => {
   const activeView = useUIStore((s) => s.activeView);
@@ -14,6 +15,7 @@ export const Sidebar: React.FC = () => {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
   const navOrder = useUIStore((s) => s.navOrder);
   const reorderNav = useUIStore((s) => s.reorderNav);
@@ -31,10 +33,13 @@ export const Sidebar: React.FC = () => {
   const dragRef = useRef<HTMLDivElement>(null);
   const { width: liveSidebarWidth, startResize: startSidebarResize } = useDragResize({
     initialWidth: sidebarWidth,
-    minWidth: 160,
-    maxWidth: 320,
+    minWidth: 148,
+    maxWidth: 240,
     side: 'right',
     onWidthChange: setSidebarWidth,
+    onResizeEnd: (width) => {
+      if (width < AUTO_COLLAPSE_WIDTH) setSidebarOpen(false);
+    },
   });
 
   const handleDragStart = useCallback((e: React.DragEvent, id: ActiveView) => {
@@ -129,7 +134,7 @@ export const Sidebar: React.FC = () => {
           )}
         </div>
 
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto min-h-0">
+        <nav className="flex-1 p-1.5 space-y-0.5 overflow-y-auto min-h-0">
           {navOrder.filter((id) => !hiddenNavItems.includes(id)).map((id) => {
             const meta = PAGE_MAP[id];
             if (!meta) return null;
@@ -146,7 +151,7 @@ export const Sidebar: React.FC = () => {
                 onDrop={(e) => handleDrop(e, id)}
                 onDragEnd={handleDragEnd}
                 onClick={() => handleClick(id)}
-                className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer select-none ${
+                className={`group w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all cursor-pointer select-none ${
                   isDragging ? 'opacity-30' : ''
                 } ${isDropTarget ? 'ring-2 ring-[var(--accent)] ring-offset-1' : ''} ${
                   activeView === id

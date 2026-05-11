@@ -32,6 +32,8 @@ export const Header: React.FC = () => {
   const sessions = usePomodoroStore((s) => s.sessions);
   const todos = useTodoStore((s) => s.todos);
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const activeView = useUIStore((s) => s.activeView);
+  const toggleSettingsView = useUIStore((s) => s.toggleSettingsView);
   const notifications = useNotificationStore((s) => s.notifications);
   const currentUser = useAuthStore((s) => s.currentUser);
   const logout = useAuthStore((s) => s.logout);
@@ -52,9 +54,9 @@ export const Header: React.FC = () => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const handleOpenSettings = useCallback(() => {
-    setActiveView('settings');
-  }, [setActiveView]);
+  const handleToggleSettings = useCallback(() => {
+    toggleSettingsView();
+  }, [toggleSettingsView]);
 
   return (
     <header className="bg-[#faf9f7]/80 backdrop-blur-sm border-b border-[#e5e2dd] px-4 md:px-6 py-3 rounded-t-2xl">
@@ -96,7 +98,7 @@ export const Header: React.FC = () => {
                   ? 'text-[#c87d2f] bg-[#fef7ed]'
                   : 'text-[#6b7280] hover:text-[#1a1a1a] hover:bg-[#f3f2ef]'
               }`}
-              title={chatOpen ? '关闭 AI 助手' : '打开 AI 助手'}
+              title={chatOpen ? '关闭灵境小助手' : '打开灵境小助手'}
             >
               <Bot size={18} />
             </button>
@@ -112,8 +114,13 @@ export const Header: React.FC = () => {
               )}
             </button>
             <button
-              onClick={handleOpenSettings}
-              className="p-2 text-[#6b7280] hover:text-[#1a1a1a] hover:bg-[#f3f2ef] rounded-lg transition-colors"
+              onClick={handleToggleSettings}
+              className={`p-2 rounded-lg transition-colors ${
+                activeView === 'settings'
+                  ? 'text-[#c87d2f] bg-[#fef7ed]'
+                  : 'text-[#6b7280] hover:text-[#1a1a1a] hover:bg-[#f3f2ef]'
+              }`}
+              title={activeView === 'settings' ? '返回上一页' : '打开设置'}
             >
               <Settings size={18} />
             </button>

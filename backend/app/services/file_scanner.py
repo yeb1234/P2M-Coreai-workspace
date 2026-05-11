@@ -9,6 +9,7 @@ from watchdog.observers import Observer
 
 from app.database import SessionLocal, settings
 from app.models import Category, Video
+from app.services.sprite import has_sprite, generate_sprite
 
 
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"}
@@ -183,6 +184,32 @@ def generate_missing_thumbnails(limit: int = 3) -> int:
         db.close()
 
 
+def generate_missing_sprites(limit: int = 3) -> int:
+    db = SessionLocal()
+    generated = 0
+    try:
+        videos = (
+            db.query(Video)
+            .filter(Video.duration.isnot(None))
+            .order_by(Video.sort_key, Video.id)
+            .all()
+        )
+        count = 0
+        for video in videos:
+            if count >= limit:
+                break
+            if has_sprite(video.id):
+                continue
+            if not os.path.exists(video.filepath):
+                continue
+            if generate_sprite(video.filepath, video.id):
+                generated += 1
+                count += 1
+        return generated
+    finally:
+        db.close()
+
+
 def remove_missing_videos(db, existing_files: set[str]) -> int:
     removed = 0
     videos = db.query(Video).all()
@@ -237,6 +264,11 @@ def scan_video_library() -> dict:
 
         removed = remove_missing_videos(db, seen)
         remove_empty_categories(db)
+        # Clear stale thumbnail paths
+        for video in db.query(Video).filter(Video.thumbnail.isnot(None)).all():
+            if not Path(video.thumbnail).exists():
+                video.thumbnail = None
+        db.commit()
         total = db.query(Video).count()
         return {"status": "ok", "added": added, "removed": removed, "total": total}
     finally:

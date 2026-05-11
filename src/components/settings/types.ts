@@ -31,7 +31,11 @@ export const TRANSCRIPTION_PARAM_HELP = [
   },
   {
     name: '字幕校对',
-    desc: '转写完成后把整份字幕交给本地 LLM 校对，修正误识别词、错别字和专有名词，不改时间轴。',
+    desc: '转写完成后把整份字幕交给 LLM 校对，修正误识别词、错别字和专有名词，不改时间轴。',
+  },
+  {
+    name: 'LLM 使用策略',
+    desc: '控制总结、字幕校对和灵境小助手对话优先使用本地模型还是外部网络模型，也可以限制只用其中一种。',
   },
 ] as const;
 
@@ -51,6 +55,7 @@ export function transcriptionFormToDto(form: TranscriptionDraft): TranscriptionS
     subtitle_correction_enabled: form.subtitleCorrectionEnabled,
     subtitle_correction_scope: form.subtitleCorrectionScope,
     subtitle_correction_prompt: form.subtitleCorrectionPrompt,
+    llm_usage_policy: form.llmUsagePolicy,
   };
 }
 
@@ -70,6 +75,7 @@ export function transcriptionDtoToForm(dto: TranscriptionSettingsDto): Transcrip
     subtitleCorrectionEnabled: dto.subtitle_correction_enabled,
     subtitleCorrectionScope: dto.subtitle_correction_scope === 'off' ? 'off' : 'full',
     subtitleCorrectionPrompt: dto.subtitle_correction_prompt,
+    llmUsagePolicy: dto.llm_usage_policy,
   };
 }
 

@@ -4,7 +4,8 @@ import { useUIStore, useNotificationStore, useAuthStore } from '../../stores';
 import { NotificationPanel } from './NotificationPanel';
 
 export const MobileHeader: React.FC = () => {
-  const setActiveView = useUIStore((s) => s.setActiveView);
+  const activeView = useUIStore((s) => s.activeView);
+  const toggleSettingsView = useUIStore((s) => s.toggleSettingsView);
   const notifications = useNotificationStore((s) => s.notifications);
   const currentUser = useAuthStore((s) => s.currentUser);
   const logout = useAuthStore((s) => s.logout);
@@ -32,8 +33,13 @@ export const MobileHeader: React.FC = () => {
           )}
         </button>
         <button
-          onClick={() => setActiveView('settings')}
-          className="p-2 text-[#6b7280] hover:text-[#1a1a1a] rounded-lg"
+          onClick={toggleSettingsView}
+          className={`p-2 rounded-lg ${
+            activeView === 'settings'
+              ? 'text-[#c87d2f] bg-[#fef7ed]'
+              : 'text-[#6b7280] hover:text-[#1a1a1a]'
+          }`}
+          title={activeView === 'settings' ? '返回上一页' : '打开设置'}
         >
           <Settings size={18} />
         </button>

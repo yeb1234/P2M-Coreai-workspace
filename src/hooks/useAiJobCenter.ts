@@ -18,12 +18,14 @@ import {
   type AiJobBatchOut,
   type AiJobListOut,
 } from '../lib/videoApi';
+import { playInteractionSound } from '../lib/sounds';
 
 interface AiJobCenterProps {
   jobs: AiJobListOut | null;
   loading: boolean;
   selectedStatus: string | null;
   batchCount: number;
+  batchScope: 'leaf' | 'descendants';
   batchLoading: boolean;
   batchProgress: { completed: number; running: number; queued: number; failed: number; total: number };
   batchMode: AiJobBatchMode;
@@ -50,6 +52,7 @@ interface AiJobCenterProps {
 
 export function useAiJobCenter(
   playlist: { id: number }[],
+  playlistScope: 'leaf' | 'descendants',
   currentVideoId: number | null,
   loadCurrentVideo: (id: number) => Promise<void>,
 ): AiJobCenterProps {
@@ -196,6 +199,7 @@ export function useAiJobCenter(
       );
       setBatchPreview(result);
       await loadAiJobs();
+      playInteractionSound('tap');
     } finally {
       setBatchingFolder(false);
     }
@@ -212,6 +216,7 @@ export function useAiJobCenter(
       if (preview.eligible <= 0) {
         setBatchPreview(preview);
         await loadAiJobs();
+        playInteractionSound('tap');
         return;
       }
       const result = await batchAiJobs(
@@ -224,6 +229,7 @@ export function useAiJobCenter(
       }
       await loadAiJobs();
       await loadVideos();
+      playInteractionSound('start');
     } finally {
       setBatchingFolder(false);
     }
@@ -255,6 +261,7 @@ export function useAiJobCenter(
       if (currentVideoId) {
         await loadCurrentVideo(currentVideoId);
       }
+      playInteractionSound('tap');
     });
   }, [aiJobs?.queued, aiJobs?.running, queuePaused, withLoading, loadAiJobs, currentVideoId, loadCurrentVideo]);
 
@@ -265,6 +272,7 @@ export function useAiJobCenter(
       if (currentVideoId) {
         await loadCurrentVideo(currentVideoId);
       }
+      playInteractionSound('delete');
     });
   }, [withLoading, loadAiJobs, currentVideoId, loadCurrentVideo]);
 
@@ -275,6 +283,7 @@ export function useAiJobCenter(
       if (currentVideoId) {
         await loadCurrentVideo(currentVideoId);
       }
+      playInteractionSound('start');
     });
   }, [withLoading, loadAiJobs, currentVideoId, loadCurrentVideo]);
 
@@ -283,6 +292,7 @@ export function useAiJobCenter(
       await syncQueuedAiJobSettings();
       setBatchPreview(null);
       await loadAiJobs();
+      playInteractionSound('save');
     });
   }, [withLoading, loadAiJobs]);
 
@@ -294,6 +304,7 @@ export function useAiJobCenter(
       if (currentVideoId) {
         await loadCurrentVideo(currentVideoId);
       }
+      playInteractionSound('delete');
     });
   }, [withLoading, loadAiJobs, currentVideoId, loadCurrentVideo]);
 
@@ -308,13 +319,22 @@ export function useAiJobCenter(
         await clearActiveAiJobs();
         await clearFinishedAiJobs();
       }
-      setBatchPreview(null);
+      if (playlist.length > 0) {
+        const preview = await batchAiJobs(
+          playlist.map((item) => item.id),
+          { ...batchAiJobOptions, mode: batchMode, max_enqueue: batchLimit, dry_run: true },
+        );
+        setBatchPreview(preview);
+      } else {
+        setBatchPreview(null);
+      }
       await loadAiJobs();
       if (currentVideoId) {
         await loadCurrentVideo(currentVideoId);
       }
+      playInteractionSound('delete');
     });
-  }, [withLoading, loadAiJobs, currentVideoId, loadCurrentVideo]);
+  }, [withLoading, playlist, batchAiJobOptions, batchMode, batchLimit, loadAiJobs, currentVideoId, loadCurrentVideo]);
 
   // ── Effects ──
 
@@ -341,13 +361,19 @@ export function useAiJobCenter(
   // Trigger AI for a single video (used by VideoPlaylistPanel)
   const triggerSingleVideo = useCallback((videoId: number) => {
     void triggerAi(videoId, manualAiJobOptions).then(() => {
+      playInteractionSound('start');
       void loadAiJobs();
+    }).catch(() => {
+      playInteractionSound('error');
     });
   }, [triggerAi, manualAiJobOptions, loadAiJobs]);
 
   const triggerCorrection = useCallback((videoId: number) => {
     void triggerAi(videoId, correctionAiJobOptions).then(() => {
+      playInteractionSound('start');
       void loadAiJobs();
+    }).catch(() => {
+      playInteractionSound('error');
     });
   }, [triggerAi, correctionAiJobOptions, loadAiJobs]);
 
@@ -356,6 +382,7 @@ export function useAiJobCenter(
     loading: aiJobsLoading,
     selectedStatus: aiJobStatusFilter,
     batchCount: playlist.length,
+    batchScope: playlistScope,
     batchLoading: batchingFolder,
     batchProgress,
     batchMode,

@@ -18,6 +18,8 @@ import { useVideoControlChrome } from './useVideoControlChrome';
 import { useVideoKeyboardShortcuts } from './useVideoKeyboardShortcuts';
 import { useVideoPlaylist } from './useVideoPlaylist';
 
+const PENDING_RECOMMENDED_VIDEO_KEY = 'p2m_pending_recommended_video_id';
+
 function VideoPlayerView() {
   const { currentVideo, currentSegments, jobStatus, jobStage, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
 
@@ -44,7 +46,7 @@ function VideoPlayerView() {
   const [subtitleOpacity, setSubtitleOpacity] = useState(initialSettings.subtitleOpacity);
   const [subtitleSize, setSubtitleSize] = useState(initialSettings.subtitleSize);
   const [autoPlay, setAutoPlay] = useState(initialSettings.autoPlay);
-  const { width: playlistPanelWidth, startResize: startPlaylistResize } = usePlaylistResize(360);
+  const { width: playlistPanelWidth, startResize: startPlaylistResize } = usePlaylistResize(300);
   const [volume, setVolume] = useState(initialSettings.volume);
   const [isMuted, setIsMuted] = useState(initialSettings.muted);
   const [dragging, setDragging] = useState(false);
@@ -96,7 +98,7 @@ function VideoPlayerView() {
   );
 
   // AI Job Center - all logic extracted to hook
-  const { triggerSingleVideo, triggerCorrection, ...aiJobCenterProps } = useAiJobCenter(playlist, currentVideoId, loadCurrentVideo);
+  const { triggerSingleVideo, triggerCorrection, ...aiJobCenterProps } = useAiJobCenter(playlist, playlistScope, currentVideoId, loadCurrentVideo);
 
   const isProcessing = jobStatus === 'running' || jobStatus === 'queued';
   const progressPct = videoDuration > 0 ? (progress / videoDuration) * 100 : 0;
@@ -380,7 +382,7 @@ function VideoPlayerView() {
   if (!currentVideo) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-0">
       {/* Header - hidden on mobile */}
       <div className="hidden md:flex items-center gap-3">
         <button onClick={clearSelection} className="p-2 rounded-lg hover:bg-[#f3f2ef] text-[#6b7280] transition-colors">
@@ -399,7 +401,7 @@ function VideoPlayerView() {
         </button>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:gap-[22px]">
         {/* Player column */}
         <div className="min-w-0 flex-1 space-y-3">
           {/* Video container with overlay controls */}
@@ -535,7 +537,7 @@ function VideoPlayerView() {
           currentVideo={currentVideo}
           playlist={playlist}
           playlistScope={playlistScope}
-          width={playlistPanelWidth}
+          width={Math.min(playlistPanelWidth, Math.max(250, window.innerWidth * 0.32))}
           isPlaying={isPlaying}
           isProcessing={isProcessing}
           jobStatus={jobStatus}
@@ -562,11 +564,19 @@ export const VideoPage: React.FC = () => {
     restoreCurrentVideo();
   }, [restoreCurrentVideo]);
 
+  useEffect(() => {
+    const savedId = Number(localStorage.getItem(PENDING_RECOMMENDED_VIDEO_KEY));
+    if (!savedId) return;
+    localStorage.removeItem(PENDING_RECOMMENDED_VIDEO_KEY);
+    void loadCurrentVideo(savedId);
+  }, [loadCurrentVideo]);
+
   // Listen for video play events from AI chat recommendations
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.videoId) {
+        localStorage.removeItem(PENDING_RECOMMENDED_VIDEO_KEY);
         void loadCurrentVideo(detail.videoId);
       }
     };
@@ -575,7 +585,7 @@ export const VideoPage: React.FC = () => {
   }, [loadCurrentVideo]);
 
   return (
-    <div className="w-full pt-2 space-y-6">
+    <div className={`w-full pt-2 space-y-6 ${currentVideo ? '' : 'px-1 lg:px-1.5'}`}>
       {!currentVideo && (
         <PageTitle
           title="视频站"

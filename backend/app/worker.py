@@ -8,7 +8,7 @@ import time
 
 from app.database import Base, engine, ensure_runtime_schema, settings
 from app.services.ai_jobs import claim_next_ai_job, requeue_interrupted_ai_jobs, run_ai_job
-from app.services.file_scanner import generate_missing_thumbnails
+from app.services.file_scanner import generate_missing_thumbnails, generate_missing_sprites
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,8 @@ def main() -> None:
             thumbnail_limit = max(1, int(settings.thumbnail_background_limit or 1))
             if settings.thumbnail_background_enabled and idle_cycles % thumbnail_cycles == 0:
                 generate_missing_thumbnails(limit=thumbnail_limit)
+            if settings.sprite_background_enabled and idle_cycles % thumbnail_cycles == 0:
+                generate_missing_sprites(limit=thumbnail_limit)
             time.sleep(settings.ai_worker_poll_interval)
 
 

@@ -17,7 +17,7 @@ const DEFAULT_NAV_ORDER: ActiveView[] = [
   'leetcode', 'interview', 'codenav', 'aiagent', 'openclaw', 'hermes',
 ];
 
-const clampSidebarWidth = (width: number | undefined) => Math.max(160, Math.min(320, Math.round(width || 208)));
+const clampSidebarWidth = (width: number | undefined) => Math.max(148, Math.min(240, Math.round(width || 184)));
 
 interface ModalState {
   type: string;
@@ -36,10 +36,13 @@ interface UIState {
   compactMode: boolean;
   themeId: ThemeId;
   customTheme: ThemeVars | null;
+  previousViewBeforeSettings: ActiveView | null;
   videoRightPanelWidth: number;
   videoRightPanelCollapsed: boolean;
+  activeNoteId: string | null;
   setActiveView: (view: ActiveView) => void;
   toggleSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
   openModal: (type: string, data?: unknown) => void;
   closeModal: () => void;
@@ -53,9 +56,11 @@ interface UIState {
   setCompactMode: (v: boolean) => void;
   setTheme: (id: ThemeId) => void;
   setCustomTheme: (vars: ThemeVars | null) => void;
+  toggleSettingsView: () => void;
   setVideoRightPanelWidth: (width: number) => void;
   toggleVideoRightPanel: () => void;
   setVideoRightPanelCollapsed: (collapsed: boolean) => void;
+  setActiveNoteId: (id: string | null) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -63,7 +68,7 @@ export const useUIStore = create<UIState>()(
     (set) => ({
       activeView: 'dashboard',
       sidebarOpen: true,
-      sidebarWidth: 208,
+      sidebarWidth: 184,
       modalState: null,
       navOrder: DEFAULT_NAV_ORDER,
       hiddenNavItems: [],
@@ -72,16 +77,24 @@ export const useUIStore = create<UIState>()(
       compactMode: false,
       themeId: 'warm-wood',
       customTheme: null,
+      previousViewBeforeSettings: null,
       videoRightPanelWidth: 340,
       videoRightPanelCollapsed: false,
+      activeNoteId: null,
       setActiveView: (view) => {
-        set({ activeView: view });
+        set((state) => ({
+          activeView: view,
+          previousViewBeforeSettings: view === 'settings' && state.activeView !== 'settings'
+            ? state.activeView
+            : state.previousViewBeforeSettings,
+        }));
         const path = VIEW_PATH[view];
         if (path !== undefined) {
           window.location.hash = `/${path}`;
         }
       },
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setSidebarWidth: (width) => set({ sidebarWidth: clampSidebarWidth(width) }),
       openModal: (type, data) => set({ modalState: { type, data } }),
       closeModal: () => set({ modalState: null }),
@@ -121,6 +134,7 @@ export const useUIStore = create<UIState>()(
       }),
       toggleVideoRightPanel: () => set((state) => ({ videoRightPanelCollapsed: !state.videoRightPanelCollapsed })),
       setVideoRightPanelCollapsed: (collapsed) => set({ videoRightPanelCollapsed: collapsed }),
+      setActiveNoteId: (activeNoteId) => set({ activeNoteId }),
       setTheme: (id) => {
         set({ themeId: id });
         if (id === 'custom') return;
@@ -130,6 +144,20 @@ export const useUIStore = create<UIState>()(
       setCustomTheme: (vars) => {
         set({ customTheme: vars, themeId: 'custom' });
         if (vars) applyTheme('custom', vars);
+      },
+      toggleSettingsView: () => {
+        const state = useUIStore.getState();
+        const target = state.activeView === 'settings'
+          ? state.previousViewBeforeSettings ?? 'dashboard'
+          : 'settings';
+        set({
+          activeView: target,
+          previousViewBeforeSettings: target === 'settings' ? state.activeView : null,
+        });
+        const path = VIEW_PATH[target];
+        if (path !== undefined) {
+          window.location.hash = `/${path}`;
+        }
       },
     }),
     {

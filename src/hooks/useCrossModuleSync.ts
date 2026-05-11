@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTodoStore, useCalendarStore, usePomodoroStore, useNotificationStore } from '../stores';
 import { PRIORITY_COLORS, type Todo, type PomodoroSession } from '../types';
-import { playBreakSound, playNotificationSound } from '../lib/sounds';
+import { playBreakSound, playPomodoroCue } from '../lib/sounds';
 import { toLocalDateString } from '../lib/date';
 
 export const useCrossModuleSync = () => {
@@ -45,7 +45,6 @@ export const useCrossModuleSync = () => {
       const stoppedRunning = prevStatus === 'running' && status !== 'running';
 
       if (phaseChanged || stoppedRunning) {
-        playNotificationSound();
         if (phaseChanged && prevPhase === 'work') {
           playBreakSound();
           const completedSessions = state.timer.sessionsCompleted;
@@ -55,6 +54,10 @@ export const useCrossModuleSync = () => {
             title: '专注完成!',
             message: `已完成 ${completedSessions} 个番茄钟${completedSessions % longBreakInterval === 0 ? '，该长休息了' : ''}`,
           });
+        } else if (phaseChanged && phase === 'work') {
+          playPomodoroCue('start');
+        } else if (stoppedRunning) {
+          playPomodoroCue('complete');
         }
       }
 

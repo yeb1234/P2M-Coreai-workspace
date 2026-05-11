@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../stores';
+import { playInteractionSound } from '../../lib/sounds';
 
 const REMEMBER_KEY = 'p2m-remember';
 
@@ -32,6 +33,7 @@ export const AuthPage: React.FC = () => {
     setLoading(true);
     const fn = isRegister ? register : login;
     const ok = await fn(username, password);
+    playInteractionSound(ok ? 'success' : 'error');
     if (ok && remember) {
       localStorage.setItem(REMEMBER_KEY, JSON.stringify({ username, password }));
     } else if (ok && !remember) {

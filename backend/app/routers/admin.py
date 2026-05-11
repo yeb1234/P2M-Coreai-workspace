@@ -9,9 +9,11 @@ from sqlalchemy import and_, or_, text
 
 from app.database import SessionLocal, engine, settings
 from app.models import AiJob, AppSetting, Video
-from app.schemas import RescanOut, TranscriptionSettingsIn, TranscriptionSettingsOut
+from app.schemas import AssistantRuntimeSettingsIn, AssistantRuntimeSettingsOut, RescanOut, TranscriptionSettingsIn, TranscriptionSettingsOut
 from app.services.ai_queue import is_queue_paused, pause_queue, resume_queue
-from app.services.file_scanner import generate_missing_thumbnails, scan_video_library
+from app.services.file_scanner import generate_missing_thumbnails, generate_thumbnail, scan_video_library
+from app.services.llm_client import OllamaClient, OpenAICompatibleClient
+from app.services.prompts import SUBTITLE_CORRECTION_DEFAULT
 
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -26,10 +28,56 @@ WHISPER_MODEL_FILES = {
 }
 
 TRANSCRIPTION_SETTINGS_KEY = "transcription_settings"
-DEFAULT_SUBTITLE_CORRECTION_PROMPT = (
-    "根据上下文校对字幕文本，修正明显的识别错误、错别字、专有名词和技术词。"
-    "保持原意，不扩写，不翻译，不合并或拆分字幕，不改变时间轴。"
-)
+ASSISTANT_RUNTIME_SETTINGS_KEY = "assistant_runtime_settings"
+DEFAULT_SUBTITLE_CORRECTION_PROMPT = SUBTITLE_CORRECTION_DEFAULT
+LLM_USAGE_POLICIES = {"local_first", "external_first", "local_only", "external_only"}
+
+
+def _normalize_openai_base_url(value: str) -> str:
+    trimmed = value.strip().rstrip("/")
+    if trimmed.endswith("/v1/chat/completions"):
+        return trimmed[: -len("/chat/completions")]
+    if trimmed.endswith("/chat/completions"):
+        return trimmed[: -len("/chat/completions")]
+    return trimmed
+
+
+def _default_assistant_runtime_settings() -> dict:
+    return {
+        "local_base_url": settings.openai_base_url,
+        "local_api_key": settings.openai_api_key,
+        "local_model": settings.openai_model,
+        "external_base_url": settings.external_llm_base_url,
+        "external_api_key": settings.external_llm_api_key,
+        "external_model": settings.external_llm_model,
+        "llm_usage_policy": settings.llm_usage_policy if settings.llm_usage_policy in LLM_USAGE_POLICIES else "local_first",
+    }
+
+
+def _coerce_assistant_runtime_settings(raw: dict | None = None) -> dict:
+    data = {**_default_assistant_runtime_settings(), **(raw or {})}
+    data["local_base_url"] = _normalize_openai_base_url(str(data.get("local_base_url") or ""))
+    data["local_api_key"] = str(data.get("local_api_key") or "")
+    data["local_model"] = str(data.get("local_model") or "").strip()
+    data["external_base_url"] = _normalize_openai_base_url(str(data.get("external_base_url") or ""))
+    data["external_api_key"] = str(data.get("external_api_key") or "")
+    data["external_model"] = str(data.get("external_model") or "").strip()
+    data["llm_usage_policy"] = data["llm_usage_policy"] if data.get("llm_usage_policy") in LLM_USAGE_POLICIES else "local_first"
+    return data
+
+
+def load_assistant_runtime_settings() -> dict:
+    db = SessionLocal()
+    try:
+        row = db.query(AppSetting).filter(AppSetting.key == ASSISTANT_RUNTIME_SETTINGS_KEY).first()
+        if not row:
+            return _coerce_assistant_runtime_settings()
+        try:
+            return _coerce_assistant_runtime_settings(json.loads(row.value))
+        except Exception:
+            return _coerce_assistant_runtime_settings()
+    finally:
+        db.close()
 
 
 def _default_transcription_settings() -> dict:
@@ -48,6 +96,7 @@ def _default_transcription_settings() -> dict:
         "subtitle_correction_enabled": settings.subtitle_correction_enabled,
         "subtitle_correction_scope": "off" if settings.subtitle_correction_scope == "off" else "full",
         "subtitle_correction_prompt": DEFAULT_SUBTITLE_CORRECTION_PROMPT,
+        "llm_usage_policy": settings.llm_usage_policy if settings.llm_usage_policy in LLM_USAGE_POLICIES else "local_first",
     }
 
 
@@ -66,6 +115,7 @@ def _coerce_transcription_settings(raw: dict | None = None) -> dict:
     data["vad_filter"] = bool(data.get("vad_filter"))
     data["subtitle_correction_enabled"] = bool(data.get("subtitle_correction_enabled"))
     data["subtitle_correction_scope"] = "off" if data.get("subtitle_correction_scope") == "off" else "full"
+    data["llm_usage_policy"] = data["llm_usage_policy"] if data.get("llm_usage_policy") in LLM_USAGE_POLICIES else "local_first"
     prompt = str(data.get("subtitle_correction_prompt") or DEFAULT_SUBTITLE_CORRECTION_PROMPT)
     if "????" in prompt or "\u5fd9" in prompt or "\ufffd" in prompt or "\u00e6" in prompt or "\u929d" in prompt:
         prompt = DEFAULT_SUBTITLE_CORRECTION_PROMPT
@@ -83,6 +133,22 @@ def load_transcription_settings() -> dict:
             return _coerce_transcription_settings(json.loads(row.value))
         except Exception:
             return _coerce_transcription_settings()
+    finally:
+        db.close()
+
+
+def _save_transcription_settings(data: dict) -> dict:
+    normalized = _coerce_transcription_settings(data)
+    db = SessionLocal()
+    try:
+        row = db.query(AppSetting).filter(AppSetting.key == TRANSCRIPTION_SETTINGS_KEY).first()
+        value = json.dumps(normalized, ensure_ascii=False)
+        if row:
+            row.value = value
+        else:
+            db.add(AppSetting(key=TRANSCRIPTION_SETTINGS_KEY, value=value))
+        db.commit()
+        return normalized
     finally:
         db.close()
 
@@ -106,11 +172,91 @@ def _check_http_json(name: str, url: str, timeout_s: float = 2.0) -> dict:
         return _health_item(name, False, str(exc), {"url": url})
 
 
+def _probe_llm_contexts() -> dict:
+    probes = {}
+    for key, label, runner in (
+        (
+            "local_openai",
+            "LM Studio / OpenAI 兼容接口",
+            lambda: OpenAICompatibleClient(
+                base_url=settings.openai_base_url,
+                api_key=settings.openai_api_key,
+                timeout_s=3,
+            ).model_context_length(settings.openai_model),
+        ),
+        (
+            "external_openai",
+            "外部网络 LLM",
+            lambda: OpenAICompatibleClient(
+                base_url=settings.external_llm_base_url,
+                api_key=settings.external_llm_api_key,
+                timeout_s=3,
+            ).model_context_length(settings.external_llm_model),
+        ),
+        (
+            "ollama",
+            "Ollama",
+            lambda: OllamaClient(base_url=settings.ollama_base_url, timeout_s=3).model_context_length(settings.ollama_model),
+        ),
+    ):
+        try:
+            context_length, raw = runner()
+            probes[key] = {
+                "name": label,
+                "context_length": context_length,
+                "message": f"探测到 {context_length} tokens" if context_length else "模型接口未返回上下文字段",
+                "raw_keys": sorted(raw.keys())[:20] if isinstance(raw, dict) else [],
+            }
+        except Exception as exc:
+            probes[key] = {
+                "name": label,
+                "context_length": None,
+                "message": str(exc),
+                "raw_keys": [],
+            }
+    return probes
+
+
 @router.post("/rescan", response_model=RescanOut)
 def rescan_library():
     result = scan_video_library()
     generate_missing_thumbnails(limit=3)
     return RescanOut(**result)
+
+
+@router.post("/generate-thumbnails")
+def generate_thumbnails_for_ids(payload: dict):
+    video_ids = payload.get("video_ids", [])
+    if not video_ids:
+        return {"generated": 0, "total": 0, "pending": 0}
+    db = SessionLocal()
+    try:
+        # Filter to videos that actually need thumbnails
+        videos = db.query(Video).filter(Video.id.in_(video_ids), Video.thumbnail.is_(None)).all()
+        pending = len(videos)
+        if pending == 0:
+            return {"generated": 0, "total": len(video_ids), "pending": 0}
+        # Process in background thread
+        def _generate():
+            gen_db = SessionLocal()
+            try:
+                vids = gen_db.query(Video).filter(Video.id.in_([v.id for v in videos])).all()
+                for v in vids:
+                    if v.thumbnail:
+                        continue
+                    result = generate_thumbnail(v.filepath, v.id)
+                    if result:
+                        v.thumbnail = result
+                gen_db.commit()
+            except Exception:
+                gen_db.rollback()
+            finally:
+                gen_db.close()
+        import threading
+        threading.Thread(target=_generate, daemon=True).start()
+        return {"generated": 0, "total": len(video_ids), "pending": pending}
+    finally:
+        db.close()
 
 
 @router.get("/whisper-models")
@@ -141,18 +287,42 @@ def get_transcription_settings():
 def save_transcription_settings(payload: TranscriptionSettingsIn):
     current = load_transcription_settings()
     updates = payload.model_dump(exclude_unset=True)
-    next_settings = _coerce_transcription_settings({**current, **updates})
+    next_settings = _save_transcription_settings({**current, **updates})
+    if "llm_usage_policy" in updates:
+        runtime = load_assistant_runtime_settings()
+        _save_assistant_runtime_settings({**runtime, "llm_usage_policy": next_settings["llm_usage_policy"]})
+    return TranscriptionSettingsOut(**next_settings)
+
+
+@router.get("/assistant-settings", response_model=AssistantRuntimeSettingsOut)
+def get_assistant_runtime_settings():
+    return AssistantRuntimeSettingsOut(**load_assistant_runtime_settings())
+
+
+@router.put("/assistant-settings", response_model=AssistantRuntimeSettingsOut)
+def save_assistant_runtime_settings(payload: AssistantRuntimeSettingsIn):
+    current = load_assistant_runtime_settings()
+    updates = payload.model_dump(exclude_unset=True)
+    next_settings = _save_assistant_runtime_settings({**current, **updates})
+    if "llm_usage_policy" in updates:
+        transcription = load_transcription_settings()
+        _save_transcription_settings({**transcription, "llm_usage_policy": next_settings["llm_usage_policy"]})
+    return AssistantRuntimeSettingsOut(**next_settings)
+
+
+def _save_assistant_runtime_settings(data: dict) -> dict:
+    next_settings = _coerce_assistant_runtime_settings(data)
     db = SessionLocal()
     try:
-        row = db.query(AppSetting).filter(AppSetting.key == TRANSCRIPTION_SETTINGS_KEY).first()
+        row = db.query(AppSetting).filter(AppSetting.key == ASSISTANT_RUNTIME_SETTINGS_KEY).first()
         value = json.dumps(next_settings, ensure_ascii=False)
         if row:
             row.value = value
             row.updated_at = datetime.now()
         else:
-            db.add(AppSetting(key=TRANSCRIPTION_SETTINGS_KEY, value=value, updated_at=datetime.now()))
+            db.add(AppSetting(key=ASSISTANT_RUNTIME_SETTINGS_KEY, value=value, updated_at=datetime.now()))
         db.commit()
-        return TranscriptionSettingsOut(**next_settings)
+        return next_settings
     finally:
         db.close()
 
@@ -200,6 +370,19 @@ def backend_health():
 
     checks.append(_check_http_json("LM Studio / OpenAI 兼容接口", settings.openai_base_url.rstrip("/") + "/models"))
     checks.append(_check_http_json("Ollama", settings.ollama_base_url.rstrip("/") + "/api/tags"))
+    context_probes = _probe_llm_contexts()
+    detected = [item["context_length"] for item in context_probes.values() if item.get("context_length")]
+    checks.append(_health_item(
+        "LLM 上下文窗口",
+        True,
+        f"当前总结压缩按 {settings.llm_context_token_limit} tokens 配置值计算",
+        {
+            "configured_context_token_limit": settings.llm_context_token_limit,
+            "compression_starts_at_percent": 90,
+            "detected_context_token_limits": detected,
+            "probes": context_probes,
+        },
+    ))
 
     db = SessionLocal()
     try:

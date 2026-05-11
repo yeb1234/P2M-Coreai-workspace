@@ -4,7 +4,7 @@ import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
 import { useCrossModuleSync } from './hooks';
 import { registerAllPlugins } from './plugins';
-import { useAuthStore, useUIStore } from './stores';
+import { useAuthStore, useUIStore, useNotificationStore } from './stores';
 import { THEME_PRESETS, applyTheme } from './lib/themes';
 import { useRehydrateStores } from './hooks/useRehydrateStores';
 
@@ -67,6 +67,20 @@ function App() {
   }, [initialized, currentUser]);
 
   useCrossModuleSync();
+
+  // Listen for token expiration events from authFetch
+  useEffect(() => {
+    const onExpired = () => {
+      useNotificationStore.getState().addNotification({
+        type: 'system',
+        title: '登录已过期',
+        message: '你的登录状态已失效，请重新登录',
+      });
+      useAuthStore.getState().logout();
+    };
+    window.addEventListener('auth:expired', onExpired);
+    return () => window.removeEventListener('auth:expired', onExpired);
+  }, []);
 
   if (!initialized) return null;
 

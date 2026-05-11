@@ -30,7 +30,7 @@ export const TodoSummary: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="auto-grid-compact text-center">
         <div className="bg-[#fef7ed] rounded-lg p-2">
           <p className="text-xl font-bold text-[#c87d2f]">{pending}</p>
           <p className="text-[10px] font-medium text-[#92400e]">待处理</p>

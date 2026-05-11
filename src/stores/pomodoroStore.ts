@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { idbStorage } from '../lib/idbStorage';
+import { localOnlyStorage } from '../lib/idbStorage';
 import type {
   PomodoroSession,
   PomodoroConfig,
@@ -84,12 +84,14 @@ export const usePomodoroStore = create<PomodoroState>()(
       pauseTimer: () => {
         set((state) => ({
           timer: { ...state.timer, status: 'paused' },
+          _lastTickTimestamp: null,
         }));
       },
 
       resumeTimer: () => {
         set((state) => ({
           timer: { ...state.timer, status: 'running' },
+          _lastTickTimestamp: Date.now(),
         }));
       },
 
@@ -183,9 +185,21 @@ export const usePomodoroStore = create<PomodoroState>()(
                 nextPhase = 'short_break';
                 nextTimeRemaining = state.config.shortBreakDuration * 60;
               }
-            } else {
+            } else if (phase === 'short_break') {
               nextPhase = 'work';
               nextTimeRemaining = state.config.workDuration * 60;
+            } else {
+              // long_break completed — one full round done, stop the timer
+              set({
+                sessions: { ...state.sessions, [currentSessionId]: updatedSession },
+                timer: {
+                  ...initialTimerState,
+                  timeRemaining: state.config.workDuration * 60,
+                  linkedTodoId,
+                },
+                _lastTickTimestamp: null,
+              });
+              return;
             }
 
             // Auto-start next phase
@@ -366,14 +380,14 @@ export const usePomodoroStore = create<PomodoroState>()(
     }),
     {
       name: 'p2m-pomodoro-storage',
-      storage: createJSONStorage(() => idbStorage),
+      storage: createJSONStorage(() => localOnlyStorage),
       version: 2,
       migrate: (persisted: unknown, version: number) => {
         const data = persisted as Record<string, unknown>;
         const safe: Record<string, unknown> = {
           ...data,
           sessions: data.sessions && typeof data.sessions === 'object' ? data.sessions : {},
-          config: data.config && typeof data.config === 'object' ? data.config : { ...DEFAULT_CONFIG },
+          config: data.config && typeof data.config === 'object' ? { ...DEFAULT_CONFIG, ...data.config } : { ...DEFAULT_CONFIG },
         };
         // Fix timeRemaining that was saved in minutes instead of seconds
         if (version < 2 && safe.timer && typeof safe.timer === 'object') {

@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Clock, Filter, Pin, Plus, RotateCcw, Save, Search, SlidersHorizontal, StickyNote, Tag, Trash2, X } from 'lucide-react';
 import { CollapsibleToolPanel, EmptyState, PageTitle } from '../shared';
-import { useNotesStore } from '../../stores';
+import { useNotesStore, useUIStore } from '../../stores';
 import type { Note, NoteColor } from '../../stores/notesStore';
 import { getNoteTags, NOTE_COLOR_OPTIONS } from '../../stores/notesStore';
+import { playInteractionSound } from '../../lib/sounds';
 
 const COLOR_DOT = Object.fromEntries(NOTE_COLOR_OPTIONS.map((item) => [item.value, item.dot])) as Record<NoteColor, string>;
 
@@ -31,6 +32,7 @@ export const NotesPage: React.FC = () => {
   const clearTrash = useNotesStore((s) => s.clearTrash);
   const togglePin = useNotesStore((s) => s.togglePin);
   const getTrashedNotes = useNotesStore((s) => s.getTrashedNotes);
+  const setActiveNoteId = useUIStore((s) => s.setActiveNoteId);
 
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState<string>('all');
@@ -81,8 +83,9 @@ export const NotesPage: React.FC = () => {
   const unpinned = useMemo(() => filtered.filter((note) => !note.pinned), [filtered]);
 
   const startEdit = useCallback((note: Note) => {
+    setActiveNoteId(note.id);
     setEdit({ id: note.id, title: note.title, content: note.content, color: note.color, tag: note.tag });
-  }, []);
+  }, [setActiveNoteId]);
 
   const startNew = useCallback(() => {
     const id = addNote({
@@ -93,6 +96,7 @@ export const NotesPage: React.FC = () => {
     });
     const created = useNotesStore.getState().notes.find((note) => note.id === id);
     if (created) startEdit(created);
+    playInteractionSound('success');
   }, [activeColor, activeTag, addNote, startEdit]);
 
   const createTodayAiNote = useCallback(() => {
@@ -102,6 +106,7 @@ export const NotesPage: React.FC = () => {
       setActiveTag('all');
       setActiveColor('all');
       startEdit(note);
+      playInteractionSound('success');
     }
   }, [startEdit, upsertTodayAiNote]);
 
@@ -113,13 +118,17 @@ export const NotesPage: React.FC = () => {
       color: edit.color,
       tag: edit.tag,
     });
+    setActiveNoteId(edit.id);
     setEdit((prev) => ({ ...prev, id: null }));
-  }, [edit, updateNote]);
+    playInteractionSound('save');
+  }, [edit, setActiveNoteId, updateNote]);
 
   const handleDelete = useCallback((id: string) => {
     deleteNote(id);
     if (edit.id === id) setEdit((prev) => ({ ...prev, id: null }));
-  }, [deleteNote, edit.id]);
+    if (edit.id === id) setActiveNoteId(null);
+    playInteractionSound('delete');
+  }, [deleteNote, edit.id, setActiveNoteId]);
 
   const resetFilters = () => {
     setSearch('');
@@ -170,7 +179,7 @@ export const NotesPage: React.FC = () => {
               />
             </div>
             <div className="flex gap-1">
-              <button onClick={() => setEdit((prev) => ({ ...prev, id: null }))} className="p-1.5 text-[#6b7280] hover:text-[#dc3545]" title="取消"><X size={14} /></button>
+              <button onClick={() => { setActiveNoteId(note.id); setEdit((prev) => ({ ...prev, id: null })); }} className="p-1.5 text-[#6b7280] hover:text-[#dc3545]" title="取消"><X size={14} /></button>
               <button onClick={saveEdit} className="p-1.5 text-[#16a34a] hover:bg-[#16a34a]/10 rounded" title="保存"><Save size={14} /></button>
             </div>
           </div>
@@ -433,7 +442,7 @@ export const NotesPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
               {trashedNotes.length > 0 && !collapsedTrash && (
-                <button onClick={clearTrash} className="text-xs text-[#9ca3af] hover:text-[#dc3545] transition-colors px-2 py-1">
+                    <button onClick={() => { clearTrash(); playInteractionSound('delete'); }} className="text-xs text-[#9ca3af] hover:text-[#dc3545] transition-colors px-2 py-1">
                   清空垃圾箱
                 </button>
               )}
@@ -454,11 +463,11 @@ export const NotesPage: React.FC = () => {
                       <span className="text-sm text-[#1a1a1a] truncate block">{note.title}</span>
                       <span className="text-[10px] text-[#b8b4ac]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
                     </div>
-                    <button onClick={() => restoreNote(note.id)} className="flex items-center gap-1 px-2 py-1 text-xs text-[#c87d2f] hover:bg-[#fef7ed] rounded transition-colors">
+                    <button onClick={() => { restoreNote(note.id); playInteractionSound('restore'); }} className="flex items-center gap-1 px-2 py-1 text-xs text-[#c87d2f] hover:bg-[#fef7ed] rounded transition-colors">
                       <RotateCcw size={12} />
                       恢复
                     </button>
-                    <button onClick={() => permanentDeleteNote(note.id)} className="p-1 text-[#9ca3af] hover:text-[#dc3545] transition-colors" title="永久删除">
+                    <button onClick={() => { permanentDeleteNote(note.id); playInteractionSound('delete'); }} className="p-1 text-[#9ca3af] hover:text-[#dc3545] transition-colors" title="永久删除">
                       <X size={14} />
                     </button>
                   </div>
@@ -472,7 +481,7 @@ export const NotesPage: React.FC = () => {
       {pinned.length > 0 && (
         <section>
           <h3 className="text-xs font-medium text-[#9ca3af] mb-2 flex items-center gap-1"><Pin size={10} />置顶</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="auto-grid-wide">
             {pinned.map(renderCard)}
           </div>
         </section>
@@ -481,7 +490,7 @@ export const NotesPage: React.FC = () => {
       <section>
         {pinned.length > 0 && <h3 className="text-xs font-medium text-[#9ca3af] mb-2">全部笔记</h3>}
         {unpinned.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="auto-grid-wide">
             {unpinned.map(renderCard)}
           </div>
         ) : filtered.length === 0 && (

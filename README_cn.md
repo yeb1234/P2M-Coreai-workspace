@@ -7,7 +7,7 @@ SiteYeb 是一个本地优先的个人工作台：前端使用 React，后端使
 - 类 VS Code 的工作台布局：左侧导航、顶部操作、通知入口、可调宽 AI 侧栏。
 - 本地多用户系统：每个用户使用独立的前端持久化数据。
 - 视频站：文件夹导航、继续观看、最近观看、最新视频、自定义播放控件、字幕、AI 总结、播放列表自动连播。
-- AI 助手：支持 LM Studio / OpenAI 兼容接口，默认本地地址为 `http://127.0.0.1:1234/v1`。
+- 灵境小助手：支持 LM Studio / OpenAI 兼容接口，默认本地地址为 `http://127.0.0.1:1234/v1`。
 - 转写设置：Whisper 模型、语言、CPU 线程、计算类型、beam size、VAD、总结、字幕校对。
 - 主题系统：支持 CSS 导出/导入，导出的 CSS 带中文注释，便于手工调整。
 - 番茄钟：和待办、历史、日历、工作台摘要联动。
@@ -101,7 +101,7 @@ npm run dev
 项目根目录的 `.env` 文件控制所有配置，主要项：
 
 ```bash
-DATABASE_URL=sqlite:///D:/SiteYeb/learning_os.db   # SQLite 数据库路径
+DATABASE_URL=sqlite:///C:/SiteYeb/learning_os.db   # SQLite 数据库路径
 VIDEO_FOLDER=D:/ITJC                               # 视频文件夹路径
 VITE_API_BASE_URL=                                 # 留空，前端使用同源或 Vite 代理
 
@@ -142,6 +142,12 @@ npm test
 npm run build
 backend/.venv311/Scripts/python -m compileall backend/app
 ```
+
+当前已验证状态：
+
+- `npm test` 通过：6 个测试文件，40 个测试。
+- `npm run build` 通过。
+- 现有测试主要在 `src/__tests__/`。
 
 ## 视频站说明
 

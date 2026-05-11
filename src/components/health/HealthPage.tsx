@@ -30,7 +30,7 @@ export const HealthPage: React.FC = () => {
       />
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="auto-grid-cards">
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#16a34a] mb-2">
             <Activity size={16} />
@@ -83,7 +83,7 @@ export const HealthPage: React.FC = () => {
       {/* Weight trend */}
       <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-5">
         <h3 className="text-sm font-medium text-[#1a1a1a] mb-4">本周体重趋势</h3>
-        <div className="flex items-end gap-3 h-32">
+        <div className="min-w-[300px] flex items-end gap-3 h-32">
           {WEEK_WEIGHT.map((d) => {
             const minW = 68;
             const maxW = 70;

@@ -30,7 +30,7 @@ export const HermesPage: React.FC = () => {
         icon={<Workflow size={22} />}
       />
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="auto-grid-compact">
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
           <Workflow size={20} className="text-[#c87d2f] mx-auto mb-2" />
           <p className="text-xl font-bold text-[#1a1a1a]">5</p>
@@ -54,10 +54,10 @@ export const HermesPage: React.FC = () => {
           const result = RESULT_MAP[wf.result];
           return (
             <div key={wf.name} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <GitBranch size={14} className="text-[#6b7280]" />
-                  <h3 className="text-sm font-semibold text-[#1a1a1a] group-hover:text-[#c87d2f] transition-colors">{wf.name}</h3>
+                  <h3 className="min-w-0 truncate text-sm font-semibold text-[#1a1a1a] group-hover:text-[#c87d2f] transition-colors">{wf.name}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
@@ -66,7 +66,7 @@ export const HermesPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-xs text-[#6b7280]">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6b7280]">
                 <span className="flex items-center gap-1"><Clock size={10} />{wf.trigger}</span>
                 <span>{wf.steps} 步骤</span>
                 <span className="flex items-center gap-1">
@@ -75,7 +75,7 @@ export const HermesPage: React.FC = () => {
                 </span>
               </div>
               {/* Steps visualization */}
-              <div className="flex items-center gap-1 mt-3">
+              <div className="flex flex-wrap items-center gap-1 mt-3">
                 {Array.from({ length: wf.steps }).map((_, i) => (
                   <React.Fragment key={i}>
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold ${

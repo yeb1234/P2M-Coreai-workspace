@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import type { StateStorage } from 'zustand/middleware';
-import { getUserData, setUserData, deleteUserData } from './authApi';
+import { deleteUserData, getUserData, hasAuthToken, setUserData } from './authApi';
 
 interface UserRow {
   username: string;
@@ -130,31 +130,132 @@ export async function clearIDBData(): Promise<void> {
   await db.users.clear();
 }
 
-export const idbStorage: StateStorage = {
-  getItem: async (name: string) => {
-    try {
-      const result = await getUserData(name);
-      return result ?? null;
-    } catch {
-      if (!db) return memoryKv.get(name) ?? null;
-      const row = await db.kv.get(name);
-      return row?.value ?? null;
-    }
-  },
-  setItem: async (name: string, value: string) => {
+const pendingWrites = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingLocalWrites = new Map<string, ReturnType<typeof setTimeout>>();
+const lastLocalValues = new Map<string, string>();
+const lastLocalWriteAt = new Map<string, number>();
+const DEBOUNCE_MS = 3000;
+const LOCAL_MAX_WAIT_MS = 15000;
+
+function scheduleWrite(name: string, value: string) {
+  const existing = pendingWrites.get(name);
+  if (existing) clearTimeout(existing);
+  pendingWrites.set(name, setTimeout(() => {
+    pendingWrites.delete(name);
+    doWrite(name, value);
+  }, DEBOUNCE_MS));
+}
+
+async function doWrite(name: string, value: string) {
+  if (hasAuthToken()) {
     try {
       await setUserData(name, value);
+      return;
     } catch {
-      if (!db) { memoryKv.set(name, value); return; }
-      await db.kv.put({ key: name, value });
+      // Fall through to local storage
     }
+  }
+  if (!db) { memoryKv.set(name, value); return; }
+  await db.kv.put({ key: name, value });
+}
+
+function scheduleLocalWrite(name: string, value: string) {
+  if (lastLocalValues.get(name) === value) return;
+  lastLocalValues.set(name, value);
+  const existing = pendingLocalWrites.get(name);
+  if (existing) clearTimeout(existing);
+
+  const now = Date.now();
+  const lastWriteAt = lastLocalWriteAt.get(name) ?? now;
+  if (now - lastWriteAt >= LOCAL_MAX_WAIT_MS) {
+    lastLocalWriteAt.set(name, now);
+    void doLocalWrite(name, value);
+    pendingLocalWrites.delete(name);
+    return;
+  }
+
+  pendingLocalWrites.set(name, setTimeout(() => {
+    pendingLocalWrites.delete(name);
+    lastLocalWriteAt.set(name, Date.now());
+    doLocalWrite(name, value);
+  }, DEBOUNCE_MS));
+}
+
+async function doLocalWrite(name: string, value: string) {
+  if (!db) { memoryKv.set(name, value); return; }
+  await db.kv.put({ key: name, value });
+}
+
+function flushLocalWrites() {
+  for (const [name, timer] of pendingLocalWrites.entries()) {
+    clearTimeout(timer);
+    pendingLocalWrites.delete(name);
+    const value = lastLocalValues.get(name);
+    if (value !== undefined) {
+      lastLocalWriteAt.set(name, Date.now());
+      void doLocalWrite(name, value);
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushLocalWrites);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushLocalWrites();
+  });
+}
+
+export const idbStorage: StateStorage = {
+  getItem: async (name: string) => {
+    if (hasAuthToken()) {
+      try {
+        const result = await getUserData(name);
+        return result ?? null;
+      } catch {
+        // Fall through to local storage
+      }
+    }
+    if (!db) return memoryKv.get(name) ?? null;
+    const row = await db.kv.get(name);
+    return row?.value ?? null;
+  },
+  setItem: async (name: string, value: string) => {
+    scheduleWrite(name, value);
   },
   removeItem: async (name: string) => {
-    try {
-      await deleteUserData(name);
-    } catch {
-      if (!db) { memoryKv.delete(name); return; }
-      await db.kv.delete(name);
+    const existing = pendingWrites.get(name);
+    if (existing) { clearTimeout(existing); pendingWrites.delete(name); }
+    if (hasAuthToken()) {
+      try {
+        await deleteUserData(name);
+        return;
+      } catch {
+        // Fall through to local storage
+      }
     }
+    if (!db) { memoryKv.delete(name); return; }
+    await db.kv.delete(name);
+  },
+};
+
+// Pure local storage — never touches backend API, always uses IndexedDB
+export const localOnlyStorage: StateStorage = {
+  getItem: async (name: string) => {
+    if (!db) return memoryKv.get(name) ?? null;
+    const row = await db.kv.get(name);
+    if (row?.value !== undefined) lastLocalValues.set(name, row.value);
+    if (row?.value !== undefined) lastLocalWriteAt.set(name, Date.now());
+    return row?.value ?? null;
+  },
+  setItem: async (name: string, value: string) => {
+    scheduleLocalWrite(name, value);
+  },
+  removeItem: async (name: string) => {
+    const existing = pendingLocalWrites.get(name);
+    if (existing) { clearTimeout(existing); pendingLocalWrites.delete(name); }
+    lastLocalValues.delete(name);
+    lastLocalWriteAt.delete(name);
+    if (!db) { memoryKv.delete(name); return; }
+    await db.kv.delete(name);
   },
 };

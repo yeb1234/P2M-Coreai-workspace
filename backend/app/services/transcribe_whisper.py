@@ -89,6 +89,7 @@ def _transcribe_with_whisper_cpp(
     *,
     model_size: str,
     language: Optional[str],
+    cpu_threads: Optional[int] = None,
 ) -> dict:
     exe = settings.whisper_cpp_exe.strip()
     model = settings.whisper_cpp_model.strip()
@@ -121,6 +122,8 @@ def _transcribe_with_whisper_cpp(
     ]
     if language:
         command.extend(["-l", language])
+    resolved_threads = _resolve_cpu_threads(cpu_threads)
+    command.extend(["-t", str(resolved_threads)])
     if model_size:
         # Kept for diagnostics; the actual model is controlled by WHISPER_CPP_MODEL.
         pass
@@ -152,6 +155,7 @@ def transcribe_wav(
             wav_path,
             model_size=model_size,
             language=language,
+            cpu_threads=cpu_threads,
         )
 
     model = get_whisper_model(model_size, cpu_threads=cpu_threads, compute_type=compute_type)

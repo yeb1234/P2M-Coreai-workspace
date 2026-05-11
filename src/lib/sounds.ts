@@ -1,6 +1,8 @@
-// Sound system for Pomodoro timer
+// Sound system for app interactions and Pomodoro timer
 // Uses Web Audio API for notification tones
 // Ambient sounds use HTML5 Audio with local loopable files
+
+import { useNotificationStore } from '../stores/notificationStore';
 
 let audioContext: AudioContext | null = null;
 
@@ -11,64 +13,96 @@ function getAudioContext(): AudioContext {
   return audioContext;
 }
 
-// Play a pleasant chime notification
-export function playNotificationSound(): void {
+function shouldPlaySounds(): boolean {
+  return useNotificationStore.getState().settings.soundEnabled;
+}
+
+type InteractionSound = 'tap' | 'success' | 'error' | 'delete' | 'restore' | 'save' | 'start' | 'complete';
+
+const INTERACTION_SOUND_NOTES: Record<InteractionSound, Array<{ frequency: number; start: number; duration: number; gain: number }>> = {
+  tap: [{ frequency: 640, start: 0, duration: 0.045, gain: 0.035 }],
+  success: [
+    { frequency: 523.25, start: 0, duration: 0.12, gain: 0.06 },
+    { frequency: 783.99, start: 0.08, duration: 0.18, gain: 0.07 },
+  ],
+  error: [
+    { frequency: 220, start: 0, duration: 0.12, gain: 0.055 },
+    { frequency: 174.61, start: 0.09, duration: 0.18, gain: 0.05 },
+  ],
+  delete: [
+    { frequency: 392, start: 0, duration: 0.08, gain: 0.045 },
+    { frequency: 246.94, start: 0.07, duration: 0.16, gain: 0.045 },
+  ],
+  restore: [
+    { frequency: 349.23, start: 0, duration: 0.09, gain: 0.045 },
+    { frequency: 523.25, start: 0.07, duration: 0.15, gain: 0.055 },
+  ],
+  save: [{ frequency: 698.46, start: 0, duration: 0.1, gain: 0.045 }],
+  start: [
+    { frequency: 440, start: 0, duration: 0.08, gain: 0.045 },
+    { frequency: 659.25, start: 0.08, duration: 0.16, gain: 0.055 },
+  ],
+  complete: [
+    { frequency: 523.25, start: 0, duration: 0.1, gain: 0.055 },
+    { frequency: 659.25, start: 0.08, duration: 0.1, gain: 0.055 },
+    { frequency: 783.99, start: 0.16, duration: 0.18, gain: 0.06 },
+  ],
+};
+
+export function playInteractionSound(sound: InteractionSound): void {
+  if (!shouldPlaySounds()) return;
+
   try {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
+    const notes = INTERACTION_SOUND_NOTES[sound];
 
-    // Three-note chime (C5, E5, G5)
-    const notes = [523.25, 659.25, 783.99];
-    notes.forEach((freq, i) => {
+    notes.forEach(({ frequency, start, duration, gain: peakGain }) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.value = freq;
-
-      gain.gain.setValueAtTime(0, now + i * 0.15);
-      gain.gain.linearRampToValueAtTime(0.3, now + i * 0.15 + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.8);
+      osc.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, now + start);
+      gain.gain.linearRampToValueAtTime(peakGain, now + start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.start(now + i * 0.15);
-      osc.stop(now + i * 0.15 + 0.8);
+      osc.start(now + start);
+      osc.stop(now + start + duration);
     });
-  } catch (e) {
-    console.warn('Could not play notification sound:', e);
+  } catch {
+    // Ignore sound failures; UI actions should never be blocked by audio.
   }
+}
+
+type PomodoroCue = 'start' | 'break' | 'complete';
+
+const POMODORO_CUES: Record<PomodoroCue, { url: string; volume: number }> = {
+  start: { url: '/sounds/pomodoro-start.ogg', volume: 0.28 },
+  break: { url: '/sounds/pomodoro-break.ogg', volume: 0.42 },
+  complete: { url: '/sounds/pomodoro-complete.ogg', volume: 0.22 },
+};
+
+export function playPomodoroCue(cue: PomodoroCue): void {
+  if (!shouldPlaySounds()) return;
+
+  const config = POMODORO_CUES[cue];
+  const audio = new Audio(config.url);
+  audio.volume = config.volume;
+  audio.preload = 'auto';
+  audio.play().catch((e) => {
+    console.info(`Pomodoro cue "${cue}" not available: ${config.url}`, e);
+  });
+}
+
+export function playNotificationSound(): void {
+  playPomodoroCue('start');
 }
 
 export function playBreakSound(): void {
-  playSoftBreakTone();
-}
-
-function playSoftBreakTone(): void {
-  try {
-    const ctx = getAudioContext();
-    const now = ctx.currentTime;
-    const notes = [392.0, 493.88];
-
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, now + i * 0.22);
-      gain.gain.linearRampToValueAtTime(0.075, now + i * 0.22 + 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.22 + 1.1);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + i * 0.22);
-      osc.stop(now + i * 0.22 + 1.1);
-    });
-  } catch {
-    // Silent fail.
-  }
+  playPomodoroCue('break');
 }
 
 // Play a soft tick sound (for each second, optional)
@@ -97,7 +131,7 @@ export function playTickSound(): void {
 }
 
 // Ambient sound types
-export type AmbientSound = 'none' | 'rain' | 'cafe' | 'fireplace' | 'forest';
+export type AmbientSound = 'none' | 'rain' | 'cafe' | 'fireplace' | 'forest' | 'ocean' | 'stream' | 'countryside' | 'wind';
 
 interface AmbientSoundConfig {
   name: string;
@@ -108,23 +142,43 @@ interface AmbientSoundConfig {
 export const AMBIENT_SOUNDS: Record<Exclude<AmbientSound, 'none'>, AmbientSoundConfig> = {
   rain: {
     name: '雨声',
-    url: '/sounds/rain.wav',
+    url: '/sounds/rain.ogg',
     volume: 0.3,
   },
   cafe: {
     name: '咖啡馆',
-    url: '/sounds/cafe.wav',
-    volume: 0.2,
+    url: '/sounds/cafe.ogg',
+    volume: 0.1,
   },
   fireplace: {
     name: '壁炉',
-    url: '/sounds/fireplace.wav',
-    volume: 0.25,
+    url: '/sounds/fireplace.ogg',
+    volume: 0.5,
   },
   forest: {
     name: '森林',
-    url: '/sounds/forest.wav',
+    url: '/sounds/forest.ogg',
     volume: 0.2,
+  },
+  ocean: {
+    name: '海浪',
+    url: '/sounds/ocean.ogg',
+    volume: 0.28,
+  },
+  stream: {
+    name: '溪流',
+    url: '/sounds/stream.ogg',
+    volume: 0.36,
+  },
+  countryside: {
+    name: '乡野',
+    url: '/sounds/countryside.ogg',
+    volume: 0.42,
+  },
+  wind: {
+    name: '风声',
+    url: '/sounds/wind.ogg',
+    volume: 0.14,
   },
 };
 
@@ -133,34 +187,57 @@ class AmbientPlayer {
   private audio: HTMLAudioElement | null = null;
   private currentSound: AmbientSound = 'none';
   private isPlaying = false;
+  private playRequestId = 0;
 
-  play(sound: AmbientSound): void {
+  private toPerceivedVolume(volume: number): number {
+    const clamped = Math.max(0, Math.min(1, volume));
+    return clamped * clamped;
+  }
+
+  async play(sound: AmbientSound, volume?: number): Promise<boolean> {
     if (sound === 'none') {
       this.stop();
-      return;
+      return true;
     }
 
     if (this.currentSound === sound && this.isPlaying) {
-      return; // Already playing this sound
+      return true; // Already playing this sound
     }
 
     this.stop();
+    const requestId = this.playRequestId;
 
     const config = AMBIENT_SOUNDS[sound];
-    if (!config) return;
+    if (!config) return false;
 
-    this.audio = new Audio(config.url);
-    this.audio.loop = true;
-    this.audio.volume = config.volume;
-    this.currentSound = sound;
+    const audio = new Audio(config.url);
+    audio.loop = true;
+    audio.volume = this.toPerceivedVolume(volume ?? config.volume);
+    audio.preload = 'auto';
 
-    this.audio.play().catch(() => {
-      console.info(`Ambient sound "${config.name}" not available: ${config.url}`);
-    });
-    this.isPlaying = true;
+    try {
+      await audio.play();
+      if (requestId !== this.playRequestId) {
+        audio.pause();
+        audio.currentTime = 0;
+        return false;
+      }
+      this.audio = audio;
+      this.currentSound = sound;
+      this.isPlaying = true;
+      return true;
+    } catch (e) {
+      audio.pause();
+      this.audio = null;
+      this.currentSound = 'none';
+      this.isPlaying = false;
+      console.info(`Ambient sound "${config.name}" not available: ${config.url}`, e);
+      return false;
+    }
   }
 
   stop(): void {
+    this.playRequestId += 1;
     if (this.audio) {
       this.audio.pause();
       this.audio.currentTime = 0;
@@ -172,7 +249,7 @@ class AmbientPlayer {
 
   setVolume(volume: number): void {
     if (this.audio) {
-      this.audio.volume = Math.max(0, Math.min(1, volume));
+      this.audio.volume = this.toPerceivedVolume(volume);
     }
   }
 

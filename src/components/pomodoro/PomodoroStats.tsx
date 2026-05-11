@@ -40,10 +40,10 @@ export const PomodoroStats: React.FC = () => {
   const hasAnySessions = useMemo(() => allDays.some((d) => d.sessions.length > 0), [allDays]);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <h3 className="font-medium text-[#1a1a1a]">专注统计</h3>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="auto-grid-compact">
         <div className="p-3 bg-[#f0fdf4] rounded-lg">
           <div className="flex items-center gap-2 text-[#16a34a] mb-1">
             <Target size={14} />
@@ -63,7 +63,8 @@ export const PomodoroStats: React.FC = () => {
       </div>
 
       {hasAnySessions && (
-        <div>
+        <div className="min-w-0 overflow-x-auto pb-1">
+          <div className="min-w-[300px]">
           <div className="flex items-center gap-2 text-[#6b7280] mb-3">
             <TrendingUp size={14} />
             <span className="text-xs font-medium">本周趋势</span>
@@ -133,6 +134,7 @@ export const PomodoroStats: React.FC = () => {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       )}

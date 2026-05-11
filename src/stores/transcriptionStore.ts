@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { idbStorage } from '../lib/idbStorage';
+import { DEFAULT_SUBTITLE_CORRECTION_PROMPT } from '../lib/aiPromptDefaults';
 
 export const WHISPER_MODELS = [
   { id: 'tiny', name: 'tiny', desc: '最快，适合临时预览，准确率最低' },
@@ -10,9 +11,6 @@ export const WHISPER_MODELS = [
   { id: 'large', name: 'large', desc: 'large 系列基础版本' },
   { id: 'large-v3', name: 'large-v3', desc: '高质量推荐，资源占用最高' },
 ];
-
-export const DEFAULT_SUBTITLE_CORRECTION_PROMPT =
-  '根据上下文校对字幕文本，修正明显的识别错误、错别字、专有名词和技术词。保持原意，不扩写，不翻译，不合并或拆分字幕，不改变时间轴。';
 
 export interface TranscriptionSettings {
   whisperEngine: string;
@@ -29,6 +27,7 @@ export interface TranscriptionSettings {
   subtitleCorrectionEnabled: boolean;
   subtitleCorrectionScope: 'full' | 'off';
   subtitleCorrectionPrompt: string;
+  llmUsagePolicy: 'local_first' | 'external_first' | 'local_only' | 'external_only';
 }
 
 interface TranscriptionState extends TranscriptionSettings {
@@ -42,7 +41,7 @@ export const DEFAULT_TRANSCRIPTION_SETTINGS: TranscriptionSettings = {
   language: 'zh',
   doSummary: true,
   wordLimit: 200,
-  cpuThreads: 12,
+  cpuThreads: 6,
   computeType: 'int8',
   beamSize: 5,
   bestOf: 5,
@@ -51,6 +50,7 @@ export const DEFAULT_TRANSCRIPTION_SETTINGS: TranscriptionSettings = {
   subtitleCorrectionEnabled: false,
   subtitleCorrectionScope: 'full',
   subtitleCorrectionPrompt: DEFAULT_SUBTITLE_CORRECTION_PROMPT,
+  llmUsagePolicy: 'local_first',
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -87,6 +87,9 @@ function sanitizeSettings(value: Partial<TranscriptionSettings>): TranscriptionS
       : DEFAULT_TRANSCRIPTION_SETTINGS.subtitleCorrectionEnabled,
     subtitleCorrectionScope: value.subtitleCorrectionScope === 'off' ? 'off' : 'full',
     subtitleCorrectionPrompt: promptLooksCorrupt ? DEFAULT_SUBTITLE_CORRECTION_PROMPT : rawPrompt,
+    llmUsagePolicy: value.llmUsagePolicy === 'external_first' || value.llmUsagePolicy === 'local_only' || value.llmUsagePolicy === 'external_only'
+      ? value.llmUsagePolicy
+      : 'local_first',
   };
 }
 
@@ -99,7 +102,7 @@ function migrateSettings(persistedState: unknown): TranscriptionSettings {
   const migrated = wasLegacyDefault
     ? { ...next, whisperEngine: DEFAULT_TRANSCRIPTION_SETTINGS.whisperEngine, whisperModel: DEFAULT_TRANSCRIPTION_SETTINGS.whisperModel }
     : next;
-  const wasOldThreadDefault = raw.cpuThreads === undefined || raw.cpuThreads === 4;
+  const wasOldThreadDefault = raw.cpuThreads === undefined || raw.cpuThreads === 4 || raw.cpuThreads === 12;
   return wasOldThreadDefault ? { ...migrated, cpuThreads: DEFAULT_TRANSCRIPTION_SETTINGS.cpuThreads } : migrated;
 }
 
@@ -113,7 +116,7 @@ export const useTranscriptionStore = create<TranscriptionState>()(
     {
       name: 'p2m-transcription-storage',
       storage: createJSONStorage(() => idbStorage),
-      version: 5,
+      version: 6,
       migrate: (persistedState: unknown) => ({
         ...DEFAULT_TRANSCRIPTION_SETTINGS,
         ...migrateSettings(persistedState),

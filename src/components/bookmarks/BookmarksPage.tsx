@@ -30,12 +30,12 @@ export const BookmarksPage: React.FC = () => {
         }
       />
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
           <input type="text" placeholder="搜索书签..." className="w-full pl-10 pr-4 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl text-sm outline-none" />
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {FOLDERS.map((f) => (
             <button key={f} className={`px-3 py-2 text-xs rounded-lg transition-colors ${f === '全部' ? 'bg-[#fef7ed] text-[#c87d2f]' : 'text-[#6b7280] hover:bg-[#f3f2ef]'}`}>
               {f}
@@ -44,7 +44,7 @@ export const BookmarksPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="auto-grid-panels">
         {MOCK_BOOKMARKS.map((bm) => (
           <div key={bm.title} className="flex items-center gap-3 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md transition-shadow cursor-pointer group">
             <span className="text-xl">{bm.favicon}</span>

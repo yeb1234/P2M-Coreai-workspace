@@ -12,23 +12,21 @@ export const PomodoroPage: React.FC = () => {
       <div className="hidden md:block">
         <PageTitle title="番茄钟" subtitle="专注工作，高效休息" icon={<Timer size={22} />} />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="space-y-4 relative">
-          <div className="lg:pr-6 flex flex-col items-center">
-            <div className="w-full max-w-lg">
+      <div
+        className="grid gap-5"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))' }}
+      >
+        <div className="space-y-4 min-w-0">
+          <div className="flex flex-col items-center">
+            <div className="w-full max-w-[440px]">
               <PomodoroTimer />
             </div>
-            <div className="w-full max-w-lg">
+            <div className="w-full max-w-[440px]">
               <PomodoroSettings />
             </div>
           </div>
-          {/* Decorative vertical divider */}
-          <div className="hidden lg:block absolute right-0 top-2 bottom-2" style={{ width: '2px' }}>
-            <div className="h-full w-full bg-gradient-to-b from-transparent via-[#d1cdc6] to-transparent opacity-60 rounded-full" />
-            <div className="absolute inset-0 w-full bg-gradient-to-b from-transparent via-[#c87d2f]/15 to-transparent blur-[2px] rounded-full" />
-          </div>
         </div>
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           <PomodoroStats />
           <PomodoroSessionList />
         </div>

@@ -8,6 +8,7 @@ import { InlineAddInput } from './InlineAddInput';
 import { Modal, EmptyState, PageTitle, ConfirmDialog } from '../shared';
 import type { Todo } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
+import { playInteractionSound } from '../../lib/sounds';
 
 export const TodoList: React.FC = () => {
   // Subscribe to raw data so component re-renders on changes
@@ -88,9 +89,11 @@ export const TodoList: React.FC = () => {
       if (e.ctrlKey && e.key === 'z') {
         e.preventDefault();
         undo();
+        playInteractionSound('restore');
       } else if (e.ctrlKey && e.key === 'y') {
         e.preventDefault();
         redo();
+        playInteractionSound('tap');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -112,6 +115,7 @@ export const TodoList: React.FC = () => {
   const handleDrop = useCallback((id: string) => {
     if (dragId && dragId !== id) {
       reorderTodos(dragId, id);
+      playInteractionSound('tap');
     }
     setDragId(null);
     setOverId(null);
@@ -125,6 +129,7 @@ export const TodoList: React.FC = () => {
   const moveCompletedToTrash = useCallback(() => {
     const moved = trashCompletedTodos(completedTodos.map((todo) => todo.id));
     if (moved > 0) {
+      playInteractionSound('delete');
       setShowTrash(true);
       setCollapsedTrash(false);
     }
@@ -169,14 +174,20 @@ export const TodoList: React.FC = () => {
                 <SlidersHorizontal size={16} />
               </button>
               <button
-                onClick={undo}
+                onClick={() => {
+                  undo();
+                  playInteractionSound('restore');
+                }}
                 className="p-2 text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
                 title="撤销 (Ctrl+Z)"
               >
                 <Undo2 size={16} />
               </button>
               <button
-                onClick={redo}
+                onClick={() => {
+                  redo();
+                  playInteractionSound('tap');
+                }}
                 className="p-2 text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
                 title="重做 (Ctrl+Y)"
               >
@@ -248,7 +259,10 @@ export const TodoList: React.FC = () => {
             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
               {trashedTodos.length > 0 && !collapsedTrash && (
                 <button
-                  onClick={clearTrash}
+                  onClick={() => {
+                    clearTrash();
+                    playInteractionSound('delete');
+                  }}
                   className="text-xs text-[#9ca3af] hover:text-[#dc3545] transition-colors px-2 py-1"
                 >
                   清空垃圾箱
@@ -278,14 +292,20 @@ export const TodoList: React.FC = () => {
                       <span className="text-[10px] text-[#b8b4ac]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
                     </div>
                     <button
-                      onClick={() => restoreTodo(todo.id)}
+                      onClick={() => {
+                        restoreTodo(todo.id);
+                        playInteractionSound('restore');
+                      }}
                       className="flex items-center gap-1 px-2 py-1 text-xs text-[#c87d2f] hover:bg-[#fef7ed] rounded transition-colors"
                     >
                       <RotateCcw size={12} />
                       恢复
                     </button>
                     <button
-                      onClick={() => permanentDeleteTodo(todo.id)}
+                      onClick={() => {
+                        permanentDeleteTodo(todo.id);
+                        playInteractionSound('delete');
+                      }}
                       className="p-1 text-[#9ca3af] hover:text-[#dc3545] transition-colors"
                       title="永久删除"
                     >
@@ -370,7 +390,7 @@ export const TodoList: React.FC = () => {
       <ConfirmDialog
         isOpen={showClearConfirm}
         onClose={() => setShowClearConfirm(false)}
-        onConfirm={clearAllTodos}
+        onConfirm={() => { clearAllTodos(); playInteractionSound('delete'); }}
         title="清空待办"
         message={`确定要清空所有 ${filteredTodos.length} 条待办事项吗？此操作不可撤销。`}
         confirmText="清空"

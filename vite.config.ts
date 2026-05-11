@@ -7,13 +7,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 8000,
-    strictPort: true,
-    proxy: {
-      '/api': 'http://127.0.0.1:80',
-      '/output': 'http://127.0.0.1:80',
-      '/thumbnails': 'http://127.0.0.1:80',
-      '/sprites': 'http://127.0.0.1:80',
-    },
+    strictPort: false,
   },
   build: {
     rolldownOptions: {

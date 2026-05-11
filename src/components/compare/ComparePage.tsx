@@ -40,7 +40,7 @@ export const ComparePage: React.FC = () => {
         {MOCK_COMPARE.map((group) => (
           <div key={group.name}>
             <h3 className="text-sm font-semibold text-[#1a1a1a] mb-3">{group.name}</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="auto-grid-panels">
               {group.items.map((item, idx) => (
                 <div
                   key={item.name}

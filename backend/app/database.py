@@ -12,17 +12,19 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     database_url: str = f"sqlite:///{ROOT_DIR / 'learning_os.db'}"
     video_folder: str = str(ROOT_DIR / "videos")
-    work_dir: str = str(ROOT_DIR / "work")
-    output_dir: str = str(ROOT_DIR / "output")
-    thumbnail_dir: str = str(ROOT_DIR / "thumbnails")
-    sprite_dir: str = str(ROOT_DIR / "sprites")
+    work_dir: str = ""
+    output_dir: str = ""
+    thumbnail_dir: str = ""
+    sprite_dir: str = ""
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b-instruct"
     default_whisper_model: str = "small"
     default_language: str = "zh"
     external_llm_base_url: str = "https://token.sensenova.cn/v1"
     external_llm_api_key: str = ""
-    external_llm_model: str = "sensenova-6.7-flash-lite"
+    external_llm_model: str = "deepseek-v4-flash"
+    llm_usage_policy: str = "local_first"
+    llm_context_token_limit: int = 8000
     assistant_llm_provider: str = "local"
     openai_base_url: str = "http://192.168.3.161:1234/v1"
     openai_api_key: str = "lm-studio"
@@ -33,7 +35,8 @@ class Settings(BaseSettings):
     thumbnail_background_enabled: bool = False
     thumbnail_background_idle_cycles: int = 10
     thumbnail_background_limit: int = 1
-    whisper_cpu_threads: int = min(12, os.cpu_count() or 12)
+    sprite_background_enabled: bool = False
+    whisper_cpu_threads: int = min(6, max(1, (os.cpu_count() or 4) - 2))
     whisper_compute_type: str = "int8"
     whisper_beam_size: int = 5
     whisper_best_of: int = 5
@@ -49,17 +52,32 @@ class Settings(BaseSettings):
     whisper_cpp_extra_args: str = ""
     jwt_secret: str = "p2m-local-dev-secret-change-in-prod"
     jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 72
+    jwt_expire_hours: int = 2160
 
     model_config = SettingsConfigDict(env_file=str(ROOT_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()
 
+if not settings.work_dir:
+    settings.work_dir = str(Path(settings.video_folder) / "work")
+if not settings.output_dir:
+    settings.output_dir = str(Path(settings.video_folder) / "output")
+if not settings.thumbnail_dir:
+    settings.thumbnail_dir = str(Path(settings.video_folder) / "thumbnails")
+if not settings.sprite_dir:
+    settings.sprite_dir = str(Path(settings.video_folder) / "sprites")
+
 for folder in (settings.video_folder, settings.work_dir, settings.output_dir, settings.thumbnail_dir, settings.sprite_dir):
     Path(folder).mkdir(parents=True, exist_ok=True)
 
-engine = create_engine(settings.database_url, connect_args={"check_same_thread": False})
+engine = create_engine(
+    settings.database_url,
+    connect_args={
+        "check_same_thread": False,
+        "timeout": 30,
+    } if settings.database_url.startswith("sqlite") else {},
+)
 
 
 @event.listens_for(engine, "connect")
@@ -69,7 +87,7 @@ def configure_sqlite_connection(dbapi_connection, _connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
-    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA busy_timeout=30000")
     cursor.close()
 
 

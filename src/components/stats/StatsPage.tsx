@@ -110,7 +110,7 @@ export const StatsPage: React.FC = () => {
       />
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="auto-grid-cards">
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#c87d2f] mb-2">
             <Target size={16} />
@@ -158,7 +158,7 @@ export const StatsPage: React.FC = () => {
       </div>
 
       {/* Extra stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="auto-grid-cards">
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-3 flex items-center gap-3">
           <StickyNote size={16} className="text-[#f59e0b]" />
           <div>
@@ -198,7 +198,7 @@ export const StatsPage: React.FC = () => {
           <h3 className="text-sm font-medium text-[#1a1a1a]">本周专注趋势</h3>
         </div>
         {totalWeekMinutes > 0 ? (
-          <div className="flex items-end gap-3 h-40">
+          <div className="min-w-[300px] flex items-end gap-3 h-40">
             {last7.map((date) => {
               const data = weekStats.dailyBreakdown[date];
               const minutes = data?.minutes || 0;

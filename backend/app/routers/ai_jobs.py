@@ -88,20 +88,49 @@ def _has_subtitles(video: Video) -> bool:
     return bool(video.subtitle_path or video.transcript_segments)
 
 
-def _needs_resume(video: Video, latest_job: AiJob | None, payload: AiJobBatchCreate) -> bool:
-    if latest_job and latest_job.status in ("failed", "cancelled"):
-        return True
-    if not _has_subtitles(video):
-        return True
-    if payload.do_summary and not video.summary:
-        return True
-    if not latest_job:
-        return True
-    if latest_job.status != "completed":
-        return True
-    if payload.subtitle_correction_enabled is not False and latest_job.subtitle_correction_enabled is False:
-        return True
-    return False
+def _has_summary(video: Video, latest_job: AiJob | None = None) -> bool:
+    return bool((video.summary and video.summary.strip()) or (latest_job and latest_job.summary and latest_job.summary.strip()))
+
+
+def _is_batch_eligible(video: Video, latest_job: AiJob | None, payload: AiJobBatchCreate) -> tuple[bool, str | None]:
+    has_subtitles = _has_subtitles(video)
+    has_summary = _has_summary(video, latest_job)
+
+    if payload.mode == "all":
+        return True, None
+
+    if latest_job and latest_job.status in ("queued", "running"):
+        return False, "active_job"
+
+    if payload.mode == "unfinished":
+        if latest_job and latest_job.status in ("failed", "cancelled"):
+            return True, None
+        if latest_job and latest_job.status == "completed":
+            return False, "complete"
+        if not has_subtitles:
+            return True, None
+        if latest_job and latest_job.status != "completed":
+            return True, None
+        return False, "complete"
+
+    if payload.mode == "missing_subtitles":
+        if has_subtitles:
+            return False, "has_subtitles"
+        return True, None
+
+    if payload.mode == "missing_summary":
+        if not has_subtitles:
+            return False, "no_subtitles"
+        if has_summary:
+            return False, "has_summary"
+        return True, None
+
+    if payload.mode == "failed_only":
+        if latest_job and latest_job.status == "failed":
+            return True, None
+        return False, "not_failed"
+
+    return False, "unknown_mode"
 
 
 def _latest_job_by_video(db: Session, video_ids: list[int]) -> dict[int, AiJob]:
@@ -170,29 +199,16 @@ def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
 
         latest_job = latest_jobs.get(video_id)
         force_rerun = payload.mode == "all"
-        if latest_job and latest_job.status in ("queued", "running") and not force_rerun:
-            active += 1
-            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="active_job"))
-            continue
         if latest_job and latest_job.status in ("queued", "running") and force_rerun:
             active += 1
 
-        has_subtitles = _has_subtitles(video)
-        has_summary = bool(video.summary)
-        if payload.mode == "missing_subtitles" and has_subtitles:
-            already_done += 1
-            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="has_subtitles"))
-            continue
-        if payload.mode == "missing_summary" and has_summary:
-            already_done += 1
-            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="has_summary"))
-            continue
-        if payload.mode == "failed_only" and (not latest_job or latest_job.status != "failed"):
-            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="not_failed"))
-            continue
-        if payload.mode == "unfinished" and not _needs_resume(video, latest_job, payload):
-            already_done += 1
-            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason="complete"))
+        eligible_for_mode, skip_reason = _is_batch_eligible(video, latest_job, payload)
+        if not eligible_for_mode:
+            if skip_reason == "active_job":
+                active += 1
+            if skip_reason in {"complete", "has_subtitles", "has_summary"}:
+                already_done += 1
+            skipped_items.append(AiJobBatchSkippedItem(video_id=video.id, title=video.title, reason=skip_reason or "skipped"))
             continue
         if latest_job and latest_job.status == "failed":
             failed += 1

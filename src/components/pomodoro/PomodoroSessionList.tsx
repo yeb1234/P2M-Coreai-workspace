@@ -3,6 +3,7 @@ import { Clock, CheckCircle, Trash2, ChevronDown, ChevronUp } from 'lucide-react
 import { usePomodoroStore, useTodoStore } from '../../stores';
 import { formatDate, formatDuration } from '../../lib/date';
 import { PHASE_LABELS } from '../../types';
+import { playInteractionSound } from '../../lib/sounds';
 
 const INITIAL_LIMIT = 5;
 
@@ -37,7 +38,7 @@ export const PomodoroSessionList: React.FC = () => {
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-[#1a1a1a]">专注记录</h3>
         <button
-          onClick={clearHistory}
+          onClick={() => { clearHistory(); playInteractionSound('delete'); }}
           className="flex items-center gap-1 text-xs text-[#9ca3af] hover:text-[#dc3545] transition-colors"
         >
           <Trash2 size={12} />

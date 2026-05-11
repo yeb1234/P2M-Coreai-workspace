@@ -2,6 +2,7 @@ import type { ID, ISODateTimeString } from './common';
 
 export type PomodoroPhase = 'work' | 'short_break' | 'long_break';
 export type PomodoroStatus = 'idle' | 'running' | 'paused';
+export type AmbientPlaybackMode = 'manual' | 'focus';
 
 export interface PomodoroConfig {
   workDuration: number;
@@ -9,6 +10,7 @@ export interface PomodoroConfig {
   longBreakDuration: number;
   longBreakInterval: number;
   dailyGoal: number;
+  ambientPlaybackMode: AmbientPlaybackMode;
 }
 
 export interface PomodoroSession {
@@ -38,6 +40,7 @@ export const DEFAULT_CONFIG: PomodoroConfig = {
   longBreakDuration: 15,
   longBreakInterval: 4,
   dailyGoal: 8,
+  ambientPlaybackMode: 'manual',
 };
 
 export const PHASE_LABELS: Record<PomodoroPhase, string> = {

@@ -1,15 +1,52 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Send, X, Trash2, Loader2, PlayCircle } from 'lucide-react';
 import { useAIStore } from '../../stores';
-import { buildAIRequestSystemPrompt } from '../../stores/aiStore';
-import { searchSegments, type SegmentSearchResult } from '../../lib/videoApi';
+import {
+  fetchAssistantRuntimeSettings,
+  sendAssistantChat,
+  type AssistantRuntimeSettingsDto,
+  type SegmentSearchResult,
+} from '../../lib/videoApi';
 import { useDragResize } from '../../hooks/useDragResize';
+import { getAssistantPageContext, type AssistantPageContext } from '../../lib/assistantPageContext';
+import { buildAIRequestSystemPrompt } from '../../lib/aiPromptDefaults';
+import { playInteractionSound } from '../../lib/sounds';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const PENDING_RECOMMENDED_VIDEO_KEY = 'p2m_pending_recommended_video_id';
+const ASSISTANT_SETTINGS_CHANGED_EVENT = 'p2m:assistant-settings-changed';
+
+function shortProviderModel(provider: 'local' | 'external', modelName: string) {
+  const label = provider === 'local' ? '本地' : '外部';
+  return `${label} ${modelName.trim() || '未设置'}`;
+}
+
+function getRuntimeModelLabel(settings: AssistantRuntimeSettingsDto) {
+  const local = shortProviderModel('local', settings.local_model);
+  const external = shortProviderModel('external', settings.external_model);
+  switch (settings.llm_usage_policy) {
+    case 'external_first':
+      return `先${external}，后${local}`;
+    case 'local_only':
+      return `只用${local}`;
+    case 'external_only':
+      return `只用${external}`;
+    case 'local_first':
+    default:
+      return `先${local}，后${external}`;
+  }
+}
+
+function openRecommendedVideo(videoId: number) {
+  localStorage.setItem(PENDING_RECOMMENDED_VIDEO_KEY, String(videoId));
+  window.location.hash = '/video';
+  window.dispatchEvent(new CustomEvent('p2m:play-video', { detail: { videoId } }));
+  playInteractionSound('start');
+}
 
 export const AIChatPanel: React.FC = () => {
   const {
-    chatOpen, setChatOpen, endpoint, model, systemPrompt, promptTemplates, activeTemplateId,
+    chatOpen, setChatOpen, model, systemPrompt, promptTemplates, activeTemplateId,
     chatWidth, setChatWidth, messages, addMessage, clearMessages,
   } = useAIStore();
   const { width: liveChatWidth, startResize } = useDragResize({
@@ -24,12 +61,9 @@ export const AIChatPanel: React.FC = () => {
   const [error, setError] = useState('');
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [videoResults, setVideoResults] = useState<SegmentSearchResult[]>([]);
-  const unmountedRef = useRef(false);
+  const [pageContext, setPageContext] = useState<AssistantPageContext>(() => getAssistantPageContext());
+  const [runtimeModelLabel, setRuntimeModelLabel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    return () => { unmountedRef.current = true; };
-  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -39,6 +73,39 @@ export const AIChatPanel: React.FC = () => {
     () => promptTemplates.find((template) => template.id === activeTemplateId) ?? promptTemplates[0],
     [activeTemplateId, promptTemplates]
   );
+  const visibleVideoResults = useMemo(
+    () => [...new Map(videoResults.filter((item) => item.score_hint > 0).map((item) => [item.video_id, item])).values()].slice(0, 5),
+    [videoResults]
+  );
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const refreshContext = () => setPageContext(getAssistantPageContext());
+    refreshContext();
+    const timer = window.setInterval(refreshContext, 1500);
+    return () => window.clearInterval(timer);
+  }, [chatOpen]);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    let cancelled = false;
+    const refreshRuntimeSettings = async () => {
+      try {
+        const settings = await fetchAssistantRuntimeSettings();
+        if (!cancelled) setRuntimeModelLabel(getRuntimeModelLabel(settings));
+      } catch {
+        if (!cancelled) setRuntimeModelLabel('');
+      }
+    };
+    void refreshRuntimeSettings();
+    window.addEventListener('focus', refreshRuntimeSettings);
+    window.addEventListener(ASSISTANT_SETTINGS_CHANGED_EVENT, refreshRuntimeSettings);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshRuntimeSettings);
+      window.removeEventListener(ASSISTANT_SETTINGS_CHANGED_EVENT, refreshRuntimeSettings);
+    };
+  }, [chatOpen]);
 
   if (!chatOpen) return null;
 
@@ -51,108 +118,41 @@ export const AIChatPanel: React.FC = () => {
     const userId = makeId();
     addMessage({ id: userId, role: 'user', content: text });
     setLoading(true);
-
-    // Search for relevant videos
-    let videoContext = '';
-    try {
-      const results = await searchSegments(text, 5);
-      if (results.length > 0) {
-        setVideoResults(results);
-        const uniqueVideos = new Map<number, { title: string; matches: string[] }>();
-        for (const r of results) {
-          const existing = uniqueVideos.get(r.video_id);
-          if (existing) {
-            existing.matches.push(r.text);
-          } else {
-            uniqueVideos.set(r.video_id, { title: r.video_title || `视频 ${r.video_id}`, matches: [r.text] });
-          }
-        }
-        const lines = [...uniqueVideos.entries()].map(([id, v]) =>
-          `- 《${v.title}》(ID:${id})：${v.matches.slice(0, 2).join('；')}`
-        );
-        videoContext = `\n\n用户视频库中找到以下相关视频：\n${lines.join('\n')}\n请根据这些视频内容回答用户问题，并推荐相关视频。`;
-      }
-    } catch {
-      // Video search is best-effort
-    }
+    playInteractionSound('start');
 
     const assistantId = makeId();
     setStreamingId(assistantId);
     addMessage({ id: assistantId, role: 'assistant', content: '' });
 
     try {
-      const payload = {
-        model,
-        messages: [
-          { role: 'system', content: buildAIRequestSystemPrompt(systemPrompt, activeTemplate?.content ?? '') + videoContext },
-          ...messages.map((message) => ({ role: message.role, content: message.content })),
-          { role: 'user', content: text },
-        ],
-        stream: true,
-      };
-      console.log('[AIChat] fetching', endpoint);
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      console.log('[AIChat] response status', res.status, 'ok:', res.ok, 'body:', !!res.body);
-      if (!res.ok || !res.body) throw new Error(`接口返回 ${res.status}`);
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let finalText = '';
-      let chunkCount = 0;
-
-      while (true) {
-        if (unmountedRef.current) { reader.cancel(); break; }
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        chunkCount++;
-        if (chunkCount <= 3) console.log('[AIChat] chunk', chunkCount, ':', text.slice(0, 200));
-        buffer += text;
-        const chunks = buffer.split('\n');
-        buffer = chunks.pop() ?? '';
-
-        for (const chunk of chunks) {
-          const line = chunk.trim();
-          if (!line) continue;
-          if (line === 'data: [DONE]') { console.log('[AIChat] stream DONE'); continue; }
-          if (!line.startsWith('data:')) continue;
-          try {
-            const json = JSON.parse(line.slice(5).trim());
-            const delta = json?.choices?.[0]?.delta?.content || json?.message?.content || '';
-            if (delta) {
-              finalText += delta;
-              setError('');
-              useAIStore.setState((state) => ({
-                messages: state.messages.map((message) =>
-                  message.id === assistantId ? { ...message, content: finalText } : message
-                ),
-              }));
-            }
-          } catch {
-            // ignore malformed chunk
-          }
-        }
-      }
-
-      console.log('[AIChat] stream finished, total chunks:', chunkCount, 'finalText length:', finalText.length);
+      const context = getAssistantPageContext();
+      setPageContext(context);
+      const requestSystemPrompt = buildAIRequestSystemPrompt(systemPrompt, activeTemplate?.content ?? '');
+      const data = await sendAssistantChat(text, 5, context.promptContext, requestSystemPrompt);
+      const finalText = data.answer?.trim() || '灵境小助手已返回，但没有可显示的文本。';
+      setVideoResults(data.references.filter((item) => item.score_hint > 0) as SegmentSearchResult[]);
+      setError('');
+      playInteractionSound('success');
+      useAIStore.setState((state) => ({
+        messages: state.messages.map((message) =>
+          message.id === assistantId ? { ...message, content: finalText } : message
+        ),
+      }));
       if (!finalText.trim()) {
+        setVideoResults([]);
         useAIStore.setState((state) => ({
           messages: state.messages.map((message) =>
-            message.id === assistantId ? { ...message, content: '本地 AI 已返回，但没有可显示的文本。' } : message
+            message.id === assistantId ? { ...message, content: '灵境小助手已返回，但没有可显示的文本。' } : message
           ),
         }));
       }
     } catch (err) {
-      console.error('[AIChat] error:', err);
-      setError(err instanceof Error ? err.message : '本地 AI 请求失败');
+      setError(err instanceof Error ? err.message : '灵境小助手请求失败');
+      playInteractionSound('error');
+      setVideoResults([]);
       useAIStore.setState((state) => ({
         messages: state.messages.map((message) =>
-          message.id === assistantId ? { ...message, content: '请求失败，请检查 LM Studio 是否已启动。' } : message
+          message.id === assistantId ? { ...message, content: '请求失败，请检查灵境小助手的模型服务是否已启动。' } : message
         ),
       }));
     } finally {
@@ -171,7 +171,7 @@ export const AIChatPanel: React.FC = () => {
         onMouseDown={(e) => { e.preventDefault(); startResize(e.clientX); }}
         onTouchStart={(e) => { e.preventDefault(); startResize(e.touches[0].clientX); }}
         className="absolute -left-3 top-0 z-10 flex h-full w-3 cursor-col-resize items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)]"
-        title="拖动调整 AI 助手宽度"
+        title="拖动调整灵境小助手宽度"
       >
         <span className="h-full w-px bg-[var(--border-light)]" />
         <span className="absolute h-12 w-1 rounded-full bg-[var(--border-medium)] opacity-60" />
@@ -179,11 +179,13 @@ export const AIChatPanel: React.FC = () => {
       <div className="h-14 px-3 border-b border-[var(--border-light)] flex items-center gap-2">
         <Bot size={17} className="text-[var(--accent)]" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">本地 AI 对话</p>
-          <p className="text-[10px] text-[var(--text-muted)] truncate">{model}</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">灵境小助手</p>
+          <p className="truncate text-[10px] text-[var(--text-muted)]" title={runtimeModelLabel || model}>
+            {runtimeModelLabel || model}
+          </p>
         </div>
         <button
-          onClick={clearMessages}
+          onClick={() => { clearMessages(); playInteractionSound('delete'); }}
           className="ml-auto p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
           title="清空对话"
         >
@@ -192,7 +194,7 @@ export const AIChatPanel: React.FC = () => {
         <button
           onClick={() => setChatOpen(false)}
           className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
-          title="关闭 AI 侧栏"
+          title="关闭灵境小助手"
         >
           <X size={15} />
         </button>
@@ -201,12 +203,15 @@ export const AIChatPanel: React.FC = () => {
       <div className="px-3 py-2 border-b border-[var(--border-light)] bg-[var(--bg-elevated)]">
         <p className="text-[10px] text-[var(--text-muted)]">当前模板</p>
         <p className="text-xs font-medium text-[var(--text-primary)] truncate">{activeTemplate?.name ?? '默认模板'}</p>
+        <p className={`mt-1 text-[10px] truncate ${pageContext.kind === 'none' ? 'text-[var(--text-muted)]' : 'text-[var(--accent)]'}`}>
+          {pageContext.label}
+        </p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
           <div className="text-xs leading-6 text-[var(--text-muted)]">
-            这里会连接你的本地 AI。提示词模板现在统一放在 AI 助手页面里编辑。
+            这里会连接灵境小助手。提示词模板现在统一放在灵境小助手页面里编辑。
           </div>
         )}
         {messages.map((message) => (
@@ -225,21 +230,19 @@ export const AIChatPanel: React.FC = () => {
         {loading && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
             <Loader2 size={13} className="animate-spin" />
-            本地 AI 正在回复...
+            灵境小助手正在回复...
           </div>
         )}
         {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
         <div ref={messagesEndRef} />
-        {videoResults.length > 0 && !loading && (
+        {visibleVideoResults.length > 0 && !loading && !error && (
           <div className="space-y-1.5">
             <p className="text-[10px] font-medium text-[var(--text-muted)]">相关视频</p>
-            {[...new Map(videoResults.map((r) => [r.video_id, r])).values()].slice(0, 5).map((r) => (
+            {visibleVideoResults.map((r) => (
               <button
                 key={r.video_id}
                 type="button"
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('p2m:play-video', { detail: { videoId: r.video_id } }));
-                }}
+                onClick={() => openRecommendedVideo(r.video_id)}
                 className="flex w-full items-start gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2.5 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
               >
                 <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />

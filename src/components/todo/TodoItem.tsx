@@ -3,7 +3,7 @@ import { Check, Clock, Trash2, Play, Edit, Calendar, GripVertical } from 'lucide
 import type { Todo } from '../../types';
 import { useTodoStore, usePomodoroStore } from '../../stores';
 import { formatDate, formatDuration } from '../../lib/date';
-import { playNotificationSound } from '../../lib/sounds';
+import { playInteractionSound, playNotificationSound } from '../../lib/sounds';
 import { TodoBadge } from './TodoBadge';
 import { ConfirmDialog } from '../shared';
 
@@ -61,6 +61,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== todo.title) {
       updateTodo(todo.id, { title: trimmed });
+      playInteractionSound('save');
     }
     setEditing(false);
   }, [editValue, todo.id, todo.title, updateTodo]);
@@ -181,7 +182,10 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
           <GripVertical size={14} />
         </div>
         <button
-          onClick={() => toggleTodoStatus(todo.id)}
+          onClick={() => {
+            toggleTodoStatus(todo.id);
+            playInteractionSound(todo.status === 'completed' ? 'restore' : 'complete');
+          }}
           onMouseEnter={() => setToggleHover(true)}
           onMouseLeave={() => setToggleHover(false)}
           className="mt-0.5 flex-shrink-0 hover:scale-110 transition-transform"
@@ -276,14 +280,20 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
             </button>
           )}
           <button
-            onClick={() => onEdit(todo)}
+            onClick={() => {
+              playInteractionSound('tap');
+              onEdit(todo);
+            }}
             className="p-1.5 rounded-lg hover:bg-[#fef7ed] text-[#9ca3af] hover:text-[#c87d2f] transition-colors"
             title="编辑"
           >
             <Edit size={16} />
           </button>
           <button
-            onClick={() => deleteTodo(todo.id)}
+            onClick={() => {
+              deleteTodo(todo.id);
+              playInteractionSound('delete');
+            }}
             className="p-1.5 rounded-lg hover:bg-[#fef2f2] text-[#9ca3af] hover:text-[#dc3545] transition-colors"
             title="删除"
           >

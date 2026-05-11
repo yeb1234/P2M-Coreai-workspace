@@ -56,7 +56,7 @@ export const EsportsPage: React.FC = () => {
         </div>
       ))}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="auto-grid-panels">
         {/* Recent matches */}
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl overflow-hidden">
           <div className="p-4 border-b border-[#e5e2dd] flex items-center gap-2">
@@ -111,7 +111,7 @@ export const EsportsPage: React.FC = () => {
       </div>
 
       {/* Stats overview */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="auto-grid-compact">
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
           <Trophy size={20} className="text-[#f59e0b] mx-auto mb-2" />
           <p className="text-xl font-bold text-[#1a1a1a]">156</p>

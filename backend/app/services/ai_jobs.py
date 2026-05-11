@@ -17,6 +17,38 @@ from app.utils.files import safe_stem, unique_suffix
 from app.utils.serialization import dump_segments
 
 
+def _external_llm_ready() -> bool:
+    runtime = _assistant_runtime_settings()
+    return bool(runtime["external_base_url"].strip() and runtime["external_api_key"].strip() and runtime["external_model"].strip())
+
+
+def _assistant_runtime_settings() -> dict:
+    try:
+        from app.routers.admin import load_assistant_runtime_settings
+
+        return load_assistant_runtime_settings()
+    except Exception:
+        return {
+            "local_base_url": settings.openai_base_url,
+            "local_api_key": settings.openai_api_key,
+            "local_model": settings.openai_model,
+            "external_base_url": settings.external_llm_base_url,
+            "external_api_key": settings.external_llm_api_key,
+            "external_model": settings.external_llm_model,
+            "llm_usage_policy": settings.llm_usage_policy,
+        }
+
+
+def _llm_usage_policy() -> str:
+    try:
+        from app.routers.admin import load_transcription_settings
+
+        value = _assistant_runtime_settings().get("llm_usage_policy") or load_transcription_settings().get("llm_usage_policy")
+    except Exception:
+        value = settings.llm_usage_policy
+    return value if value in {"local_first", "external_first", "local_only", "external_only"} else "local_first"
+
+
 def _stored_transcription_defaults() -> dict:
     try:
         from app.routers.admin import load_transcription_settings
@@ -86,7 +118,7 @@ def _build_job_options(
         do_summary=do_summary,
         word_limit=word_limit,
         ollama_model=ollama_model,
-        cpu_threads=(cpu_threads or stored.get("cpu_threads") or settings.whisper_cpu_threads) if resolved_engine != "whisper.cpp" else None,
+        cpu_threads=cpu_threads or stored.get("cpu_threads") or settings.whisper_cpu_threads,
         compute_type=compute_type or stored.get("compute_type") or settings.whisper_compute_type,
         beam_size=beam_size if beam_size is not None else stored.get("beam_size"),
         best_of=best_of if best_of is not None else stored.get("best_of"),
@@ -340,7 +372,7 @@ def requeue_interrupted_ai_jobs() -> int:
 
 def _step_extract_audio(db, job, video, paths):
     update_job_state(db, job, video, status="running", stage="extracting", message="Extracting audio")
-    extract_wav_16k_mono(paths.source, paths.wav, cpu_threads=job.cpu_threads if job.whisper_engine != "whisper.cpp" else None)
+    extract_wav_16k_mono(paths.source, paths.wav, cpu_threads=job.cpu_threads)
 
 
 def _step_transcribe(db, job, video, paths):
@@ -374,17 +406,55 @@ def _step_correct_subtitles(db, job, video, transcript, segments):
         return transcript, segments, None
 
     update_job_state(db, job, video, status="running", stage="correcting-subtitles", message="Correcting subtitles")
-    try:
-        segments = correct_segments_with_openai(
-            segments,
-            model=job.ollama_model or settings.openai_model,
-            base_url=settings.openai_base_url,
-            api_key=settings.openai_api_key,
+    policy = _llm_usage_policy()
+    runtime = _assistant_runtime_settings()
+
+    def correct_with_local(current_segments):
+        return correct_segments_with_openai(
+            current_segments,
+            model=job.ollama_model or runtime["local_model"],
+            base_url=runtime["local_base_url"],
+            api_key=runtime["local_api_key"],
             batch_size=settings.subtitle_correction_batch_size,
             timeout_s=settings.subtitle_correction_timeout_s,
             extra_prompt=job.subtitle_correction_prompt,
             scope=correction_scope,
         )
+
+    def correct_with_external(current_segments):
+        if not _external_llm_ready():
+            raise RuntimeError("External LLM is not configured")
+        return correct_segments_with_openai(
+            current_segments,
+            model=runtime["external_model"],
+            base_url=runtime["external_base_url"],
+            api_key=runtime["external_api_key"],
+            batch_size=settings.subtitle_correction_batch_size,
+            timeout_s=settings.subtitle_correction_timeout_s,
+            extra_prompt=job.subtitle_correction_prompt,
+            scope=correction_scope,
+        )
+
+    attempts = [("local", correct_with_local), ("external", correct_with_external)]
+    if policy == "external_first":
+        attempts.reverse()
+    elif policy == "local_only":
+        attempts = [("local", correct_with_local)]
+    elif policy == "external_only":
+        attempts = [("external", correct_with_external)]
+
+    errors = []
+    try:
+        for index, (label, runner) in enumerate(attempts):
+            try:
+                if index > 0:
+                    update_job_state(db, job, video, status="running", stage="correcting-subtitles", message=f"{attempts[index - 1][0]} LLM failed, retrying {label} LLM")
+                segments = runner(segments)
+                break
+            except Exception as exc:
+                errors.append(f"{label} failed: {exc}")
+        else:
+            raise RuntimeError(" | ".join(errors))
         transcript = "\n".join((s.get("text") or "").strip() for s in segments).strip()
         return transcript, segments, None
     except Exception as exc:
@@ -396,24 +466,60 @@ def _step_summarize(db, job, video, transcript):
         return None, None
 
     update_job_state(db, job, video, status="running", stage="summarizing", message="Summarizing content")
+    policy = _llm_usage_policy()
+    runtime = _assistant_runtime_settings()
+    errors = []
     try:
-        if settings.assistant_llm_provider in ("openai", "lmstudio"):
-            summary = summarize_with_openai(
-                transcript=transcript,
-                word_limit=job.word_limit,
-                model=job.ollama_model or settings.openai_model,
-                base_url=settings.openai_base_url,
-                api_key=settings.openai_api_key,
-            )
-        else:
-            summary = summarize_with_ollama(
+        def summarize_with_local():
+            if settings.assistant_llm_provider in ("openai", "lmstudio"):
+                return summarize_with_openai(
+                    transcript=transcript,
+                    word_limit=job.word_limit,
+                    model=job.ollama_model or runtime["local_model"],
+                    base_url=runtime["local_base_url"],
+                    api_key=runtime["local_api_key"],
+                )
+            return summarize_with_ollama(
                 transcript=transcript,
                 word_limit=job.word_limit,
                 model=job.ollama_model or settings.ollama_model,
                 base_url=settings.ollama_base_url,
             )
+
+        def summarize_with_external():
+            if not _external_llm_ready():
+                raise RuntimeError("External LLM is not configured")
+            return summarize_with_openai(
+                transcript=transcript,
+                word_limit=job.word_limit,
+                model=runtime["external_model"],
+                base_url=runtime["external_base_url"],
+                api_key=runtime["external_api_key"],
+            )
+
+        attempts = [("local", summarize_with_local), ("external", summarize_with_external)]
+        if policy == "external_first":
+            attempts.reverse()
+        elif policy == "local_only":
+            attempts = [("local", summarize_with_local)]
+        elif policy == "external_only":
+            attempts = [("external", summarize_with_external)]
+
+        summary = None
+        for index, (label, runner) in enumerate(attempts):
+            try:
+                if index > 0:
+                    update_job_state(db, job, video, status="running", stage="summarizing", message=f"{attempts[index - 1][0]} LLM failed, retrying {label} LLM")
+                summary = runner()
+                break
+            except Exception as exc:
+                errors.append(f"{label} failed: {exc}")
+        if summary is None:
+            raise RuntimeError(" | ".join(errors))
         return summary, None
     except Exception as exc:
+        if errors:
+            return None, " | ".join([*errors, f"external fallback failed: {exc}"])
         return None, str(exc)
 
 

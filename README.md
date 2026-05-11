@@ -4,19 +4,19 @@ SiteYeb is a local-first personal productivity workspace with a React frontend a
 
 ## Quick Start
 
-### 日常使用（单端口 80）
+### Daily use
 
 ```bash
 cd backend
 .venv311/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
 ```
 
-- 本机: http://localhost
-- 局域网: http://192.168.3.161
+- Local: http://localhost
+- LAN: use your machine IP on port 80
 
-改了前端代码后: `npm run build` → 浏览器 Ctrl+Shift+R 刷新，不用重启后端。
+If you only changed frontend code, run `npm run build` and refresh the browser. You do not need to restart the backend.
 
-### 开发调试（端口 8000 + 80）
+### Development
 
 Terminal 1 — 后端（端口 80）:
 
@@ -90,6 +90,12 @@ npm test
 npm run build
 cd backend && .venv311/Scripts/python -m compileall app
 ```
+
+Current verified state:
+
+- `npm test` passes: 6 test files, 40 tests.
+- `npm run build` passes.
+- Test coverage currently lives in `src/__tests__/`.
 
 ## Video Station Notes
 

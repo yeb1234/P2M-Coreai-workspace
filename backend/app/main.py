@@ -24,13 +24,6 @@ logger = logging.getLogger(__name__)
 
 def run_startup_scan() -> None:
     try:
-        db = SessionLocal()
-        try:
-            if db.query(Video).count() > 0:
-                logger.info("Startup video scan skipped: database already has videos")
-                return
-        finally:
-            db.close()
         result = scan_video_library()
         logger.info("Startup video scan finished: %s", result)
     except Exception:
@@ -88,8 +81,10 @@ app.mount("/output", StaticFiles(directory=settings.output_dir), name="output")
 app.mount("/thumbnails", StaticFiles(directory=settings.thumbnail_dir), name="thumbnails")
 app.mount("/sprites", StaticFiles(directory=settings.sprite_dir), name="sprites")
 
-if DIST_DIR.is_dir():
+if (DIST_DIR / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="static-assets")
+if (DIST_DIR / "sounds").is_dir():
+    app.mount("/sounds", StaticFiles(directory=DIST_DIR / "sounds"), name="static-sounds")
 
 
 @app.get("/api/stats", response_model=StatsOut)
@@ -120,10 +115,23 @@ def get_stats():
 
 @app.get("/{full_path:path}")
 async def serve_spa(request: Request, full_path: str):
-    if full_path.startswith("api/") or full_path.startswith("output/") or full_path.startswith("thumbnails/") or full_path.startswith("sprites/") or full_path.startswith("assets/"):
+    if (
+        full_path.startswith("api/")
+        or full_path.startswith("output/")
+        or full_path.startswith("thumbnails/")
+        or full_path.startswith("sprites/")
+        or full_path.startswith("assets/")
+        or full_path.startswith("sounds/")
+    ):
         from fastapi.responses import JSONResponse
         return JSONResponse({"detail": "Not Found"}, status_code=404)
     index = DIST_DIR / "index.html"
     if index.is_file():
-        return FileResponse(index)
+        return FileResponse(
+            index,
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+            },
+        )
     return {"message": "P2 Learning OS API", "video_folder": settings.video_folder}

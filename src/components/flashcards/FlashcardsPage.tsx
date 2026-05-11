@@ -25,14 +25,14 @@ export const FlashcardsPage: React.FC = () => {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="auto-grid-panels">
         {MOCK_DECKS.map((deck) => (
           <div key={deck.name} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-5 hover:shadow-md transition-shadow cursor-pointer">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: deck.color }} />
               <h3 className="text-sm font-semibold text-[#1a1a1a]">{deck.name}</h3>
             </div>
-            <div className="flex items-center gap-4 text-xs text-[#6b7280] mb-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6b7280] mb-4">
               <span>{deck.cards} 张卡片</span>
               <span className="text-[#16a34a]">{deck.mastered} 已掌握</span>
             </div>

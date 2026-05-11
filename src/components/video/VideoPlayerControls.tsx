@@ -14,6 +14,7 @@ import {
 import { SpritePreview } from './SpritePreview';
 import { Slider } from './VideoSlider';
 import { PLAYER_SPEED_MAX, PLAYER_SPEED_MIN, PLAYER_SPEED_STEP, clampPlaybackRate, formatTime } from './videoPlayerUtils';
+import { playInteractionSound } from '../../lib/sounds';
 
 interface VideoPlayerControlsProps {
   showControls: boolean;
@@ -128,19 +129,19 @@ export function VideoPlayerControls({
         )}
 
         <div className={`flex items-center ${isMobile ? 'gap-1.5' : 'gap-1'}`}>
-          <button onClick={onTogglePlay} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title={isPlaying ? '暂停 (空格)' : '播放 (空格)'}>
+          <button onClick={() => { onTogglePlay(); playInteractionSound(isPlaying ? 'tap' : 'start'); }} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title={isPlaying ? '暂停 (空格)' : '播放 (空格)'}>
             {isPlaying ? <Pause size={isMobile ? 18 : 20} /> : <Play size={isMobile ? 18 : 20} />}
           </button>
-          <button onClick={() => onSeekBy(-10)} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="后退10秒">
+          <button onClick={() => { onSeekBy(-10); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="后退10秒">
             <SkipBack size={isMobile ? 14 : 16} />
           </button>
-          <button onClick={() => onSeekBy(10)} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="前进10秒">
+          <button onClick={() => { onSeekBy(10); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="前进10秒">
             <SkipForward size={isMobile ? 14 : 16} />
           </button>
 
           {!isMobile && (
             <div className="flex items-center gap-1 group/vol">
-              <button onClick={onToggleMute} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isMuted ? '取消静音 (M)' : '静音 (M)'}>
+              <button onClick={() => { onToggleMute(); playInteractionSound('tap'); }} className="p-1.5 text-white/80 hover:text-white transition-colors" title={isMuted ? '取消静音 (M)' : '静音 (M)'}>
                 {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
               <div className="w-0 group-hover/vol:w-20 overflow-hidden transition-all duration-200">
@@ -154,14 +155,14 @@ export function VideoPlayerControls({
 
           {hasSubtitle && (
             <div className="relative">
-              <button data-subtitle-btn onClick={onToggleSubtitleMenu} className={`${isMobile ? 'p-1.5' : 'p-1.5'} transition-colors ${showSubtitles ? 'text-[#c87d2f]' : 'text-white/80 hover:text-white'}`} title="字幕">
+              <button data-subtitle-btn onClick={() => { onToggleSubtitleMenu(); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1.5' : 'p-1.5'} transition-colors ${showSubtitles ? 'text-[#c87d2f]' : 'text-white/80 hover:text-white'}`} title="字幕">
                 <Subtitles size={isMobile ? 14 : 16} />
               </button>
               {showSubtitleMenu && (
                 <div data-subtitle-menu className="absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-sm rounded-lg p-3 min-w-[180px] space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-white/70">字幕</span>
-                    <button onClick={onToggleSubtitles} className={`px-2 py-0.5 text-[10px] rounded ${showSubtitles ? 'bg-[#c87d2f] text-white' : 'bg-white/10 text-white/60'}`}>
+                    <button onClick={() => { onToggleSubtitles(); playInteractionSound('tap'); }} className={`px-2 py-0.5 text-[10px] rounded ${showSubtitles ? 'bg-[#c87d2f] text-white' : 'bg-white/10 text-white/60'}`}>
                       {showSubtitles ? '开' : '关'}
                     </button>
                   </div>
@@ -185,7 +186,7 @@ export function VideoPlayerControls({
           )}
 
           <div className="relative">
-            <button data-speed-btn onClick={onToggleSpeedMenu} className={`${isMobile ? 'px-1.5 py-1 text-[10px]' : 'px-1.5 py-1 text-[11px]'} text-white/80 hover:text-white transition-colors font-medium`} title="倍速">
+            <button data-speed-btn onClick={() => { onToggleSpeedMenu(); playInteractionSound('tap'); }} className={`${isMobile ? 'px-1.5 py-1 text-[10px]' : 'px-1.5 py-1 text-[11px]'} text-white/80 hover:text-white transition-colors font-medium`} title="倍速">
               {playbackRate === 1 ? '倍速' : `${playbackRate.toFixed(1)}x`}
             </button>
             {showSpeedMenu && (
@@ -204,11 +205,11 @@ export function VideoPlayerControls({
           </div>
 
           {!isMobile && (
-            <button onClick={onTogglePip} className="p-1.5 text-white/80 hover:text-white transition-colors" title="画中画">
+            <button onClick={() => { onTogglePip(); playInteractionSound('tap'); }} className="p-1.5 text-white/80 hover:text-white transition-colors" title="画中画">
               <PictureInPicture2 size={16} />
             </button>
           )}
-          <button onClick={onToggleFullscreen} className={`${isMobile ? 'p-1.5' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title={isFullscreen ? '退出全屏 (F)' : '全屏 (F)'}>
+          <button onClick={() => { onToggleFullscreen(); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1.5' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title={isFullscreen ? '退出全屏 (F)' : '全屏 (F)'}>
             {isFullscreen ? <Minimize size={isMobile ? 14 : 16} /> : <Maximize size={isMobile ? 14 : 16} />}
           </button>
         </div>

@@ -29,7 +29,7 @@ export const LeetcodePage: React.FC = () => {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="auto-grid-cards">
         <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#16a34a] mb-2"><CheckCircle size={16} /><span className="text-xs font-medium">已解决</span></div>
           <p className="text-2xl font-bold text-[#1a1a1a]">128</p>
@@ -53,7 +53,7 @@ export const LeetcodePage: React.FC = () => {
       </div>
 
       {/* Difficulty breakdown */}
-      <div className="flex gap-3">
+      <div className="auto-grid-compact">
         {['Easy', 'Medium', 'Hard'].map((d) => (
           <div key={d} className="flex-1 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-3 text-center">
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${DIFF_COLOR[d]}`}>{d}</span>
@@ -70,12 +70,12 @@ export const LeetcodePage: React.FC = () => {
         </div>
         <div className="divide-y divide-[#e5e2dd]">
           {MOCK_PROBLEMS.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#fef7ed] transition-colors cursor-pointer">
+            <div key={p.id} className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3 hover:bg-[#fef7ed] transition-colors cursor-pointer">
               <span className={`w-5 h-5 rounded-full flex items-center justify-center ${p.solved ? 'bg-[#16a34a]' : 'bg-[#e5e2dd]'}`}>
                 {p.solved && <CheckCircle size={12} className="text-white" />}
               </span>
               <span className="text-xs font-mono text-[#9ca3af] w-8">{p.id}</span>
-              <span className="flex-1 text-sm text-[#1a1a1a]">{p.title}</span>
+              <span className="min-w-[140px] flex-1 text-sm text-[#1a1a1a]">{p.title}</span>
               <span className={`text-[10px] px-2 py-0.5 rounded-full ${DIFF_COLOR[p.difficulty]}`}>{p.difficulty}</span>
               <span className="text-[10px] px-2 py-0.5 bg-[#f3f2ef] text-[#6b7280] rounded-full">{p.tag}</span>
               <span className="text-xs text-[#9ca3af] w-14 text-right">{p.time}</span>

@@ -13,18 +13,18 @@ const MOCK_AGENTS = [
 ];
 
 export const AIAgentPage: React.FC = () => {
-  const { promptTemplates, activeTemplateId, setActiveTemplateId, updateTemplate, addTemplate, setChatOpen } = useAIStore();
+  const { systemPrompt, setSystemPrompt, promptTemplates, activeTemplateId, setActiveTemplateId, updateTemplate, addTemplate, setChatOpen } = useAIStore();
   const activeTemplate = promptTemplates.find((template) => template.id === activeTemplateId) ?? promptTemplates[0];
 
   return (
     <div className="w-full pt-2 space-y-6">
       <PageTitle
-        title="AI 助手"
-        subtitle="这里连接你的本地 LM Studio，并统一管理提示词模板"
+        title="灵境小助手"
+        subtitle="统一管理灵境小助手的系统提示词和场景模板"
         icon={<Bot size={22} />}
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="auto-grid-cards">
         {MOCK_AGENTS.map((agent) => (
           <div key={agent.name} className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -39,8 +39,8 @@ export const AIAgentPage: React.FC = () => {
       <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] p-4 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">提示词模板</p>
-            <p className="text-xs text-[var(--text-muted)]">这些模板会被右侧本地 AI 对话面板直接读取。</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">对话提示词</p>
+            <p className="text-xs text-[var(--text-muted)]">系统提示词和当前模板会一起发送给右侧灵境小助手。</p>
           </div>
           <button
             onClick={addTemplate}
@@ -48,6 +48,16 @@ export const AIAgentPage: React.FC = () => {
           >
             新建模板
           </button>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-[var(--text-secondary)]">系统提示词</label>
+          <textarea
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+            className="w-full min-h-28 text-sm resize-y"
+            placeholder="控制 AI 的整体身份、语气、语言和回答边界"
+          />
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -87,11 +97,11 @@ export const AIAgentPage: React.FC = () => {
       <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] overflow-hidden">
         <div className="p-3 border-b border-[var(--border-light)] flex items-center gap-2">
           <Bot size={14} className="text-[var(--accent)]" />
-          <span className="text-xs font-medium text-[var(--text-primary)]">本地对话入口</span>
+          <span className="text-xs font-medium text-[var(--text-primary)]">灵境小助手入口</span>
           <span className="text-[10px] px-1.5 py-0.5 bg-[var(--accent-bg)] text-[var(--accent)] rounded-full ml-auto">LM Studio</span>
         </div>
         <div className="p-4 text-xs text-[var(--text-muted)]">
-          点击下面按钮会打开右侧 AI 对话栏，直接连接本机 LM Studio。
+          点击下面按钮会打开右侧灵境小助手对话栏，直接连接当前配置的模型服务。
         </div>
         <div className="p-3 border-t border-[var(--border-light)]">
           <div className="flex justify-end">
@@ -100,7 +110,7 @@ export const AIAgentPage: React.FC = () => {
               className="inline-flex items-center gap-2 px-3 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] text-xs"
             >
               <Send size={14} />
-              打开本地 AI 对话
+              打开灵境小助手
             </button>
           </div>
         </div>
