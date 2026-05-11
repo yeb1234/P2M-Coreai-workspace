@@ -25,7 +25,8 @@ export const MobileTabBar: React.FC = () => {
   const currentPath = location.hash.replace('#/', '').replace('#', '') || '';
 
   return (
-    <nav className="flex items-center justify-around bg-white border-t border-[#e5e2dd] px-1 py-1.5 safe-area-pb">
+    <nav className="safe-area-pb border-t border-[var(--border-light)] bg-[color-mix(in_srgb,var(--bg-card)_94%,transparent)] px-2 pt-1.5 shadow-[0_-8px_24px_rgba(0,0,0,0.04)] backdrop-blur">
+      <div className="mx-auto flex max-w-md items-center justify-around gap-1">
       {TABS.map((tab) => {
         const tabPath = VIEW_PATH[tab.id];
         const isActive = currentPath === tabPath;
@@ -33,17 +34,18 @@ export const MobileTabBar: React.FC = () => {
           <button
             key={tab.id}
             onClick={() => navigate(`/${tabPath}`)}
-            className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors min-w-0 flex-1 ${
+            className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 transition-colors ${
               isActive
-                ? 'text-[#c87d2f]'
-                : 'text-[#9ca3af] active:text-[#c87d2f]/60'
+                ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
+                : 'text-[var(--text-muted)] active:text-[var(--accent)]/60'
             }`}
           >
-            {tab.icon}
-            <span className="text-[11px] font-medium leading-tight">{tab.label}</span>
+            <span className="[&_svg]:h-[21px] [&_svg]:w-[21px]">{tab.icon}</span>
+            <span className="text-[10px] font-medium leading-tight">{tab.label}</span>
           </button>
         );
       })}
+      </div>
     </nav>
   );
 };

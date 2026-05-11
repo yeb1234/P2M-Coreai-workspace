@@ -16,6 +16,7 @@ export interface Todo {
   priority: TodoPriority;
   tags: ID[];
   dueDate: ISODateString | null;
+  reminderAt: ISODateTimeString | null;
   status: TodoStatus;
   pomodoroCount: number;
   pomodoroRounds: number;

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Calendar } from 'lucide-react';
+import { AlarmClock, Calendar } from 'lucide-react';
 import type { Todo, TodoPriority } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
 import { usePomodoroStore, useTodoStore } from '../../stores';
@@ -36,6 +36,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   const [description, setDescription] = useState(todo?.description || '');
   const [priority, setPriority] = useState<TodoPriority>(todo?.priority || defaultPriority || 'green');
   const [dueDate, setDueDate] = useState(todo?.dueDate || defaultDate || toISODateString(new Date()));
+  const [reminderAt, setReminderAt] = useState(() => todo?.reminderAt ? todo.reminderAt.slice(0, 16) : '');
   const [pomodoroRounds, setPomodoroRounds] = useState(todo?.pomodoroRounds || 0);
   const [customMode, setCustomMode] = useState(() => {
     if (!todo?.pomodoroRounds) return false;
@@ -145,6 +146,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       description: description.trim(),
       priority,
       dueDate: dueDate || null,
+      reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
       pomodoroRounds,
     };
 
@@ -224,6 +226,19 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
             placeholder="YYYY/MM/DD"
           />
           <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#d1cdc6] pointer-events-none" />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">提醒时间</label>
+        <div className="relative">
+          <input
+            type="datetime-local"
+            value={reminderAt}
+            onChange={(event) => setReminderAt(event.target.value)}
+            className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#faf9f7] text-sm text-[#1a1a1a]"
+          />
+          <AlarmClock size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#d1cdc6] pointer-events-none" />
         </div>
       </div>
 

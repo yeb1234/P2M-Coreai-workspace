@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { Film, Loader2, PlayCircle, Sparkles, ArrowDownWideNarrow, ArrowUpWideNarrow, Clock } from 'lucide-react';
+import { Film, Loader2, PlayCircle, Sparkles, ArrowDownWideNarrow, ArrowUpWideNarrow, Clock, Columns3, Star } from 'lucide-react';
 import { getThumbnailUrl, type VideoItem } from '../../lib/videoApi';
 import { formatVideoDuration } from './videoFormat';
 
@@ -31,34 +31,34 @@ export function Pagination({ page, totalPages, onPageChange }: { page: number; t
 
   return (
     <div className="flex items-center justify-center gap-1 pt-2 flex-wrap">
-      <button onClick={() => onPageChange(1)} disabled={page <= 1} className="px-2 py-1 rounded-lg text-xs text-[#6b7280] hover:bg-[#f3f2ef] disabled:opacity-30 disabled:cursor-not-allowed transition-colors" title="第一页">«</button>
-      <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="px-2 py-1 rounded-lg text-xs text-[#6b7280] hover:bg-[#f3f2ef] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">上一页</button>
+      <button onClick={() => onPageChange(1)} disabled={page <= 1} className="rounded-lg px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] disabled:cursor-not-allowed disabled:opacity-30 transition-colors" title="第一页">«</button>
+      <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="rounded-lg px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] disabled:cursor-not-allowed disabled:opacity-30 transition-colors">上一页</button>
       {pages.map((p, i) => p === '...' ? (
-        <span key={`e${i}`} className="px-1 text-xs text-[#b8b4ac]">...</span>
+        <span key={`e${i}`} className="px-1 text-xs text-[var(--text-muted)]">...</span>
       ) : (
         <button
           key={p}
           onClick={() => onPageChange(p)}
-          className={`px-3 py-1 rounded-lg text-xs transition-colors ${p === page ? 'bg-[#c87d2f] text-white' : 'text-[#6b7280] hover:bg-[#f3f2ef]'}`}
+          className={`rounded-lg px-3 py-1 text-xs transition-colors ${p === page ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-accent)]'}`}
         >
           {p}
         </button>
       ))}
-      <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className="px-2 py-1 rounded-lg text-xs text-[#6b7280] hover:bg-[#f3f2ef] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">下一页</button>
-      <button onClick={() => onPageChange(totalPages)} disabled={page >= totalPages} className="px-2 py-1 rounded-lg text-xs text-[#6b7280] hover:bg-[#f3f2ef] disabled:opacity-30 disabled:cursor-not-allowed transition-colors" title="最后一页">»</button>
+      <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className="rounded-lg px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] disabled:cursor-not-allowed disabled:opacity-30 transition-colors">下一页</button>
+      <button onClick={() => onPageChange(totalPages)} disabled={page >= totalPages} className="rounded-lg px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] disabled:cursor-not-allowed disabled:opacity-30 transition-colors" title="最后一页">»</button>
       {totalPages > 11 && (
         <div className="flex items-center gap-1 ml-2">
-          <span className="text-[10px] text-[#9ca3af]">跳至</span>
+          <span className="text-[10px] text-[var(--text-muted)]">跳至</span>
           <input
             type="text"
             value={jumpVal}
             onChange={(e) => setJumpVal(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleJump()}
             placeholder={`${page}`}
-            className="w-12 px-1.5 py-1 text-xs text-center bg-[#faf9f7] border border-[#e5e2dd] rounded-lg"
+            className="w-12 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-1.5 py-1 text-center text-xs"
           />
-          <span className="text-[10px] text-[#9ca3af]">/ {totalPages}</span>
-          <button onClick={handleJump} className="px-2 py-1 text-xs bg-[#f3f2ef] rounded-lg hover:bg-[#e5e2dd] text-[#6b7280] transition-colors">GO</button>
+          <span className="text-[10px] text-[var(--text-muted)]">/ {totalPages}</span>
+          <button onClick={handleJump} className="rounded-lg bg-[var(--bg-accent)] px-2 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--border-light)]">GO</button>
         </div>
       )}
     </div>
@@ -94,18 +94,18 @@ export function VideoNavigationCards({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-[#1a1a1a]">视频导航</span>
-          <span className="text-[10px] text-[#9ca3af]">继续观看、历史记录与推荐</span>
+          <span className="text-sm font-semibold text-[var(--text-primary)]">视频导航</span>
+          <span className="text-[10px] text-[var(--text-muted)]">继续观看、历史记录与推荐</span>
         </div>
       </div>
-      <div className="auto-grid-video">
+      <div className="video-navigation-grid">
         <button
           onClick={() => { if (continueVideo) onPlay(continueVideo.id); }}
           disabled={!continueVideo}
-          className="min-w-0 overflow-hidden rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-3 text-left hover:border-[#c87d2f]/50 hover:shadow-md disabled:cursor-default disabled:opacity-70 transition-all"
+          className="theme-card min-w-0 overflow-hidden rounded-xl p-3 text-left transition-all hover:border-[var(--accent)]/50 hover:shadow-md disabled:cursor-default disabled:opacity-70"
         >
-          <div className="flex items-center gap-3">
-            <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-[#e5e2dd]">
+          <div className="flex h-full items-center gap-3">
+            <div className="theme-progress-track relative aspect-video w-[7.25rem] shrink-0 overflow-hidden rounded-lg">
               {continueVideo?.thumbnail ? (
                 <img src={getThumbnailUrl(continueVideo.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
               ) : (
@@ -113,18 +113,18 @@ export function VideoNavigationCards({
               )}
               {continueVideo && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
-                  <div className="h-full bg-[#c87d2f]" style={{ width: `${continueVideo.duration ? Math.min(100, ((continueVideo.watch_progress || 0) / continueVideo.duration) * 100) : 0}%` }} />
+                  <div className="theme-progress-fill h-full" style={{ width: `${continueVideo.duration ? Math.min(100, ((continueVideo.watch_progress || 0) / continueVideo.duration) * 100) : 0}%` }} />
                 </div>
               )}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-medium text-[#c87d2f]">继续观看</p>
-              <p className="truncate text-sm font-semibold text-[#1a1a1a]">{continueVideo?.title || '暂无未看完的视频'}</p>
-              <p className="mt-1 text-xs text-[#9ca3af]">
+            <div className="min-w-0 flex-1 self-center">
+              <p className="text-[10px] font-medium text-[var(--accent)]">继续观看</p>
+              <p className="theme-text-primary truncate text-sm font-semibold">{continueVideo?.title || '暂无未看完的视频'}</p>
+              <p className="theme-text-muted mt-1 line-clamp-2 text-xs leading-4">
                 {continueVideo ? `已看到 ${formatVideoDuration(continueVideo.watch_progress)} / ${formatVideoDuration(continueVideo.duration)}` : '开始播放后会自动记录进度'}
               </p>
             </div>
-            <PlayCircle size={22} className="shrink-0 text-[#c87d2f]" />
+            <PlayCircle size={22} className="shrink-0 text-[var(--accent)]" />
           </div>
         </button>
 
@@ -201,9 +201,9 @@ function CompactVideoListCard({
   }, [videos, sortMode]);
 
   return (
-    <div className="min-w-0 rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-3">
+    <div className="theme-card min-w-0 rounded-xl p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-[#1a1a1a]">{title}</span>
+        <span className="text-xs font-semibold text-[var(--text-primary)]">{title}</span>
         <div className="flex items-center gap-1">
           {sortMode !== undefined && onSortChange && (
             <div className="flex items-center gap-0.5 mr-1">
@@ -215,7 +215,7 @@ function CompactVideoListCard({
                 <button
                   key={mode}
                   onClick={(e) => { e.stopPropagation(); onSortChange(mode); }}
-                  className={`p-0.5 rounded transition-colors ${sortMode === mode ? 'text-[#c87d2f]' : 'text-[#b8b4ac] hover:text-[#6b7280]'}`}
+                  className={`rounded p-0.5 transition-colors ${sortMode === mode ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
                   title={tip}
                 >
                   <Icon size={11} />
@@ -223,29 +223,29 @@ function CompactVideoListCard({
               ))}
             </div>
           )}
-          <button onClick={onShow} disabled={videos.length === 0} className={`text-[10px] ${active ? 'text-[#c87d2f]' : 'text-[#9ca3af] hover:text-[#c87d2f]'}`}>
+          <button onClick={onShow} disabled={videos.length === 0} className={`text-[10px] ${active ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)]'}`}>
             {videos.length === 0 ? '0 个' : `${videos.length} 个 查看`}
           </button>
         </div>
       </div>
       <div className="space-y-1.5">
         {sortedVideos.slice(0, 3).map((video) => (
-          <button key={video.id} onClick={() => onPlay(video.id)} className="flex w-full min-w-0 items-center gap-2 rounded-lg p-1.5 text-left hover:bg-[#f3f2ef] transition-colors">
-            <div className="relative h-8 w-12 shrink-0 overflow-hidden rounded bg-[#e5e2dd]">
+          <button key={video.id} onClick={() => onPlay(video.id)} className="flex w-full min-w-0 items-center gap-2 rounded-lg p-1.5 text-left transition-colors hover:bg-[var(--bg-accent)]">
+            <div className="theme-progress-track relative h-8 w-12 shrink-0 overflow-hidden rounded">
               {video.thumbnail ? (
                 <img src={getThumbnailUrl(video.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
               ) : (
-                <PlayCircle size={14} className="absolute inset-0 m-auto text-[#b8b4ac]" />
+              <PlayCircle size={14} className="absolute inset-0 m-auto text-[var(--text-muted)]" />
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-[#1a1a1a]">{video.title}</p>
-              <p className="truncate text-[10px] text-[#9ca3af]">{meta(video)}</p>
+              <p className="theme-text-primary truncate text-xs font-medium">{video.title}</p>
+              <p className="theme-text-muted truncate text-[10px]">{meta(video)}</p>
             </div>
           </button>
         ))}
-        {footnote && <p className="pt-1 text-[10px] leading-4 text-[#9ca3af]">{footnote}</p>}
-        {sortedVideos.length === 0 && <p className="rounded-lg border border-dashed border-[#e5e2dd] px-2 py-4 text-center text-xs text-[#9ca3af]">{emptyText}</p>}
+        {footnote && <p className="theme-text-muted pt-1 text-[10px] leading-4">{footnote}</p>}
+        {sortedVideos.length === 0 && <p className="rounded-lg border border-dashed border-[var(--border-light)] px-2 py-4 text-center text-xs text-[var(--text-muted)]">{emptyText}</p>}
       </div>
     </div>
   );
@@ -256,6 +256,8 @@ interface VideoGridSectionProps {
   videos: VideoItem[];
   gridMode: VideoGridMode;
   gridTitle: string;
+  columnsPerRow: number;
+  onColumnsPerRowChange: (columns: number) => void;
   filesLabel?: string;
   isSearching: boolean;
   currentCategoryId: number | null;
@@ -264,6 +266,7 @@ interface VideoGridSectionProps {
   totalPages: number;
   searchQuery: string;
   onPlay: (videoId: number) => void;
+  onToggleFavorite?: (videoId: number, nextFavorite: boolean) => void;
   onReturnToNormal: () => void;
   onPageChange: (page: number, searchQuery?: string) => void;
 }
@@ -273,6 +276,8 @@ export function VideoGridSection({
   videos,
   gridMode,
   gridTitle,
+  columnsPerRow,
+  onColumnsPerRowChange,
   filesLabel,
   isSearching,
   currentCategoryId,
@@ -281,6 +286,7 @@ export function VideoGridSection({
   totalPages,
   searchQuery,
   onPlay,
+  onToggleFavorite,
   onReturnToNormal,
   onPageChange,
 }: VideoGridSectionProps) {
@@ -302,7 +308,7 @@ export function VideoGridSection({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-[#9ca3af]">
+      <div className="flex items-center justify-center py-12 text-[var(--text-muted)]">
         <Loader2 size={24} className="animate-spin mr-2" /> 加载中...
       </div>
     );
@@ -310,7 +316,7 @@ export function VideoGridSection({
 
   if (videos.length === 0) {
     return (
-      <div className="text-center py-12 text-[#9ca3af]">
+      <div className="py-12 text-center text-[var(--text-muted)]">
         <Film size={40} className="mx-auto mb-3 opacity-40" />
         <p className="text-sm">{gridMode === 'history' ? '暂无历史记录' : gridMode === 'latest' ? '暂无最新视频' : (isSearching ? '没有匹配的视频' : '暂无视频')}</p>
         {gridMode === 'normal' && !isSearching && <p className="text-xs mt-1">请确认后端服务已启动且视频文件夹已配置</p>}
@@ -321,38 +327,72 @@ export function VideoGridSection({
   return (
     <>
       {gridMode !== 'normal' ? (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-[#9ca3af]">{gridTitle}</p>
-          <button onClick={onReturnToNormal} className="rounded-lg px-2 py-1 text-xs text-[#6b7280] hover:bg-[#f3f2ef] hover:text-[#c87d2f] transition-colors">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-[var(--text-muted)]">{gridTitle}</p>
+          <button onClick={onReturnToNormal} className="rounded-lg px-2 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]">
             返回当前列表
           </button>
         </div>
       ) : (
-        <>
-          {isSearching && <p className="text-xs text-[#9ca3af]">匹配的视频</p>}
-          {!isSearching && filesLabel && <p className="text-xs text-[#9ca3af]">{filesLabel}</p>}
-          {!isSearching && !filesLabel && !currentCategoryId && <p className="text-xs text-[#9ca3af]">共 {total} 个视频</p>}
-        </>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-[var(--text-muted)]">
+            {isSearching ? '匹配的视频' : filesLabel || (!currentCategoryId ? `共 ${total} 个视频` : '')}
+          </p>
+          <label className="flex items-center gap-1.5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
+            <Columns3 size={12} className="text-[var(--text-muted)]" />
+            每行
+            <select
+              value={columnsPerRow}
+              onChange={(event) => onColumnsPerRowChange(Number(event.target.value))}
+              className="h-6 rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-1.5 py-0 text-xs"
+              title="设置当前视频列表每行显示的视频数量"
+            >
+              {[2, 3, 4, 5, 6, 7, 8].map((count) => (
+                <option key={count} value={count}>{count}</option>
+              ))}
+            </select>
+            个
+          </label>
+        </div>
       )}
-      <div className="auto-grid-video">
+      <div
+        className="video-card-grid"
+        style={{ '--video-grid-columns': columnsPerRow } as React.CSSProperties}
+      >
         {displayVideos.map((v) => (
-          <div key={v.id} onClick={() => onPlay(v.id)} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer group">
-            <div className="aspect-video bg-gradient-to-br from-[#f3f2ef] to-[#e5e2dd] flex items-center justify-center relative overflow-hidden">
+          <div key={v.id} onClick={() => onPlay(v.id)} className="theme-card overflow-hidden rounded-lg transition-all hover:shadow-md cursor-pointer group">
+            <div className="theme-progress-track aspect-video flex items-center justify-center relative overflow-hidden">
               {v.thumbnail ? (
                 <img src={getThumbnailUrl(v.id)} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
               ) : (
-                <PlayCircle size={28} className="text-[#d1cdc6] group-hover:text-[#c87d2f] transition-colors" />
+                <PlayCircle size={28} className="text-[var(--border-medium)] transition-colors group-hover:text-[var(--accent)]" />
               )}
-              <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[9px] px-1 py-0.5 rounded font-mono">{formatVideoDuration(v.duration)}</span>
-              {v.completed && <span className="absolute top-1 left-1 bg-[#16a34a] text-white text-[9px] px-1 py-0.5 rounded">✓</span>}
+              <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] text-white">{formatVideoDuration(v.duration)}</span>
+              {onToggleFavorite && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleFavorite(v.id, !v.is_favorite);
+                  }}
+                  className={`absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md border border-white/20 bg-black/45 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/65 ${
+                    v.is_favorite ? 'text-[#fbbf24]' : 'text-white/80'
+                  }`}
+                  title={v.is_favorite ? '取消收藏' : '收藏视频'}
+                  aria-label={v.is_favorite ? '取消收藏' : '收藏视频'}
+                >
+                  <Star size={13} fill={v.is_favorite ? 'currentColor' : 'none'} />
+                </button>
+              )}
+              {v.completed && <span className="absolute left-1 top-1 rounded bg-[var(--success)] px-1 py-0.5 text-[9px] text-white">✓</span>}
               {v.watch_progress != null && v.duration && !v.completed && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20">
-                  <div className="h-full bg-[#c87d2f]" style={{ width: `${Math.min(100, (v.watch_progress / v.duration) * 100)}%` }} />
+                  <div className="theme-progress-fill h-full" style={{ width: `${Math.min(100, (v.watch_progress / v.duration) * 100)}%` }} />
                 </div>
               )}
             </div>
             <div className="px-2 py-1.5">
-              <h4 className="text-xs font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{v.title}</h4>
+              <h4 className="theme-text-primary truncate text-xs font-medium transition-colors group-hover:text-[var(--accent)]">{v.title}</h4>
             </div>
           </div>
         ))}

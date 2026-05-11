@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.database import SessionLocal, settings
 from app.models import AiJob, Note, SubtitleSegment, Video
+from app.services.admin_settings import load_assistant_runtime_settings, load_transcription_settings
 from app.services.ffmpeg_audio import extract_wav_16k_mono
 from app.services.ai_queue import is_queue_paused
 from app.services.ollama_summarize import summarize_with_ollama, summarize_with_openai
@@ -24,8 +25,6 @@ def _external_llm_ready() -> bool:
 
 def _assistant_runtime_settings() -> dict:
     try:
-        from app.routers.admin import load_assistant_runtime_settings
-
         return load_assistant_runtime_settings()
     except Exception:
         return {
@@ -41,8 +40,6 @@ def _assistant_runtime_settings() -> dict:
 
 def _llm_usage_policy() -> str:
     try:
-        from app.routers.admin import load_transcription_settings
-
         value = _assistant_runtime_settings().get("llm_usage_policy") or load_transcription_settings().get("llm_usage_policy")
     except Exception:
         value = settings.llm_usage_policy
@@ -51,8 +48,6 @@ def _llm_usage_policy() -> str:
 
 def _stored_transcription_defaults() -> dict:
     try:
-        from app.routers.admin import load_transcription_settings
-
         return load_transcription_settings()
     except Exception:
         return {}

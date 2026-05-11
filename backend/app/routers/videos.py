@@ -17,11 +17,13 @@ from app.schemas import (
     SubtitleSegmentOut,
     VideoOut,
     VideoPage,
+    VideoFavoriteIn,
     WatchHistoryIn,
 )
 from app.services.ai_jobs import create_ai_job_from_payload, ensure_video_note
 from app.services.sprite import get_or_generate_sprite, get_sprite_meta_path, get_sprite_path, has_sprite
-from app.utils.serialization import load_segments, to_output_url
+from app.services.video_serialization import serialize_video
+from app.utils.serialization import to_output_url
 
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
@@ -42,42 +44,6 @@ def active_job_map(db: Session, video_ids: list[int]) -> dict[int, AiJob]:
         if job.video_id not in result:
             result[job.video_id] = job
     return result
-
-
-def serialize_video(
-    video: Video,
-    last_watch: WatchHistory | None = None,
-    active_job: AiJob | None = None,
-    category_path: str | None = None,
-    include_segments: bool = True,
-    include_details: bool = True,
-) -> VideoOut:
-    return VideoOut(
-        id=video.id,
-        title=video.title,
-        filename=video.filename,
-        filepath=video.filepath,
-        file_size=video.file_size,
-        duration=video.duration,
-        thumbnail=video.thumbnail,
-        tags=video.tags,
-        category_id=video.category_id,
-        category_path=category_path,
-        transcription=video.transcription if include_details else None,
-        transcript_segments=load_segments(video.transcript_segments) if include_segments else [],
-        summary=video.summary if include_details else None,
-        markdown_path=video.markdown_path if include_details else None,
-        subtitle_path=video.subtitle_path,
-        subtitle_url=to_output_url(video.subtitle_path),
-        ai_status=video.ai_status or "idle",
-        ai_stage=video.ai_stage,
-        ai_error=video.ai_error,
-        active_job_id=active_job.id if active_job else None,
-        watch_progress=last_watch.progress if last_watch else None,
-        completed=bool(last_watch.completed) if last_watch else False,
-        created_at=video.created_at,
-        updated_at=video.updated_at,
-    )
 
 
 def latest_watch_map(db: Session, video_ids: list[int]) -> dict[int, WatchHistory]:
@@ -481,6 +447,26 @@ def start_ai_job(video_id: int, payload: AiJobCreate, db: Session = Depends(get_
     return {"job_id": job.id, "status": job.status, "stage": job.stage}
 
 
+@router.post("/{video_id}/favorite", response_model=VideoOut)
+def set_video_favorite(video_id: int, payload: VideoFavoriteIn, db: Session = Depends(get_db)):
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    video.is_favorite = payload.is_favorite
+    video.favorited_at = datetime.now() if payload.is_favorite else None
+    db.commit()
+    db.refresh(video)
+
+    watch_map = latest_watch_map(db, [video.id])
+    job_map = active_job_map(db, [video.id])
+    category_path = None
+    if video.category_id:
+        category = db.query(Category).filter(Category.id == video.category_id).first()
+        category_path = category.path if category else None
+    return serialize_video(video, watch_map.get(video.id), job_map.get(video.id), category_path)
+
+
 @router.get("/{video_id}/playlist")
 def get_playlist(video_id: int, scope: str = "leaf", category_id: int | None = None, db: Session = Depends(get_db)):
     video = db.query(Video).filter(Video.id == video_id).first()
@@ -518,6 +504,8 @@ def get_playlist(video_id: int, scope: str = "leaf", category_id: int | None = N
                 "category_path": category_map.get(item.category_id),
                 "watch_progress": last_watch.progress if last_watch else None,
                 "completed": bool(last_watch.completed) if last_watch else False,
+                "is_favorite": bool(item.is_favorite),
+                "favorited_at": item.favorited_at,
                 "subtitle_url": to_output_url(item.subtitle_path),
             }
         )

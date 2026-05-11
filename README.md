@@ -1,125 +1,143 @@
 # SiteYeb / P2M CoreAI Workspace
 
-SiteYeb is a local-first personal productivity workspace with a React frontend and a FastAPI backend. It combines todo management, Pomodoro focus sessions, calendar, notes, local video learning, subtitle transcription, and a local LLM assistant.
+一个还在持续生长的个人工作台。
 
-## Quick Start
+SiteYeb 最开始是为个人学习、看视频、做笔记、跑番茄钟、管理待办和调用本地 AI 准备的。现在它已经慢慢长成一个本地优先的 CoreAI 工作空间：前端是 React，后端是 FastAPI，数据主要落在 SQLite，本机和局域网都能用。
 
-### Daily use
+这个项目目前仍然偏个人使用，但我很欢迎开源社区里的朋友拿去研究、改造、提交想法。它不追求一上来就变成大而全的企业系统，更适合个人、家庭、小团队、工作室在可信局域网里用，或者在此基础上继续加固、加权限、加审计，改造成自己的内部工具。
+
+## 适合谁
+
+- 想把待办、日历、番茄钟、笔记、本地视频学习和 AI 助手放到一个工作台里的人。
+- 有一堆本地课程/会议/学习视频，希望转录、总结、续播和管理的人。
+- 想在局域网里给自己几台设备或小团队共用一个轻量工具的人。
+- 想研究 React + FastAPI + SQLite + 本地/外部 LLM 工作流的人。
+
+如果你要直接暴露到公网，请先认真做安全加固。当前定位更接近“个人和小团体内网工具”，不是开箱即用的公网 SaaS。
+
+## 当前能力
+
+- 工作台：左侧插件导航、顶部快捷入口、右侧灵境小助手、通知面板。
+- 待办：优先级、截止日期、番茄计划、时间提醒。
+- 日历：查看待办、提醒、番茄专注记录和普通事件。
+- 番茄钟：专注/休息循环、背景音、统计、历史记录。
+- 时间中心：模拟时钟、世界时钟、自定义时区、正计时、倒计时、闹钟、提醒、待办提醒。
+- 视频站：本地视频扫描、文件夹导航、继续观看、字幕、AI 总结、AI 任务中心。
+- AI 助手：支持本地 LLM 和 OpenAI-compatible 外部 LLM，后续会接入更多页面。
+- 设置：主题、AI、转录、通知、数据管理等配置。
+
+未来会继续接大量 AI 功能，前端页面也会尽量统一接入左侧插件系统，而不是散落在不同入口里。
+
+## 运行方式
+
+### 日常使用
+
+后端监听 80 端口，局域网内可以直接用机器 IP 访问：
 
 ```bash
 cd backend
 .venv311/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
 ```
 
-- Local: http://localhost
-- LAN: use your machine IP on port 80
+- 本机访问：http://localhost
+- 局域网访问：`http://你的电脑IP`
 
-If you only changed frontend code, run `npm run build` and refresh the browser. You do not need to restart the backend.
+如果只改前端生产包，执行 `npm run build` 后刷新浏览器即可。
 
-### Development
+### 前端开发
 
-Terminal 1 — 后端（端口 80）:
-
-```bash
-cd backend
-.venv311/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 80 --reload
-```
-
-Terminal 2 — 前端（端口 8000）:
+前端测试和开发使用 8000 端口，支持 Vite 热更新：
 
 ```bash
 npm install
 npm run dev
 ```
 
-- 访问 http://localhost:8000 — 改代码自动热更新
-- API 自动代理到 80
+- 前端开发地址：http://localhost:8000
+- API 会代理到 80 端口后端
 
 ## 端口说明
 
-| 端口 | 用途 | 访问方式 |
+| 端口 | 用途 | 说明 |
 | --- | --- | --- |
-| 80 | 生产模式（前端+后端） | http://localhost 或 http://192.168.3.161 |
-| 8000 | 开发模式前端（热更新） | http://localhost:8000 |
-| 80 | 开发模式后端 API | 被 8000 自动代理，不用直接访问 |
+| 80 | 后端 / 生产入口 | FastAPI，同时可提供构建后的前端；局域网直接访问这个端口 |
+| 8000 | 前端开发 | Vite 热更新，适合调 UI |
+| 1234 | 本地 LLM | LM Studio / OpenAI-compatible 常用端口 |
+| 11434 | Ollama | Ollama 默认端口 |
 
-## User System
+## 视频转录说明
 
-- 多用户支持，JWT 认证（72 小时有效期）。
-- 用户账号和所有个人数据（待办、日历、番茄钟、笔记等）存储在后端 SQLite 数据库。
-- 跨设备同步 — 同一账号在任何设备上看到相同数据。
-- 支持"记住密码"和自动登录。
-- 首次登录自动从旧 IndexedDB 迁移数据。
+视频转录目前有两条路线：
 
-## Tech Stack
+- CPU 路线：`faster-whisper`，相对通用，CPU 部分正常。
+- 外部引擎路线：`whisper.cpp`，本机为了 A 卡做过 Windows 兼容层。
 
-| Area | Stack |
+因为 A 卡/GPU 这块和本机环境绑定比较深，如果你不是类似环境，视频转录的 GPU 部分可能需要大改。CPU 转录逻辑更通用，适合先跑通流程。
+
+## 技术栈
+
+| 模块 | 技术 |
 | --- | --- |
-| Frontend | React 19, TypeScript 6, Vite 8 |
-| UI | Tailwind CSS, lucide-react |
-| State | Zustand persist, backend API storage |
-| Backend | FastAPI, SQLAlchemy, SQLite, JWT auth |
-| Video/AI | ffmpeg, Faster-Whisper, whisper.cpp external engine, LM Studio/OpenAI-compatible API |
-| Tests | Vitest, jsdom |
+| 前端 | React 19、TypeScript 6、Vite 8 |
+| UI | Tailwind CSS、lucide-react |
+| 状态 | Zustand、IndexedDB/Dexie、后端 SQLite |
+| 后端 | FastAPI、SQLAlchemy、SQLite、JWT |
+| 视频/AI | ffmpeg、Faster-Whisper、whisper.cpp、LM Studio/OpenAI-compatible API |
+| 测试 | Vitest、jsdom、Playwright |
 
-## Project Structure
+## 项目结构
 
 ```text
 SiteYeb/
-  src/                  React frontend
-    components/         Pages, layout, shared UI
-    stores/             Zustand stores
-    lib/                API clients, storage, themes, helpers
-    hooks/              Cross-module and hydration hooks
-    plugins/            Dashboard/plugin registration
-    types/              Shared TypeScript types
-  backend/app/          FastAPI backend
-    routers/            API routes (auth, videos, categories, ai_jobs, notes, admin, user_data)
-    services/           scanner, transcription, subtitles, summary
-    auth.py             JWT authentication utilities
-    worker.py           AI job worker
-  dist/                 Built frontend (served by backend in production mode)
-  docs/                 Notes and implementation records
+  src/                  React 前端
+    components/         页面、布局、通用组件
+    stores/             Zustand 状态
+    lib/                API、声音、主题、工具函数
+    hooks/              跨模块同步和恢复逻辑
+    plugins/            插件注册
+    types/              TypeScript 类型
+  backend/app/          FastAPI 后端
+    routers/            API 路由
+    services/           扫描、转录、AI、管理服务
+    worker.py           AI 任务 worker
+  docs/                 设计记录、踩坑记录、更新日志
+  public/sounds/        本地提示音和背景音
 ```
 
-## Quality Checks
+## 测试和构建
 
 ```bash
-npm run lint
 npm test
 npm run build
+npm run test:e2e
 cd backend && .venv311/Scripts/python -m compileall app
 ```
 
-Current verified state:
+日常改前端时，至少跑：
 
-- `npm test` passes: 6 test files, 40 tests.
-- `npm run build` passes.
-- Test coverage currently lives in `src/__tests__/`.
+```bash
+npm test
+npm run build
+```
 
-## Video Station Notes
+## 参与和改造
 
-- "Continue watching" opens the last unfinished video.
-- "Recent watch history" previews three videos; clicking the count shows the latest eight watched videos in the main grid, newest first.
-- "Latest videos" behaves the same way and shows the latest eight added/scanned videos in the main grid.
-- Search and folder navigation automatically return the grid to normal browsing mode.
-- Player settings such as volume, mute state, subtitle visibility, subtitle opacity/size, playback rate, and autoplay are persisted.
-- Normal "generate subtitles" jobs do not run LLM correction by default.
-- The explicit "correct subtitles" action forces `large-v3` and enables local LLM correction.
-- Folder batch jobs have a separate "also correct subtitles" toggle; it is off by default.
+欢迎 issue、PR、二次开发和各种实验性想法。这个项目的方向是“先让个人工作流真的好用”，再逐步把 AI、视频学习、时间管理和插件系统打磨得更稳。
 
-## Performance Notes
+如果你准备给小团队使用，建议优先补：
 
-- Startup scan skips full scanning when videos already exist in the database.
-- Thumbnail/sprite generation should stay lazy or queued; avoid running large media jobs synchronously during page load.
-- Faster-Whisper CPU thread limits are captured when jobs are created; restart the backend worker after `.env` changes.
-- `whisper.cpp` external/GPU mode ignores the CPU thread setting for transcription; GPU use depends on the chosen `whisper-cli.exe` build and extra args.
+- 更严格的账号和权限策略。
+- 数据备份和恢复。
+- 公网部署时的 HTTPS、反向代理和访问控制。
+- AI 接口额度、日志和审计。
+- 视频文件目录的权限隔离。
 
-## Git Hygiene
+## 文档
 
-- `tools/` is local-only. It contains Whisper binaries and model files that can be several GB each.
-- Do not stage `tools/`, model `.bin` files, or downloaded local tool binaries.
-- If many `git.exe` processes appear, check whether a stuck `git add` is trying to stage `tools/` or other large local artifacts.
+- [更新日志](docs/changelog.md)
+- [今日踩坑与维护记录](docs/today-fixes-and-pitfalls.md)
+- [主题导入导出说明](docs/theme-import-export.md)
+- [后续改进 Todo](docs/next-improvement-todo.md)
 
 ## License
 

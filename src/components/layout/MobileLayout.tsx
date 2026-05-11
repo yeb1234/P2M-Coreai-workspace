@@ -5,8 +5,8 @@ import { PAGES } from '../../config/pageRegistry';
 
 export const MobileLayout: React.FC = () => {
   return (
-    <div className="flex flex-col h-screen bg-[#f5f0e8]">
-      <main className="flex-1 overflow-y-auto px-3">
+    <div className="flex h-screen flex-col bg-[var(--bg-body)]">
+      <main className="mobile-app-main flex-1 overflow-y-auto">
         <Routes>
           {PAGES.map((page) => (
             <Route

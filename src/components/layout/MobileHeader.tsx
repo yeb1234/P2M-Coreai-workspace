@@ -14,20 +14,20 @@ export const MobileHeader: React.FC = () => {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <header className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-[#e5e2dd]">
-      <h1 className="text-base font-bold text-[#1a1a1a]">
-        <span className="text-[#c87d2f]">灵</span>
-        <span className="text-[#7c3aed]">境</span>
+    <header className="flex items-center justify-between border-b border-[var(--border-light)] px-4 py-2.5" style={{ background: 'var(--header-bg)' }}>
+      <h1 className="text-base font-bold text-[var(--text-primary)]">
+        <span className="text-[var(--accent)]">灵</span>
+        <span className="text-[color-mix(in_srgb,var(--accent)_62%,#7c3aed)]">境</span>
       </h1>
 
       <div className="flex items-center gap-1">
         <button
           onClick={() => setShowNotifications(!showNotifications)}
-          className="p-2 text-[#6b7280] hover:text-[#1a1a1a] rounded-lg relative"
+          className="relative rounded-lg p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         >
           <Bell size={18} />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#dc3545] text-white text-[9px] rounded-full flex items-center justify-center font-medium">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--danger)] text-[9px] font-medium text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -36,8 +36,8 @@ export const MobileHeader: React.FC = () => {
           onClick={toggleSettingsView}
           className={`p-2 rounded-lg ${
             activeView === 'settings'
-              ? 'text-[#c87d2f] bg-[#fef7ed]'
-              : 'text-[#6b7280] hover:text-[#1a1a1a]'
+              ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
           title={activeView === 'settings' ? '返回上一页' : '打开设置'}
         >
@@ -46,7 +46,7 @@ export const MobileHeader: React.FC = () => {
         {currentUser && (
           <button
             onClick={logout}
-            className="p-2 text-[#b8b4ac] hover:text-[#dc3545] rounded-lg"
+            className="rounded-lg p-2 text-[var(--text-muted)] hover:text-[var(--danger)]"
           >
             <LogOut size={14} />
           </button>

@@ -13,6 +13,18 @@ import {
 import { VideoGridSection, VideoNavigationCards, type HistorySortMode, type VideoGridMode } from './VideoListSections';
 import { playInteractionSound } from '../../lib/sounds';
 
+const VIDEO_GRID_COLUMNS_KEY = 'p2m_video_grid_columns';
+const DEFAULT_VIDEO_GRID_COLUMNS = 5;
+
+function loadVideoGridColumns(): number {
+  try {
+    const raw = Number(localStorage.getItem(VIDEO_GRID_COLUMNS_KEY));
+    return Number.isFinite(raw) && raw >= 2 && raw <= 8 ? raw : DEFAULT_VIDEO_GRID_COLUMNS;
+  } catch {
+    return DEFAULT_VIDEO_GRID_COLUMNS;
+  }
+}
+
 interface FolderSearchGroup {
   key: string;
   parent: CategoryTree | null;
@@ -75,7 +87,7 @@ export function VideoList() {
     videos, total, page, totalPages, loading, error, loadVideos, loadCurrentVideo,
     searchQuery, setSearchQuery, categoryTree, breadcrumb, currentCategoryId,
     loadCategoryTree, enterCategory, goToBreadcrumb, getCurrentChildren,
-    restoreNavigation, selectedFolderIds, setSelectedFolderIds,
+    restoreNavigation, selectedFolderIds, setSelectedFolderIds, toggleFavorite,
   } = useVideoStore();
   const [inputVal, setInputVal] = useState('');
   const [navRestored, setNavRestored] = useState(false);
@@ -85,6 +97,7 @@ export function VideoList() {
   const [recentVideosFallback, setRecentVideosFallback] = useState(false);
   const [gridMode, setGridMode] = useState<VideoGridMode>('normal');
   const [historySort, setHistorySort] = useState<HistorySortMode>('newest');
+  const [columnsPerRow, setColumnsPerRow] = useState(loadVideoGridColumns);
   const [rescanLoading, setRescanLoading] = useState(false);
   const [rescanMsg, setRescanMsg] = useState('');
   const selectedFolderIdSet = useMemo(() => new Set(selectedFolderIds), [selectedFolderIds]);
@@ -115,6 +128,19 @@ export function VideoList() {
       setRescanLoading(false);
       setTimeout(() => setRescanMsg(''), 4000);
     }
+  };
+
+  const handleRefreshFolders = () => {
+    void loadCategoryTree();
+    const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;
+    loadVideos(page, searchQuery || undefined, ids);
+    fetchRecentVideos(20, currentCategoryId)
+      .then((recent) => {
+        setRecentVideos(recent.items);
+        setRecentVideosFallback(recent.fallback);
+      })
+      .catch(() => {});
+    fetchRecentHistory(30).then((history) => setHistoryVideos(history)).catch(() => {});
   };
 
   useEffect(() => { loadCategoryTree(); }, [loadCategoryTree]);
@@ -205,6 +231,16 @@ export function VideoList() {
     loadVideos(1, inputVal || undefined);
   };
 
+  const handleColumnsPerRowChange = (columns: number) => {
+    const next = Math.max(2, Math.min(8, columns));
+    setColumnsPerRow(next);
+    try {
+      localStorage.setItem(VIDEO_GRID_COLUMNS_KEY, String(next));
+    } catch {
+      // ignore storage quota or private mode failures
+    }
+  };
+
   const searchFolders = (q: string): CategoryTree[] => {
     const results: CategoryTree[] = [];
     const lower = q.toLowerCase();
@@ -251,14 +287,14 @@ export function VideoList() {
   return (
     <div className="space-y-4">
       <div className="relative max-w-xl">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
         <input
           type="text"
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="搜索视频或文件夹..."
-          className="w-full pl-10 pr-4 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl text-sm"
+          className="w-full rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] py-2.5 pl-10 pr-4 text-sm"
         />
       </div>
 
@@ -267,10 +303,10 @@ export function VideoList() {
           <div className="flex items-center gap-1 text-sm flex-wrap">
             {breadcrumb.map((b, i) => (
               <React.Fragment key={b.id ?? 'root'}>
-                {i > 0 && <ChevronRight size={12} className="text-[#b8b4ac]" />}
+                {i > 0 && <ChevronRight size={12} className="text-[var(--text-muted)]" />}
                 <button
                   onClick={() => { setGridMode('normal'); goToBreadcrumb(b.id); }}
-                  className={`hover:text-[#c87d2f] transition-colors ${i === breadcrumb.length - 1 ? 'text-[#1a1a1a] font-medium' : 'text-[#6b7280]'}`}
+                  className={`transition-colors hover:text-[var(--accent)] ${i === breadcrumb.length - 1 ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}
                 >
                   {b.name}
                 </button>
@@ -278,10 +314,10 @@ export function VideoList() {
             ))}
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => loadCategoryTree()} className="p-2 text-[#6b7280] hover:text-[#c87d2f] hover:bg-[#f3f2ef] rounded-lg transition-colors" title="刷新文件夹结构">
+            <button onClick={handleRefreshFolders} className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]" title="刷新当前目录和视频列表">
               <RefreshCw size={14} />
             </button>
-            <button onClick={handleRescan} disabled={rescanLoading} className="p-2 text-[#6b7280] hover:text-[#c87d2f] hover:bg-[#f3f2ef] rounded-lg transition-colors disabled:opacity-50" title="重新扫描视频文件">
+            <button onClick={handleRescan} disabled={rescanLoading} className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-50" title="重新扫描视频文件">
               {rescanLoading ? <RefreshCw size={14} className="animate-spin" /> : <Scan size={14} />}
             </button>
           </div>
@@ -289,7 +325,7 @@ export function VideoList() {
       )}
 
       {rescanMsg && (
-        <div className={`px-3 py-2 rounded-lg text-sm ${rescanMsg.includes('失败') ? 'bg-[#fef2f2] text-[#dc3545]' : 'bg-[#f0fdf4] text-[#16a34a]'}`}>
+        <div className={`rounded-lg px-3 py-2 text-sm ${rescanMsg.includes('失败') ? 'bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--danger)]' : 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success)]'}`}>
           {rescanMsg}
         </div>
       )}
@@ -396,6 +432,8 @@ export function VideoList() {
         videos={baseGridVideos}
         gridMode={gridMode}
         gridTitle={gridTitle}
+        columnsPerRow={columnsPerRow}
+        onColumnsPerRowChange={handleColumnsPerRowChange}
         filesLabel={filesLabel}
         isSearching={isSearching}
         currentCategoryId={currentCategoryId}
@@ -404,6 +442,7 @@ export function VideoList() {
         totalPages={totalPages}
         searchQuery={searchQuery}
         onPlay={(videoId) => { void loadCurrentVideo(videoId); }}
+        onToggleFavorite={(videoId, nextFavorite) => { void toggleFavorite(videoId, nextFavorite); }}
         onReturnToNormal={() => setGridMode('normal')}
         onPageChange={(p, query) => {
           const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;

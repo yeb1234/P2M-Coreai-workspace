@@ -10,30 +10,30 @@ interface PageTitleProps {
 
 export const PageTitle: React.FC<PageTitleProps> = React.memo(({ title, subtitle, icon, action, dev }) => {
   return (
-    <div className="flex items-end justify-between mb-3 pb-2 border-b border-[#e5e2dd]">
-      <div className="flex items-center gap-2.5">
+    <div className="mb-4 flex flex-col gap-3 border-b border-[color-mix(in_srgb,var(--border-light)_72%,transparent)] pb-3 pt-1 sm:flex-row sm:items-end sm:justify-between md:pt-0">
+      <div className="flex min-w-0 items-center gap-3">
         {icon && (
-          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#fef7ed] text-[#c87d2f]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[color-mix(in_srgb,var(--accent)_18%,var(--border-light))] bg-[var(--accent-bg)] text-[var(--accent)] md:rounded-lg">
             {icon}
           </span>
         )}
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-[#1a1a1a] tracking-tight leading-tight">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="truncate text-[1.25rem] font-semibold leading-tight tracking-normal text-[var(--text-primary)] md:text-[1.35rem]">
               {title}
             </h2>
             {dev && (
-              <span className="px-1.5 py-0.5 text-[9px] font-medium bg-[#f59e0b]/15 text-[#d97706] rounded-full border border-[#f59e0b]/30">
+              <span className="shrink-0 rounded-full border border-[#f59e0b]/30 bg-[#f59e0b]/15 px-1.5 py-0.5 text-[9px] font-medium text-[#d97706]">
                 DEV
               </span>
             )}
           </div>
           {subtitle && (
-            <p className="text-xs text-[#b8b4ac] mt-0.5 leading-snug">{subtitle}</p>
+            <p className="mt-1 text-xs leading-snug text-[var(--text-muted)]">{subtitle}</p>
           )}
         </div>
       </div>
-      {action && <div className="flex-shrink-0">{action}</div>}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 });

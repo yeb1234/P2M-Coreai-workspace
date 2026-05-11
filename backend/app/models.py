@@ -40,6 +40,8 @@ class Video(Base):
     ai_status = Column(String, default="idle")
     ai_stage = Column(String, nullable=True)
     ai_error = Column(Text, nullable=True)
+    is_favorite = Column(Boolean, default=False, index=True)
+    favorited_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 

@@ -4,13 +4,13 @@ import { idbStorage } from '../lib/idbStorage';
 import { type ThemeVars, THEME_PRESETS, applyTheme } from '../lib/themes';
 import { VIEW_PATH } from '../config/pageRegistry';
 
-export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'notes' | 'pomodoro' | 'video' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
+export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'notes' | 'pomodoro' | 'timecenter' | 'video' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
 
 export type FontSize = 'sm' | 'md' | 'lg';
 export type ThemeId = string;
 
 const DEFAULT_NAV_ORDER: ActiveView[] = [
-  'dashboard', 'todo', 'calendar', 'notes', 'pomodoro',
+  'dashboard', 'todo', 'calendar', 'notes', 'pomodoro', 'timecenter',
   'health', 'video', 'compare', 'shop', 'esports',
   'stats', 'reader', 'snippets', 'habits',
   'flashcards', 'bookmarks', 'tokens',

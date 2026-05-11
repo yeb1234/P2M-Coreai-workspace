@@ -358,6 +358,11 @@ export function useAiJobCenter(
     return () => window.clearInterval(timer);
   }, [aiJobs?.queued, aiJobs?.running, currentVideoId, loadAiJobs, loadCurrentVideo]);
 
+  // Status chips are filters, so the visible list should update immediately when they change.
+  useEffect(() => {
+    void loadAiJobs();
+  }, [aiJobStatusFilter, loadAiJobs]);
+
   // Trigger AI for a single video (used by VideoPlaylistPanel)
   const triggerSingleVideo = useCallback((videoId: number) => {
     void triggerAi(videoId, manualAiJobOptions).then(() => {

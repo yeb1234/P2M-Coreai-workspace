@@ -46,11 +46,34 @@ const initialTimerState: PomodoroTimerState = {
   linkedTodoId: null,
 };
 
+export function createPomodoroInitialTimer(config: PomodoroConfig): PomodoroTimerState {
+  return {
+    ...initialTimerState,
+    timeRemaining: config.workDuration * 60,
+  };
+}
+
+export function completedPomodoroSessionsOnly(sessions: Record<ID, PomodoroSession>): Record<ID, PomodoroSession> {
+  return Object.fromEntries(
+    Object.entries(sessions).filter(([, session]) => session.completed && Boolean(session.endTime)),
+  );
+}
+
+export function sanitizePomodoroPersistedState(data: Partial<PomodoroState>): Pick<PomodoroState, 'config' | 'sessions' | 'timer' | '_lastTickTimestamp'> {
+  const config = { ...DEFAULT_CONFIG, ...(data.config || {}) };
+  return {
+    config,
+    sessions: completedPomodoroSessionsOnly((data.sessions || {}) as Record<ID, PomodoroSession>),
+    timer: createPomodoroInitialTimer(config),
+    _lastTickTimestamp: null,
+  };
+}
+
 export const usePomodoroStore = create<PomodoroState>()(
   persist(
     (set, get) => ({
       config: { ...DEFAULT_CONFIG },
-      timer: { ...initialTimerState, timeRemaining: DEFAULT_CONFIG.workDuration * 60 },
+      timer: createPomodoroInitialTimer(DEFAULT_CONFIG),
       sessions: {},
       _lastTickTimestamp: null,
 
@@ -360,39 +383,29 @@ export const usePomodoroStore = create<PomodoroState>()(
 
       restoreTimer: () => {
         const state = get();
-        if (state.timer.status !== 'running') return;
-        if (!state._lastTickTimestamp) return;
-
-        const elapsed = Math.floor((Date.now() - state._lastTickTimestamp) / 1000);
-        if (elapsed <= 0) return;
-
-        const newTimeRemaining = state.timer.timeRemaining - elapsed;
-        if (newTimeRemaining <= 0) {
-          state.completePhase();
-          return;
-        }
-
-        set({
-          timer: { ...state.timer, timeRemaining: newTimeRemaining },
-          _lastTickTimestamp: Date.now(),
-        });
+        if (state.timer.status === 'idle' && !state._lastTickTimestamp) return;
+        set({ timer: createPomodoroInitialTimer(state.config), _lastTickTimestamp: null });
       },
     }),
     {
       name: 'p2m-pomodoro-storage',
       storage: createJSONStorage(() => localOnlyStorage),
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version: number) => {
         const data = persisted as Record<string, unknown>;
-        const safe: Record<string, unknown> = {
+        const config = data.config && typeof data.config === 'object'
+          ? { ...DEFAULT_CONFIG, ...data.config } as PomodoroConfig
+          : { ...DEFAULT_CONFIG };
+        const safe: Record<string, unknown> = sanitizePomodoroPersistedState({
           ...data,
-          sessions: data.sessions && typeof data.sessions === 'object' ? data.sessions : {},
-          config: data.config && typeof data.config === 'object' ? { ...DEFAULT_CONFIG, ...data.config } : { ...DEFAULT_CONFIG },
-        };
+          config,
+          sessions: data.sessions && typeof data.sessions === 'object'
+            ? data.sessions as Record<ID, PomodoroSession>
+            : {},
+        } as Partial<PomodoroState>);
         // Fix timeRemaining that was saved in minutes instead of seconds
-        if (version < 2 && safe.timer && typeof safe.timer === 'object') {
-          const timer = safe.timer as Record<string, unknown>;
-          const config = safe.config as PomodoroConfig;
+        if (version < 2 && data.timer && typeof data.timer === 'object') {
+          const timer = data.timer as Record<string, unknown>;
           if (typeof timer.timeRemaining === 'number' && timer.timeRemaining < 120) {
             timer.timeRemaining = (timer.timeRemaining || config.workDuration) * 60;
           }
@@ -401,10 +414,15 @@ export const usePomodoroStore = create<PomodoroState>()(
       },
       partialize: (state) => ({
         config: state.config,
-        sessions: state.sessions,
-        timer: state.timer,
-        _lastTickTimestamp: state._lastTickTimestamp,
+        sessions: completedPomodoroSessionsOnly(state.sessions),
       }),
+      merge: (persisted, current) => {
+        const saved = sanitizePomodoroPersistedState(persisted as Partial<PomodoroState>);
+        return {
+          ...current,
+          ...saved,
+        };
+      },
     }
   )
 );

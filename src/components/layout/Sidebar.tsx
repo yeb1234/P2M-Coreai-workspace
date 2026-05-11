@@ -95,33 +95,39 @@ export const Sidebar: React.FC = () => {
       style={{ width: sidebarOpen ? liveSidebarWidth : COLLAPSED_WIDTH }}
     >
       <div className="flex flex-col h-full">
-        <div className="px-2 pb-1 flex items-center gap-1" style={HEADER_STYLE}>
-          <button
-            onClick={toggleSidebar}
-            className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] transition-all"
-            title={sidebarOpen ? '收起左侧栏' : '展开左侧栏'}
-          >
-            {sidebarOpen ? (
-              <>
-                <span className="text-sm font-bold text-[var(--accent)] tracking-wider">灵境</span>
-                <ChevronLeft size={16} />
-              </>
-            ) : (
+        <div className="flex items-center border-b border-[var(--border-light)] px-3" style={HEADER_STYLE}>
+          {sidebarOpen ? (
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span className="truncate text-sm font-bold tracking-wider text-[var(--accent)]">灵境</span>
+              <button
+                onClick={toggleSidebar}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
+                title="收起左侧栏"
+              >
+                <ChevronLeft size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={toggleSidebar}
+              className="grid h-8 w-full place-items-center rounded-md text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
+              title="展开左侧栏"
+            >
               <ChevronRight size={16} />
-            )}
-          </button>
+            </button>
+          )}
           {sidebarOpen && (
-            <>
+            <div className="ml-2 flex shrink-0 items-center gap-0.5">
               <button
                 onClick={resetNavOrder}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] transition-all"
+                className="grid h-7 w-7 place-items-center rounded-md text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
                 title="重置顺序"
               >
                 <RotateCcw size={14} />
               </button>
               <button
                 onClick={() => setShowRestorePanel((v) => !v)}
-                className={`p-1.5 rounded-lg transition-all ${
+                className={`grid h-7 w-7 place-items-center rounded-md transition-all ${
                   showRestorePanel
                     ? 'text-[var(--accent)] bg-[var(--accent-bg)]'
                     : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)]'
@@ -130,11 +136,11 @@ export const Sidebar: React.FC = () => {
               >
                 <Eye size={14} />
               </button>
-            </>
+            </div>
           )}
         </div>
 
-        <nav className="flex-1 p-1.5 space-y-0.5 overflow-y-auto min-h-0">
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto min-h-0">
           {navOrder.filter((id) => !hiddenNavItems.includes(id)).map((id) => {
             const meta = PAGE_MAP[id];
             if (!meta) return null;
@@ -169,7 +175,7 @@ export const Sidebar: React.FC = () => {
                   </span>
                 )}
                 {id === 'pomodoro' && timerStatus === 'running' && (
-                  <span className="ml-auto w-2 h-2 bg-[var(--success)] rounded-full animate-pulse" />
+                  <span className="ml-auto w-2 h-2 bg-[var(--accent)] rounded-full animate-pulse" />
                 )}
                 {sidebarOpen && (
                   <button
@@ -224,9 +230,9 @@ export const Sidebar: React.FC = () => {
 
         {sidebarOpen && timerStatus === 'running' && (
           <div className="p-3 border-t border-[var(--border-light)]">
-            <div className="px-3 py-2 rounded-lg bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-card))]">
-              <p className="text-xs text-[var(--success)] font-medium">专注进行中</p>
-              <p className="text-lg font-bold text-[var(--success)] font-mono">
+            <div className="px-3 py-2 rounded-lg border border-[color-mix(in_srgb,var(--accent)_22%,var(--border-light))] bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-card))]">
+              <p className="text-xs text-[var(--accent)] font-medium">专注进行中</p>
+              <p className="text-lg font-bold text-[var(--accent)] font-mono">
                 {Math.floor(timerTimeRemaining / 60).toString().padStart(2, '0')}:
                 {(timerTimeRemaining % 60).toString().padStart(2, '0')}
               </p>

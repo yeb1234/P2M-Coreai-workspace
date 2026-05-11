@@ -114,8 +114,8 @@ export function VideoPlayerControls({
             onMouseMove={onProgressMouseMove}
             onMouseLeave={onProgressMouseLeave}
           >
-            <div className="absolute inset-y-0 left-0 bg-[#c87d2f] rounded-full" style={{ width: `${progressPct}%` }} />
-            <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-[#c87d2f] rounded-full shadow-sm opacity-0 group-hover/progress:opacity-100 transition-opacity" style={{ left: `calc(${progressPct}% - 6px)` }} />
+            <div className="theme-progress-fill absolute inset-y-0 left-0 rounded-full" style={{ width: `${progressPct}%` }} />
+            <div className="theme-progress-fill absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full opacity-0 shadow-sm transition-opacity group-hover/progress:opacity-100" style={{ left: `calc(${progressPct}% - 6px)` }} />
             {hoverTime !== null && (
               <div
                 className="absolute bottom-full mb-3 pointer-events-none z-30"
@@ -155,14 +155,14 @@ export function VideoPlayerControls({
 
           {hasSubtitle && (
             <div className="relative">
-              <button data-subtitle-btn onClick={() => { onToggleSubtitleMenu(); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1.5' : 'p-1.5'} transition-colors ${showSubtitles ? 'text-[#c87d2f]' : 'text-white/80 hover:text-white'}`} title="字幕">
+              <button data-subtitle-btn onClick={() => { onToggleSubtitleMenu(); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1.5' : 'p-1.5'} transition-colors ${showSubtitles ? 'text-[var(--accent)]' : 'text-white/80 hover:text-white'}`} title="字幕">
                 <Subtitles size={isMobile ? 14 : 16} />
               </button>
               {showSubtitleMenu && (
                 <div data-subtitle-menu className="absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-sm rounded-lg p-3 min-w-[180px] space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-white/70">字幕</span>
-                    <button onClick={() => { onToggleSubtitles(); playInteractionSound('tap'); }} className={`px-2 py-0.5 text-[10px] rounded ${showSubtitles ? 'bg-[#c87d2f] text-white' : 'bg-white/10 text-white/60'}`}>
+                    <button onClick={() => { onToggleSubtitles(); playInteractionSound('tap'); }} className={`rounded px-2 py-0.5 text-[10px] ${showSubtitles ? 'bg-[var(--accent)] text-white' : 'bg-white/10 text-white/60'}`}>
                       {showSubtitles ? '开' : '关'}
                     </button>
                   </div>

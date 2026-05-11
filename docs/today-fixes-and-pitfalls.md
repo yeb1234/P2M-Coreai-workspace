@@ -198,16 +198,29 @@ THUMBNAIL_BACKGROUND_LIMIT=1
 - `src/lib/themes.ts`
 - `src/index.css`
 - `src/components/settings/SettingsPage.tsx`
+- `src/components/settings/AppearanceSettings.tsx`
+- `docs/theme-import-export.md`
 
 改动：
 
 - 重写 `themes.ts`，恢复主题名称、说明和 CSS 导出注释。
 - CSS 导出文件包含每个变量的说明。
+- 新增 JSON 主题包导出，包含 `kind/version/themeId/name/description/vars`。
+- 导入逻辑统一收敛到 `parseThemeVarsText()`，支持 CSS `:root` 和 JSON `vars`。
+- CSS 导入至少需要核心变量 `--bg-body`、`--bg-base`、`--bg-card`、`--text-primary`、`--accent`，避免普通 CSS 被误识别成主题。
+- 导出的 CSS 只包含主题变量和说明，运行时工具类留在 `src/index.css`。
 - 深色主题继续对旧页面里的浅色 Tailwind 类做兜底覆盖。
+- 新一轮深色主题检查后，补充了暗色主题可用性规则：`body/base/card/elevated` 必须分层，主文字避免纯白，`accent-bg` 不能等于卡片色。
+- Playwright 暗色截图不能只设置 `data-theme`，还必须写入主题变量；否则截图仍然是浅色变量，只是挂了暗色 theme id。
+- 导入后的自定义主题只使用 `vars`，不会保留导出文件里的名称、说明和分组元信息。
 
 维护原则：
 
 - 页面新增硬编码颜色时，要同步考虑 `theme-surface`、`theme-elevated` 或 CSS 变量。
+- 页面组件不要复制主题解析正则；导入只走 `parseThemeVarsText()`。
+- 新增主题变量时，同步更新 `ThemeVars`、`THEME_VAR_COMMENTS`、默认主题和 `themeImportExport.test.ts`。
+- CSS 导出面向手工调变量，JSON 导出面向备份/迁移。
+- 暗色主题修改后要同时跑 `themeImportExport.test.ts`、`regressionContracts.test.ts` 和 Playwright 暗色截图。
 - 如果深色模式出现亮块，优先搜索：
   - `bg-white`
   - `bg-[#faf9f7]`
@@ -285,3 +298,275 @@ python -m compileall backend/app
 - 把 AI 任务中心的按钮组抽成通用 `IconToolbar`，以后设置页和视频页复用。
 - 后端 `videos.py` 里列表序列化和分类路径查询可以继续抽 helper，减少重复查询代码。
 - 增加浏览器截图回归检查，重点覆盖视频右侧栏、AI 任务中心、深色模式和设置页。
+
+# 2026-05-11 追加踩坑记录
+
+今天主要集中在 AI 任务中心、外部 LLM、番茄钟声音、视频布局、主题系统和设置入口交互。很多问题不是单点 bug，而是“状态来源不清”和“宽度按视口判断”叠加出来的。
+
+## AI 任务中心和批处理范围
+
+现象：
+
+- 已经完成的 3 个视频，在点击“继续未完成”后又被放进批处理队列。
+- 577 个视频卡在任务中心里，用户很难判断这些任务到底从哪个范围读出来。
+- “批处理当前文件夹”文案不够准确，实际可能是当前叶子文件夹，也可能是包含子文件夹的全部视频范围。
+
+原因：
+
+- 批处理模式、文件夹范围、任务完成状态是三套逻辑，前端文案没有把范围暴露出来。
+- “继续未完成”和“全部重跑”必须严格区分：前者只能挑未成功的视频，后者才允许完成项重新入队。
+- 本地 LLM 和外部 LLM 都可能完成总结，判断是否完成不能只看本地模型字段。
+
+维护原则：
+
+- 任务筛选先按数据库真实状态判断，再按用户选择的批处理模式决定是否入队。
+- UI 文案必须显示范围，例如“当前文件夹”或“全部视频范围”。
+- 总结完成状态要以“任意 LLM 总结成功”为准，不要把外部 LLM 成功的视频误判成未完成。
+
+## 外部 LLM 和真实模型显示
+
+现象：
+
+- 用户已经设置“先外部，再本地”，右侧灵境小助手仍显示 `qwen3-4b`，看起来像只走本地。
+
+原因：
+
+- 右侧面板显示的是前端旧的 `model` 字段，不是后端真实运行时设置。
+
+处理：
+
+- 右侧面板打开时读取后端运行设置。
+- 标题下方显示真实策略，例如：
+  - `先外部 deepseek-v4-flash，后本地 qwen3-4b`
+  - `只用外部 deepseek-v4-flash`
+  - `先本地 qwen3-4b，后外部 deepseek-v4-flash`
+- 设置页保存后派发事件，让右侧面板立即刷新。
+
+维护原则：
+
+- 和模型执行有关的显示，应以运行时配置为准，不要只读旧的前端持久化字段。
+- 外部模型和本地模型要分别显示，避免用户误判请求链路。
+
+## 番茄钟背景音
+
+现象：
+
+- `rain.ogg`、`cafe.ogg` 等声音在控制台报 `Empty src attribute` 或 media error。
+- 咖啡馆背景音点开、关、再开后容易卡住，后续状态乱套。
+- 音量条 0% 和 100% 显示不贴合，拖动位置和填充条不一致。
+- 咖啡馆默认音量过大，壁炉和咖啡馆体感不一致。
+
+原因：
+
+- HTMLAudioElement 的加载和播放是异步的，快速切换时旧请求可能覆盖新状态。
+- 背景音“手动播放”和“只在专注阶段播放”是两种模式，不能复用同一套简单开关逻辑。
+- 音量感知不是线性的，素材本身响度也不同；不能只靠统一百分比。
+
+维护原则：
+
+- 背景音播放要有命令序号或当前请求引用，避免旧的 `play()`/`pause()` 回调覆盖新状态。
+- “专注模式”下点击背景音只是选择将要使用的声音，不等于立即播放。
+- 声音素材要提供合理默认音量；咖啡馆这类素材默认值应更低。
+- 音量条应按控件实际宽度计算填充和滑块位置，不要让两者分别算。
+
+2026-05-11 追加处理：
+
+- 新增 `src/lib/ambientSoundRules.ts`，把手动/专注模式下的背景音开关规则写成纯函数。
+- 新增 `src/hooks/useAmbientSoundController.ts`，集中管理背景音选择、播放、停止、错误提示和音量更新。
+- 背景音音量改为按素材独立保存，初始值来自 `AMBIENT_SOUNDS`，例如咖啡馆 10%、壁炉 50%、雨声 30%。
+- 音量条填充和滑块位置改为共用 `--ambient-volume-ratio`，避免 0%/100% 两端视觉不同步。
+- `PomodoroTimer.tsx` 不再自己维护背景音命令序号，组件只负责按钮和展示。
+- 补充 `src/__tests__/ambientSoundRules.test.ts`，覆盖专注前待播放、专注中切换、重复点击关闭、退出专注停止。
+
+新的状态规则：
+
+- 手动模式：点击未选中的背景音立即播放；再次点击同一个背景音关闭。
+- 专注模式非专注中：点击背景音只设置“待专注”，不立即播放。
+- 专注模式专注中：点击不同背景音立即切换；暂停、休息、重置或离开专注阶段后停止播放。
+- 每个背景音保留自己的音量，避免咖啡馆这种低默认素材影响其它背景音。
+- 番茄开始按钮仍会在用户点击手势里尝试播放选中的背景音，避免浏览器自动播放限制导致静默失败。
+
+2026-05-11 声音入口继续收敛：
+
+- `src/lib/sounds.ts` 新增 `soundController`，统一负责交互音、番茄提示音、通知音和 tick 音。
+- `playInteractionSound()`、`playPomodoroCue()`、`playNotificationSound()`、`playBreakSound()`、`playTickSound()` 保留为兼容函数，但内部都转到 `soundController`。
+- 补充 `src/__tests__/soundController.test.ts`，确认全局声音关闭时不会创建 Web Audio 音调或番茄媒体音频。
+
+维护原则：
+
+- 新增短交互音时优先加到 `INTERACTION_SOUND_NOTES`，不要在组件里临时创建 AudioContext。
+- 新增番茄或通知类文件音效时优先加到 `POMODORO_CUES` 或后续同级配置表，不要在业务组件里散写 `new Audio()`。
+- 业务组件可以暂时继续调用旧 helper；底层实现必须保持统一入口，方便后续做全局音量、静音、声音包切换。
+
+## 前端布局和收缩错乱
+
+现象：
+
+- AI 任务中心收起时，箭头、标题、状态文案没有对齐。
+- 右侧 AI 面板打开后，很多页面虽然视口仍然是桌面宽度，但实际内容容器已经变窄，固定 `lg:grid-cols-*` 会挤压。
+- 视频页中间拖拽分隔线在绿色主题下太硬。
+
+原因：
+
+- 旧布局按 viewport breakpoint 判断，而不是按组件实际可用宽度判断。
+- 部分按钮组固定两列或四列，窄容器里容易文字截断或错位。
+- 分隔线使用整条实线和强主题色 hover，在浅绿主题中视觉过重。
+
+处理：
+
+- 新增 `auto-grid-cards`、`auto-grid-panels`、`auto-grid-wide`、`auto-grid-video`、`auto-grid-compact`，用 `auto-fit + minmax()` 适配实际容器宽度。
+- AI 任务中心收起态改为统一 `items-center`，按钮和标题行使用稳定高度。
+- 视频右栏拖拽手柄改为淡渐隐线，悬停时才轻微强调。
+
+维护原则：
+
+- 右侧 AI 面板、可拖拽侧栏存在时，优先使用容器自适应网格，少用固定 `lg:grid-cols-*`。
+- 固定列数只适合日历周视图、播放器按钮这类语义结构固定的小控件。
+
+## 主题系统
+
+现象：
+
+- `Primer 云白`、`编辑器晨白`、`木棉纸白` 初版区分度太低。
+- `曜石暖橙` 和 `墨陶深棕` 初版也太像，都是黑灰橙。
+- 深色主题容易漏出旧组件里的浅色背景块。
+
+原因：
+
+- 只是微调色温不够，主题需要从底色、强调色、边框、文字气质一起拉开。
+- 老组件里仍有不少 Tailwind 写死色值，例如 `bg-white`、`bg-[#faf9f7]`。
+
+处理：
+
+- 自带主题和自定义风格分组展示。
+- 自定义浅色方向拉开：
+  - `木棉纸白`：暖纸 + 陶土橙。
+  - `Primer 云白`：冷白 + GitHub 蓝灰。
+  - `编辑器冰蓝`：浅蓝灰 + 紫蓝强调。
+- 深色方向拉开：
+  - `曜石暖橙`：黑灰底 + 琥珀橙，高对比。
+  - `墨陶深棕`：暖棕陶底 + 柔和陶土色，低对比。
+  - `Primer 暗幕`：GitHub 暗色工作台。
+  - `反重力紫夜`：紫黑 AI IDE 风格。
+- 新增共享暗色兜底，覆盖新增深色主题里的旧浅色类。
+
+维护原则：
+
+- 新增主题前先定义明确视觉方向，不要只改 accent。
+- 深色主题必须同步检查硬编码浅色背景。
+- 主题名要像主题名，不要叫“夜间模式”“早间模式”这种功能名。
+
+## 设置入口折返
+
+现象：
+
+- 右上角全局设置按钮只能打开设置，不能再次点击收回。
+
+处理：
+
+- UI store 记录进入设置前的页面。
+- 不在设置页时点击设置：进入设置。
+- 已在设置页时再次点击：返回进入设置前的页面；没有记录则回工作台。
+- 移动端顶部设置按钮同步同样逻辑。
+
+维护原则：
+
+- 顶部全局入口适合做 toggle，不要只做单向跳转。
+- 如果入口会覆盖当前工作流，应记录来源页面，返回时恢复用户上下文。
+
+## 提交和 PR 踩坑
+
+现象：
+
+- 本机没有 `gh` 命令。
+- GitHub API 创建 PR 返回 `Requires authentication`。
+- 工作区有 `learning_os.db.bak-*` 数据库备份文件，不能进提交。
+- `prompts/__pycache__` 是 Python 缓存，也不能进提交。
+
+处理：
+
+- 先运行 `npm test` 和 `npm run build`。
+- 提交前用 `git status --short --ignored` 检查暂存和忽略文件。
+- 使用 pathspec 排除数据库备份和缓存目录。
+- 分支推送成功后，用 GitHub 给出的 PR 链接手动创建 PR。
+
+维护原则：
+
+- 不提交 SQLite 数据库、数据库备份、Python 缓存、构建产物和本机工具目录。
+- 如果没有 GitHub CLI 或 token，推送分支后保留 PR 创建链接即可。
+
+## 后端设置层拆分
+
+现象：
+
+- `backend/app/services/assistant.py` 和 `backend/app/services/ai_jobs.py` 为了读取运行时设置，反向 import `app.routers.admin`。
+- `admin.py` 同时包含接口、设置默认值、归一化、数据库读写、健康检查、队列管理，文件过重。
+
+处理：
+
+- 新增 `backend/app/services/admin_settings.py`。
+- 把 assistant runtime settings、transcription settings、LLM 使用策略、Whisper 模型文件表、OpenAI base URL 归一化迁到 service。
+- `admin.py` 继续保留原 API 路径，只负责收 payload、调用 service、返回 schema。
+- `assistant.py` 和 `ai_jobs.py` 改为直接依赖 `admin_settings`，不再从 router 层读取设置。
+
+维护原则：
+
+- 业务服务不能依赖 router 文件；router 只做 HTTP 入口。
+- 设置归一化只能维护在 `admin_settings.py`，避免前端保存、AI 任务、助手对话各自有一套默认值。
+- 后续继续拆 `admin.py` 时，优先拆 health 检查和 AI 队列管理，接口路径保持 `/api/admin/...` 不变。
+
+2026-05-11 继续处理：
+
+- 新增 `backend/app/services/admin_health.py`，承接数据库、目录、ffmpeg、Whisper、LLM、AI 队列和视频库健康检查。
+- 新增 `backend/app/services/admin_ai_queue.py`，承接队列状态、暂停/恢复、清理、取消、恢复失败/卡住任务、同步排队任务设置。
+- `backend/app/routers/admin.py` 的对应接口改为委托 service，`/api/admin/health` 和 `/api/admin/ai-jobs/...` 路径不变。
+
+维护原则：
+
+- 队列状态修改统一走 `admin_ai_queue.py`，不要在 router 或前端对应接口里重复写数据库状态同步。
+- 健康检查统一走 `admin_health.py`，避免同一项检查在设置页、启动脚本、调试接口里各写一份。
+- 继续拆 admin 时，下一块适合处理 rescan、thumbnail、whisper model 查询。
+
+2026-05-11 admin 路由继续瘦身：
+
+- 新增 `backend/app/services/admin_library.py`，承接视频库重新扫描、批量补缩略图、Whisper 模型列表查询。
+- `backend/app/routers/admin.py` 现在基本只保留 `/api/admin/...` 路由声明、schema 转换和 service 委托。
+- `generate-thumbnails` 仍然保持后台线程补图行为，但线程和数据库会话创建放进 service，避免 router 里混业务流程。
+
+维护原则：
+
+- `admin.py` 后续新增接口时，先判断属于 settings、health、ai_queue、library 哪一类；业务逻辑放对应 service。
+- 如果要新增管理域，优先新建 `backend/app/services/admin_*.py`，不要把 router 文件重新堆大。
+
+## Playwright 布局回归
+
+处理：
+
+- 安装 `@playwright/test`，新增 `playwright.config.ts`。
+- 新增 `npm run test:e2e`，使用 Vite dev server 自动启动本地页面。
+- 新增 `tests/e2e/layout.spec.ts`，覆盖：
+  - 设置页打开右侧灵境小助手后无横向溢出。
+  - 视频站列表页自适应网格无横向溢出。
+  - `primer-dark` 深色主题下设置页保持可读。
+- 每个场景覆盖 `1440x900` 和 `1024x768` 两个桌面宽度，并生成截图基准。
+- 新增 `tests/contracts/regressionContracts.test.ts`，锁住自适应网格、主区 padding、背景音音量条比例变量、admin router 瘦身这些低成本契约。
+
+维护原则：
+
+- 修改布局、主题、右侧 AI 面板、视频站、设置页前后，都跑 `npm run test:e2e`。
+- 更新截图基准只在确认视觉变化是有意的情况下执行 `npx playwright test --update-snapshots`。
+- Playwright 测试会走真实注册流程，不依赖内部 Zustand store 注入，避免测试和真实入口脱节。
+
+2026-05-11 继续补充：
+
+- Playwright 增加 Chromium mobile 项目，用 Pixel 7 视口覆盖移动端。
+- e2e 改为 mock `/api/videos`、`/api/ai-jobs`、`/api/admin/assistant-settings` 等接口，避免依赖本机视频库和真实后端账号。
+- 新增具体视频页截图：AI 任务中心展开、AI 任务中心收起。
+- 新增移动端截图：设置页、视频页列表。
+- 测试里不写真实用户名和密码；真实账号只用于本机手动联调，不能进入仓库。
+
+维护原则：
+
+- 默认 e2e 走 mock API，保证截图稳定。
+- 真实后端联调应该另开 smoke 测试，并通过环境变量提供账号，不写入测试源码。
+- 具体视频页测试优先断言布局关键区域，例如播放器、AI 总结、AI 任务中心、无横向溢出；本地媒体文件是否能播放不要作为布局测试前置条件。

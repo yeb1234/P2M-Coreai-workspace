@@ -10,7 +10,7 @@ export const pomodoroPlugin: Plugin = {
     icon: <Timer size={20} />,
     description: '专注工作，高效休息',
     defaultPosition: 2,
-    color: 'text-[#16a34a]',
+    color: 'text-[var(--accent)]',
     defaultSize: 'small',
     summaryComponent: PomodoroSummary,
   },

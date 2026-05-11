@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayCircle, ArrowLeft } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { useVideoStore } from '../../stores/videoStore';
-import { getVideoStreamUrl, getSubtitleFileUrl, saveWatchHistory, type TranscriptSegment } from '../../lib/videoApi';
+import { saveWatchHistory } from '../../lib/videoApi';
 import { useAiJobCenter } from '../../hooks/useAiJobCenter';
 import { VideoList } from './VideoList';
 import { VideoAiSummaryPanel } from './VideoAiSummaryPanel';
@@ -11,14 +11,15 @@ import { VideoPlayerControls } from './VideoPlayerControls';
 import { VideoPlaylistPanel } from './VideoPlaylistPanel';
 import { VideoAiJobCenter } from './VideoAiJobCenter';
 import { VideoErrorBoundary } from './VideoErrorBoundary';
-import { normalizeSegment } from './videoPlayerAdapters';
-import { loadPlayerSettings, savePlayerSettings, type PlayerSettings } from './videoPlayerSettings';
 import { usePlaylistResize } from './usePlaylistResize';
 import { useVideoControlChrome } from './useVideoControlChrome';
 import { useVideoKeyboardShortcuts } from './useVideoKeyboardShortcuts';
 import { useVideoPlaylist } from './useVideoPlaylist';
-
-const PENDING_RECOMMENDED_VIDEO_KEY = 'p2m_pending_recommended_video_id';
+import { useVideoPlayerMedia } from './useVideoPlayerMedia';
+import { useVideoPlayerSettings } from './useVideoPlayerSettings';
+import { useVideoPlayback } from './useVideoPlayback';
+import { useVideoSubtitles } from './useVideoSubtitles';
+import { useVideoSelection } from './useVideoSelection';
 
 function VideoPlayerView() {
   const { currentVideo, currentSegments, jobStatus, jobStage, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
@@ -27,13 +28,7 @@ function VideoPlayerView() {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const isPlayingRef = useRef(false);
-  const initialSettings = useMemo(() => loadPlayerSettings(), []);
-  const settingsRef = useRef<PlayerSettings>(initialSettings);
-  const lastVolumeRef = useRef(initialSettings.volume || 1);
-  const [activeSegIdx, setActiveSegIdx] = useState(-1);
   const currentTimeRef = useRef(0);
-  const [showSubtitles, setShowSubtitles] = useState(initialSettings.showSubtitles);
-  const subtitleListRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -42,15 +37,44 @@ function VideoPlayerView() {
   const [hoverX, setHoverX] = useState(0);
   const [playerWidth, setPlayerWidth] = useState(800);
   const [videoDuration, setVideoDuration] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(initialSettings.playbackRate);
-  const [subtitleOpacity, setSubtitleOpacity] = useState(initialSettings.subtitleOpacity);
-  const [subtitleSize, setSubtitleSize] = useState(initialSettings.subtitleSize);
-  const [autoPlay, setAutoPlay] = useState(initialSettings.autoPlay);
   const { width: playlistPanelWidth, startResize: startPlaylistResize } = usePlaylistResize(300);
-  const [volume, setVolume] = useState(initialSettings.volume);
-  const [isMuted, setIsMuted] = useState(initialSettings.muted);
   const [dragging, setDragging] = useState(false);
   const [mediaError, setMediaError] = useState('');
+  const {
+    showSubtitles,
+    setShowSubtitles,
+    subtitleOpacity,
+    setSubtitleOpacity,
+    subtitleSize,
+    setSubtitleSize,
+    autoPlay,
+    setAutoPlay,
+    playbackRate,
+    setPlaybackRate,
+    volume,
+    setVolume,
+    isMuted,
+    setIsMuted,
+    settingsRef,
+    lastVolumeRef,
+  } = useVideoPlayerSettings();
+  const {
+    togglePlay,
+    seekBy,
+    toggleMute,
+    handleVolumeChange,
+    togglePip,
+    toggleFullscreen,
+  } = useVideoPlayback({
+    videoRef,
+    videoDuration,
+    lastVolumeRef,
+    setProgress,
+    setVolume,
+    setIsMuted,
+    videoContainerRef,
+    setIsFullscreen,
+  });
   const {
     showControls,
     setShowControls,
@@ -77,25 +101,30 @@ function VideoPlayerView() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  const videoUrl = currentVideo ? getVideoStreamUrl(currentVideo.id) : '';
-  const subtitleUrl = currentVideo && (currentVideo.subtitle_url || currentVideo.subtitle_path)
-    ? getSubtitleFileUrl(currentVideo.id)
-    : null;
-  const normalizedSegments = useMemo(
-    () => currentSegments.map(normalizeSegment).filter((segment): segment is TranscriptSegment => !!segment),
-    [currentSegments]
-  );
-  const activeSubtitleText = activeSegIdx >= 0 ? normalizedSegments[activeSegIdx]?.text || '' : '';
-  const hasEmbeddedSubtitle = normalizedSegments.length > 0;
-  const hasSubtitle = !!subtitleUrl || hasEmbeddedSubtitle;
-
-  const videoKey = `${currentVideo?.id ?? 'none'}`;
-  const currentVideoId = currentVideo?.id ?? null;
-  const hasVideoDetails = !!(
-    currentVideo?.transcript_segments?.length ||
-    currentVideo?.summary ||
-    currentVideo?.transcription
-  );
+  const {
+    videoUrl,
+    subtitleUrl,
+    normalizedSegments,
+    hasSubtitle,
+    videoKey,
+    currentVideoId,
+    hasVideoDetails,
+  } = useVideoPlayerMedia({ currentVideo, currentSegments });
+  const {
+    activeSubtitleText,
+    resetActiveSubtitle,
+    toggleSubtitles,
+    updateActiveSubtitle,
+    hideCurrentTextTracks,
+  } = useVideoSubtitles({
+    videoRef,
+    subtitleUrl,
+    normalizedSegments,
+    showSubtitles,
+    setShowSubtitles,
+    subtitleOpacity,
+    subtitleSize,
+  });
 
   // AI Job Center - all logic extracted to hook
   const { triggerSingleVideo, triggerCorrection, ...aiJobCenterProps } = useAiJobCenter(playlist, playlistScope, currentVideoId, loadCurrentVideo);
@@ -116,43 +145,20 @@ function VideoPlayerView() {
       setVideoDuration(0);
       setIsPlaying(false);
       setHoverTime(null);
-      setActiveSegIdx(-1);
+      resetActiveSubtitle();
       setPlaybackRate(settingsRef.current.playbackRate);
       setMediaError('');
     });
-  }, [currentVideo?.id]);
+  }, [currentVideo?.id, resetActiveSubtitle]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
   useEffect(() => {
-    settingsRef.current = {
-      showSubtitles,
-      subtitleOpacity,
-      subtitleSize,
-      autoPlay,
-      playbackRate,
-      volume,
-      muted: isMuted,
-    };
-    savePlayerSettings(settingsRef.current);
-  }, [showSubtitles, subtitleOpacity, subtitleSize, autoPlay, playbackRate, volume, isMuted]);
-
-  useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, []);
-
-  const togglePlay = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused || v.ended) {
-      v.play().catch(() => {});
-    } else {
-      v.pause();
-    }
   }, []);
 
   // Mobile: keep simple tap-to-play behavior and let the browser handle native playback mode.
@@ -179,94 +185,11 @@ function VideoPlayerView() {
     };
   }, [isMobile, togglePlay, videoKey]);
 
-  const seekBy = useCallback((seconds: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    const duration = Number.isFinite(v.duration) ? v.duration : videoDuration;
-    const next = Math.max(0, Math.min(duration || 0, v.currentTime + seconds));
-    v.currentTime = next;
-    setProgress(next);
-  }, [videoDuration]);
-
-  const toggleSubtitles = useCallback(() => {
-    const next = !showSubtitles;
-    setShowSubtitles(next);
-      const video = videoRef.current;
-      if (video) {
-        for (let i = 0; i < video.textTracks.length; i++) {
-          video.textTracks[i].mode = 'hidden';
-        }
-      }
-  }, [showSubtitles]);
-
-  useEffect(() => {
-    if (!subtitleUrl || !videoRef.current) return;
-    const video = videoRef.current;
-    for (let i = 0; i < video.textTracks.length; i++) {
-      video.textTracks[i].mode = 'hidden';
-    }
-  }, [subtitleUrl, showSubtitles]);
-
-  const toggleMute = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.muted || v.volume === 0) {
-      const restored = lastVolumeRef.current > 0 ? lastVolumeRef.current : 0.6;
-      v.volume = restored;
-      v.muted = false;
-      setVolume(restored);
-      setIsMuted(false);
-      return;
-    }
-    lastVolumeRef.current = v.volume;
-    v.muted = true;
-    setIsMuted(true);
-  }, []);
-
-  const handleVolumeChange = useCallback((val: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    const next = Math.max(0, Math.min(1, val));
-    v.volume = next;
-    if (next > 0) {
-      lastVolumeRef.current = next;
-      v.muted = false;
-    } else {
-      v.muted = true;
-    }
-    setVolume(next);
-    setIsMuted(v.muted);
-  }, []);
-
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.playbackRate = playbackRate;
     }
   }, [playbackRate]);
-
-  const togglePip = useCallback(async () => {
-    const v = videoRef.current;
-    if (!v) return;
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else {
-        await v.requestPictureInPicture();
-      }
-    } catch {
-      // Browsers can reject PiP when the source or gesture is not eligible.
-    }
-  }, []);
-
-  const toggleFullscreen = useCallback(() => {
-    const el = videoContainerRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
-    }
-  }, []);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -274,38 +197,19 @@ function VideoPlayerView() {
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  // Inject subtitle ::cue styles
-  useEffect(() => {
-    let el = document.getElementById('subtitle-cue-style') as HTMLStyleElement;
-    if (!el) {
-      el = document.createElement('style');
-      el.id = 'subtitle-cue-style';
-      document.head.appendChild(el);
-    }
-    el.textContent = `video::cue { opacity: ${subtitleOpacity}; font-size: ${subtitleSize}%; }`;
-  }, [subtitleOpacity, subtitleSize]);
-
   const handleTimeUpdate = useCallback(() => {
     if (!currentVideo) return;
     const t = videoRef.current?.currentTime ?? 0;
     currentTimeRef.current = t;
     setProgress(t);
-
-    const idx = normalizedSegments.findIndex((s) => t >= s.start && t < s.end);
-    if (idx !== activeSegIdx) {
-      setActiveSegIdx(idx);
-      if (idx >= 0 && subtitleListRef.current) {
-        const el = subtitleListRef.current.querySelector(`[data-seg="${idx}"]`);
-        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
+    updateActiveSubtitle(t);
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       const dur = videoRef.current?.duration ?? 0;
       if (dur > 0) saveWatchHistory(currentVideo.id, t, dur).catch(() => {});
     }, 10000);
-  }, [normalizedSegments, activeSegIdx, currentVideo]);
+  }, [currentVideo, updateActiveSubtitle]);
 
   const handleEnded = useCallback(() => {
     if (!autoPlay) return;
@@ -447,11 +351,7 @@ function VideoPlayerView() {
                 if (currentVideo.duration) {
                   setVideoDuration(currentVideo.duration);
                 }
-                  if (subtitleUrl) {
-                    for (let i = 0; i < video.textTracks.length; i++) {
-                      video.textTracks[i].mode = 'hidden';
-                    }
-                  }
+                if (subtitleUrl) hideCurrentTextTracks();
                 if (playAfterLoadRef.current) {
                   playAfterLoadRef.current = false;
                   video.play().catch(() => {
@@ -556,33 +456,7 @@ function VideoPlayerView() {
 }
 
 export const VideoPage: React.FC = () => {
-  const currentVideo = useVideoStore((s) => s.currentVideo);
-  const restoreCurrentVideo = useVideoStore((s) => s.restoreCurrentVideo);
-  const loadCurrentVideo = useVideoStore((s) => s.loadCurrentVideo);
-
-  useEffect(() => {
-    restoreCurrentVideo();
-  }, [restoreCurrentVideo]);
-
-  useEffect(() => {
-    const savedId = Number(localStorage.getItem(PENDING_RECOMMENDED_VIDEO_KEY));
-    if (!savedId) return;
-    localStorage.removeItem(PENDING_RECOMMENDED_VIDEO_KEY);
-    void loadCurrentVideo(savedId);
-  }, [loadCurrentVideo]);
-
-  // Listen for video play events from AI chat recommendations
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.videoId) {
-        localStorage.removeItem(PENDING_RECOMMENDED_VIDEO_KEY);
-        void loadCurrentVideo(detail.videoId);
-      }
-    };
-    window.addEventListener('p2m:play-video', handler);
-    return () => window.removeEventListener('p2m:play-video', handler);
-  }, [loadCurrentVideo]);
+  const { currentVideo } = useVideoSelection();
 
   return (
     <div className={`w-full pt-2 space-y-6 ${currentVideo ? '' : 'px-1 lg:px-1.5'}`}>

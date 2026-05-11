@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import AiJob, Note, SubtitleSegment, Video
 from app.schemas import AiJobBatchCreate, AiJobBatchOut, AiJobBatchSkippedItem, AiJobListItem, AiJobListOut, AiJobOut
 from app.services.ai_jobs import create_ai_job_from_payload
+from app.services.ai_job_rules import is_batch_eligible
 from app.utils.serialization import load_segments, to_output_url
 
 
@@ -84,55 +85,6 @@ def list_ai_jobs(
     )
 
 
-def _has_subtitles(video: Video) -> bool:
-    return bool(video.subtitle_path or video.transcript_segments)
-
-
-def _has_summary(video: Video, latest_job: AiJob | None = None) -> bool:
-    return bool((video.summary and video.summary.strip()) or (latest_job and latest_job.summary and latest_job.summary.strip()))
-
-
-def _is_batch_eligible(video: Video, latest_job: AiJob | None, payload: AiJobBatchCreate) -> tuple[bool, str | None]:
-    has_subtitles = _has_subtitles(video)
-    has_summary = _has_summary(video, latest_job)
-
-    if payload.mode == "all":
-        return True, None
-
-    if latest_job and latest_job.status in ("queued", "running"):
-        return False, "active_job"
-
-    if payload.mode == "unfinished":
-        if latest_job and latest_job.status in ("failed", "cancelled"):
-            return True, None
-        if latest_job and latest_job.status == "completed":
-            return False, "complete"
-        if not has_subtitles:
-            return True, None
-        if latest_job and latest_job.status != "completed":
-            return True, None
-        return False, "complete"
-
-    if payload.mode == "missing_subtitles":
-        if has_subtitles:
-            return False, "has_subtitles"
-        return True, None
-
-    if payload.mode == "missing_summary":
-        if not has_subtitles:
-            return False, "no_subtitles"
-        if has_summary:
-            return False, "has_summary"
-        return True, None
-
-    if payload.mode == "failed_only":
-        if latest_job and latest_job.status == "failed":
-            return True, None
-        return False, "not_failed"
-
-    return False, "unknown_mode"
-
-
 def _latest_job_by_video(db: Session, video_ids: list[int]) -> dict[int, AiJob]:
     if not video_ids:
         return {}
@@ -202,7 +154,7 @@ def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
         if latest_job and latest_job.status in ("queued", "running") and force_rerun:
             active += 1
 
-        eligible_for_mode, skip_reason = _is_batch_eligible(video, latest_job, payload)
+        eligible_for_mode, skip_reason = is_batch_eligible(video, latest_job, payload)
         if not eligible_for_mode:
             if skip_reason == "active_job":
                 active += 1

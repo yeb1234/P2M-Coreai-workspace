@@ -1,11 +1,23 @@
 import { useEffect, useRef } from 'react';
 import { useTodoStore, useCalendarStore, usePomodoroStore, useNotificationStore } from '../stores';
 import { PRIORITY_COLORS, type Todo, type PomodoroSession } from '../types';
-import { playBreakSound, playPomodoroCue } from '../lib/sounds';
+import { playBreakSound, playPomodoroCue, playNotificationSound } from '../lib/sounds';
 import { toLocalDateString } from '../lib/date';
+
+const TODO_DUE_MARKER = 'todo:due';
+const TODO_REMINDER_MARKER = 'todo:reminder';
+
+function splitReminderDateTime(reminderAt: string): { date: string; time: string } {
+  const date = new Date(reminderAt);
+  return {
+    date: toLocalDateString(date),
+    time: `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
+  };
+}
 
 export const useCrossModuleSync = () => {
   const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
+  const todoReminderRef = useRef<Set<string>>(new Set());
 
   // Restore timer on app load (adjust for elapsed time while page was closed)
   useEffect(() => {
@@ -68,25 +80,86 @@ export const useCrossModuleSync = () => {
   }, []);
 
   useEffect(() => {
+    const reminderTimer = setInterval(() => {
+      const now = Date.now();
+      const notificationStore = useNotificationStore.getState();
+      Object.values(useTodoStore.getState().todos).forEach((todo) => {
+        if (!todo.reminderAt || todo.status === 'completed') return;
+        if (todoReminderRef.current.has(todo.id)) return;
+        if (new Date(todo.reminderAt).getTime() > now) return;
+        todoReminderRef.current.add(todo.id);
+        playNotificationSound();
+        notificationStore.addNotification({
+          type: 'todo',
+          title: '待办提醒',
+          message: todo.title,
+        });
+      });
+    }, 15000);
+    return () => clearInterval(reminderTimer);
+  }, []);
+
+  useEffect(() => {
     // Subscribe to todo changes
     const unsubTodos = useTodoStore.subscribe((state) => {
       const todos = state.todos;
       const calendarStore = useCalendarStore.getState();
+      const activeTodoIds = new Set(Object.keys(todos));
 
       Object.values(todos).forEach((todo: Todo) => {
+        const existingEvents = calendarStore.getEventsByTodoId(todo.id);
+        const dueEvent = existingEvents.find((event) => event.description === TODO_DUE_MARKER);
+        const reminderEvent = existingEvents.find((event) => event.description === TODO_REMINDER_MARKER);
+
         if (todo.dueDate) {
-          const existingEvents = calendarStore.getEventsByTodoId(todo.id);
-          if (existingEvents.length === 0) {
+          const dueData = {
+            title: todo.title,
+            date: todo.dueDate,
+            type: 'todo' as const,
+            color: PRIORITY_COLORS[todo.priority],
+            todoId: todo.id,
+            pomodoroSessionId: null,
+            description: TODO_DUE_MARKER,
+          };
+          if (dueEvent) {
+            calendarStore.updateEvent(dueEvent.id, dueData);
+          } else {
             calendarStore.addEvent({
-              title: todo.title,
-              date: todo.dueDate,
-              type: 'todo',
-              color: PRIORITY_COLORS[todo.priority],
-              todoId: todo.id,
-              pomodoroSessionId: null,
+              ...dueData,
             });
           }
+        } else if (dueEvent) {
+          calendarStore.deleteEvent(dueEvent.id);
         }
+
+        if (todo.reminderAt) {
+          const { date, time } = splitReminderDateTime(todo.reminderAt);
+          const reminderData = {
+            title: `提醒：${todo.title}`,
+            date,
+            startTime: time,
+            type: 'reminder' as const,
+            color: '#f59e0b',
+            todoId: todo.id,
+            pomodoroSessionId: null,
+            description: TODO_REMINDER_MARKER,
+          };
+          if (reminderEvent) {
+            calendarStore.updateEvent(reminderEvent.id, reminderData);
+          } else {
+            calendarStore.addEvent({
+              ...reminderData,
+            });
+          }
+        } else if (reminderEvent) {
+          calendarStore.deleteEvent(reminderEvent.id);
+        }
+      });
+
+      Object.values(calendarStore.events).forEach((event) => {
+        if (!event.todoId || activeTodoIds.has(event.todoId)) return;
+        if (event.description !== TODO_DUE_MARKER && event.description !== TODO_REMINDER_MARKER) return;
+        calendarStore.deleteEvent(event.id);
       });
     });
 

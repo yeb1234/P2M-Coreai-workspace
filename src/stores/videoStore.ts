@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { VideoItem, SegmentSearchResult, TranscriptSegment, CategoryTree } from '../lib/videoApi';
-import { fetchVideos, fetchVideo, searchSegments, startAiJob, fetchCategoryTree } from '../lib/videoApi';
+import { fetchVideos, fetchVideo, searchSegments, startAiJob, fetchCategoryTree, setVideoFavorite } from '../lib/videoApi';
 
 const VIDEO_ID_KEY = 'p2m_current_video_id';
 const NAV_STATE_KEY = 'p2m_video_nav_state';
@@ -141,6 +141,7 @@ interface VideoState {
   getCurrentChildren: () => CategoryTree[];
   restoreNavigation: () => void;
   setSelectedFolderIds: (ids: number[]) => void;
+  toggleFavorite: (videoId: number, nextFavorite: boolean) => Promise<void>;
 }
 
 export const useVideoStore = create<VideoState>()((set, get) => ({
@@ -410,5 +411,32 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
 
   setSelectedFolderIds: (ids) => {
     set({ selectedFolderIds: ids });
+  },
+
+  toggleFavorite: async (videoId, nextFavorite) => {
+    const previous = get();
+    const applyFavorite = (video: VideoItem): VideoItem => ({
+      ...video,
+      is_favorite: nextFavorite,
+      favorited_at: nextFavorite ? new Date().toISOString() : null,
+    });
+    set({
+      videos: previous.videos.map((video) => video.id === videoId ? applyFavorite(video) : video),
+      currentVideo: previous.currentVideo?.id === videoId ? applyFavorite(previous.currentVideo) : previous.currentVideo,
+    });
+
+    try {
+      const fresh = await setVideoFavorite(videoId, nextFavorite);
+      set((state) => ({
+        videos: state.videos.map((video) => video.id === videoId ? { ...video, ...fresh } : video),
+        currentVideo: state.currentVideo?.id === videoId ? { ...state.currentVideo, ...fresh } : state.currentVideo,
+      }));
+    } catch (e: unknown) {
+      set({
+        videos: previous.videos,
+        currentVideo: previous.currentVideo,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   },
 }));

@@ -61,6 +61,8 @@ class VideoOut(BaseModel):
     active_job_id: Optional[str] = None
     watch_progress: Optional[float] = None
     completed: bool = False
+    is_favorite: bool = False
+    favorited_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -79,6 +81,10 @@ class WatchHistoryIn(BaseModel):
     video_id: int
     progress: float = Field(ge=0)
     duration: float = Field(ge=0)
+
+
+class VideoFavoriteIn(BaseModel):
+    is_favorite: bool
 
 
 class AiJobCreate(BaseModel):

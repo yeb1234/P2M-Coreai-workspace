@@ -15,8 +15,8 @@ function timeToPercent(isoStr: string): number {
 }
 
 function sessionColor(phase: PomodoroSession['phase']): string {
-  if (phase === 'work') return '#86efac';
-  return '#c4b5fd';
+  if (phase === 'work') return 'var(--accent)';
+  return 'var(--warning)';
 }
 
 export const PomodoroStats: React.FC = () => {
@@ -41,52 +41,52 @@ export const PomodoroStats: React.FC = () => {
 
   return (
     <div className="min-w-0 space-y-4">
-      <h3 className="font-medium text-[#1a1a1a]">专注统计</h3>
+      <h3 className="font-medium text-[var(--text-primary)]">专注统计</h3>
 
       <div className="auto-grid-compact">
-        <div className="p-3 bg-[#f0fdf4] rounded-lg">
-          <div className="flex items-center gap-2 text-[#16a34a] mb-1">
+        <div className="p-3 bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-card))] rounded-lg border border-[color-mix(in_srgb,var(--accent)_18%,var(--border-light))]">
+          <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
             <Target size={14} />
             <span className="text-xs font-medium">今日番茄</span>
           </div>
-          <p className="text-2xl font-bold text-[#166534]">{todayStats.totalPomodoros}</p>
+          <p className="text-2xl font-bold text-[var(--accent)]">{todayStats.totalPomodoros}</p>
         </div>
-        <div className="p-3 bg-[#eff6ff] rounded-lg">
-          <div className="flex items-center gap-2 text-[#2563eb] mb-1">
+        <div className="p-3 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border-light)]">
+          <div className="flex items-center gap-2 text-[var(--text-secondary)] mb-1">
             <Clock size={14} />
             <span className="text-xs font-medium">今日专注</span>
           </div>
-          <p className="text-2xl font-bold text-[#1e40af]">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">
             {formatDuration(todayStats.totalMinutes)}
           </p>
         </div>
       </div>
 
       {hasAnySessions && (
-        <div className="min-w-0 overflow-x-auto pb-1">
-          <div className="min-w-[300px]">
-          <div className="flex items-center gap-2 text-[#6b7280] mb-3">
+        <div className="min-w-0 overflow-x-auto pb-1 pr-1">
+          <div className="min-w-[300px] pr-2">
+          <div className="flex items-center gap-2 text-[var(--text-secondary)] mb-3">
             <TrendingUp size={14} />
             <span className="text-xs font-medium">本周趋势</span>
-            <div className="ml-auto flex items-center gap-3 text-[10px]">
+            <div className="ml-auto flex items-center gap-3 pr-1 text-[10px]">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#86efac' }} />
+                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'var(--accent)' }} />
                 专注
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#c4b5fd' }} />
+                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'var(--warning)' }} />
                 休息
               </span>
             </div>
           </div>
 
-          <div className="flex mb-1 pl-8">
+          <div className="flex mb-1 pl-8 pr-2">
             <div className="flex-1 relative h-3">
               {[0, 6, 12, 18].map((h) => {
                 const pct = ((h + 6 - TIMELINE_START) / TIMELINE_HOURS) * 100;
                 if (pct < 0 || pct > 100) return null;
                 return (
-                  <span key={h} className="absolute text-[8px] text-[#b8b4ac]" style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}>
+                  <span key={h} className="absolute text-[8px] text-[var(--text-muted)]" style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}>
                     {String(h + 6).padStart(2, '0')}:00
                   </span>
                 );
@@ -101,12 +101,12 @@ export const PomodoroStats: React.FC = () => {
               const isToday = date === toLocalDateString(new Date());
 
               return (
-                <div key={date} className="flex items-center gap-2">
-                  <div className={`w-8 text-right flex-shrink-0 ${isToday ? 'text-[#c87d2f] font-bold' : 'text-[#9ca3af]'}`}>
+                <div key={date} className="flex items-center gap-2 pr-2">
+                  <div className={`w-8 text-right flex-shrink-0 ${isToday ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-muted)]'}`}>
                     <div className="text-[10px] leading-tight">{dayName}</div>
                     <div className="text-[9px] leading-tight">{dayNum}</div>
                   </div>
-                  <div className="flex-1 h-5 rounded-md relative overflow-hidden" style={{ backgroundColor: '#f3f2ef' }}>
+                  <div className="flex-1 h-5 rounded-md relative overflow-hidden bg-[var(--bg-elevated)]">
                     {sessions.map((session) => {
                       const left = timeToPercent(session.startTime);
                       const endPct = session.endTime ? timeToPercent(session.endTime) : left + 2;
@@ -127,7 +127,7 @@ export const PomodoroStats: React.FC = () => {
                     })}
                     {sessions.length === 0 && (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[8px] text-[#d1cdc6]">-</span>
+                        <span className="text-[8px] text-[var(--text-muted)]">-</span>
                       </div>
                     )}
                   </div>

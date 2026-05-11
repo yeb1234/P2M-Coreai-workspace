@@ -7,6 +7,7 @@ export { useNotesStore } from './notesStore';
 export { useNotificationStore } from './notificationStore';
 export { useAuthStore } from './authStore';
 export { useVideoStore } from './videoStore';
+export { useTimeCenterStore } from './timeCenterStore';
 export { useAIStore } from './aiStore';
 export { DEFAULT_TRANSCRIPTION_SETTINGS, useTranscriptionStore, WHISPER_MODELS } from './transcriptionStore';
 export { DEFAULT_SUBTITLE_CORRECTION_PROMPT } from '../lib/aiPromptDefaults';

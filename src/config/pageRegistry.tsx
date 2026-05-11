@@ -3,12 +3,14 @@ import {
   LayoutDashboard, ListTodo, Calendar, StickyNote, Timer, PlayCircle, BarChart3,
   BookOpen, Code2, Target, Layers, Bookmark, Heart, GitCompare, ShoppingCart,
   Trophy, Coins, MessageSquare, Compass, Bot, Package, Workflow, Settings,
+  AlarmClock,
 } from 'lucide-react';
 import type { ActiveView } from '../stores/uiStore';
 import { DashboardPage } from '../components/dashboard/DashboardPage';
 import { TodoPage } from '../components/todo/TodoPage';
 import { CalendarPage } from '../components/calendar/CalendarPage';
 import { PomodoroPage } from '../components/pomodoro/PomodoroPage';
+import { TimeCenterPage } from '../components/timecenter/TimeCenterPage';
 import { VideoPage } from '../components/video/VideoPage';
 import { NotesPage } from '../components/notes/NotesPage';
 import { StatsPage } from '../components/stats/StatsPage';
@@ -45,7 +47,8 @@ export const PAGES: PageEntry[] = [
   { id: 'todo', path: 'todo', component: TodoPage, label: '待办事项', icon: <ListTodo size={20} />, color: 'text-[#2563eb]' },
   { id: 'calendar', path: 'calendar', component: CalendarPage, label: '日历', icon: <Calendar size={20} />, color: 'text-[#7c3aed]' },
   { id: 'notes', path: 'notes', component: NotesPage, label: '笔记', icon: <StickyNote size={20} />, color: 'text-[#f59e0b]' },
-  { id: 'pomodoro', path: 'pomodoro', component: PomodoroPage, label: '番茄钟', icon: <Timer size={20} />, color: 'text-[#16a34a]' },
+  { id: 'pomodoro', path: 'pomodoro', component: PomodoroPage, label: '番茄钟', icon: <Timer size={20} />, color: 'text-[var(--accent)]' },
+  { id: 'timecenter', path: 'timecenter', component: TimeCenterPage, label: '时间中心', icon: <AlarmClock size={20} />, color: 'text-[var(--accent)]' },
   { id: 'video', path: 'video', component: VideoPage, label: '视频站', icon: <PlayCircle size={20} />, color: 'text-[#ec4899]' },
   { id: 'health', path: 'health', component: HealthPage, label: '健康助手', icon: <Heart size={20} />, color: 'text-[#ec4899]', dev: true },
   { id: 'compare', path: 'compare', component: ComparePage, label: '产品对比', icon: <GitCompare size={20} />, color: 'text-[#06b6d4]', dev: true },

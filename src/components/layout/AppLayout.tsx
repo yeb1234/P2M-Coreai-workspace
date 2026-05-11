@@ -7,6 +7,7 @@ import { MobileLayout } from './MobileLayout';
 import { useUIStore } from '../../stores';
 import { PAGES } from '../../config/pageRegistry';
 import { useHashSync } from '../../hooks/useHashSync';
+import { GlobalAmbientSoundController } from '../pomodoro/GlobalAmbientSoundController';
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
@@ -25,11 +26,17 @@ export const AppLayout: React.FC = () => {
   useHashSync();
 
   if (isMobile) {
-    return <MobileLayout />;
+    return (
+      <>
+        <GlobalAmbientSoundController />
+        <MobileLayout />
+      </>
+    );
   }
 
   return (
     <div className="flex flex-col h-screen" data-font-size={fontSize} data-compact={compactMode ? 'true' : 'false'}>
+      <GlobalAmbientSoundController />
       <div className="flex-1 m-1 md:m-2 wood-texture rounded-lg p-1 md:p-2 overflow-hidden flex flex-col">
         <div className="flex-1 paper-surface flex flex-col overflow-hidden">
           <Header />

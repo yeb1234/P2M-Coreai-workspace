@@ -115,7 +115,7 @@ const SelectedDateEvents: React.FC = () => {
               )}
             </div>
             <span className="text-xs text-[#9ca3af] capitalize">
-              {event.type === 'todo' ? '待办' : event.type === 'pomodoro' ? '专注' : '事件'}
+              {event.type === 'todo' ? '待办' : event.type === 'pomodoro' ? '专注' : event.type === 'reminder' ? '提醒' : '事件'}
             </span>
           </div>
         ))}

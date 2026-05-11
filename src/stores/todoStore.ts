@@ -86,6 +86,7 @@ export const useTodoStore = create<TodoState>()(
           priority: data.priority || 'medium',
           tags: data.tags || [],
           dueDate: data.dueDate || null,
+          reminderAt: data.reminderAt || null,
           status: data.status || 'pending',
           pomodoroCount: data.pomodoroCount || 0,
           pomodoroRounds: data.pomodoroRounds || 0,

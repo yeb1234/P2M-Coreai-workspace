@@ -68,6 +68,8 @@ export interface VideoItem {
   active_job_id: string | null;
   watch_progress: number | null;
   completed: boolean;
+  is_favorite: boolean;
+  favorited_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -270,6 +272,8 @@ export interface PlaylistItem {
   category_path: string | null;
   watch_progress: number | null;
   completed: boolean;
+  is_favorite: boolean;
+  favorited_at: string | null;
   subtitle_url: string | null;
 }
 
@@ -417,6 +421,13 @@ export async function saveWatchHistory(videoId: number, progress: number, durati
   await apiFetch('/api/videos/history', {
     method: 'POST',
     body: JSON.stringify({ video_id: videoId, progress, duration }),
+  });
+}
+
+export async function setVideoFavorite(videoId: number, isFavorite: boolean): Promise<VideoItem> {
+  return apiFetch<VideoItem>(`/api/videos/${videoId}/favorite`, {
+    method: 'POST',
+    body: JSON.stringify({ is_favorite: isFavorite }),
   });
 }
 

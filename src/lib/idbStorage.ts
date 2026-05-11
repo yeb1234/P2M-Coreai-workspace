@@ -186,6 +186,10 @@ async function doLocalWrite(name: string, value: string) {
   await db.kv.put({ key: name, value });
 }
 
+function scopedLocalName(name: string): string {
+  return currentUser ? `${currentUser}:${name}` : name;
+}
+
 function flushLocalWrites() {
   for (const [name, timer] of pendingLocalWrites.entries()) {
     clearTimeout(timer);
@@ -241,21 +245,23 @@ export const idbStorage: StateStorage = {
 // Pure local storage — never touches backend API, always uses IndexedDB
 export const localOnlyStorage: StateStorage = {
   getItem: async (name: string) => {
-    if (!db) return memoryKv.get(name) ?? null;
-    const row = await db.kv.get(name);
-    if (row?.value !== undefined) lastLocalValues.set(name, row.value);
-    if (row?.value !== undefined) lastLocalWriteAt.set(name, Date.now());
+    const scopedName = scopedLocalName(name);
+    if (!db) return memoryKv.get(scopedName) ?? memoryKv.get(name) ?? null;
+    const row = await db.kv.get(scopedName) ?? await db.kv.get(name);
+    if (row?.value !== undefined) lastLocalValues.set(scopedName, row.value);
+    if (row?.value !== undefined) lastLocalWriteAt.set(scopedName, Date.now());
     return row?.value ?? null;
   },
   setItem: async (name: string, value: string) => {
-    scheduleLocalWrite(name, value);
+    scheduleLocalWrite(scopedLocalName(name), value);
   },
   removeItem: async (name: string) => {
-    const existing = pendingLocalWrites.get(name);
-    if (existing) { clearTimeout(existing); pendingLocalWrites.delete(name); }
-    lastLocalValues.delete(name);
-    lastLocalWriteAt.delete(name);
-    if (!db) { memoryKv.delete(name); return; }
-    await db.kv.delete(name);
+    const scopedName = scopedLocalName(name);
+    const existing = pendingLocalWrites.get(scopedName);
+    if (existing) { clearTimeout(existing); pendingLocalWrites.delete(scopedName); }
+    lastLocalValues.delete(scopedName);
+    lastLocalWriteAt.delete(scopedName);
+    if (!db) { memoryKv.delete(scopedName); return; }
+    await db.kv.delete(scopedName);
   },
 };

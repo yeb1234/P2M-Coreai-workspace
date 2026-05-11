@@ -1,6 +1,5 @@
-// Sound system for app interactions and Pomodoro timer
-// Uses Web Audio API for notification tones
-// Ambient sounds use HTML5 Audio with local loopable files
+// Central sound system for app interactions, Pomodoro cues, and ambient loops.
+// Short UI feedback uses Web Audio tones; longer cues and ambient loops use local media files.
 
 import { useNotificationStore } from '../stores/notificationStore';
 
@@ -17,7 +16,7 @@ function shouldPlaySounds(): boolean {
   return useNotificationStore.getState().settings.soundEnabled;
 }
 
-type InteractionSound = 'tap' | 'success' | 'error' | 'delete' | 'restore' | 'save' | 'start' | 'complete';
+export type InteractionSound = 'tap' | 'success' | 'error' | 'delete' | 'restore' | 'save' | 'start' | 'complete';
 
 const INTERACTION_SOUND_NOTES: Record<InteractionSound, Array<{ frequency: number; start: number; duration: number; gain: number }>> = {
   tap: [{ frequency: 640, start: 0, duration: 0.045, gain: 0.035 }],
@@ -49,13 +48,58 @@ const INTERACTION_SOUND_NOTES: Record<InteractionSound, Array<{ frequency: numbe
   ],
 };
 
-export function playInteractionSound(sound: InteractionSound): void {
-  if (!shouldPlaySounds()) return;
+export type PomodoroCue = 'start' | 'break' | 'complete';
 
-  try {
+const POMODORO_CUES: Record<PomodoroCue, { url: string; volume: number }> = {
+  start: { url: '/sounds/pomodoro-start.ogg', volume: 0.28 },
+  break: { url: '/sounds/pomodoro-break.ogg', volume: 0.42 },
+  complete: { url: '/sounds/pomodoro-complete.ogg', volume: 0.22 },
+};
+
+class SoundController {
+  playInteraction(sound: InteractionSound): void {
+    if (!shouldPlaySounds()) return;
+
+    try {
+      this.playToneSequence(INTERACTION_SOUND_NOTES[sound]);
+    } catch {
+      // UI actions should never be blocked by audio failures.
+    }
+  }
+
+  playPomodoroCue(cue: PomodoroCue): void {
+    if (!shouldPlaySounds()) return;
+
+    const config = POMODORO_CUES[cue];
+    const audio = new Audio(config.url);
+    audio.volume = config.volume;
+    audio.preload = 'auto';
+    audio.play().catch((e) => {
+      console.info(`Pomodoro cue "${cue}" not available: ${config.url}`, e);
+    });
+  }
+
+  playNotification(): void {
+    this.playPomodoroCue('start');
+  }
+
+  playBreak(): void {
+    this.playPomodoroCue('break');
+  }
+
+  playTick(): void {
+    if (!shouldPlaySounds()) return;
+
+    try {
+      this.playToneSequence([{ frequency: 800, start: 0, duration: 0.05, gain: 0.05 }]);
+    } catch {
+      // Optional ticking is best-effort only.
+    }
+  }
+
+  private playToneSequence(notes: Array<{ frequency: number; start: number; duration: number; gain: number }>): void {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
-    const notes = INTERACTION_SOUND_NOTES[sound];
 
     notes.forEach(({ frequency, start, duration, gain: peakGain }) => {
       const osc = ctx.createOscillator();
@@ -72,62 +116,29 @@ export function playInteractionSound(sound: InteractionSound): void {
       osc.start(now + start);
       osc.stop(now + start + duration);
     });
-  } catch {
-    // Ignore sound failures; UI actions should never be blocked by audio.
   }
 }
 
-type PomodoroCue = 'start' | 'break' | 'complete';
+export const soundController = new SoundController();
 
-const POMODORO_CUES: Record<PomodoroCue, { url: string; volume: number }> = {
-  start: { url: '/sounds/pomodoro-start.ogg', volume: 0.28 },
-  break: { url: '/sounds/pomodoro-break.ogg', volume: 0.42 },
-  complete: { url: '/sounds/pomodoro-complete.ogg', volume: 0.22 },
-};
+export function playInteractionSound(sound: InteractionSound): void {
+  soundController.playInteraction(sound);
+}
 
 export function playPomodoroCue(cue: PomodoroCue): void {
-  if (!shouldPlaySounds()) return;
-
-  const config = POMODORO_CUES[cue];
-  const audio = new Audio(config.url);
-  audio.volume = config.volume;
-  audio.preload = 'auto';
-  audio.play().catch((e) => {
-    console.info(`Pomodoro cue "${cue}" not available: ${config.url}`, e);
-  });
+  soundController.playPomodoroCue(cue);
 }
 
 export function playNotificationSound(): void {
-  playPomodoroCue('start');
+  soundController.playNotification();
 }
 
 export function playBreakSound(): void {
-  playPomodoroCue('break');
+  soundController.playBreak();
 }
 
-// Play a soft tick sound (for each second, optional)
 export function playTickSound(): void {
-  try {
-    const ctx = getAudioContext();
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.value = 800;
-
-    gain.gain.setValueAtTime(0.05, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.05);
-  } catch {
-    // Silent fail for tick
-  }
+  soundController.playTick();
 }
 
 // Ambient sound types
@@ -188,6 +199,7 @@ class AmbientPlayer {
   private currentSound: AmbientSound = 'none';
   private isPlaying = false;
   private playRequestId = 0;
+  private currentVolume = 0;
 
   private toPerceivedVolume(volume: number): number {
     const clamped = Math.max(0, Math.min(1, volume));
@@ -201,6 +213,9 @@ class AmbientPlayer {
     }
 
     if (this.currentSound === sound && this.isPlaying) {
+      if (typeof volume === 'number') {
+        this.setVolume(volume);
+      }
       return true; // Already playing this sound
     }
 
@@ -212,7 +227,8 @@ class AmbientPlayer {
 
     const audio = new Audio(config.url);
     audio.loop = true;
-    audio.volume = this.toPerceivedVolume(volume ?? config.volume);
+    this.currentVolume = volume ?? config.volume;
+    audio.volume = this.toPerceivedVolume(this.currentVolume);
     audio.preload = 'auto';
 
     try {
@@ -231,6 +247,7 @@ class AmbientPlayer {
       this.audio = null;
       this.currentSound = 'none';
       this.isPlaying = false;
+      this.currentVolume = 0;
       console.info(`Ambient sound "${config.name}" not available: ${config.url}`, e);
       return false;
     }
@@ -245,11 +262,13 @@ class AmbientPlayer {
     }
     this.currentSound = 'none';
     this.isPlaying = false;
+    this.currentVolume = 0;
   }
 
   setVolume(volume: number): void {
+    this.currentVolume = Math.max(0, Math.min(1, volume));
     if (this.audio) {
-      this.audio.volume = this.toPerceivedVolume(volume);
+      this.audio.volume = this.toPerceivedVolume(this.currentVolume);
     }
   }
 
@@ -259,6 +278,10 @@ class AmbientPlayer {
 
   getIsPlaying(): boolean {
     return this.isPlaying;
+  }
+
+  getCurrentVolume(): number {
+    return this.currentVolume;
   }
 }
 

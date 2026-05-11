@@ -29,6 +29,59 @@ export interface ThemePreset {
   vars: ThemeVars;
 }
 
+export const BUILT_IN_THEME_IDS = new Set(['warm-wood', 'morning', 'corporate', 'meadow', 'lavender', 'night']);
+
+export function themeGroupLabel(themeId: string): string {
+  return BUILT_IN_THEME_IDS.has(themeId) ? '主题风格' : '自定义风格';
+}
+
+export function isThemeVars(value: unknown): value is ThemeVars {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return THEME_VAR_KEYS.every((key) => typeof candidate[key] === 'string' && candidate[key].trim().length > 0);
+}
+
+export function normalizeThemeVars(value: Partial<ThemeVars>): ThemeVars | null {
+  const fallback = THEME_PRESETS[0].vars;
+  const normalized = {} as ThemeVars;
+  for (const key of THEME_VAR_KEYS) {
+    const raw = value[key];
+    normalized[key] = typeof raw === 'string' && raw.trim() ? raw.trim() : fallback[key];
+  }
+  return isThemeVars(normalized) ? normalized : null;
+}
+
+// CSS imports may omit optional variables, but must include core colors so normal CSS is not mistaken for a theme.
+export function parseThemeVarsText(text: string): ThemeVars | null {
+  const input = text.trim();
+  if (!input) return null;
+
+  try {
+    const parsed = JSON.parse(input) as unknown;
+    if (isThemeVars(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object' && 'vars' in parsed && isThemeVars((parsed as { vars?: unknown }).vars)) {
+      return (parsed as { vars: ThemeVars }).vars;
+    }
+  } catch {
+    // Continue to CSS parsing.
+  }
+
+  const cssMatches = [...input.matchAll(/(--[a-z-]+)\s*:\s*([^;{}]+);/gi)];
+  if (cssMatches.length === 0) return null;
+
+  const extracted: Partial<ThemeVars> = {};
+  for (const match of cssMatches) {
+    const key = match[1] as keyof ThemeVars;
+    if (THEME_VAR_KEYS.includes(key)) {
+      extracted[key] = match[2].trim();
+    }
+  }
+
+  if (!REQUIRED_IMPORTED_CSS_KEYS.every((key) => extracted[key])) return null;
+
+  return normalizeThemeVars(extracted);
+}
+
 export const THEME_VAR_COMMENTS: Record<keyof ThemeVars, string> = {
   '--bg-body': '最外层背景。影响应用框架外侧和页面大底色。',
   '--bg-base': '主工作区背景。影响页面主体、路由内容区和三栏布局的大面积底色。',
@@ -53,10 +106,22 @@ export const THEME_VAR_COMMENTS: Record<keyof ThemeVars, string> = {
   '--shadow-card': '卡片阴影。深色主题建议低透明黑影加细微高光，不要太重。',
 };
 
+export const THEME_VAR_KEYS = Object.keys(THEME_VAR_COMMENTS) as Array<keyof ThemeVars>;
+const REQUIRED_IMPORTED_CSS_KEYS: Array<keyof ThemeVars> = ['--bg-body', '--bg-base', '--bg-card', '--text-primary', '--accent'];
+
 export function generateThemeCss(themeId: string, vars: ThemeVars): string {
+  const preset = THEME_PRESETS.find((theme) => theme.id === themeId);
+  const preview = [
+    `分组：${themeGroupLabel(themeId)}`,
+    `名称：${preset?.name ?? themeId}`,
+    `说明：${preset?.description ?? '自定义主题'}`,
+    `预览：页面 ${vars['--bg-base']} / 卡片 ${vars['--bg-card']} / 强调 ${vars['--accent']} / 主文字 ${vars['--text-primary']} / 边框 ${vars['--border-light']}`,
+  ];
   const lines = [
     '/*',
     `  P2M 主题样式：${themeId}`,
+    '',
+    ...preview.map((line) => `  ${line}`),
     '',
     '  这个文件可以直接覆盖到 :root 里使用，也可以按需复制其中的变量。',
     '',
@@ -89,87 +154,11 @@ export function generateThemeCss(themeId: string, vars: ThemeVars): string {
     '  - 成功/危险/失败/清空：--success、--danger',
     '*/',
     '',
-    '/* 通用主题表面，用来覆盖 Tailwind 写死的颜色 */',
-    '.theme-surface {',
-    '  background: var(--bg-card);',
-    '  border-color: var(--border-light);',
-    '  color: var(--text-primary);',
-    '  box-shadow: var(--shadow-card);',
-    '}',
     '',
-    '.theme-elevated {',
-    '  background: var(--bg-elevated);',
-    '  border-color: var(--border-light);',
-    '  color: var(--text-primary);',
-    '}',
-    '',
-    '.theme-accent-soft {',
-    '  background: var(--accent-bg);',
-    '  color: var(--accent);',
-    '  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-light));',
-    '}',
-    '',
-    '.theme-success-soft {',
-    '  background: color-mix(in srgb, var(--success) 14%, transparent);',
-    '  border: 1px solid color-mix(in srgb, var(--success) 42%, var(--border-light));',
-    '  color: var(--success);',
-    '}',
-    '',
-    '.theme-danger-button {',
-    '  background: color-mix(in srgb, var(--danger) 12%, transparent);',
-    '  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);',
-    '  color: var(--danger);',
-    '}',
-    '',
-    '.theme-danger-button:hover {',
-    '  background: color-mix(in srgb, var(--danger) 20%, transparent);',
-    '}',
-    '',
-    '/* 表单和按钮 */',
-    'input, textarea, select {',
-    '  background: var(--bg-elevated);',
-    '  border-color: var(--border-light);',
-    '  color: var(--text-primary);',
-    '}',
-    '',
-    'input::placeholder, textarea::placeholder {',
-    '  color: var(--text-muted);',
-    '}',
-    '',
-    'input:focus, textarea:focus, select:focus {',
-    '  border-color: var(--accent);',
-    '  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);',
-    '}',
-    '',
-    'button.primary, .theme-primary-button {',
-    '  background: var(--accent);',
-    '  color: #fff;',
-    '}',
-    '',
-    'button.primary:hover, .theme-primary-button:hover {',
-    '  background: var(--accent-hover);',
-    '}',
-    '',
-    '/* 视频站和 AI 任务中心 */',
-    '.video-page-shell, .video-list-shell, .ai-job-center {',
-    '  background: var(--bg-base);',
-    '  color: var(--text-primary);',
-    '}',
-    '',
-    '.video-card, .video-playlist-item, .ai-job-card {',
-    '  background: var(--bg-card);',
-    '  border: 1px solid var(--border-light);',
-    '  color: var(--text-primary);',
-    '}',
-    '',
-    '.video-card:hover, .video-playlist-item:hover {',
-    '  border-color: var(--accent);',
-    '  background: var(--bg-accent);',
-    '}',
-    '',
-    '.video-progress, .batch-progress {',
-    '  background: var(--accent);',
-    '}',
+    '/*',
+    '  运行时工具类不随主题导出。',
+    '  theme-card/theme-surface 等通用类保留在 src/index.css，导出的文件只负责变量和值，方便手工编辑和导入。',
+    '*/',
     '',
     '/* 深色主题兜底，处理旧页面里写死的浅色背景 */',
     '[data-theme="night"] [class*="bg-white"],',
@@ -443,27 +432,27 @@ export const THEME_PRESETS: ThemePreset[] = [
     name: '曜石暖橙',
     description: '烟灰橙黑主题，参考代码编辑器深色配色，层级清楚且不刺眼。',
     vars: {
-      '--bg-body': '#0f0f10',
-      '--bg-base': '#171717',
-      '--bg-card': '#202020',
-      '--bg-elevated': '#292826',
-      '--bg-accent': '#342414',
-      '--text-primary': '#f3eee7',
-      '--text-secondary': '#d2c5b8',
-      '--text-muted': '#a8998b',
-      '--border-light': '#3b3936',
-      '--border-medium': '#5a5148',
-      '--accent': '#f59e0b',
-      '--accent-hover': '#fbbf24',
-      '--accent-bg': '#342414',
-      '--paper-bg': '#202020',
-      '--scrollbar-thumb': '#5a5148',
-      '--scrollbar-hover': '#786758',
-      '--header-bg': 'rgba(23, 23, 23, 0.96)',
-      '--sidebar-bg': 'rgba(15, 15, 16, 0.96)',
-      '--success': '#8bd49c',
-      '--danger': '#ff8a80',
-      '--shadow-card': '0 1px 0 rgba(255,255,255,0.045), 0 14px 30px rgba(0,0,0,0.34)',
+      '--bg-body': '#0e0e0d',
+      '--bg-base': '#161513',
+      '--bg-card': '#211f1b',
+      '--bg-elevated': '#2a2722',
+      '--bg-accent': '#3a2b17',
+      '--text-primary': '#f4efe7',
+      '--text-secondary': '#cdbfad',
+      '--text-muted': '#978979',
+      '--border-light': '#343029',
+      '--border-medium': '#51483b',
+      '--accent': '#d98a2b',
+      '--accent-hover': '#f0a44a',
+      '--accent-bg': '#3a2b17',
+      '--paper-bg': '#211f1b',
+      '--scrollbar-thumb': '#51483b',
+      '--scrollbar-hover': '#6f604d',
+      '--header-bg': 'rgba(22, 21, 19, 0.96)',
+      '--sidebar-bg': 'rgba(14, 14, 13, 0.96)',
+      '--success': '#7ccf8a',
+      '--danger': '#ef8377',
+      '--shadow-card': '0 1px 0 rgba(255,255,255,0.04), 0 12px 26px rgba(0,0,0,0.30)',
     },
   },
   {
@@ -471,27 +460,27 @@ export const THEME_PRESETS: ThemePreset[] = [
     name: '墨陶深棕',
     description: '温暖陶棕深色，低对比书写感，和曜石暖橙拉开。',
     vars: {
-      '--bg-body': '#1a120e',
-      '--bg-base': '#241812',
-      '--bg-card': '#302119',
-      '--bg-elevated': '#3a2a21',
-      '--bg-accent': '#493128',
-      '--text-primary': '#f2e6d6',
-      '--text-secondary': '#d0b9a3',
-      '--text-muted': '#a88d77',
-      '--border-light': '#4b3529',
-      '--border-medium': '#6b4d3c',
-      '--accent': '#c9825f',
-      '--accent-hover': '#e0a17e',
-      '--accent-bg': '#493128',
-      '--paper-bg': '#302119',
-      '--scrollbar-thumb': '#6b4d3c',
-      '--scrollbar-hover': '#87644f',
-      '--header-bg': 'rgba(36, 24, 18, 0.96)',
-      '--sidebar-bg': 'rgba(26, 18, 14, 0.96)',
-      '--success': '#9dcc8b',
-      '--danger': '#ef8f7d',
-      '--shadow-card': '0 1px 0 rgba(255,244,225,0.045), 0 14px 30px rgba(44,24,12,0.38)',
+      '--bg-body': '#17110e',
+      '--bg-base': '#211815',
+      '--bg-card': '#2c211d',
+      '--bg-elevated': '#382a25',
+      '--bg-accent': '#4a332b',
+      '--text-primary': '#f1e5d7',
+      '--text-secondary': '#c9b39f',
+      '--text-muted': '#9b826f',
+      '--border-light': '#46352e',
+      '--border-medium': '#655044',
+      '--accent': '#d28a67',
+      '--accent-hover': '#eba582',
+      '--accent-bg': '#4a332b',
+      '--paper-bg': '#2c211d',
+      '--scrollbar-thumb': '#655044',
+      '--scrollbar-hover': '#826858',
+      '--header-bg': 'rgba(33, 24, 21, 0.96)',
+      '--sidebar-bg': 'rgba(23, 17, 14, 0.96)',
+      '--success': '#94c983',
+      '--danger': '#ec8b78',
+      '--shadow-card': '0 1px 0 rgba(255,244,225,0.04), 0 12px 28px rgba(38,22,14,0.34)',
     },
   },
   {
@@ -501,19 +490,19 @@ export const THEME_PRESETS: ThemePreset[] = [
     vars: {
       '--bg-body': '#010409',
       '--bg-base': '#0d1117',
-      '--bg-card': '#161b22',
-      '--bg-elevated': '#21262d',
-      '--bg-accent': '#0d2d4d',
+      '--bg-card': '#151b23',
+      '--bg-elevated': '#1f2630',
+      '--bg-accent': '#102f4f',
       '--text-primary': '#f0f6fc',
-      '--text-secondary': '#c9d1d9',
-      '--text-muted': '#8b949e',
-      '--border-light': '#30363d',
-      '--border-medium': '#484f58',
-      '--accent': '#58a6ff',
-      '--accent-hover': '#79c0ff',
-      '--accent-bg': '#0d2d4d',
-      '--paper-bg': '#161b22',
-      '--scrollbar-thumb': '#484f58',
+      '--text-secondary': '#b9c4d0',
+      '--text-muted': '#7d8793',
+      '--border-light': '#2d3640',
+      '--border-medium': '#46515d',
+      '--accent': '#4f9cf9',
+      '--accent-hover': '#75b7ff',
+      '--accent-bg': '#102f4f',
+      '--paper-bg': '#151b23',
+      '--scrollbar-thumb': '#46515d',
       '--scrollbar-hover': '#6e7681',
       '--header-bg': 'rgba(13, 17, 23, 0.96)',
       '--sidebar-bg': 'rgba(1, 4, 9, 0.96)',
@@ -527,24 +516,24 @@ export const THEME_PRESETS: ThemePreset[] = [
     name: '反重力紫夜',
     description: '偏 AI IDE 的深紫黑科技感，紫蓝高光但保持低噪。',
     vars: {
-      '--bg-body': '#0c0a14',
-      '--bg-base': '#12101d',
-      '--bg-card': '#1b1828',
-      '--bg-elevated': '#252136',
-      '--bg-accent': '#282047',
-      '--text-primary': '#f3f0ff',
-      '--text-secondary': '#cbc3e6',
-      '--text-muted': '#9b91bd',
-      '--border-light': '#332d49',
-      '--border-medium': '#4d436b',
-      '--accent': '#a78bfa',
-      '--accent-hover': '#c4b5fd',
-      '--accent-bg': '#282047',
-      '--paper-bg': '#1b1828',
-      '--scrollbar-thumb': '#4d436b',
-      '--scrollbar-hover': '#6d5f91',
-      '--header-bg': 'rgba(18, 16, 29, 0.96)',
-      '--sidebar-bg': 'rgba(12, 10, 20, 0.96)',
+      '--bg-body': '#0b0a12',
+      '--bg-base': '#12101b',
+      '--bg-card': '#1c1928',
+      '--bg-elevated': '#262233',
+      '--bg-accent': '#30274f',
+      '--text-primary': '#f2efff',
+      '--text-secondary': '#c6bedf',
+      '--text-muted': '#8d84aa',
+      '--border-light': '#332d45',
+      '--border-medium': '#4b4263',
+      '--accent': '#9b87f5',
+      '--accent-hover': '#beb2ff',
+      '--accent-bg': '#30274f',
+      '--paper-bg': '#1c1928',
+      '--scrollbar-thumb': '#4b4263',
+      '--scrollbar-hover': '#695c84',
+      '--header-bg': 'rgba(18, 16, 27, 0.96)',
+      '--sidebar-bg': 'rgba(11, 10, 18, 0.96)',
       '--success': '#86efac',
       '--danger': '#fb7185',
       '--shadow-card': '0 1px 0 rgba(255,255,255,0.045), 0 14px 32px rgba(0,0,0,0.38)',
@@ -555,24 +544,24 @@ export const THEME_PRESETS: ThemePreset[] = [
     name: '深夜蓝',
     description: '偏 VS Code / Night Owl 的冷色深夜主题，适合暗光环境。',
     vars: {
-      '--bg-body': '#0d1320',
-      '--bg-base': '#111827',
-      '--bg-card': '#172033',
-      '--bg-elevated': '#1f2a40',
-      '--bg-accent': '#17325a',
-      '--text-primary': '#eef6ff',
-      '--text-secondary': '#c6d7ee',
-      '--text-muted': '#96abc6',
-      '--border-light': '#314057',
-      '--border-medium': '#485b78',
-      '--accent': '#60a5fa',
-      '--accent-hover': '#93c5fd',
-      '--accent-bg': '#17325a',
-      '--paper-bg': '#172033',
-      '--scrollbar-thumb': '#485b78',
-      '--scrollbar-hover': '#647b9d',
-      '--header-bg': 'rgba(17, 24, 39, 0.96)',
-      '--sidebar-bg': 'rgba(13, 19, 32, 0.96)',
+      '--bg-body': '#0a1020',
+      '--bg-base': '#101827',
+      '--bg-card': '#172236',
+      '--bg-elevated': '#202d46',
+      '--bg-accent': '#16375f',
+      '--text-primary': '#edf6ff',
+      '--text-secondary': '#c2d3ea',
+      '--text-muted': '#8ba1bd',
+      '--border-light': '#2f405b',
+      '--border-medium': '#475d7d',
+      '--accent': '#6ab7ff',
+      '--accent-hover': '#9ad0ff',
+      '--accent-bg': '#16375f',
+      '--paper-bg': '#172236',
+      '--scrollbar-thumb': '#475d7d',
+      '--scrollbar-hover': '#627da3',
+      '--header-bg': 'rgba(16, 24, 39, 0.96)',
+      '--sidebar-bg': 'rgba(10, 16, 32, 0.96)',
       '--success': '#74d99f',
       '--danger': '#ff8f99',
       '--shadow-card': '0 1px 0 rgba(255,255,255,0.055), 0 12px 28px rgba(0,0,0,0.32)',

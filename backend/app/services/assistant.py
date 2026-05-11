@@ -5,6 +5,7 @@ from sqlalchemy import desc, or_, text
 
 from app.database import SessionLocal, settings
 from app.models import ChatMessage, ChatSession, SubtitleSegment, Video
+from app.services.admin_settings import load_assistant_runtime_settings, load_transcription_settings
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 from app.services.prompts import (
     ASSISTANT_SYSTEM_DEFAULT,
@@ -16,8 +17,6 @@ from app.utils.files import unique_suffix
 
 def llm_usage_policy() -> str:
     try:
-        from app.routers.admin import load_assistant_runtime_settings, load_transcription_settings
-
         value = load_assistant_runtime_settings().get("llm_usage_policy") or load_transcription_settings().get("llm_usage_policy")
     except Exception:
         value = settings.llm_usage_policy
@@ -26,8 +25,6 @@ def llm_usage_policy() -> str:
 
 def assistant_runtime_settings() -> dict:
     try:
-        from app.routers.admin import load_assistant_runtime_settings
-
         return load_assistant_runtime_settings()
     except Exception:
         return {
@@ -109,7 +106,7 @@ def search_references(query: str, video_id: int | None = None, limit: int = 6) -
             fallback = db.query(Video)
             if video_id:
                 fallback = fallback.filter(Video.id == video_id)
-            videos = fallback.order_by(desc(Video.updated_at)).limit(limit).all()
+            videos = fallback.order_by(desc(Video.is_favorite), desc(Video.favorited_at), desc(Video.updated_at)).limit(limit).all()
             return [
                 {
                     "video_id": video.id,

@@ -242,6 +242,12 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
                 {formatDate(todo.dueDate, 'MM月dd日')}
               </span>
             )}
+            {todo.reminderAt && (
+              <span className="flex items-center gap-1">
+                <Clock size={12} />
+                提醒 {new Date(todo.reminderAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
             {todo.pomodoroRounds > 0 && (
               <span className="flex items-center gap-1 text-[#16a34a]">
                 <Clock size={12} />

@@ -407,14 +407,86 @@ button {
   color: var(--text-primary);
 }
 
+.theme-elevated {
+  background: var(--bg-elevated);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.theme-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+}
+
+.theme-chip {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+}
+
+.theme-chip-active {
+  background: var(--accent-bg);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border-light));
+  color: var(--accent);
+}
+
+.theme-text-primary {
+  color: var(--text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+
+.theme-text-muted {
+  color: var(--text-muted);
+}
+
+.theme-progress-track {
+  background: color-mix(in srgb, var(--border-light) 75%, transparent);
+}
+
+.theme-progress-fill {
+  background: var(--accent);
+}
+
+.theme-accent-soft {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-light));
+}
+
+.theme-success-soft {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 42%, var(--border-light));
+  color: var(--success);
+}
+
 .theme-danger-button {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
   color: var(--danger);
 }
 
+.theme-danger-button,
+.theme-primary-button {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
 .theme-danger-button:hover {
   background: color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+button.primary,
+.theme-primary-button {
+  background: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover,
+.theme-primary-button:hover {
+  background: var(--accent-hover);
 }
 
 /* Responsive content grids that adapt to actual available width, not viewport width. */
@@ -440,6 +512,51 @@ button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
   gap: 0.5rem;
+}
+
+/* Dense video navigation needs card widths that do not balloon into awkward empty panels. */
+.video-navigation-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.15fr) repeat(3, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 1180px) {
+  .video-navigation-grid {
+    grid-template-columns: repeat(2, minmax(min(100%, 260px), 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .video-navigation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Actual video cards should keep a readable media-card width even when only one item is present. */
+.video-card-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--video-grid-columns, 5), minmax(0, 1fr));
+  gap: 0.75rem;
+  justify-content: start;
+}
+
+@media (max-width: 1180px) {
+  .video-card-grid {
+    grid-template-columns: repeat(min(var(--video-grid-columns, 5), 4), minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .video-card-grid {
+    grid-template-columns: repeat(min(var(--video-grid-columns, 5), 3), minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .video-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .auto-grid-compact {
@@ -964,6 +1081,60 @@ button {
 :is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
 :is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
+/* Final dark-theme usability layer. Keep this late so older theme-specific overrides obey variables. */
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) body {
+  background: var(--bg-body);
+  color: var(--text-primary);
+}
+
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) .app-main,
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) .mobile-app-main {
+  background: var(--bg-base);
+}
+
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) .theme-card,
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) .theme-surface,
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="bg-white"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="bg-[#faf9f7"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="bg-[#f5f3ef"] {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-primary) !important;
+}
+
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="bg-[#f3f2ef"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="bg-[#f8f6f2"] {
+  background-color: var(--bg-elevated) !important;
+}
+
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="bg-[#fef7ed"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="bg-[#fff7ed"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) .theme-chip-active {
+  background-color: var(--accent-bg) !important;
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-light)) !important;
+  color: var(--accent) !important;
+}
+
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) button:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="text-[#1a1a1a"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="text-[#111827"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="text-[#0f172a"] {
+  color: var(--text-primary) !important;
+}
+
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="text-[#6b7280"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="text-[#475569"] {
+  color: var(--text-secondary) !important;
+}
+
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="text-[#9ca3af"],
+:is([data-theme="night"], [data-theme="blue-night"], [data-theme="claude-ink"], [data-theme="primer-dark"], [data-theme="antigravity-dark"]) [class*="text-[#b8b4ac"] {
+  color: var(--text-muted) !important;
+}
+
 /* ═══════════════════════════════════════════════════════
    COMPREHENSIVE THEME OVERRIDES
    Each theme overrides ALL hardcoded Tailwind color classes
@@ -1438,11 +1609,92 @@ video::cue(backdrop) {
   padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
 }
 
+.mobile-app-main {
+  padding: max(0.75rem, env(safe-area-inset-top)) 0.875rem 1rem;
+}
+
+.settings-nav-scroll {
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.settings-nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-nav-scroll > * {
+  scroll-snap-align: start;
+}
+
+/* React Clock uses fixed class names; keep the vendor widget aligned with app themes. */
+.time-center-clock-shell {
+  display: grid;
+  width: 7rem;
+  height: 7rem;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 36% 26%, color-mix(in srgb, #fff 42%, transparent), transparent 24%),
+    linear-gradient(145deg, var(--bg-card), var(--bg-elevated));
+  box-shadow:
+    inset 0 8px 18px color-mix(in srgb, #fff 16%, transparent),
+    inset 0 -12px 20px rgba(0, 0, 0, 0.08),
+    0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.time-center-clock-shell .react-clock {
+  border: 0;
+}
+
+.time-center-clock-shell .react-clock__face {
+  border-color: color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+
+.time-center-clock-shell .react-clock__mark__body {
+  background-color: color-mix(in srgb, var(--text-muted) 48%, transparent);
+}
+
+.time-center-clock-shell .react-clock__number {
+  color: var(--text-secondary);
+  font-size: 0.55rem;
+  font-weight: 600;
+}
+
+.time-center-clock-shell .react-clock__hand__body {
+  background-color: var(--text-primary);
+}
+
+.time-center-clock-shell .react-clock__minute-hand__body {
+  background-color: var(--accent);
+}
+
+.time-center-clock-shell .react-clock__second-hand__body {
+  background-color: var(--danger);
+}
+
+.time-center-clock-shell .react-clock__second-hand__body::after {
+  background-color: var(--danger);
+}
+
 @media (max-width: 767px) {
   .app-main {
     padding: 0.75rem;
   }
   .app-main.compact-mode {
     padding: 0.5rem;
+  }
+
+  .video-navigation-grid {
+    gap: 0.625rem;
+  }
+
+  .video-navigation-grid > * {
+    border-radius: 0.875rem;
+  }
+
+  .video-card-grid {
+    gap: 0.875rem;
   }
 }

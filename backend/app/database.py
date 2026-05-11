@@ -115,12 +115,19 @@ def ensure_runtime_schema() -> None:
         }
         if "sort_key" not in video_columns:
             connection.exec_driver_sql("ALTER TABLE videos ADD COLUMN sort_key TEXT")
+        if "is_favorite" not in video_columns:
+            connection.exec_driver_sql("ALTER TABLE videos ADD COLUMN is_favorite BOOLEAN DEFAULT 0")
+        if "favorited_at" not in video_columns:
+            connection.exec_driver_sql("ALTER TABLE videos ADD COLUMN favorited_at DATETIME")
 
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_videos_category_sort ON videos(category_id, sort_key)"
         )
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_videos_sort_key ON videos(sort_key)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_videos_favorite ON videos(is_favorite, favorited_at)"
         )
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_watch_history_video_watched ON watch_history(video_id, watched_at)"

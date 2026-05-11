@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Settings } from 'lucide-react';
+import React, { forwardRef, useState } from 'react';
+import { Clock3, Coffee, Repeat2, Settings2, TimerReset, Volume2, X } from 'lucide-react';
 import { usePomodoroStore } from '../../stores';
 import { playInteractionSound } from '../../lib/sounds';
 
@@ -7,50 +7,77 @@ const WORK_PRESETS = [25, 30, 35, 45, 60];
 const BREAK_PRESETS = [5, 10, 15, 20];
 const LONG_BREAK_PRESETS = [15, 20, 25, 30];
 
-export const PomodoroSettings: React.FC = () => {
-  const { config, updateConfig } = usePomodoroStore();
-  const [open, setOpen] = useState(false);
-  const ambientMode = config.ambientPlaybackMode ?? 'manual';
+interface PomodoroSettingsButtonProps {
+  onClick: () => void;
+}
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => { setOpen(true); playInteractionSound('tap'); }}
-        className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6b7280] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
-      >
-        <Settings size={16} />
-        设置
-      </button>
-    );
+export const PomodoroSettingsButton = forwardRef<HTMLButtonElement, PomodoroSettingsButtonProps>(
+  ({ onClick }, ref) => (
+    <button
+      ref={ref}
+      onClick={onClick}
+      className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-[var(--accent-bg)] px-2.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_16%,var(--bg-card))]"
+    >
+      <Settings2 size={14} />
+      参数
+    </button>
+  )
+);
+
+PomodoroSettingsButton.displayName = 'PomodoroSettingsButton';
+
+interface PomodoroSettingsProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideClosed?: boolean;
+  compact?: boolean;
+}
+
+export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpenChange, hideClosed = false, compact = false }) => {
+  const { config, updateConfig } = usePomodoroStore();
+  const [internalOpen, setInternalOpen] = useState(false);
+  const ambientMode = config.ambientPlaybackMode ?? 'manual';
+  const isOpen = open ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+  const openSettings = () => { setOpen(true); playInteractionSound('tap'); };
+  const closeSettings = () => { setOpen(false); playInteractionSound('tap'); };
+
+  if (!isOpen) {
+    if (hideClosed) return null;
+    return <PomodoroSettingsButton onClick={openSettings} />;
   }
 
   return (
-    <div className="p-4 bg-[#faf9f7] rounded-2xl border border-[#e5e2dd] shadow-sm space-y-5">
+    <div className={`${compact ? 'absolute inset-x-3 bottom-3 z-20' : ''} rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--bg-card)_94%,var(--accent-bg))] px-3 py-2.5 shadow-lg backdrop-blur-sm space-y-2.5`}>
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-[#1a1a1a] flex items-center gap-2">
-          <Settings size={16} className="text-[#c87d2f]" />
-          番茄钟设置
+        <h3 className="text-xs font-medium text-[var(--text-primary)] flex items-center gap-1.5">
+          <Settings2 size={14} className="text-[var(--accent)]" />
+          专注参数
         </h3>
         <button
-          onClick={() => { setOpen(false); playInteractionSound('tap'); }}
-          className="text-xs text-[#9ca3af] hover:text-[#6b7280] transition-colors"
+          onClick={closeSettings}
+          className="grid h-6 w-6 place-items-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)]"
+          title="关闭参数面板"
         >
-          收起
+          <X size={13} />
         </button>
       </div>
 
       {/* Work duration */}
-      <div>
-        <label className="block text-xs text-[#6b7280] mb-2">专注时长（分钟）</label>
-        <div className="flex gap-1.5">
+      <div className="grid grid-cols-[64px_1fr] items-center gap-2">
+        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          <Clock3 size={12} />
+          专注
+        </label>
+        <div className="grid grid-cols-5 gap-1">
           {WORK_PRESETS.map((min) => (
             <button
               key={min}
               onClick={() => { updateConfig({ workDuration: min }); playInteractionSound('save'); }}
-              className={`flex-1 py-2 text-sm rounded-lg border transition-all ${
+              className={`h-7 text-xs rounded-md border transition-all ${
                 config.workDuration === min
-                  ? 'bg-[#c87d2f] text-white border-[#c87d2f] shadow-sm'
-                  : 'bg-[#f3f2ef] text-[#6b7280] border-[#e5e2dd] hover:border-[#c87d2f]'
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--accent)]'
               }`}
             >
               {min}
@@ -60,17 +87,20 @@ export const PomodoroSettings: React.FC = () => {
       </div>
 
       {/* Short break duration */}
-      <div>
-        <label className="block text-xs text-[#6b7280] mb-2">短休息（分钟）</label>
-        <div className="flex gap-1.5">
+      <div className="grid grid-cols-[64px_1fr] items-center gap-2">
+        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          <Coffee size={12} />
+          短休
+        </label>
+        <div className="grid grid-cols-4 gap-1">
           {BREAK_PRESETS.map((min) => (
             <button
               key={min}
               onClick={() => { updateConfig({ shortBreakDuration: min }); playInteractionSound('save'); }}
-              className={`flex-1 py-2 text-sm rounded-lg border transition-all ${
+              className={`h-7 text-xs rounded-md border transition-all ${
                 config.shortBreakDuration === min
-                  ? 'bg-[#16a34a] text-white border-[#16a34a] shadow-sm'
-                  : 'bg-[#f3f2ef] text-[#6b7280] border-[#e5e2dd] hover:border-[#16a34a]'
+                  ? 'bg-[var(--success)] text-white border-[var(--success)] shadow-sm'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--success)]'
               }`}
             >
               {min}
@@ -80,17 +110,20 @@ export const PomodoroSettings: React.FC = () => {
       </div>
 
       {/* Long break duration */}
-      <div>
-        <label className="block text-xs text-[#6b7280] mb-2">长休息（分钟）</label>
-        <div className="flex gap-1.5">
+      <div className="grid grid-cols-[64px_1fr] items-center gap-2">
+        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          <TimerReset size={12} />
+          长休
+        </label>
+        <div className="grid grid-cols-4 gap-1">
           {LONG_BREAK_PRESETS.map((min) => (
             <button
               key={min}
               onClick={() => { updateConfig({ longBreakDuration: min }); playInteractionSound('save'); }}
-              className={`flex-1 py-2 text-sm rounded-lg border transition-all ${
+              className={`h-7 text-xs rounded-md border transition-all ${
                 config.longBreakDuration === min
-                  ? 'bg-[#7c3aed] text-white border-[#7c3aed] shadow-sm'
-                  : 'bg-[#f3f2ef] text-[#6b7280] border-[#e5e2dd] hover:border-[#7c3aed]'
+                  ? 'bg-[var(--warning)] text-white border-[var(--warning)] shadow-sm'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--warning)]'
               }`}
             >
               {min}
@@ -100,17 +133,20 @@ export const PomodoroSettings: React.FC = () => {
       </div>
 
       {/* Long break interval */}
-      <div>
-        <label className="block text-xs text-[#6b7280] mb-2">每几个番茄后长休息</label>
-        <div className="flex gap-1.5">
+      <div className="grid grid-cols-[64px_1fr] items-center gap-2">
+        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          <Repeat2 size={12} />
+          间隔
+        </label>
+        <div className="grid grid-cols-4 gap-1">
           {[3, 4, 5, 6].map((n) => (
             <button
               key={n}
               onClick={() => { updateConfig({ longBreakInterval: n }); playInteractionSound('save'); }}
-              className={`flex-1 py-2 text-sm rounded-lg border transition-all ${
+              className={`h-7 text-xs rounded-md border transition-all ${
                 config.longBreakInterval === n
-                  ? 'bg-[#c87d2f] text-white border-[#c87d2f] shadow-sm'
-                  : 'bg-[#f3f2ef] text-[#6b7280] border-[#e5e2dd] hover:border-[#c87d2f]'
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--accent)]'
               }`}
             >
               {n}
@@ -120,23 +156,26 @@ export const PomodoroSettings: React.FC = () => {
       </div>
 
       <div>
-        <label className="block text-xs text-[#6b7280] mb-2">背景音模式</label>
-        <div className="grid grid-cols-2 gap-1.5">
+        <label className="mb-1 flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          <Volume2 size={12} />
+          环境音策略
+        </label>
+        <div className="grid grid-cols-2 gap-1">
           {[
-            { value: 'manual' as const, label: '手动', desc: '自己开关背景音' },
-            { value: 'focus' as const, label: '专注', desc: '只在专注计时时播放' },
+            { value: 'manual' as const, label: '手动控制', desc: '由底部开关独立控制' },
+            { value: 'focus' as const, label: '随专注计时', desc: '仅专注阶段自动播放' },
           ].map((item) => (
             <button
               key={item.value}
               type="button"
               onClick={() => { updateConfig({ ambientPlaybackMode: item.value }); playInteractionSound('save'); }}
-              className={`rounded-lg border px-3 py-2 text-left transition-all ${
+              className={`rounded-md border px-2.5 py-1.5 text-left transition-all ${
                 ambientMode === item.value
-                  ? 'border-[#c87d2f] bg-[#fef7ed] text-[#9a5a1e]'
-                  : 'border-[#e5e2dd] bg-[#f3f2ef] text-[#6b7280] hover:border-[#c87d2f]'
+                  ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                  : 'border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-[var(--accent)]'
               }`}
             >
-              <p className="text-sm font-medium">{item.label}</p>
+              <p className="text-xs font-medium">{item.label}</p>
               <p className="mt-0.5 text-[10px] leading-4">{item.desc}</p>
             </button>
           ))}

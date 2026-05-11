@@ -158,7 +158,11 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) 
                 <p className="text-[10px] font-medium text-[#6b7280] mb-1.5">日程</p>
                 {(eventsByDate[popupDate] || []).map((e) => (
                   <div key={e.id} className="py-1.5 border-b border-[#e5e2dd] last:border-0">
-                    <span className="text-xs text-[#1a1a1a]">{e.title}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: e.color }} />
+                      <span className="text-xs text-[#1a1a1a]">{e.title}</span>
+                      {e.startTime && <span className="ml-auto text-[10px] text-[#9ca3af]">{e.startTime}</span>}
+                    </div>
                   </div>
                 ))}
               </div>

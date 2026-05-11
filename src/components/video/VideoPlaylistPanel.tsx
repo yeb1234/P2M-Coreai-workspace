@@ -2,6 +2,7 @@ import type React from 'react';
 import { useState, useEffect } from 'react';
 import { CheckCircle2, FolderTree, List, Loader2, PlayCircle, RotateCcw, Sparkles } from 'lucide-react';
 import { getThumbnailUrl, type PlaylistItem, type VideoItem } from '../../lib/videoApi';
+import { getVideoAiCompletion } from '../../lib/videoAiStatus';
 import type { PlaylistScope } from './useVideoPlaylist';
 
 interface VideoPlaylistPanelProps {
@@ -46,10 +47,13 @@ export function VideoPlaylistPanel({
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
+  const aiCompletion = getVideoAiCompletion(currentVideo);
+
+  const playlistMaxHeight = isMobile ? 'max-h-[35vh]' : 'max-h-[min(42vh,420px)]';
 
   return (
     <div
-      className="relative min-w-0 space-y-3 lg:shrink-0"
+      className="relative flex min-w-0 flex-col gap-3 lg:shrink-0"
       style={isMobile ? { width: '100%', maxWidth: '100%' } : { width: `${width}px`, maxWidth: '100%' }}
     >
       <div
@@ -72,7 +76,7 @@ export function VideoPlaylistPanel({
             <>
               <button
                 onClick={onTriggerAi}
-                className="flex min-w-0 items-center justify-center gap-1 rounded-lg bg-[#c87d2f] px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#b06d20]"
+                className="flex min-w-0 items-center justify-center gap-1 rounded-lg bg-[var(--accent)] px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
                 title="生成字幕和总结，默认不做 AI 校对。"
               >
                 {jobStatus === 'completed' ? <RotateCcw size={13} className="shrink-0" /> : <Sparkles size={13} className="shrink-0" />}
@@ -80,7 +84,7 @@ export function VideoPlaylistPanel({
               </button>
               <button
                 onClick={onCorrectSubtitles}
-                className="flex min-w-0 items-center justify-center gap-1 rounded-lg border border-[#c87d2f] bg-white px-2 py-1.5 text-xs font-medium text-[#a95f17] transition-colors hover:bg-[#fff7ed]"
+                className="flex min-w-0 items-center justify-center gap-1 rounded-lg border border-[color-mix(in_srgb,var(--accent)_45%,var(--border-light))] bg-[var(--bg-card)] px-2 py-1.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)]"
                 title="使用 large-v3 重新生成并交给灵境小助手校对。"
               >
                 <CheckCircle2 size={13} className="shrink-0" />
@@ -88,28 +92,41 @@ export function VideoPlaylistPanel({
               </button>
             </>
           ) : (
-            <div className="col-span-2 flex items-center justify-center gap-1 rounded-lg bg-[#fef7ed] px-2 py-1.5 text-xs font-medium text-[#c87d2f]">
+            <div className="col-span-2 flex items-center justify-center gap-1 rounded-lg bg-[var(--accent-bg)] px-2 py-1.5 text-xs font-medium text-[var(--accent)]">
               <Loader2 size={13} className="animate-spin" />
               处理中
             </div>
           )}
         </div>
+        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+          <span className={`rounded-full border px-1.5 py-0.5 ${
+            aiCompletion.complete
+              ? 'border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] text-[var(--success)]'
+              : aiCompletion.failed
+              ? 'border-[color-mix(in_srgb,var(--danger)_35%,var(--border-light))] text-[var(--danger)]'
+              : 'border-[var(--border-light)]'
+          }`}>
+            {aiCompletion.label}
+          </span>
+          <span>{aiCompletion.hasSubtitles ? '有字幕' : '缺字幕'}</span>
+          <span>{aiCompletion.hasSummary ? '有总结' : '缺总结'}</span>
+        </div>
       </div>
 
       <div className="flex min-w-0 items-center gap-2">
-        <List size={14} className="shrink-0 text-[#6b7280]" />
-        <span className="truncate text-xs font-medium text-[#1a1a1a]">
+        <List size={14} className="theme-text-secondary shrink-0" />
+        <span className="theme-text-primary truncate text-xs font-medium">
           {playlistScope === 'descendants' ? '全部视频' : '当前文件夹'}
         </span>
-        <span className="shrink-0 text-[10px] text-[#9ca3af]">{playlist.length} 个</span>
+        <span className="theme-text-muted shrink-0 text-[10px]">{playlist.length} 个</span>
         <button
           onClick={onToggleScope}
-          className={`ml-1 p-1 rounded transition-colors ${playlistScope === 'descendants' ? 'text-[#c87d2f] bg-[#fef7ed]' : 'text-[#9ca3af] hover:text-[#c87d2f] hover:bg-[#fef7ed]'}`}
+          className={`ml-1 rounded p-1 transition-colors ${playlistScope === 'descendants' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]'}`}
           title={playlistScope === 'descendants' ? '切换到当前文件夹' : '切换到全部视频'}
         >
           <FolderTree size={13} />
         </button>
-        <label className="ml-auto mr-2 flex shrink-0 cursor-pointer items-center gap-1.5 text-[10px] text-[#6b7280]" title="播放结束后自动播放下一个视频">
+        <label className="theme-text-secondary ml-auto mr-2 flex shrink-0 cursor-pointer items-center gap-1.5 text-[10px]" title="播放结束后自动播放下一个视频">
           <input
             type="checkbox"
             checked={autoPlay}
@@ -120,16 +137,16 @@ export function VideoPlaylistPanel({
         </label>
       </div>
 
-      <div className={`${isMobile ? 'h-[35vh]' : 'h-[60vh]'} space-y-1 overflow-y-auto pr-1`}>
+      <div className={`${playlistMaxHeight} min-h-0 space-y-1 overflow-y-auto pr-1`}>
         {playlist.map((item) => (
           <div
             key={item.id}
             onClick={() => onSelectItem(item)}
             className={`flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors ${
-              item.id === currentVideo.id ? 'border border-[#fde68a] bg-[#fef7ed]' : 'hover:bg-[#f3f2ef]'
+              item.id === currentVideo.id ? 'theme-chip-active' : 'hover:bg-[var(--bg-accent)]'
             }`}
           >
-            <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded bg-[#e5e2dd]">
+            <div className="theme-progress-track relative h-12 w-20 shrink-0 overflow-hidden rounded">
               {item.thumbnail ? (
                 <img src={getThumbnailUrl(item.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
               ) : (
@@ -146,13 +163,13 @@ export function VideoPlaylistPanel({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className={`truncate text-xs ${item.id === currentVideo.id ? 'font-medium text-[#c87d2f]' : 'text-[#1a1a1a]'}`}>
+              <p className={`truncate text-xs ${item.id === currentVideo.id ? 'font-medium text-[var(--accent)]' : 'theme-text-primary'}`}>
                 {item.title}
               </p>
               {item.completed && <span className="text-[9px] text-[#16a34a]">已看完</span>}
               {item.watch_progress != null && !item.completed && (
-                <div className="mt-1 h-0.5 overflow-hidden rounded-full bg-[#e5e2dd]">
-                  <div className="h-full rounded-full bg-[#c87d2f]" style={{ width: `${Math.min(100, (item.watch_progress / (item.watch_progress + 60)) * 100)}%` }} />
+                <div className="theme-progress-track mt-1 h-0.5 overflow-hidden rounded-full">
+                  <div className="theme-progress-fill h-full rounded-full" style={{ width: `${Math.min(100, (item.watch_progress / (item.watch_progress + 60)) * 100)}%` }} />
                 </div>
               )}
             </div>

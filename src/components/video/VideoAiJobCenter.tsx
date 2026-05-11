@@ -52,13 +52,37 @@ const STATUS_FILTERS = [
   { value: 'completed', label: '完成' },
 ] as const;
 
-const BATCH_MODES: Array<{ value: AiJobBatchMode; label: string }> = [
-  { value: 'unfinished', label: '继续未完成' },
-  { value: 'missing_subtitles', label: '只处理无字幕' },
-  { value: 'missing_summary', label: '只补总结' },
-  { value: 'failed_only', label: '只重试失败' },
-  { value: 'all', label: '全部重跑' },
+const BATCH_MODES: Array<{ value: AiJobBatchMode; label: string; desc: string }> = [
+  { value: 'unfinished', label: '继续未完成', desc: '跳过已有字幕和总结的视频，只补没完成的。' },
+  { value: 'missing_subtitles', label: '只处理无字幕', desc: '只给没有字幕的视频生成字幕和总结。' },
+  { value: 'missing_summary', label: '只补总结', desc: '已有字幕但没有总结时才入队。' },
+  { value: 'failed_only', label: '只重试失败', desc: '只把最近失败的视频重新入队。' },
+  { value: 'all', label: '全部重跑', desc: '清空旧 AI 输出后重新生成。' },
 ];
+
+const SKIP_REASON_LABELS: Record<string, string> = {
+  active_job: '正在运行或排队',
+  complete: '已完成',
+  has_subtitles: '已有字幕',
+  has_summary: '已有总结',
+  no_subtitles: '没有字幕',
+  not_failed: '最近不是失败',
+  missing_video: '视频不存在',
+  unknown_mode: '模式未知',
+  skipped: '已跳过',
+};
+
+function skipReasonLabel(reason: string) {
+  return SKIP_REASON_LABELS[reason] ?? reason;
+}
+
+function summarizeSkippedItems(batchPreview: AiJobBatchOut | null | undefined) {
+  const counts = new Map<string, number>();
+  for (const item of batchPreview?.skipped_items ?? []) {
+    counts.set(item.reason, (counts.get(item.reason) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([reason, count]) => `${skipReasonLabel(reason)} ${count}`).join(' / ');
+}
 
 function statusLabel(status: string) {
   switch (status) {
@@ -253,6 +277,8 @@ export function VideoAiJobCenter({
   const items = jobs?.items ?? [];
   const previewEnqueueCount = batchPreview ? Math.min(batchPreview.eligible, batchPreview.max_enqueue) : batchLimit;
   const batchScopeLabel = batchScope === 'descendants' ? '全部视频范围' : '当前文件夹';
+  const currentBatchMode = BATCH_MODES.find((mode) => mode.value === batchMode) ?? BATCH_MODES[0];
+  const skippedSummary = summarizeSkippedItems(batchPreview);
   const totalActive = (jobs?.running ?? 0) + (jobs?.queued ?? 0);
   const hasQueuedOrRunningJobs = totalActive > 0;
   const canToggleQueue = queuePaused || hasQueuedOrRunningJobs;
@@ -329,7 +355,7 @@ export function VideoAiJobCenter({
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-[var(--text-primary)]">批处理{batchScopeLabel}</p>
                 <p className="truncate text-[11px] text-[var(--text-muted)]">
-                  {batchScopeLabel} {batchCount} 个视频，预计新增 {previewEnqueueCount} 个任务
+                  来源：{batchScopeLabel} {batchCount} 个视频，规则：{currentBatchMode.label}，预计新增 {previewEnqueueCount} 个任务
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -371,6 +397,9 @@ export function VideoAiJobCenter({
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-[11px] leading-5 text-[var(--text-muted)]">
+              {currentBatchMode.desc}
+            </p>
 
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
               <label className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-[11px] text-[var(--text-secondary)]">
@@ -398,9 +427,24 @@ export function VideoAiJobCenter({
             </div>
 
             {batchPreview && (
-              <div className="mt-2 min-w-0 rounded-md border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] text-[var(--text-muted)]">
-                可处理 {batchPreview.eligible}，本次入队 {batchPreview.enqueued || previewEnqueueCount}，跳过 {batchPreview.skipped}，已完成 {batchPreview.already_done}
-                {batchPreview.limited ? '，已按上限截断' : ''}
+              <div className="mt-2 min-w-0 rounded-md border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] leading-5 text-[var(--text-muted)]">
+                <p>
+                  共 {batchPreview.requested}，可处理 {batchPreview.eligible}，本次入队 {batchPreview.enqueued || previewEnqueueCount}，跳过 {batchPreview.skipped}
+                  {batchPreview.active ? `，活动中 ${batchPreview.active}` : ''}
+                  {batchPreview.already_done ? `，已满足条件 ${batchPreview.already_done}` : ''}
+                  {batchPreview.failed ? `，失败项 ${batchPreview.failed}` : ''}
+                  {batchPreview.limited ? '，已按上限截断' : ''}
+                </p>
+                {skippedSummary && <p className="truncate">跳过原因：{skippedSummary}</p>}
+                {batchPreview.skipped_items.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {batchPreview.skipped_items.slice(0, 3).map((item) => (
+                      <p key={`${item.video_id}-${item.reason}`} className="truncate" title={item.title}>
+                        {skipReasonLabel(item.reason)}：{item.title}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
