@@ -1,14 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useTodoStore } from '../../stores';
-import type { TodoPriority } from '../../types';
-
-const PRIORITY_SHORTCUTS: Record<string, TodoPriority> = {
-  '/g': 'green',
-  '/p': 'high',
-  '/y': 'medium',
-  '/b': 'low',
-};
+import { parseTodoQuickInput } from '../../lib/todoQuickInput';
 
 export const InlineAddInput: React.FC = () => {
   const addTodo = useTodoStore((s) => s.addTodo);
@@ -23,17 +16,16 @@ export const InlineAddInput: React.FC = () => {
   }, [active]);
 
   const handleSubmit = useCallback(() => {
-    let title = value.trim();
-    let priority: TodoPriority = 'green';
-    for (const [shortcut, p] of Object.entries(PRIORITY_SHORTCUTS)) {
-      if (title.endsWith(shortcut)) {
-        title = title.slice(0, -shortcut.length).trim();
-        priority = p;
-        break;
-      }
-    }
-    if (title) {
-      addTodo({ title, description: '', priority, dueDate: null });
+    const parsed = parseTodoQuickInput(value);
+    if (parsed.title) {
+      addTodo({
+        title: parsed.title,
+        description: '',
+        priority: parsed.priority || 'green',
+        dueDate: parsed.dueDate || null,
+        reminderAt: parsed.reminderAt || null,
+        pomodoroRounds: parsed.pomodoroRounds || 0,
+      });
     }
     setValue('');
     setActive(false);
@@ -79,7 +71,7 @@ export const InlineAddInput: React.FC = () => {
         onBlur={handleSubmit}
         onKeyDown={handleKeyDown}
         className="flex-1 text-sm text-[#1a1a1a] bg-transparent outline-none placeholder:text-[#d1cdc6]"
-        placeholder="输入待办...（/g绿色 /p粉色）"
+        placeholder="输入待办... 例：洗澡 下午6点 /t1 /g"
       />
       <div className="w-[76px] flex-shrink-0" />
     </div>

@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Clock, Filter, Pin, Plus, RotateCcw, Save, Search, SlidersHorizontal, StickyNote, Tag, Trash2, X } from 'lucide-react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Clock, Filter, GripVertical, Pin, Plus, RotateCcw, Save, Search, SlidersHorizontal, StickyNote, Tag, Trash2, X } from 'lucide-react';
 import { CollapsibleToolPanel, EmptyState, PageTitle } from '../shared';
 import { useNotesStore, useUIStore } from '../../stores';
-import type { Note, NoteColor } from '../../stores/notesStore';
+import type { Note, NoteColor, NoteInsertPosition } from '../../stores/notesStore';
 import { getNoteTags, NOTE_COLOR_OPTIONS } from '../../stores/notesStore';
 import { playInteractionSound } from '../../lib/sounds';
 
@@ -26,6 +26,7 @@ export const NotesPage: React.FC = () => {
   const addNote = useNotesStore((s) => s.addNote);
   const upsertTodayAiNote = useNotesStore((s) => s.upsertTodayAiNote);
   const updateNote = useNotesStore((s) => s.updateNote);
+  const reorderNotes = useNotesStore((s) => s.reorderNotes);
   const deleteNote = useNotesStore((s) => s.deleteNote);
   const restoreNote = useNotesStore((s) => s.restoreNote);
   const permanentDeleteNote = useNotesStore((s) => s.permanentDeleteNote);
@@ -33,6 +34,8 @@ export const NotesPage: React.FC = () => {
   const togglePin = useNotesStore((s) => s.togglePin);
   const getTrashedNotes = useNotesStore((s) => s.getTrashedNotes);
   const setActiveNoteId = useUIStore((s) => s.setActiveNoteId);
+  const noteEnterBehavior = useUIStore((s) => s.noteEnterBehavior);
+  const contentInputRef = useRef<HTMLTextAreaElement>(null);
 
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState<string>('all');
@@ -42,6 +45,9 @@ export const NotesPage: React.FC = () => {
   const [collapsedTrash, setCollapsedTrash] = useState(false);
   const [collapsedFilters, setCollapsedFilters] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [insertPosition, setInsertPosition] = useState<NoteInsertPosition>('after');
 
   const trashedNotes = getTrashedNotes();
 
@@ -123,12 +129,61 @@ export const NotesPage: React.FC = () => {
     playInteractionSound('save');
   }, [edit, setActiveNoteId, updateNote]);
 
+  const handleEditContentKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter') return;
+    const shouldSave = noteEnterBehavior === 'enter_save' ? !event.altKey : event.altKey;
+    if (!shouldSave) return;
+    event.preventDefault();
+    saveEdit();
+  }, [noteEnterBehavior, saveEdit]);
+
+  const handleEditTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    contentInputRef.current?.focus();
+  }, []);
+
   const handleDelete = useCallback((id: string) => {
     deleteNote(id);
     if (edit.id === id) setEdit((prev) => ({ ...prev, id: null }));
     if (edit.id === id) setActiveNoteId(null);
     playInteractionSound('delete');
   }, [deleteNote, edit.id, setActiveNoteId]);
+
+  const handleNoteDragOver = useCallback((event: React.DragEvent<HTMLDivElement>, noteId: string) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const dragged = dragId ? notes.find((note) => note.id === dragId) : null;
+    const target = notes.find((note) => note.id === noteId);
+    if (dragged && target && dragged.pinned !== target.pinned) {
+      event.dataTransfer.dropEffect = 'none';
+      setOverId(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const position = event.clientX < rect.left + rect.width / 2 ? 'before' : 'after';
+    setOverId(noteId);
+    setInsertPosition(position);
+  }, [dragId, notes]);
+
+  const handleNoteDrop = useCallback((event: React.DragEvent<HTMLDivElement>, noteId: string) => {
+    event.preventDefault();
+    if (dragId && dragId !== noteId) {
+      const dragged = notes.find((note) => note.id === dragId);
+      const target = notes.find((note) => note.id === noteId);
+      if (dragged && target && dragged.pinned === target.pinned) {
+        reorderNotes(dragId, noteId, insertPosition);
+      }
+      playInteractionSound('tap');
+    }
+    setDragId(null);
+    setOverId(null);
+  }, [dragId, insertPosition, notes, reorderNotes]);
+
+  const handleNoteDragEnd = useCallback(() => {
+    setDragId(null);
+    setOverId(null);
+  }, []);
 
   const resetFilters = () => {
     setSearch('');
@@ -149,15 +204,18 @@ export const NotesPage: React.FC = () => {
             type="text"
             value={edit.title}
             onChange={(event) => setEdit((prev) => ({ ...prev, title: event.target.value }))}
+            onKeyDown={handleEditTitleKeyDown}
             className="w-full text-sm font-semibold text-[#1a1a1a] bg-transparent outline-none border-b border-[#d1cdc6] pb-1 mb-2"
             placeholder="标题"
             autoFocus
           />
           <textarea
+            ref={contentInputRef}
             value={edit.content}
             onChange={(event) => setEdit((prev) => ({ ...prev, content: event.target.value }))}
+            onKeyDown={handleEditContentKeyDown}
             className="w-full text-xs text-[#374151] bg-transparent outline-none resize-none min-h-[120px] leading-relaxed"
-            placeholder="写点什么..."
+            placeholder={noteEnterBehavior === 'enter_save' ? '写点什么... Enter 保存，Alt+Enter 换行' : '写点什么... Enter 换行，Alt+Enter 保存'}
           />
           <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-[#d1cdc6]/30">
             <div className="flex items-center gap-1.5">
@@ -178,9 +236,25 @@ export const NotesPage: React.FC = () => {
                 placeholder="标签"
               />
             </div>
-            <div className="flex gap-1">
-              <button onClick={() => { setActiveNoteId(note.id); setEdit((prev) => ({ ...prev, id: null })); }} className="p-1.5 text-[#6b7280] hover:text-[#dc3545]" title="取消"><X size={14} /></button>
-              <button onClick={saveEdit} className="p-1.5 text-[#16a34a] hover:bg-[#16a34a]/10 rounded" title="保存"><Save size={14} /></button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => { setActiveNoteId(note.id); setEdit((prev) => ({ ...prev, id: null })); }}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6b7280] transition-colors hover:bg-white/65 hover:text-[#dc3545]"
+                title="取消"
+                aria-label="取消编辑"
+              >
+                <X size={14} strokeWidth={2.2} />
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#16a34a] text-white shadow-sm transition-colors hover:bg-[#15803d]"
+                title="保存"
+                aria-label="保存笔记"
+              >
+                <Save size={14} strokeWidth={2.2} />
+              </button>
             </div>
           </div>
         </div>
@@ -190,9 +264,36 @@ export const NotesPage: React.FC = () => {
     return (
       <div
         key={note.id}
-        className={`${note.color} rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow relative group`}
+        data-note-card
+        data-note-id={note.id}
+        className={`${note.color} relative rounded-xl p-4 cursor-pointer transition-all group ${
+          dragId === note.id ? 'opacity-55 shadow-2xl scale-[1.015] z-10' : 'hover:shadow-md'
+        }`}
+        onDragOver={(event) => handleNoteDragOver(event, note.id)}
+        onDrop={(event) => handleNoteDrop(event, note.id)}
         onClick={() => startEdit(note)}
       >
+        <div
+          className="absolute left-2 top-3 cursor-grab rounded-md px-0.5 py-1 text-[#6b7280]/45 opacity-0 transition-all hover:bg-white/45 hover:text-[#374151] active:cursor-grabbing group-hover:opacity-100"
+          draggable
+          onClick={(event) => event.stopPropagation()}
+          onDragStart={(event) => {
+            event.stopPropagation();
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', note.id);
+            const card = (event.currentTarget as HTMLElement).closest('[data-note-card]') as HTMLElement | null;
+            if (card) {
+              const gripRect = event.currentTarget.getBoundingClientRect();
+              const cardRect = card.getBoundingClientRect();
+              event.dataTransfer.setDragImage(card, gripRect.left - cardRect.left + gripRect.width / 2, gripRect.top - cardRect.top + gripRect.height / 2);
+            }
+            setDragId(note.id);
+          }}
+          onDragEnd={handleNoteDragEnd}
+          title="拖动调整顺序"
+        >
+          <GripVertical size={15} />
+        </div>
         <button
           onClick={(event) => { event.stopPropagation(); togglePin(note.id); }}
           className={`absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity ${note.pinned ? 'opacity-100 text-[#c87d2f]' : 'text-[#6b7280] hover:text-[#c87d2f]'}`}
@@ -207,7 +308,7 @@ export const NotesPage: React.FC = () => {
         >
           <Trash2 size={12} />
         </button>
-        <h3 className="text-sm font-semibold text-[#1a1a1a] mb-2 pr-12">{note.title}</h3>
+        <h3 className="text-sm font-semibold text-[#1a1a1a] mb-2 pl-4 pr-12">{note.title}</h3>
         <p className="text-xs text-[#374151] leading-relaxed line-clamp-4 whitespace-pre-wrap">{note.content || '空笔记'}</p>
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#d1cdc6]/20">
           <div className="flex min-w-0 flex-wrap gap-1">
@@ -227,6 +328,16 @@ export const NotesPage: React.FC = () => {
             {timeAgo(note.updatedAt)}
           </span>
         </div>
+        {overId === note.id && dragId !== note.id && (
+          <div
+            className={`pointer-events-none absolute top-3 bottom-3 w-1 rounded-full bg-gradient-to-b from-transparent via-[#f59e0b] to-transparent ${
+              insertPosition === 'before' ? '-left-0.5' : '-right-0.5'
+            }`}
+            style={{ boxShadow: '0 0 14px rgba(245,158,11,0.55)' }}
+          >
+            <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#f59e0b] shadow-sm" />
+          </div>
+        )}
       </div>
     );
   };
@@ -310,7 +421,7 @@ export const NotesPage: React.FC = () => {
       <div className="hidden md:block">
         <PageTitle
           title="笔记"
-          subtitle={`${notes.length} 条笔记，${trashedNotes.length} 条在垃圾箱`}
+          subtitle={`${notes.length} 条笔记，${trashedNotes.length} 条在垃圾箱；拖动卡片手柄调整顺序`}
           icon={<StickyNote size={22} />}
           action={
             <div className="flex items-center gap-2">

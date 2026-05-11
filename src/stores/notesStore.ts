@@ -21,12 +21,15 @@ export interface TrashedNote {
   deletedAt: string;
 }
 
+export type NoteInsertPosition = 'before' | 'after';
+
 interface NotesState {
   notes: Note[];
   trash: Record<string, TrashedNote>;
   addNote: (data: Partial<Note> & { title: string }) => string;
   upsertTodayAiNote: () => string;
   updateNote: (id: string, updates: Partial<Note>) => void;
+  reorderNotes: (fromId: string, toId: string, position?: NoteInsertPosition) => void;
   deleteNote: (id: string) => void;
   restoreNote: (id: string) => void;
   permanentDeleteNote: (id: string) => void;
@@ -181,6 +184,21 @@ export const useNotesStore = create<NotesState>()(
               : note
           ),
         }));
+      },
+
+      reorderNotes: (fromId, toId, position = 'before') => {
+        if (fromId === toId) return;
+        set((state) => {
+          const notes = [...state.notes];
+          const fromIndex = notes.findIndex((note) => note.id === fromId);
+          const toIndex = notes.findIndex((note) => note.id === toId);
+          if (fromIndex < 0 || toIndex < 0) return state;
+          const [moved] = notes.splice(fromIndex, 1);
+          const currentTargetIndex = notes.findIndex((note) => note.id === toId);
+          const insertIndex = position === 'after' ? currentTargetIndex + 1 : currentTargetIndex;
+          notes.splice(insertIndex, 0, moved);
+          return { notes };
+        });
       },
 
       deleteNote: (id) => {

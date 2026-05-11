@@ -63,7 +63,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) 
 
   // Now safe to branch
   if (currentView === 'week') {
-    return <WeekView />;
+    return <WeekView onDayDoubleClick={onDayDoubleClick} />;
   }
 
   return (

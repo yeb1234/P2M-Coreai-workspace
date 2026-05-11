@@ -167,6 +167,7 @@ npm run build
 - [2.6 技术改进报告](docs/2026-05-11-2.6-technical-report.md)
 - [2.6 计划](docs/2.6-roadmap.md)
 - [今日踩坑与维护记录](docs/today-fixes-and-pitfalls.md)
+- [待办、提醒时间和番茄快捷输入规则](docs/todo-reminder-input-rules.md)
 - [主题导入导出说明](docs/theme-import-export.md)
 - [后续改进 Todo](docs/next-improvement-todo.md)
 

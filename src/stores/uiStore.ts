@@ -8,6 +8,7 @@ export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'notes' | 'pomodoro
 
 export type FontSize = 'sm' | 'md' | 'lg';
 export type ThemeId = string;
+export type NoteEnterBehavior = 'enter_save' | 'enter_newline';
 
 const DEFAULT_NAV_ORDER: ActiveView[] = [
   'dashboard', 'todo', 'calendar', 'notes', 'pomodoro', 'timecenter',
@@ -36,6 +37,7 @@ interface UIState {
   compactMode: boolean;
   themeId: ThemeId;
   customTheme: ThemeVars | null;
+  noteEnterBehavior: NoteEnterBehavior;
   previousViewBeforeSettings: ActiveView | null;
   videoRightPanelWidth: number;
   videoRightPanelCollapsed: boolean;
@@ -56,6 +58,7 @@ interface UIState {
   setCompactMode: (v: boolean) => void;
   setTheme: (id: ThemeId) => void;
   setCustomTheme: (vars: ThemeVars | null) => void;
+  setNoteEnterBehavior: (behavior: NoteEnterBehavior) => void;
   toggleSettingsView: () => void;
   setVideoRightPanelWidth: (width: number) => void;
   toggleVideoRightPanel: () => void;
@@ -77,6 +80,7 @@ export const useUIStore = create<UIState>()(
       compactMode: false,
       themeId: 'warm-wood',
       customTheme: null,
+      noteEnterBehavior: 'enter_save',
       previousViewBeforeSettings: null,
       videoRightPanelWidth: 340,
       videoRightPanelCollapsed: false,
@@ -145,6 +149,7 @@ export const useUIStore = create<UIState>()(
         set({ customTheme: vars, themeId: 'custom' });
         if (vars) applyTheme('custom', vars);
       },
+      setNoteEnterBehavior: (noteEnterBehavior) => set({ noteEnterBehavior }),
       toggleSettingsView: () => {
         const state = useUIStore.getState();
         const target = state.activeView === 'settings'
@@ -173,6 +178,7 @@ export const useUIStore = create<UIState>()(
         compactMode: state.compactMode,
         themeId: state.themeId,
         customTheme: state.customTheme,
+        noteEnterBehavior: state.noteEnterBehavior,
         videoRightPanelWidth: state.videoRightPanelWidth,
         videoRightPanelCollapsed: state.videoRightPanelCollapsed,
       }),

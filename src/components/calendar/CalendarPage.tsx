@@ -1,24 +1,23 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, CalendarDays } from 'lucide-react';
+import { Plus, CalendarDays, Trash2 } from 'lucide-react';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarGrid } from './CalendarGrid';
 import { CalendarEventForm } from './CalendarEventForm';
 import { Modal, PageTitle } from '../shared';
-import { useCalendarStore, useTodoStore, useUIStore } from '../../stores';
+import { TodoForm } from '../todo/TodoForm';
+import { useCalendarStore, useTodoStore } from '../../stores';
 import { toISODateString } from '../../lib/date';
 import type { ISODateString } from '../../types';
-import { createCompletedTodoLookup, getEventsForCalendarDate } from './calendarDerivedData';
+import { createCompletedTodoLookup, getEventsForCalendarDate, groupTodosByCalendarDate } from './calendarDerivedData';
+import { playInteractionSound } from '../../lib/sounds';
 
 export const CalendarPage: React.FC = () => {
   const { selectedDate } = useCalendarStore();
-  const { setPendingTodoDate, setPendingTodoPriority } = useTodoStore();
-  const { setActiveView } = useUIStore();
   const [showEventForm, setShowEventForm] = useState(false);
+  const [todoPlanDate, setTodoPlanDate] = useState<ISODateString | null>(null);
 
   const handleDayDoubleClick = (date: ISODateString) => {
-    setPendingTodoDate(date);
-    setPendingTodoPriority('medium');
-    setActiveView('todo');
+    setTodoPlanDate(date);
   };
 
   const handleAddEvent = () => {
@@ -63,6 +62,18 @@ export const CalendarPage: React.FC = () => {
           onClose={() => setShowEventForm(false)}
         />
       </Modal>
+
+      <Modal
+        isOpen={Boolean(todoPlanDate)}
+        onClose={() => setTodoPlanDate(null)}
+        title={todoPlanDate ? `${todoPlanDate} 的待办计划` : '新建待办'}
+      >
+        <TodoForm
+          defaultDate={todoPlanDate}
+          defaultPriority="medium"
+          onClose={() => setTodoPlanDate(null)}
+        />
+      </Modal>
     </div>
   );
 };
@@ -71,15 +82,24 @@ const SelectedDateEvents: React.FC = () => {
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const calendarEvents = useCalendarStore((s) => s.events);
   const todos = useTodoStore((s) => s.todos);
+  const deleteTodo = useTodoStore((s) => s.deleteTodo);
   const completedTodoLookup = useMemo(() => createCompletedTodoLookup(todos), [todos]);
+  const { pendingByDate, completedByDate } = useMemo(() => groupTodosByCalendarDate(todos), [todos]);
   const events = useMemo(
     () => selectedDate
       ? getEventsForCalendarDate(calendarEvents, selectedDate, completedTodoLookup)
       : [],
     [calendarEvents, completedTodoLookup, selectedDate],
   );
+  const pendingTodos = selectedDate ? pendingByDate[selectedDate] || [] : [];
+  const completedTodos = selectedDate ? completedByDate[selectedDate] || [] : [];
 
-  if (!selectedDate || events.length === 0) return null;
+  if (!selectedDate || events.length === 0 && pendingTodos.length === 0 && completedTodos.length === 0) return null;
+
+  const handleDeleteTodo = (id: string) => {
+    deleteTodo(id);
+    playInteractionSound('delete');
+  };
 
   return (
     <div className="mt-4 bg-[#fef7ed] rounded-xl border border-[#e5e2dd] p-4">
@@ -115,6 +135,58 @@ const SelectedDateEvents: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {pendingTodos.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium text-[#c87d2f]">待办</p>
+          <div className="space-y-2">
+            {pendingTodos.map((todo) => (
+              <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-[#e5e2dd] bg-white px-3 py-2">
+                <div
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: todo.priority === 'high' ? '#e8a0a0' : todo.priority === 'medium' ? '#e8d4a0' : todo.priority === 'low' ? '#a0c4e8' : '#a0d4a0' }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[#1a1a1a]">{todo.title}</p>
+                  {todo.pomodoroRounds > 0 && <p className="text-[10px] text-[#9ca3af]">{todo.pomodoroRounds} 个番茄</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteTodo(todo.id)}
+                  className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]"
+                  title="移入垃圾箱"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {completedTodos.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium text-[#16a34a]">已完成</p>
+          <div className="space-y-2">
+            {completedTodos.map((todo) => (
+              <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-[#e5e2dd] bg-white px-3 py-2">
+                <div className="w-2 h-2 rounded-full shrink-0 bg-[#16a34a]" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-[#9ca3af] line-through">{todo.title}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteTodo(todo.id)}
+                  className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]"
+                  title="移入垃圾箱"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

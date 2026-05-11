@@ -20,6 +20,30 @@ describe('notesStore', () => {
     expect(useNotesStore.getState().notes[0].title).toBe('Updated');
   });
 
+  it('reorders notes before a target by id', () => {
+    const first = useNotesStore.getState().addNote({ title: 'First' });
+    const second = useNotesStore.getState().addNote({ title: 'Second' });
+    const third = useNotesStore.getState().addNote({ title: 'Third' });
+
+    expect(useNotesStore.getState().notes.map((note) => note.id)).toEqual([third, second, first]);
+
+    useNotesStore.getState().reorderNotes(first, third);
+
+    expect(useNotesStore.getState().notes.map((note) => note.id)).toEqual([first, third, second]);
+  });
+
+  it('reorders notes after a target by id', () => {
+    const first = useNotesStore.getState().addNote({ title: 'First' });
+    const second = useNotesStore.getState().addNote({ title: 'Second' });
+    const third = useNotesStore.getState().addNote({ title: 'Third' });
+
+    expect(useNotesStore.getState().notes.map((note) => note.id)).toEqual([third, second, first]);
+
+    useNotesStore.getState().reorderNotes(first, third, 'after');
+
+    expect(useNotesStore.getState().notes.map((note) => note.id)).toEqual([third, first, second]);
+  });
+
   it('deletes a note', () => {
     const id = useNotesStore.getState().addNote({ title: 'To delete' });
     expect(useNotesStore.getState().notes.length).toBe(1);

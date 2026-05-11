@@ -131,6 +131,45 @@ describe('regression contracts', () => {
     expect(todoItem).not.toContain('const todos = useTodoStore');
   });
 
+  it('keeps notes manually reorderable with drag affordances', () => {
+    const notesStore = readRepoFile('src/stores/notesStore.ts');
+    const notesPage = readRepoFile('src/components/notes/NotesPage.tsx');
+
+    expect(notesStore).toContain('reorderNotes');
+    expect(notesStore).toContain("export type NoteInsertPosition = 'before' | 'after'");
+    expect(notesStore).toContain('notes.splice(insertIndex, 0, moved)');
+    expect(notesStore).toContain('partialize: (state) => ({ notes: state.notes');
+    expect(notesPage).toContain('data-note-card');
+    expect(notesPage).toContain('event.clientX < rect.left + rect.width / 2');
+    expect(notesPage).not.toContain('event.clientY < rect.top + rect.height / 2');
+    expect(notesPage).toContain('setDragImage');
+    expect(notesPage).toContain('GripVertical');
+    expect(notesPage).toContain("insertPosition === 'before'");
+    expect(notesPage).toContain('bg-gradient-to-b from-transparent via-[#f59e0b] to-transparent');
+  });
+
+  it('keeps note editor enter behavior configurable', () => {
+    const uiStore = readRepoFile('src/stores/uiStore.ts');
+    const notesPage = readRepoFile('src/components/notes/NotesPage.tsx');
+    const todoForm = readRepoFile('src/components/todo/TodoForm.tsx');
+    const settingsPage = readRepoFile('src/components/settings/SettingsPage.tsx');
+
+    expect(uiStore).toContain("export type NoteEnterBehavior = 'enter_save' | 'enter_newline'");
+    expect(uiStore).toContain("noteEnterBehavior: 'enter_save'");
+    expect(uiStore).toContain('setNoteEnterBehavior');
+    expect(notesPage).toContain('handleEditContentKeyDown');
+    expect(notesPage).toContain('handleEditTitleKeyDown');
+    expect(notesPage).toContain('contentInputRef.current?.focus()');
+    expect(notesPage).toContain("noteEnterBehavior === 'enter_save' ? !event.altKey : event.altKey");
+    expect(notesPage).toContain('Enter 保存，Alt+Enter 换行');
+    expect(todoForm).toContain('handleDescriptionKeyDown');
+    expect(todoForm).toContain('handleTitleKeyDown');
+    expect(todoForm).toContain('descriptionInputRef.current?.focus()');
+    expect(todoForm).toContain("noteEnterBehavior === 'enter_save' ? !event.altKey : event.altKey");
+    expect(settingsPage).toContain('编辑回车行为');
+    expect(settingsPage).toContain('setNoteEnterBehavior');
+  });
+
   it('keeps calendar todo/event derived data centralized', () => {
     const helper = readRepoFile('src/components/calendar/calendarDerivedData.ts');
     const calendarGrid = readRepoFile('src/components/calendar/CalendarGrid.tsx');
@@ -151,6 +190,33 @@ describe('regression contracts', () => {
     expect(calendarPage).not.toContain('Object.values(calendarEvents)');
     expect(calendarGrid).toContain('useMemo(() => getMonthDays(currentMonth)');
     expect(weekView).toContain('useMemo(() => getWeekDays(currentMonth)');
+  });
+
+  it('keeps selected calendar todos deletable into todo trash', () => {
+    const calendarPage = readRepoFile('src/components/calendar/CalendarPage.tsx');
+    const helper = readRepoFile('src/components/calendar/calendarDerivedData.ts');
+
+    expect(calendarPage).toContain('groupTodosByCalendarDate');
+    expect(calendarPage).toContain('handleDeleteTodo');
+    expect(calendarPage).toContain('deleteTodo(id)');
+    expect(calendarPage).toContain('playInteractionSound(\'delete\')');
+    expect(calendarPage).toContain('移入垃圾箱');
+    expect(helper).toContain('groupTodosByCalendarDate');
+  });
+
+  it('keeps calendar todo planning modal local to calendar views', () => {
+    const calendarPage = readRepoFile('src/components/calendar/CalendarPage.tsx');
+    const calendarGrid = readRepoFile('src/components/calendar/CalendarGrid.tsx');
+    const weekView = readRepoFile('src/components/calendar/WeekView.tsx');
+
+    expect(calendarPage).toContain('todoPlanDate');
+    expect(calendarPage).toContain('setTodoPlanDate(date)');
+    expect(calendarPage).toContain('<TodoForm');
+    expect(calendarPage).toContain('defaultPriority="medium"');
+    expect(calendarPage).not.toContain('setActiveView(\'todo\')');
+    expect(calendarGrid).toContain('<WeekView onDayDoubleClick={onDayDoubleClick} />');
+    expect(weekView).toContain('onDayDoubleClick?: (date: ISODateString) => void');
+    expect(weekView).toContain('onDoubleClick={() => onDayDoubleClick?.(dateStr)}');
   });
 
   it('keeps media query listeners centralized in shared hooks', () => {

@@ -2,9 +2,10 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AlarmClock, Calendar } from 'lucide-react';
 import type { Todo, TodoPriority } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
-import { usePomodoroStore, useTodoStore } from '../../stores';
+import { usePomodoroStore, useTodoStore, useUIStore } from '../../stores';
 import { toISODateString } from '../../lib/date';
 import { playInteractionSound } from '../../lib/sounds';
+import { formatLocalDateTimeInput, getDefaultReminderInputValue, parseTodoQuickInput } from '../../lib/todoQuickInput';
 
 const PRIORITY_SHORTCUTS: Record<string, TodoPriority> = {
   '/g': 'green',
@@ -24,7 +25,9 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   const addTodo = useTodoStore((s) => s.addTodo);
   const updateTodo = useTodoStore((s) => s.updateTodo);
   const config = usePomodoroStore((s) => s.config);
+  const noteEnterBehavior = useUIStore((s) => s.noteEnterBehavior);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
   const pomodorosPerPlanRound = Math.max(1, config.longBreakInterval || 4);
   const getPresetPomodoros = useCallback(
@@ -35,8 +38,8 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   const [title, setTitle] = useState(todo?.title || '');
   const [description, setDescription] = useState(todo?.description || '');
   const [priority, setPriority] = useState<TodoPriority>(todo?.priority || defaultPriority || 'green');
-  const [dueDate, setDueDate] = useState(todo?.dueDate || defaultDate || toISODateString(new Date()));
-  const [reminderAt, setReminderAt] = useState(() => todo?.reminderAt ? todo.reminderAt.slice(0, 16) : '');
+  const [dueDate, setDueDate] = useState(todo?.dueDate || defaultDate || '');
+  const [reminderAt, setReminderAt] = useState(() => todo?.reminderAt ? formatLocalDateTimeInput(new Date(todo.reminderAt)) : '');
   const [pomodoroRounds, setPomodoroRounds] = useState(todo?.pomodoroRounds || 0);
   const [customMode, setCustomMode] = useState(() => {
     if (!todo?.pomodoroRounds) return false;
@@ -76,42 +79,13 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
     setTitle(value);
   }, []);
 
-  const formatDisplayDate = (iso: string): string => {
-    const [y, m, d] = iso.split('-');
-    return `${y}/${m}/${d}`;
-  };
-
-  const parseDisplayDate = (text: string): string | null => {
-    const match = text.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
-    if (!match) return null;
-    const year = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10);
-    const day = parseInt(match[3], 10);
-    if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) return null;
-    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  };
-
   const handleDateInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseDisplayDate(event.target.value);
-    if (parsed) setDueDate(parsed);
+    setDueDate(event.target.value);
   }, []);
 
   const handleDateFocus = useCallback(() => {
     if (!dueDate) setDueDate(toISODateString(new Date()));
-    setTimeout(() => {
-      const input = dateInputRef.current;
-      if (!input) return;
-      const len = input.value.length;
-      input.setSelectionRange(Math.max(0, len - 2), len);
-    }, 0);
   }, [dueDate]);
-
-  const handleDateBlur = useCallback(() => {
-    const input = dateInputRef.current;
-    if (!input) return;
-    const parsed = parseDisplayDate(input.value);
-    if (parsed) setDueDate(parsed);
-  }, []);
 
   const handleDateKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
@@ -119,6 +93,47 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       event.currentTarget.blur();
     }
   }, []);
+
+  const handleReminderFocus = useCallback(() => {
+    if (!reminderAt) setReminderAt(getDefaultReminderInputValue());
+  }, [reminderAt]);
+
+  const saveTodo = useCallback(() => {
+    const parsed = parseTodoQuickInput(title);
+    if (!parsed.title.trim()) return;
+
+    const data = {
+      title: parsed.title.trim(),
+      description: description.trim(),
+      priority: parsed.priority || priority,
+      dueDate: parsed.dueDate || dueDate || null,
+      reminderAt: parsed.reminderAt || (reminderAt ? new Date(reminderAt).toISOString() : null),
+      pomodoroRounds: parsed.pomodoroRounds ?? pomodoroRounds,
+    };
+
+    if (todo) {
+      updateTodo(todo.id, data);
+      playInteractionSound('save');
+    } else {
+      addTodo(data);
+      playInteractionSound('success');
+    }
+    onClose();
+  }, [addTodo, description, dueDate, onClose, pomodoroRounds, priority, reminderAt, title, todo, updateTodo]);
+
+  const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    descriptionInputRef.current?.focus();
+  }, []);
+
+  const handleDescriptionKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter') return;
+    const shouldSave = noteEnterBehavior === 'enter_save' ? !event.altKey : event.altKey;
+    if (!shouldSave) return;
+    event.preventDefault();
+    saveTodo();
+  }, [noteEnterBehavior, saveTodo]);
 
   const handleSelectPreset = useCallback((rounds: number) => {
     setCustomMode(false);
@@ -139,25 +154,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!title.trim()) return;
-
-    const data = {
-      title: title.trim(),
-      description: description.trim(),
-      priority,
-      dueDate: dueDate || null,
-      reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
-      pomodoroRounds,
-    };
-
-    if (todo) {
-      updateTodo(todo.id, data);
-      playInteractionSound('save');
-    } else {
-      addTodo(data);
-      playInteractionSound('success');
-    }
-    onClose();
+    saveTodo();
   };
 
   return (
@@ -170,6 +167,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
           type="text"
           value={title}
           onChange={(event) => handleTitleChange(event.target.value)}
+          onKeyDown={handleTitleKeyDown}
           className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#faf9f7] text-sm"
           placeholder="输入标题，快捷：/g 绿 /p 粉 /y 黄 /b 蓝"
           autoFocus
@@ -180,10 +178,12 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       <div>
         <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">描述</label>
         <textarea
+          ref={descriptionInputRef}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
+          onKeyDown={handleDescriptionKeyDown}
           className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all resize-none bg-[#faf9f7] text-sm"
-          placeholder="添加描述（可选）"
+          placeholder={noteEnterBehavior === 'enter_save' ? '添加描述（可选）... Enter 保存，Alt+Enter 换行' : '添加描述（可选）... Enter 换行，Alt+Enter 保存'}
           rows={2}
         />
       </div>
@@ -216,14 +216,12 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
         <div className="relative">
           <input
             ref={dateInputRef}
-            type="text"
-            value={dueDate ? formatDisplayDate(dueDate) : ''}
+            type="date"
+            value={dueDate}
             onChange={handleDateInputChange}
             onFocus={handleDateFocus}
-            onBlur={handleDateBlur}
             onKeyDown={handleDateKeyDown}
             className={`w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#faf9f7] text-sm ${!dueDate ? 'text-[#b8b4ac]' : 'text-[#1a1a1a]'}`}
-            placeholder="YYYY/MM/DD"
           />
           <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#d1cdc6] pointer-events-none" />
         </div>
@@ -235,6 +233,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
           <input
             type="datetime-local"
             value={reminderAt}
+            onFocus={handleReminderFocus}
             onChange={(event) => setReminderAt(event.target.value)}
             className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#faf9f7] text-sm text-[#1a1a1a]"
           />

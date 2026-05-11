@@ -112,6 +112,8 @@ function PomodoroSettings() {
 function ProfileSettings() {
   const displayName = useUIStore((s) => s.displayName);
   const setDisplayName = useUIStore((s) => s.setDisplayName);
+  const noteEnterBehavior = useUIStore((s) => s.noteEnterBehavior);
+  const setNoteEnterBehavior = useUIStore((s) => s.setNoteEnterBehavior);
   const currentUser = useAuthStore((s) => s.currentUser);
   const [name, setName] = useState(displayName);
   const [saved, setSaved] = useState(false);
@@ -170,6 +172,27 @@ function ProfileSettings() {
           <Save size={14} /> 保存设置
         </SettingsButton>
         {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
+      </div>
+
+      <div className="pt-4 border-t border-[#e5e2dd]">
+        <SettingsSectionTitle>编辑偏好</SettingsSectionTitle>
+        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-3">
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)]">编辑回车行为</p>
+            <SettingsHint>
+              {noteEnterBehavior === 'enter_save'
+                ? 'Enter 保存笔记/待办，Alt+Enter 在正文里换行。'
+                : 'Enter 在正文里换行，Alt+Enter 保存笔记/待办。'}
+            </SettingsHint>
+          </div>
+          <ToggleSwitch
+            checked={noteEnterBehavior === 'enter_newline'}
+            onClick={() => {
+              setNoteEnterBehavior(noteEnterBehavior === 'enter_save' ? 'enter_newline' : 'enter_save');
+              playInteractionSound('tap');
+            }}
+          />
+        </div>
       </div>
 
       {/* Change password */}

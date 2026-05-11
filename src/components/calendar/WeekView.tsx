@@ -2,8 +2,13 @@ import React, { useMemo } from 'react';
 import { useCalendarStore, useTodoStore } from '../../stores';
 import { getWeekDays, getWeekDayNames, isTodayCheck, toISODateString } from '../../lib/date';
 import { createCompletedTodoLookup, getEventsForCalendarDates, groupTodosByCalendarDate } from './calendarDerivedData';
+import type { ISODateString } from '../../types';
 
-export const WeekView: React.FC = () => {
+interface WeekViewProps {
+  onDayDoubleClick?: (date: ISODateString) => void;
+}
+
+export const WeekView: React.FC<WeekViewProps> = ({ onDayDoubleClick }) => {
   const rawMonth = useCalendarStore((s) => s.currentMonth);
   const currentMonth = rawMonth instanceof Date ? rawMonth : new Date(rawMonth);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
@@ -39,6 +44,7 @@ export const WeekView: React.FC = () => {
               key={dateStr}
               type="button"
               onClick={() => setSelectedDate(dateStr)}
+              onDoubleClick={() => onDayDoubleClick?.(dateStr)}
               className="flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 transition-all"
               style={{
                 background: isSelected
@@ -86,6 +92,7 @@ export const WeekView: React.FC = () => {
               key={dateStr}
               type="button"
               onClick={() => setSelectedDate(dateStr)}
+              onDoubleClick={() => onDayDoubleClick?.(dateStr)}
               className={`w-full rounded-xl border p-3 text-left transition-all ${
                 isSelected
                   ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]'
@@ -162,6 +169,7 @@ export const WeekView: React.FC = () => {
             key={dateStr}
             type="button"
             onClick={() => setSelectedDate(dateStr)}
+            onDoubleClick={() => onDayDoubleClick?.(dateStr)}
             className={`hidden md:flex flex-col items-stretch text-left rounded-lg border transition-all hover:shadow-sm ${
               isSelected
                 ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]'
