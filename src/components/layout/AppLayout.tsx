@@ -11,7 +11,11 @@ import { GlobalAmbientSoundController } from '../pomodoro/GlobalAmbientSoundCont
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { TodoReminderPopup } from './TodoReminderPopup';
 
-export const AppLayout: React.FC = () => {
+interface AppLayoutProps {
+  storesReady?: boolean;
+}
+
+export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
   const { fontSize, compactMode } = useUIStore();
   const isMobile = useIsMobile();
   useHashSync();
@@ -19,7 +23,7 @@ export const AppLayout: React.FC = () => {
   if (isMobile) {
     return (
       <>
-        <GlobalAmbientSoundController />
+        <GlobalAmbientSoundController enabled={storesReady} />
         <TodoReminderPopup />
         <MobileLayout />
       </>
@@ -28,7 +32,7 @@ export const AppLayout: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen" data-font-size={fontSize} data-compact={compactMode ? 'true' : 'false'}>
-      <GlobalAmbientSoundController />
+      <GlobalAmbientSoundController enabled={storesReady} />
       <TodoReminderPopup />
       <div className="flex-1 m-1 md:m-2 wood-texture rounded-lg p-1 md:p-2 overflow-hidden flex flex-col">
         <div className="flex-1 paper-surface flex flex-col overflow-hidden">

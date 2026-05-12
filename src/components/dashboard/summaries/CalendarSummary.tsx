@@ -1,13 +1,15 @@
 import React from 'react';
 import { Calendar } from 'lucide-react';
-import { useCalendarStore, useUIStore } from '../../../stores';
+import { useScheduleStore, useUIStore } from '../../../stores';
 import { formatDate, toLocalDateString } from '../../../lib/date';
+import { datePart, hasScheduleTime, timePart } from '../../../lib/scheduleTime';
+import { PRIORITY_COLORS } from '../../../types';
 
 export const CalendarSummary: React.FC = () => {
-  const { getEventsForDate } = useCalendarStore();
+  const items = useScheduleStore((s) => s.items);
   const { setActiveView } = useUIStore();
   const today = toLocalDateString(new Date());
-  const todayEvents = getEventsForDate(today);
+  const todayEvents = Object.values(items).filter((item) => !item.deletedAt && hasScheduleTime(item) && datePart(item.startAt) === today);
   const displayEvents = todayEvents.slice(0, 3);
   const hasMore = todayEvents.length > 3;
 
@@ -26,7 +28,9 @@ export const CalendarSummary: React.FC = () => {
       ) : (
         <div className="space-y-1">
           {displayEvents.map((event, idx) => {
+            if (!hasScheduleTime(event)) return null;
             const isLast = idx === 2 && hasMore;
+            const color = event.type === 'todo' ? PRIORITY_COLORS[event.priority] : '#8b5cf6';
             return (
               <div
                 key={event.id}
@@ -34,8 +38,8 @@ export const CalendarSummary: React.FC = () => {
                   isLast ? 'cursor-pointer hover:bg-[#fef7ed] transition-colors' : 'bg-[#faf9f7]'
                 }`}
                 style={!isLast ? {
-                  background: `linear-gradient(135deg, ${event.color}15 0%, transparent 100%)`,
-                  borderLeft: `3px solid ${event.color}`,
+                  background: `linear-gradient(135deg, ${color}15 0%, transparent 100%)`,
+                  borderLeft: `3px solid ${color}`,
                 } : undefined}
                 onClick={() => { if (isLast) setActiveView('calendar'); }}
               >
@@ -44,9 +48,7 @@ export const CalendarSummary: React.FC = () => {
                 ) : (
                   <>
                     <span className="truncate text-[#1a1a1a] font-medium">{event.title}</span>
-                    {event.startTime && (
-                      <span className="text-[10px] text-[#9ca3af] ml-auto flex-shrink-0">{event.startTime}</span>
-                    )}
+                    <span className="text-[10px] text-[#9ca3af] ml-auto flex-shrink-0">{timePart(event.startAt)}</span>
                   </>
                 )}
               </div>

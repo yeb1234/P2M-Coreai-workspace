@@ -24,11 +24,10 @@ export interface AmbientFocusInput {
 }
 
 export function isAmbientFocusActive(
-  mode: AmbientPlaybackMode,
   status: PomodoroStatus,
   phase: PomodoroPhase,
 ): boolean {
-  return mode === 'focus' && status === 'running' && phase === 'work';
+  return status === 'running' && phase === 'work';
 }
 
 export function getAmbientTogglePlan({
@@ -53,7 +52,9 @@ export function getAmbientFocusPlan({
   selectedSound,
   isFocusActive,
 }: AmbientFocusInput): AmbientPlaybackPlan {
-  if (mode !== 'focus') return 'none';
+  if (mode === 'manual') {
+    return selectedSound === 'none' ? 'stop' : 'play';
+  }
   if (isFocusActive && selectedSound !== 'none') return 'play';
   return 'stop';
 }

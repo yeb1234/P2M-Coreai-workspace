@@ -1,11 +1,12 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { AlarmClock, Calendar } from 'lucide-react';
-import type { Todo, TodoPriority } from '../../types';
+import React, { useCallback, useRef, useState } from 'react';
+import { Calendar } from 'lucide-react';
+import type { ScheduleItem, TodoPriority } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
-import { usePomodoroStore, useTodoStore, useUIStore } from '../../stores';
+import { useScheduleStore, useUIStore } from '../../stores';
 import { toISODateString } from '../../lib/date';
 import { playInteractionSound } from '../../lib/sounds';
-import { formatLocalDateTimeInput, getDefaultReminderInputValue, parseTodoQuickInput } from '../../lib/todoQuickInput';
+import { parseTodoQuickInput } from '../../lib/todoQuickInput';
+import { combineLocalDateTime, dateTimeParts, defaultDueAt } from '../../lib/scheduleTime';
 
 const PRIORITY_SHORTCUTS: Record<string, TodoPriority> = {
   '/g': 'green',
@@ -14,59 +15,46 @@ const PRIORITY_SHORTCUTS: Record<string, TodoPriority> = {
   '/b': 'low',
 };
 
+function getReminderDefaultParts(startDate: string, startTime: string, fallbackDate?: string | null) {
+  if (startDate && startTime) {
+    const startAt = new Date(combineLocalDateTime(startDate, startTime));
+    startAt.setMinutes(startAt.getMinutes() - 30);
+    return dateTimeParts(startAt.toISOString());
+  }
+  return {
+    date: startDate || fallbackDate || toISODateString(new Date()),
+    time: '09:00',
+  };
+}
+
 interface TodoFormProps {
-  todo?: Todo | null;
+  todo?: ScheduleItem | null;
   defaultDate?: string | null;
   defaultPriority?: TodoPriority | null;
   onClose: () => void;
 }
 
 export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPriority, onClose }) => {
-  const addTodo = useTodoStore((s) => s.addTodo);
-  const updateTodo = useTodoStore((s) => s.updateTodo);
-  const config = usePomodoroStore((s) => s.config);
+  const addTodo = useScheduleStore((s) => s.addTodo);
+  const updateItem = useScheduleStore((s) => s.updateItem);
   const noteEnterBehavior = useUIStore((s) => s.noteEnterBehavior);
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
-
-  const pomodorosPerPlanRound = Math.max(1, config.longBreakInterval || 4);
-  const getPresetPomodoros = useCallback(
-    (rounds: number) => (rounds <= 0 ? 0 : rounds * pomodorosPerPlanRound),
-    [pomodorosPerPlanRound]
-  );
+  const startParts = todo?.startAt ? dateTimeParts(todo.startAt) : null;
+  const dueParts = todo?.dueAt ? dateTimeParts(todo.dueAt) : null;
+  const reminderParts = todo?.reminderAt ? dateTimeParts(todo.reminderAt) : null;
 
   const [title, setTitle] = useState(todo?.title || '');
   const [description, setDescription] = useState(todo?.description || '');
   const [priority, setPriority] = useState<TodoPriority>(todo?.priority || defaultPriority || 'green');
-  const [dueDate, setDueDate] = useState(todo?.dueDate || defaultDate || '');
-  const [reminderAt, setReminderAt] = useState(() => todo?.reminderAt ? formatLocalDateTimeInput(new Date(todo.reminderAt)) : '');
-  const [pomodoroRounds, setPomodoroRounds] = useState(todo?.pomodoroRounds || 0);
-  const [customMode, setCustomMode] = useState(() => {
-    if (!todo?.pomodoroRounds) return false;
-    return todo.pomodoroRounds % pomodorosPerPlanRound !== 0;
-  });
-  const [customHours, setCustomHours] = useState(() => {
-    if (!todo?.pomodoroRounds) return '1.0';
-    return ((todo.pomodoroRounds * config.workDuration) / 60).toFixed(1);
-  });
+  const [startDate, setStartDate] = useState(startParts?.date || '');
+  const [startTime, setStartTime] = useState(startParts?.time || '');
+  const [dueDate, setDueDate] = useState(dueParts?.date || '');
+  const [endTime, setEndTime] = useState(dueParts?.time || '');
+  const [reminderEnabled, setReminderEnabled] = useState(Boolean(todo?.reminderAt));
+  const [reminderDate, setReminderDate] = useState(reminderParts?.date || startDate);
+  const [reminderTime, setReminderTime] = useState(reminderParts?.time || startTime);
 
-  const presetOptions = useMemo(() => [0, 1, 2, 3], []);
   const priorities: TodoPriority[] = ['high', 'medium', 'low', 'green'];
-
-  const calcTotalPomodoros = useCallback((hours: number): number => {
-    const totalMin = hours * 60;
-    if (totalMin <= 0) return 0;
-    return Math.max(1, Math.floor(totalMin / config.workDuration));
-  }, [config.workDuration]);
-
-  const formatTimeEstimate = useCallback((hours: number): string => {
-    const totalMin = hours * 60;
-    if (totalMin <= 0) return '约 0 分钟';
-    if (totalMin < 60) return `约 ${Math.round(totalMin)} 分钟`;
-    const h = Math.floor(totalMin / 60);
-    const m = Math.round(totalMin % 60);
-    return m === 0 ? `约 ${h} 小时` : `约 ${h} 小时 ${m} 分钟`;
-  }, []);
 
   const handleTitleChange = useCallback((value: string) => {
     for (const [shortcut, nextPriority] of Object.entries(PRIORITY_SHORTCUTS)) {
@@ -79,53 +67,60 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
     setTitle(value);
   }, []);
 
-  const handleDateInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setDueDate(event.target.value);
+  const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    descriptionInputRef.current?.focus();
   }, []);
 
-  const handleDateFocus = useCallback(() => {
-    if (!dueDate) setDueDate(toISODateString(new Date()));
-  }, [dueDate]);
-
-  const handleDateKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      event.currentTarget.blur();
+  const handleReminderToggle = useCallback((checked: boolean) => {
+    setReminderEnabled(checked);
+    if (checked && !reminderEnabled && !todo?.reminderAt) {
+      const defaultReminder = getReminderDefaultParts(startDate || dueDate, startTime, defaultDate);
+      setReminderDate(defaultReminder.date);
+      setReminderTime(defaultReminder.time);
     }
-  }, []);
-
-  const handleReminderFocus = useCallback(() => {
-    if (!reminderAt) setReminderAt(getDefaultReminderInputValue());
-  }, [reminderAt]);
+  }, [defaultDate, dueDate, reminderEnabled, startDate, startTime, todo?.reminderAt]);
 
   const saveTodo = useCallback(() => {
     const parsed = parseTodoQuickInput(title);
     if (!parsed.title.trim()) return;
 
+    const normalizedStartDate = startDate || dueDate;
+    const normalizedDueDate = dueDate || startDate;
+    const hasAnyScheduleInput = Boolean(startDate || startTime || dueDate || endTime);
+    const hasCompleteScheduleInput = Boolean(normalizedStartDate && normalizedDueDate && startTime && endTime);
+    let startAt: string | null = null;
+    let dueAt: string | null = null;
+    if (hasAnyScheduleInput && hasCompleteScheduleInput) {
+      startAt = combineLocalDateTime(normalizedStartDate, startTime);
+      dueAt = combineLocalDateTime(normalizedDueDate, endTime);
+      if (new Date(dueAt).getTime() <= new Date(startAt).getTime()) {
+        dueAt = defaultDueAt(startAt, 60);
+      }
+    }
+
     const data = {
       title: parsed.title.trim(),
       description: description.trim(),
       priority: parsed.priority || priority,
-      dueDate: parsed.dueDate || dueDate || null,
-      reminderAt: parsed.reminderAt || (reminderAt ? new Date(reminderAt).toISOString() : null),
-      pomodoroRounds: parsed.pomodoroRounds ?? pomodoroRounds,
+      startAt,
+      dueAt,
+      reminderAt: reminderEnabled
+        ? parsed.reminderAt ?? combineLocalDateTime(reminderDate || normalizedStartDate || defaultDate || toISODateString(new Date()), reminderTime || startTime || '09:00')
+        : null,
+      pomodoroRounds: parsed.pomodoroRounds ?? todo?.pomodoroRounds ?? (startAt && dueAt ? 0 : 1),
     };
 
     if (todo) {
-      updateTodo(todo.id, data);
+      updateItem(todo.id, data);
       playInteractionSound('save');
     } else {
       addTodo(data);
       playInteractionSound('success');
     }
     onClose();
-  }, [addTodo, description, dueDate, onClose, pomodoroRounds, priority, reminderAt, title, todo, updateTodo]);
-
-  const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    descriptionInputRef.current?.focus();
-  }, []);
+  }, [addTodo, defaultDate, description, dueDate, endTime, onClose, priority, reminderDate, reminderEnabled, reminderTime, startDate, startTime, title, todo, updateItem]);
 
   const handleDescriptionKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== 'Enter') return;
@@ -135,30 +130,14 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
     saveTodo();
   }, [noteEnterBehavior, saveTodo]);
 
-  const handleSelectPreset = useCallback((rounds: number) => {
-    setCustomMode(false);
-    setPomodoroRounds(getPresetPomodoros(rounds));
-  }, [getPresetPomodoros]);
-
-  const handleSelectCustom = useCallback(() => {
-    setCustomMode(true);
-    setPomodoroRounds(calcTotalPomodoros(parseFloat(customHours) || 1));
-  }, [calcTotalPomodoros, customHours]);
-
-  const handleCustomHoursChange = useCallback((value: string) => {
-    if (!/^[0-9]*\.?[0-9]*$/.test(value)) return;
-    setCustomHours(value);
-    const hours = parseFloat(value);
-    if (Number.isFinite(hours)) setPomodoroRounds(calcTotalPomodoros(hours));
-  }, [calcTotalPomodoros]);
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    saveTodo();
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        saveTodo();
+      }}
+      className="space-y-3 md:space-y-4"
+    >
       <div>
         <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">
           标题 <span className="text-[#dc3545]">*</span>
@@ -168,7 +147,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
           value={title}
           onChange={(event) => handleTitleChange(event.target.value)}
           onKeyDown={handleTitleKeyDown}
-          className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#faf9f7] text-sm"
+          className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           placeholder="输入标题，快捷：/g 绿 /p 粉 /y 黄 /b 蓝"
           autoFocus
           required
@@ -182,7 +161,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           onKeyDown={handleDescriptionKeyDown}
-          className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all resize-none bg-[#faf9f7] text-sm"
+          className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all resize-none bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           placeholder={noteEnterBehavior === 'enter_save' ? '添加描述（可选）... Enter 保存，Alt+Enter 换行' : '添加描述（可选）... Enter 换行，Alt+Enter 保存'}
           rows={2}
         />
@@ -197,7 +176,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
               type="button"
               onClick={() => setPriority(item)}
               className={`flex-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg border-2 transition-all text-xs md:text-sm font-medium ${
-                priority === item ? 'border-current shadow-sm' : 'border-[#e5e2dd] hover:border-[#d1cdc6]'
+                priority === item ? 'border-current shadow-sm' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'
               }`}
               style={{
                 color: priority === item ? PRIORITY_COLORS[item] : undefined,
@@ -212,101 +191,90 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       </div>
 
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">截止日期</label>
-        <div className="relative">
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={dueDate}
-            onChange={handleDateInputChange}
-            onFocus={handleDateFocus}
-            onKeyDown={handleDateKeyDown}
-            className={`w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#faf9f7] text-sm ${!dueDate ? 'text-[#b8b4ac]' : 'text-[#1a1a1a]'}`}
-          />
-          <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#d1cdc6] pointer-events-none" />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">提醒时间</label>
-        <div className="relative">
-          <input
-            type="datetime-local"
-            value={reminderAt}
-            onFocus={handleReminderFocus}
-            onChange={(event) => setReminderAt(event.target.value)}
-            className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#faf9f7] text-sm text-[#1a1a1a]"
-          />
-          <AlarmClock size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#d1cdc6] pointer-events-none" />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">番茄钟计划</label>
-        <p className="mb-1.5 text-[10px] md:text-xs text-[#9ca3af]">
-          1 轮 = {pomodorosPerPlanRound} 个番茄
-        </p>
-        <div className="flex gap-1.5 md:gap-2">
-          {presetOptions.map((rounds) => {
-            const planned = getPresetPomodoros(rounds);
-            return (
-              <button
-                key={rounds}
-                type="button"
-                onClick={() => handleSelectPreset(rounds)}
-                className={`flex-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg border-2 transition-all text-xs md:text-sm font-medium ${
-                  !customMode && pomodoroRounds === planned
-                    ? 'border-[#c87d2f] bg-[#fef7ed] text-[#c87d2f]'
-                    : 'border-[#e5e2dd] text-[#9ca3af] hover:border-[#d1cdc6]'
-                }`}
-              >
-                {rounds === 0 ? '无' : `${rounds}`}
-                {rounds > 0 && <span className="block text-[8px] md:text-[10px] font-normal opacity-70">{planned}个</span>}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            onClick={handleSelectCustom}
-            className={`flex-1 py-1.5 px-2 md:py-2 md:px-3 rounded-lg border-2 transition-all text-xs md:text-sm font-medium ${
-              customMode
-                ? 'border-[#c87d2f] bg-[#fef7ed] text-[#c87d2f]'
-                : 'border-[#e5e2dd] text-[#9ca3af] hover:border-[#d1cdc6]'
-            }`}
-          >
-            自定义
-          </button>
-        </div>
-        {customMode && (
-          <div className="mt-1.5 flex items-center gap-2">
+        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">开始时间</label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
             <input
-              type="text"
-              inputMode="decimal"
-              value={customHours}
-              onChange={(event) => handleCustomHoursChange(event.target.value)}
-              className="w-20 px-2 py-1 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none text-xs bg-[#faf9f7] text-[#1a1a1a]"
-              placeholder="1.0"
+              type="date"
+              value={startDate}
+              onChange={(event) => {
+                setStartDate(event.target.value);
+                if (!dueDate) setDueDate(event.target.value);
+              }}
+              className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
             />
-            <span className="text-xs text-[#6b7280]">小时</span>
-            <span className="text-[10px] text-[#b8b4ac]">
-              {formatTimeEstimate(parseFloat(customHours) || 0)} · {pomodoroRounds}个
-            </span>
+            <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+          </div>
+          <input
+            type="time"
+            value={startTime}
+            onChange={(event) => setStartTime(event.target.value)}
+            step="60"
+            className="w-28 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">截止时间</label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+              className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+            />
+            <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+          </div>
+          <input
+            type="time"
+            value={endTime}
+            onChange={(event) => setEndTime(event.target.value)}
+            step="60"
+            className="w-28 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+          />
+        </div>
+        <p className="mt-1 text-[10px] md:text-xs text-[var(--text-muted)]">开始和截止时间会按分钟写入数据库。</p>
+      </div>
+
+      <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2.5">
+        <label className="flex cursor-pointer items-center justify-between gap-3">
+          <span className="text-xs md:text-sm font-medium text-[var(--text-secondary)]">是否提醒</span>
+          <input
+            type="checkbox"
+            checked={reminderEnabled}
+            onChange={(event) => handleReminderToggle(event.target.checked)}
+            className="h-4 w-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+          />
+        </label>
+        {reminderEnabled && (
+          <div className="mt-2 flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type="date"
+                value={reminderDate}
+                onChange={(event) => setReminderDate(event.target.value)}
+                className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+              />
+              <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+            </div>
+            <input
+              type="time"
+              value={reminderTime}
+              onChange={(event) => setReminderTime(event.target.value)}
+              step="60"
+              className="w-28 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+            />
           </div>
         )}
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-[#e5e2dd] mt-1">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 text-xs md:text-sm font-medium text-[#6b7280] bg-[#f3f2ef] rounded-lg hover:bg-[#e5e2dd] transition-colors"
-        >
+      <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-light)] mt-1">
+        <button type="button" onClick={onClose} className="px-4 py-2 text-xs md:text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-lg hover:bg-[var(--bg-elevated)] transition-colors">
           取消
         </button>
-        <button
-          type="submit"
-          className="px-4 py-2 text-xs md:text-sm font-semibold text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] shadow-sm transition-colors"
-        >
+        <button type="submit" className="px-4 py-2 text-xs md:text-sm font-semibold text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] shadow-sm transition-colors">
           {todo ? '保存' : '创建'}
         </button>
       </div>

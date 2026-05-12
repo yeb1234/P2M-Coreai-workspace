@@ -76,6 +76,27 @@ async function prepareApp(page: Page, route = '/') {
 }
 
 async function mockApi(page: Page) {
+  const scheduleItems: Array<Record<string, unknown>> = [];
+  const normalizeScheduleItem = (body: Record<string, unknown>) => ({
+    id: String(body.id || `schedule-${scheduleItems.length + 1}`),
+    type: body.type || 'todo',
+    title: body.title || '未命名事项',
+    description: body.description || '',
+    status: body.status || 'pending',
+    priority: body.priority || 'green',
+    start_at: body.start_at || '2026-05-11T01:00:00.000Z',
+    due_at: body.due_at || '2026-05-11T02:00:00.000Z',
+    reminder_at: body.reminder_at ?? null,
+    pomodoro_count: body.pomodoro_count || 0,
+    pomodoro_rounds: body.pomodoro_rounds || 0,
+    total_focus_minutes: body.total_focus_minutes || 0,
+    completed_at: body.completed_at ?? null,
+    deleted_at: body.deleted_at ?? null,
+    sort_order: body.sort_order || 0,
+    created_at: body.created_at || '2026-05-11T00:00:00.000Z',
+    updated_at: '2026-05-11T00:00:00.000Z',
+  });
+
   await page.route('**/api/auth/register', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -98,6 +119,63 @@ async function mockApi(page: Page) {
       return;
     }
     await route.fulfill({ contentType: 'application/json', body: '{}' });
+  });
+  await page.route('**/api/schedule-items**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const method = request.method();
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const itemId = pathParts[2];
+
+    if (method === 'GET') {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: scheduleItems }) });
+      return;
+    }
+
+    if (method === 'POST' && itemId && pathParts[3] === 'restore') {
+      const item = scheduleItems.find((entry) => entry.id === itemId);
+      if (item) item.deleted_at = null;
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify(item) });
+      return;
+    }
+
+    if (method === 'POST') {
+      const body = JSON.parse(request.postData() || '{}') as Record<string, unknown>;
+      const item = normalizeScheduleItem(body);
+      scheduleItems.push(item);
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(item) });
+      return;
+    }
+
+    if (method === 'PATCH' && itemId) {
+      const body = JSON.parse(request.postData() || '{}') as Record<string, unknown>;
+      const index = scheduleItems.findIndex((entry) => entry.id === itemId);
+      if (index >= 0) {
+        scheduleItems[index] = normalizeScheduleItem({ ...scheduleItems[index], ...body, id: itemId });
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify(scheduleItems[index]) });
+        return;
+      }
+    }
+
+    if (method === 'DELETE' && itemId) {
+      const permanent = url.searchParams.get('permanent') === 'true';
+      const index = scheduleItems.findIndex((entry) => entry.id === itemId);
+      if (index >= 0 && permanent) {
+        scheduleItems.splice(index, 1);
+      } else if (index >= 0) {
+        scheduleItems[index].deleted_at = '2026-05-11T00:00:00.000Z';
+      }
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+      return;
+    }
+
+    if (method === 'DELETE') {
+      scheduleItems.splice(0, scheduleItems.length);
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+      return;
+    }
+
+    await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });
   await page.route('**/api/categories/tree', async (route) => {
     await route.fulfill({ contentType: 'application/json', body: '[]' });
@@ -224,6 +302,51 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(2);
 }
 
+async function getCalendar2DropPoint(page: Page, dayIndex: number, hourOffset: number) {
+  const grid = page.locator('main.app-main [class*="select-none"]').first();
+  const metrics = await grid.evaluate((node) => {
+    const element = node as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    return {
+      width: rect.width,
+      height: rect.height,
+      leftGutter: 64,
+    };
+  });
+  const visibleDays = await getCalendar2VisibleDayCount(page);
+  const dayWidth = (metrics.width - metrics.leftGutter) / visibleDays;
+  return {
+    x: metrics.leftGutter + dayWidth * dayIndex + Math.min(40, dayWidth / 2),
+    y: 64 * hourOffset + 8,
+  };
+}
+
+async function getCalendar2VisibleDayCount(page: Page) {
+  return page.locator('main.app-main').evaluate(() => {
+    const header = Array.from(document.querySelectorAll('main.app-main p'))
+      .filter((item) => /^周[一二三四五六日]$/.test(item.textContent || ''));
+    return header.length;
+  });
+}
+
+function getCalendar2Grid(page: Page) {
+  return page.locator('main.app-main [class*="select-none"]').first();
+}
+
+async function expectCalendar2NoInternalHorizontalOverflow(page: Page) {
+  const overflow = await page.locator('main.app-main').evaluate(() => {
+    const shells = Array.from(document.querySelectorAll('main.app-main section, main.app-main div'));
+    let maxOverflow = 0;
+    for (const node of shells) {
+      const element = node as HTMLElement;
+      const delta = element.scrollWidth - element.clientWidth;
+      if (delta > maxOverflow) maxOverflow = delta;
+    }
+    return maxOverflow;
+  });
+  expect(overflow).toBeLessThanOrEqual(2);
+}
+
 async function openAiPanel(page: Page) {
   const button = page.getByTitle('灵境小助手').or(page.getByRole('button', { name: /灵境小助手|AI/ })).first();
   await button.click();
@@ -283,6 +406,224 @@ test.describe('layout regression', () => {
     await expect(page.getByText('统一管理计时、倒计时、闹钟与提醒')).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expect(page.locator('main.app-main')).toHaveScreenshot('time-center-layout.png');
+  });
+
+  test('calendar2 week view supports drag selection', async ({ page }) => {
+    await prepareApp(page, '/#/calendar2');
+    await expect(page.getByText('日历2').first()).toBeVisible();
+    const grid = getCalendar2Grid(page);
+    const box = await grid.boundingBox();
+    expect(box).toBeTruthy();
+    if (!box) return;
+
+    const start = await getCalendar2DropPoint(page, 2, 4);
+    const end = await getCalendar2DropPoint(page, 2, 6);
+    await page.mouse.move(box.x + start.x, box.y + start.y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + end.x, box.y + end.y);
+    await page.mouse.up();
+
+    await expect(page.getByText('新建日程')).toBeVisible();
+    await page.getByPlaceholder('日程标题').fill('测试拖拽日程');
+    await page.getByLabel('保存为待办').check();
+    await page.getByRole('button', { name: '保存' }).click();
+    await expect(page.locator('[data-calendar-event]').filter({ hasText: '测试拖拽日程' }).first()).toBeVisible();
+
+    await page.goto('/#/todo');
+    await expect(page.locator('main.app-main').getByText('测试拖拽日程', { exact: true }).first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('calendar2 supports dragging calendar lanes and events', async ({ page }) => {
+    await prepareApp(page, '/#/calendar2');
+    await expect(page.getByText('日历2').first()).toBeVisible();
+
+    const grid = getCalendar2Grid(page);
+    const box = await grid.boundingBox();
+    expect(box).toBeTruthy();
+    if (!box) return;
+
+    await page.locator('label', { hasText: '粉色待办' }).getByText('拖入').dragTo(grid, {
+      targetPosition: await getCalendar2DropPoint(page, 3, 8),
+    });
+    await expect(page.getByText('新建日程')).toBeVisible();
+    await page.getByRole('button', { name: '保存' }).click();
+    await expect(page.locator('[data-calendar-event]').filter({ hasText: '粉色待办' })).toHaveCount(1);
+
+    const createdEvent = page.locator('[data-calendar-event]').filter({ hasText: '粉色待办' }).first();
+    await createdEvent.dragTo(grid, {
+      targetPosition: await getCalendar2DropPoint(page, 1, 9),
+    });
+    await expect(createdEvent).toBeVisible();
+    await expect(page.locator('[data-calendar-event]').filter({ hasText: '粉色待办' })).toHaveCount(1);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('calendar2 shows overlapping events side by side', async ({ page }) => {
+    await prepareApp(page, '/#/calendar2');
+    await expect(page.getByText('日历2').first()).toBeVisible();
+
+    const grid = getCalendar2Grid(page);
+    const box = await grid.boundingBox();
+    expect(box).toBeTruthy();
+    if (!box) return;
+
+    for (const title of ['重叠任务1', '重叠任务2']) {
+      const start = await getCalendar2DropPoint(page, 2, 4);
+      const end = await getCalendar2DropPoint(page, 2, 6);
+      await page.mouse.move(box.x + start.x, box.y + start.y);
+      await page.mouse.down();
+      await page.mouse.move(box.x + end.x, box.y + end.y);
+      await page.mouse.up();
+
+      await expect(page.getByText('新建日程')).toBeVisible();
+      await page.getByPlaceholder('日程标题').fill(title);
+      await page.getByLabel('保存为待办').check();
+      await page.getByRole('button', { name: '保存' }).click();
+    }
+
+    const overlappedEvents = page.locator('[data-calendar-event]').filter({ hasText: /重叠任务[12]/ });
+    await expect(overlappedEvents).toHaveCount(2);
+
+    const boxes = await overlappedEvents.evaluateAll((nodes) => nodes.map((node) => {
+      const element = node as HTMLElement;
+      const rect = element.getBoundingClientRect();
+      return {
+        left: Math.round(rect.left),
+        width: Math.round(rect.width),
+        conflictColumn: element.dataset.conflictColumn,
+        conflictColumns: element.dataset.conflictColumns,
+      };
+    }));
+
+    expect(new Set(boxes.map((item) => item.conflictColumns))).toEqual(new Set(['2']));
+    expect(new Set(boxes.map((item) => item.conflictColumn))).toEqual(new Set(['0', '1']));
+    expect(Math.abs(boxes[0].left - boxes[1].left)).toBeGreaterThan(20);
+    expect(boxes[0].width).toBeLessThan((await grid.boundingBox())!.width / 2);
+  });
+
+  test('calendar2 right panel only shows concrete todos for this week', async ({ page }) => {
+    await prepareApp(page, '/#/calendar2');
+    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByText('本周还没有具体事项')).toBeVisible();
+
+    const grid = getCalendar2Grid(page);
+    const box = await grid.boundingBox();
+    expect(box).toBeTruthy();
+    if (!box) return;
+
+    const start = await getCalendar2DropPoint(page, 1, 5);
+    const end = await getCalendar2DropPoint(page, 1, 6);
+    await page.mouse.move(box.x + start.x, box.y + start.y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + end.x, box.y + end.y);
+    await page.mouse.up();
+
+    await page.getByPlaceholder('日程标题').fill('右栏待办显示测试');
+    await page.getByLabel('保存为待办').check();
+    await page.getByRole('button', { name: '保存' }).click();
+
+    await expect(page.getByText('本周还没有具体事项')).toBeHidden();
+    await expect(page.locator('aside').getByText('右栏待办显示测试', { exact: true })).toBeVisible();
+    await expect(page.getByText('拖入').first()).toBeVisible();
+  });
+
+  test('calendar2 closing draft modal clears pending selection', async ({ page }) => {
+    await prepareApp(page, '/#/calendar2');
+    await expect(page.getByText('日历2').first()).toBeVisible();
+
+    const grid = getCalendar2Grid(page);
+    const box = await grid.boundingBox();
+    expect(box).toBeTruthy();
+    if (!box) return;
+
+    const start = await getCalendar2DropPoint(page, 2, 4);
+    const end = await getCalendar2DropPoint(page, 2, 6);
+    await page.mouse.move(box.x + start.x, box.y + start.y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + end.x, box.y + end.y);
+    await page.mouse.up();
+
+    await expect(page.getByText('新建日程')).toBeVisible();
+    await page.getByRole('button', { name: '取消' }).click();
+    await expect(page.getByText('新建日程')).toBeHidden();
+    await expect(page.locator('[data-calendar-event]').filter({ hasText: '未命名事项' })).toHaveCount(0);
+  });
+
+  test('calendar2 supports context-menu deletion for scheduled items', async ({ page }) => {
+    await prepareApp(page, '/#/calendar2');
+    await page.on('dialog', (dialog) => dialog.accept());
+
+    const grid = getCalendar2Grid(page);
+    const box = await grid.boundingBox();
+    expect(box).toBeTruthy();
+    if (!box) return;
+
+    const start = await getCalendar2DropPoint(page, 2, 4);
+    const end = await getCalendar2DropPoint(page, 2, 6);
+    await page.mouse.move(box.x + start.x, box.y + start.y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + end.x, box.y + end.y);
+    await page.mouse.up();
+
+    await page.getByPlaceholder('日程标题').fill('右键删除测试');
+    await page.getByRole('button', { name: '保存' }).click();
+    const createdEvent = page.locator('[data-calendar-event]').filter({ hasText: '右键删除测试' }).first();
+    await expect(createdEvent).toBeVisible();
+
+    await createdEvent.click({ button: 'right' });
+    await expect(createdEvent).toBeHidden();
+  });
+
+  test('calendar2 month picker collapses and switches weeks', async ({ page }) => {
+    await prepareApp(page, '/#/calendar2');
+    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByTitle('切换到 2026-05-18 所在周')).toBeVisible();
+    await page.getByTitle('切换到 2026-05-18 所在周').click();
+    await expect(page.locator('main.app-main').getByText('18').first()).toBeVisible();
+
+    await page.getByTitle('折叠月历').click();
+    await expect(page.getByTitle('切换到 2026-05-18 所在周')).toBeHidden();
+    await page.getByTitle('展开月历').click();
+    await expect(page.getByTitle('切换到 2026-05-18 所在周')).toBeVisible();
+  });
+
+  test('calendar2 narrows to four visible days on low width', async ({ page }) => {
+    await page.setViewportSize({ width: 980, height: 820 });
+    await prepareApp(page, '/#/calendar2');
+    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('周一-周四');
+    await expect(page.locator('main.app-main').getByText('周五').first()).toBeHidden();
+    await page.getByTitle('切换显示前半周/后半周').click();
+    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('周二-周五');
+    await expect(page.locator('main.app-main').getByText('周五').first()).toBeVisible();
+    await page.getByTitle('切换显示前半周/后半周').click();
+    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('周三-周六');
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('calendar2 progressively shows 4, 5, 6, and 7 days as width grows', async ({ page }) => {
+    const cases = [
+      { width: 860, count: 4 },
+      { width: 1120, count: 5 },
+      { width: 1380, count: 6 },
+      { width: 1540, count: 7 },
+    ];
+
+    for (const item of cases) {
+      await page.setViewportSize({ width: item.width, height: 820 });
+      await prepareApp(page, '/#/calendar2');
+      await expect.poll(() => getCalendar2VisibleDayCount(page)).toBe(item.count);
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
+  test('calendar2 full-width desktop view avoids internal horizontal scrolling', async ({ page }) => {
+    await page.setViewportSize({ width: 1680, height: 900 });
+    await prepareApp(page, '/#/calendar2');
+    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect.poll(() => getCalendar2VisibleDayCount(page)).toBe(7);
+    await expectCalendar2NoInternalHorizontalOverflow(page);
   });
 
   test('dark theme keeps settings surfaces dark and readable', async ({ page }) => {

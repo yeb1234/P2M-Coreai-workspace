@@ -1,14 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { Timer, ListTodo, Flame } from 'lucide-react';
-import { usePomodoroStore, useTodoStore } from '../../../stores';
+import { usePomodoroStore, useScheduleStore } from '../../../stores';
 import { PHASE_LABELS } from '../../../types';
 import { formatDuration, toLocalDateString } from '../../../lib/date';
+import { datePart, hasScheduleTime } from '../../../lib/scheduleTime';
+import { calculateSchedulePomodoroRounds } from '../../../lib/pomodoroPlanning';
 
 type StatsMode = 'pomodoro' | 'todo';
 
 export const PomodoroSummary: React.FC = () => {
   const { timer, getTodayStats, config } = usePomodoroStore();
-  const todos = useTodoStore((s) => s.todos);
+  const todos = useScheduleStore((s) => s.items);
   const todayStats = getTodayStats();
 
   // Random initial mode — refresh switches it
@@ -17,19 +19,19 @@ export const PomodoroSummary: React.FC = () => {
   const { dailyGoal, hasTodoGoal } = useMemo(() => {
     const today = toLocalDateString(new Date());
     const todayTodoRounds = Object.values(todos)
-      .filter((t) => t.dueDate === today && t.status !== 'completed' && t.pomodoroRounds > 0)
-      .reduce((sum, t) => sum + t.pomodoroRounds, 0);
+      .filter((t) => t.type === 'todo' && hasScheduleTime(t) && datePart(t.dueAt) === today && t.status !== 'completed')
+      .reduce((sum, t) => sum + calculateSchedulePomodoroRounds(t, config), 0);
     if (todayTodoRounds > 0) return { dailyGoal: todayTodoRounds, hasTodoGoal: true };
     return { dailyGoal: config.dailyGoal, hasTodoGoal: false };
-  }, [todos, config.dailyGoal]);
+  }, [todos, config]);
 
   const progress = hasTodoGoal ? Math.min((todayStats.totalPomodoros / dailyGoal) * 100, 100) : 0;
 
   // Todo stats for today
   const todoStats = useMemo(() => {
     const today = toLocalDateString(new Date());
-    const allTodos = Object.values(todos);
-    const todayTodos = allTodos.filter((t) => t.dueDate === today);
+    const allTodos = Object.values(todos).filter((t) => t.type === 'todo' && !t.deletedAt);
+    const todayTodos = allTodos.filter((t) => hasScheduleTime(t) && datePart(t.dueAt) === today);
     const completed = todayTodos.filter((t) => t.status === 'completed').length;
     const total = todayTodos.length;
     // Also count in-progress

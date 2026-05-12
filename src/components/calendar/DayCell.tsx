@@ -1,19 +1,19 @@
 import React from 'react';
-import type { CalendarEvent, ISODateString, Todo } from '../../types';
+import type { ISODateString, ScheduleCalendarEvent, ScheduleItem } from '../../types';
 import { isTodayCheck, toISODateString } from '../../lib/date';
 import { EventChip } from './EventChip';
 
 interface DayCellProps {
   date: Date;
-  events: CalendarEvent[];
-  completedTodos?: Todo[];
-  pendingTodos?: Todo[];
+  events: ScheduleCalendarEvent[];
+  completedTodos?: ScheduleItem[];
+  pendingTodos?: ScheduleItem[];
   isSelected: boolean;
   isCurrentMonth: boolean;
   heatLevel: number;
   onSelect: (date: ISODateString) => void;
   onDoubleClick?: (date: ISODateString) => void;
-  onEventClick?: (event: CalendarEvent) => void;
+  onEventClick?: (event: ScheduleCalendarEvent) => void;
 }
 
 const HEAT_COLORS = [

@@ -189,3 +189,32 @@ class UserData(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     user = relationship("User", back_populates="data")
+
+
+class ScheduleItem(Base):
+    __tablename__ = "schedule_items"
+    __table_args__ = (
+        Index("ix_schedule_items_user_type", "user_id", "type"),
+        Index("ix_schedule_items_user_start", "user_id", "start_at"),
+        Index("ix_schedule_items_user_due", "user_id", "due_at"),
+        Index("ix_schedule_items_user_status", "user_id", "status"),
+    )
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    type = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, default="")
+    status = Column(String, nullable=False, default="pending")
+    priority = Column(String, nullable=False, default="green")
+    start_at = Column(DateTime, nullable=True)
+    due_at = Column(DateTime, nullable=True)
+    reminder_at = Column(DateTime, nullable=True)
+    pomodoro_count = Column(Integer, nullable=False, default=0)
+    pomodoro_rounds = Column(Integer, nullable=False, default=0)
+    total_focus_minutes = Column(Integer, nullable=False, default=0)
+    completed_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

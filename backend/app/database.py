@@ -244,3 +244,99 @@ def ensure_runtime_schema() -> None:
         connection.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_data_user_store ON user_data(user_id, store_key)"
         )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS schedule_items (
+                id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                priority TEXT NOT NULL DEFAULT 'green',
+                start_at DATETIME,
+                due_at DATETIME,
+                reminder_at DATETIME,
+                pomodoro_count INTEGER NOT NULL DEFAULT 0,
+                pomodoro_rounds INTEGER NOT NULL DEFAULT 0,
+                total_focus_minutes INTEGER NOT NULL DEFAULT 0,
+                completed_at DATETIME,
+                deleted_at DATETIME,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at DATETIME,
+                updated_at DATETIME
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_type ON schedule_items(user_id, type)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_start ON schedule_items(user_id, start_at)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_due ON schedule_items(user_id, due_at)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_status ON schedule_items(user_id, status)"
+        )
+        schedule_columns = {
+            row[1]: row
+            for row in connection.exec_driver_sql("PRAGMA table_info(schedule_items)").fetchall()
+        }
+        if schedule_columns.get("start_at", (None, None, None, 0))[3] or schedule_columns.get("due_at", (None, None, None, 0))[3]:
+            connection.exec_driver_sql("DROP TABLE IF EXISTS schedule_items_nullable_time")
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE schedule_items_nullable_time (
+                    id TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    type TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    priority TEXT NOT NULL DEFAULT 'green',
+                    start_at DATETIME,
+                    due_at DATETIME,
+                    reminder_at DATETIME,
+                    pomodoro_count INTEGER NOT NULL DEFAULT 0,
+                    pomodoro_rounds INTEGER NOT NULL DEFAULT 0,
+                    total_focus_minutes INTEGER NOT NULL DEFAULT 0,
+                    completed_at DATETIME,
+                    deleted_at DATETIME,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at DATETIME,
+                    updated_at DATETIME
+                )
+                """
+            )
+            connection.exec_driver_sql(
+                """
+                INSERT INTO schedule_items_nullable_time (
+                    id, user_id, type, title, description, status, priority,
+                    start_at, due_at, reminder_at, pomodoro_count, pomodoro_rounds,
+                    total_focus_minutes, completed_at, deleted_at, sort_order,
+                    created_at, updated_at
+                )
+                SELECT
+                    id, user_id, type, title, description, status, priority,
+                    start_at, due_at, reminder_at, pomodoro_count, pomodoro_rounds,
+                    total_focus_minutes, completed_at, deleted_at, sort_order,
+                    created_at, updated_at
+                FROM schedule_items
+                """
+            )
+            connection.exec_driver_sql("DROP TABLE schedule_items")
+            connection.exec_driver_sql("ALTER TABLE schedule_items_nullable_time RENAME TO schedule_items")
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_type ON schedule_items(user_id, type)"
+            )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_start ON schedule_items(user_id, start_at)"
+            )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_due ON schedule_items(user_id, due_at)"
+            )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_status ON schedule_items(user_id, status)"
+            )

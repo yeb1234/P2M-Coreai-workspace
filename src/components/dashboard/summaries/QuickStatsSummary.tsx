@@ -1,31 +1,31 @@
 import React, { useMemo } from 'react';
 import { CheckCircle2, Timer, StickyNote, Calendar } from 'lucide-react';
-import { useTodoStore, usePomodoroStore, useNotesStore, useCalendarStore } from '../../../stores';
+import { useScheduleStore, usePomodoroStore, useNotesStore } from '../../../stores';
 import { toLocalDateString } from '../../../lib/date';
+import { datePart, hasScheduleTime } from '../../../lib/scheduleTime';
 
 export const QuickStatsSummary: React.FC = () => {
-  const todos = useTodoStore((s) => s.todos);
+  const scheduleItems = useScheduleStore((s) => s.items);
   const sessions = usePomodoroStore((s) => s.sessions);
   const notes = useNotesStore((s) => s.notes);
-  const events = useCalendarStore((s) => s.events);
 
   const stats = useMemo(() => {
     const today = toLocalDateString(new Date());
-    const todayTodos = Object.values(todos).filter((t) => t.dueDate === today);
+    const todayItems = Object.values(scheduleItems).filter((item) => !item.deletedAt && hasScheduleTime(item) && datePart(item.startAt) === today);
+    const todayTodos = todayItems.filter((item) => item.type === 'todo');
     const completedToday = todayTodos.filter((t) => t.status === 'completed').length;
     const todaySessions = Object.values(sessions || {}).filter(
       (s) => s.completed && s.phase === 'work' && toLocalDateString(s.startTime) === today
     );
-    const todayEvents = Object.values(events).filter((e) => e.date === today);
 
     return {
       todosDone: completedToday,
       todosTotal: todayTodos.length,
       pomodoros: todaySessions.length,
       notesCount: notes.length,
-      eventsCount: todayEvents.length,
+      eventsCount: todayItems.length,
     };
-  }, [todos, sessions, notes, events]);
+  }, [scheduleItems, sessions, notes]);
 
   const items = [
     { icon: <CheckCircle2 size={14} />, label: '今日完成', value: `${stats.todosDone}/${stats.todosTotal}`, color: '#16a34a' },

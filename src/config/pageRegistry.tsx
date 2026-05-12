@@ -17,6 +17,7 @@ function lazyPage<T extends React.ComponentType>(loader: () => Promise<Record<st
 const DashboardPage = lazyPage(() => import('../components/dashboard/DashboardPage'), 'DashboardPage');
 const TodoPage = lazyPage(() => import('../components/todo/TodoPage'), 'TodoPage');
 const CalendarPage = lazyPage(() => import('../components/calendar/CalendarPage'), 'CalendarPage');
+const Calendar2Page = lazyPage(() => import('../components/calendar2/Calendar2Page'), 'Calendar2Page');
 const NotesPage = lazyPage(() => import('../components/notes/NotesPage'), 'NotesPage');
 const PomodoroPage = lazyPage(() => import('../components/pomodoro/PomodoroPage'), 'PomodoroPage');
 const TimeCenterPage = lazyPage(() => import('../components/timecenter/TimeCenterPage'), 'TimeCenterPage');
@@ -55,6 +56,7 @@ const PAGE_LOADERS: Record<ActiveView, () => Promise<unknown>> = {
   dashboard: () => import('../components/dashboard/DashboardPage'),
   todo: () => import('../components/todo/TodoPage'),
   calendar: () => import('../components/calendar/CalendarPage'),
+  calendar2: () => import('../components/calendar2/Calendar2Page'),
   notes: () => import('../components/notes/NotesPage'),
   pomodoro: () => import('../components/pomodoro/PomodoroPage'),
   timecenter: () => import('../components/timecenter/TimeCenterPage'),
@@ -91,6 +93,7 @@ export const PAGES: PageEntry[] = [
   { id: 'dashboard', path: '', component: DashboardPage, label: '工作台', icon: <LayoutDashboard size={20} />, color: 'text-[#c87d2f]' },
   { id: 'todo', path: 'todo', component: TodoPage, label: '待办事项', icon: <ListTodo size={20} />, color: 'text-[#2563eb]' },
   { id: 'calendar', path: 'calendar', component: CalendarPage, label: '日历', icon: <Calendar size={20} />, color: 'text-[#7c3aed]' },
+  { id: 'calendar2', path: 'calendar2', component: Calendar2Page, label: '日历2', icon: <Calendar size={20} />, color: 'text-[#2563eb]', dev: true },
   { id: 'notes', path: 'notes', component: NotesPage, label: '笔记', icon: <StickyNote size={20} />, color: 'text-[#f59e0b]' },
   { id: 'pomodoro', path: 'pomodoro', component: PomodoroPage, label: '番茄钟', icon: <Timer size={20} />, color: 'text-[var(--accent)]' },
   { id: 'timecenter', path: 'timecenter', component: TimeCenterPage, label: '时间中心', icon: <AlarmClock size={20} />, color: 'text-[var(--accent)]' },

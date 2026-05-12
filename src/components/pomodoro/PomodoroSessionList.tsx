@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Clock, CheckCircle, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
-import { usePomodoroStore, useTodoStore } from '../../stores';
+import { usePomodoroStore, useScheduleStore } from '../../stores';
 import { formatDate, formatDuration } from '../../lib/date';
 import { PHASE_LABELS } from '../../types';
 import { playInteractionSound } from '../../lib/sounds';
@@ -10,7 +10,7 @@ const INITIAL_LIMIT = 5;
 export const PomodoroSessionList: React.FC = () => {
   const sessions = usePomodoroStore((s) => s.sessions);
   const clearHistory = usePomodoroStore((s) => s.clearHistory);
-  const todos = useTodoStore((s) => s.todos);
+  const todos = useScheduleStore((s) => s.items);
   const [expanded, setExpanded] = useState(false);
 
   const completedSessions = useMemo(() =>

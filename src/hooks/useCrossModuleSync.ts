@@ -1,23 +1,27 @@
 import { useEffect, useRef } from 'react';
-import { useTodoStore, useCalendarStore, usePomodoroStore, useNotificationStore } from '../stores';
-import { type PomodoroSession } from '../types';
+import { useCalendarStore, usePomodoroStore, useNotificationStore, useScheduleStore } from '../stores';
+import { PRIORITY_COLORS, type PomodoroSession } from '../types';
 import { playBreakSound, playPomodoroCue, playNotificationSound } from '../lib/sounds';
 import { toLocalDateString } from '../lib/date';
-import { buildTodoCalendarSyncPlan } from './todoCalendarSyncPlan';
 
-export const useCrossModuleSync = () => {
+const TODO_REMINDER_GRACE_MS = 2 * 60 * 1000;
+
+export const useCrossModuleSync = (enabled = true) => {
   const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval>>(null);
   const todoReminderRef = useRef<Set<string>>(new Set());
-  const todoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const todoReminderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Restore timer on app load (adjust for elapsed time while page was closed)
   useEffect(() => {
+    if (!enabled) return;
     usePomodoroStore.getState().restoreTimer();
-  }, []);
+    void usePomodoroStore.getState().restoreRemoteState();
+  }, [enabled]);
 
   // Global pomodoro tick - runs on ALL pages
   useEffect(() => {
+    if (!enabled) return;
     intervalRef.current = setInterval(() => {
       const { timer, tick } = usePomodoroStore.getState();
       if (timer.status === 'running') {
@@ -28,10 +32,36 @@ export const useCrossModuleSync = () => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    heartbeatRef.current = setInterval(() => {
+      usePomodoroStore.getState().syncRemoteRuntime('heartbeat');
+    }, 15_000);
+
+    const flushRuntime = () => {
+      usePomodoroStore.getState().syncRemoteRuntime('page-hidden');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushRuntime();
+    };
+
+    window.addEventListener('pagehide', flushRuntime);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      window.removeEventListener('pagehide', flushRuntime);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [enabled]);
 
   // Play notification on phase transitions or timer stop
   useEffect(() => {
+    if (!enabled) return;
     let prevPhase: string | null = null;
     let prevStatus: string | null = null;
 
@@ -69,29 +99,39 @@ export const useCrossModuleSync = () => {
       prevStatus = status;
     });
     return unsub;
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     const runReminderCheck = () => {
       const now = Date.now();
       const notificationStore = useNotificationStore.getState();
       let nextReminderAt = Number.POSITIVE_INFINITY;
-      Object.values(useTodoStore.getState().todos).forEach((todo) => {
+      Object.values(useScheduleStore.getState().items).forEach((todo) => {
+        if (todo.type !== 'todo') return;
         if (!todo.reminderAt || todo.status === 'completed') return;
-        if (todoReminderRef.current.has(todo.id)) return;
         const reminderTime = new Date(todo.reminderAt).getTime();
         if (!Number.isFinite(reminderTime)) return;
+        const reminderKey = `todo-reminder:${todo.id}:${todo.reminderAt}`;
+        if (todoReminderRef.current.has(reminderKey)) return;
+        if (notificationStore.notifications.some((notification) => notification.sourceKey === reminderKey)) {
+          todoReminderRef.current.add(reminderKey);
+          return;
+        }
         if (reminderTime > now) {
           nextReminderAt = Math.min(nextReminderAt, reminderTime);
           return;
         }
-        todoReminderRef.current.add(todo.id);
-        playNotificationSound();
-        notificationStore.addNotification({
+        todoReminderRef.current.add(reminderKey);
+        if (now - reminderTime > TODO_REMINDER_GRACE_MS) return;
+
+        const added = notificationStore.addNotification({
           type: 'todo',
           title: '待办提醒',
           message: todo.title,
+          sourceKey: reminderKey,
         });
+        if (added) playNotificationSound();
       });
 
       if (todoReminderTimerRef.current) clearTimeout(todoReminderTimerRef.current);
@@ -102,7 +142,7 @@ export const useCrossModuleSync = () => {
     };
 
     runReminderCheck();
-    const unsubTodos = useTodoStore.subscribe(() => {
+    const unsubTodos = useScheduleStore.subscribe(() => {
       if (todoReminderTimerRef.current) clearTimeout(todoReminderTimerRef.current);
       todoReminderTimerRef.current = setTimeout(runReminderCheck, 250);
     });
@@ -111,27 +151,10 @@ export const useCrossModuleSync = () => {
       unsubTodos();
       if (todoReminderTimerRef.current) clearTimeout(todoReminderTimerRef.current);
     };
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    const syncTodosToCalendar = () => {
-      const todos = useTodoStore.getState().todos;
-      const calendarStore = useCalendarStore.getState();
-      const plan = buildTodoCalendarSyncPlan(todos, calendarStore.events);
-
-      plan.add.forEach((data) => calendarStore.addEvent(data));
-      plan.update.forEach(({ id, data }) => calendarStore.updateEvent(id, data));
-      plan.delete.forEach((id) => calendarStore.deleteEvent(id));
-    };
-
-    syncTodosToCalendar();
-
-    // Subscribe to todo changes
-    const unsubTodos = useTodoStore.subscribe(() => {
-      if (todoSyncTimerRef.current) clearTimeout(todoSyncTimerRef.current);
-      todoSyncTimerRef.current = setTimeout(syncTodosToCalendar, 120);
-    });
-
+    if (!enabled) return;
     // Subscribe to pomodoro session changes - defer mutations to avoid cascading re-renders
     const unsubSessions = usePomodoroStore.subscribe((state) => {
       const sessions = state.sessions;
@@ -145,17 +168,25 @@ export const useCrossModuleSync = () => {
 
       // Defer to avoid mutating stores inside a subscription callback
       setTimeout(() => {
-        const todoStore = useTodoStore.getState();
+        const scheduleStore = useScheduleStore.getState();
         const calendarStore = useCalendarStore.getState();
 
         pending.forEach((session) => {
-          todoStore.incrementPomodoroCount(session.todoId!, session.actualDuration);
+          const linkedTodo = scheduleStore.items[session.todoId!];
+          if (linkedTodo) {
+            scheduleStore.updateItem(linkedTodo.id, {
+              pomodoroCount: linkedTodo.pomodoroCount + 1,
+              totalFocusMinutes: linkedTodo.totalFocusMinutes + session.actualDuration,
+              status: 'in_progress',
+            });
+          }
+          const color = linkedTodo ? PRIORITY_COLORS[linkedTodo.priority] : '#10b981';
 
           const eventId = calendarStore.addEvent({
             title: `专注 ${session.actualDuration}分钟`,
             date: toLocalDateString(session.startTime),
             type: 'pomodoro',
-            color: '#10b981',
+            color,
             todoId: session.todoId,
             pomodoroSessionId: session.id,
           });
@@ -166,9 +197,7 @@ export const useCrossModuleSync = () => {
     });
 
     return () => {
-      unsubTodos();
-      if (todoSyncTimerRef.current) clearTimeout(todoSyncTimerRef.current);
       unsubSessions();
     };
-  }, []);
+  }, [enabled]);
 };

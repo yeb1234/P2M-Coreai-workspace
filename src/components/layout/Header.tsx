@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Bell, Settings, Clock, LogOut, Bot } from 'lucide-react';
-import { usePomodoroStore, useTodoStore, useUIStore, useNotificationStore, useAuthStore, useAIStore } from '../../stores';
+import { usePomodoroStore, useScheduleStore, useUIStore, useNotificationStore, useAuthStore, useAIStore } from '../../stores';
 import { NotificationPanel } from './NotificationPanel';
 import { toLocalDateString } from '../../lib/date';
 import { useClockNow } from '../../hooks/useClockNow';
@@ -35,7 +35,7 @@ function LiveClock({ active, onClick }: { active: boolean; onClick: () => void }
 
 export const Header: React.FC = () => {
   const sessions = usePomodoroStore((s) => s.sessions);
-  const todos = useTodoStore((s) => s.todos);
+  const items = useScheduleStore((s) => s.items);
   const setActiveView = useUIStore((s) => s.setActiveView);
   const activeView = useUIStore((s) => s.activeView);
   const toggleSettingsView = useUIStore((s) => s.toggleSettingsView);
@@ -53,8 +53,8 @@ export const Header: React.FC = () => {
     (s) => s.completed && toLocalDateString(s.startTime) === today
   );
 
-  const pendingTodos = Object.values(todos).filter(
-    (t) => t.status !== 'completed'
+  const pendingTodos = Object.values(items).filter(
+    (item) => item.type === 'todo' && !item.deletedAt && item.status !== 'completed'
   ).length;
 
   const unreadCount = notifications.filter((n) => !n.read).length;

@@ -10,6 +10,7 @@ export interface Notification {
   type: NotificationType;
   title: string;
   message: string;
+  sourceKey?: string;
   read: boolean;
   createdAt: string;
 }
@@ -24,7 +25,7 @@ export interface NotificationSettings {
 interface NotificationState {
   notifications: Notification[];
   settings: NotificationSettings;
-  addNotification: (data: Omit<Notification, 'id' | 'read' | 'createdAt'>) => void;
+  addNotification: (data: Omit<Notification, 'id' | 'read' | 'createdAt'>) => boolean;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearAll: () => void;
@@ -33,41 +34,6 @@ interface NotificationState {
 }
 
 const MAX_NOTIFICATIONS = 50;
-
-const DEMO_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'demo-1',
-    type: 'pomodoro',
-    title: '番茄钟完成',
-    message: '恭喜完成第 4 个番茄钟！休息一下吧 ☕',
-    read: false,
-    createdAt: new Date(Date.now() - 5 * 60000).toISOString(),
-  },
-  {
-    id: 'demo-2',
-    type: 'todo',
-    title: '待办即将到期',
-    message: '「完成项目文档」将在明天到期',
-    read: false,
-    createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
-  },
-  {
-    id: 'demo-3',
-    type: 'system',
-    title: '欢迎使用 P2M',
-    message: '你的个人效率工作台已准备就绪，开始高效的一天吧！',
-    read: true,
-    createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
-  },
-  {
-    id: 'demo-4',
-    type: 'pomodoro',
-    title: '每日目标达成',
-    message: '今日已完成 6 个番茄钟，超越了昨日记录！',
-    read: true,
-    createdAt: new Date(Date.now() - 8 * 3600000).toISOString(),
-  },
-];
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   enablePomodoroNotif: true,
@@ -79,14 +45,17 @@ const DEFAULT_SETTINGS: NotificationSettings = {
 export const useNotificationStore = create<NotificationState>()(
   persist(
     (set, get) => ({
-      notifications: DEMO_NOTIFICATIONS,
+      notifications: [],
       settings: DEFAULT_SETTINGS,
 
       addNotification: (data) => {
         const { settings } = get();
-        if (data.type === 'pomodoro' && !settings.enablePomodoroNotif) return;
-        if (data.type === 'todo' && !settings.enableTodoNotif) return;
-        if (data.type === 'system' && !settings.enableSystemNotif) return;
+        if (data.type === 'pomodoro' && !settings.enablePomodoroNotif) return false;
+        if (data.type === 'todo' && !settings.enableTodoNotif) return false;
+        if (data.type === 'system' && !settings.enableSystemNotif) return false;
+        if (data.sourceKey && get().notifications.some((notification) => notification.sourceKey === data.sourceKey)) {
+          return false;
+        }
 
         const notification: Notification = {
           id: generateId(),
@@ -97,6 +66,7 @@ export const useNotificationStore = create<NotificationState>()(
         set((state) => ({
           notifications: [notification, ...state.notifications].slice(0, MAX_NOTIFICATIONS),
         }));
+        return true;
       },
 
       markAsRead: (id) => {

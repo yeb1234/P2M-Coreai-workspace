@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { Play, Pause, RotateCcw, SkipForward, CloudRain, Coffee, Flame, Trees, Waves, Droplets, Wheat, Wind } from 'lucide-react';
-import { usePomodoroStore, useTodoStore } from '../../stores';
+import { usePomodoroStore, useScheduleStore } from '../../stores';
 import { formatTime, toLocalDateString } from '../../lib/date';
 import { PHASE_LABELS } from '../../types';
 import { type AmbientSound, AMBIENT_SOUNDS, playInteractionSound, playPomodoroCue } from '../../lib/sounds';
@@ -44,7 +44,13 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
   const getPhaseDuration = usePomodoroStore((s) => s.getPhaseDuration);
   const longBreakInterval = usePomodoroStore((s) => s.config.longBreakInterval);
   const ambientPlaybackMode = usePomodoroStore((s) => s.config.ambientPlaybackMode ?? 'manual');
-  const linkedTodo = useTodoStore((s) => timer.linkedTodoId ? s.todos[timer.linkedTodoId] : null);
+  const configuredAmbientSound = usePomodoroStore((s) => s.config.ambientSound ?? 'none');
+  const ambientVolumeBySound = usePomodoroStore((s) => s.config.ambientVolumeBySound);
+  const ambientWasPlaying = usePomodoroStore((s) => s.config.ambientWasPlaying);
+  const updateAmbientSound = usePomodoroStore((s) => s.updateAmbientSound);
+  const updateAmbientPlaybackState = usePomodoroStore((s) => s.updateAmbientPlaybackState);
+  const updateStoredAmbientVolume = usePomodoroStore((s) => s.updateAmbientVolume);
+  const linkedTodo = useScheduleStore((s) => timer.linkedTodoId ? s.items[timer.linkedTodoId] : null);
 
   const volumeTrackRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -54,12 +60,18 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
     isFocusActive: isFocusAmbientActive,
     play: playAmbient,
     toggle: toggleAmbient,
-    resetForTimerReset: resetAmbientForTimerReset,
+    stopForTimerReset,
     updateVolume: updateAmbientVolume,
   } = useAmbientSoundController({
     mode: ambientPlaybackMode,
     timerStatus: timer.status,
     timerPhase: timer.phase,
+    selectedSound: configuredAmbientSound,
+    volumeBySound: ambientVolumeBySound,
+    ambientWasPlaying,
+    onSelectedSoundChange: updateAmbientSound,
+    onPlaybackStateChange: updateAmbientPlaybackState,
+    onVolumeChange: updateStoredAmbientVolume,
   });
 
   const duration = getPhaseDuration(timer.phase);
@@ -75,25 +87,25 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
   }, [sessions]);
 
   const handleReset = useCallback(() => {
-    resetAmbientForTimerReset();
+    stopForTimerReset();
     resetTimer();
-  }, [resetAmbientForTimerReset, resetTimer]);
+  }, [resetTimer, stopForTimerReset]);
 
   const handleStart = useCallback(() => {
     if (timer.status === 'idle') {
       startTimer();
       playPomodoroCue('start');
-      if (ambientPlaybackMode === 'focus' && timer.phase === 'work' && ambientSound !== 'none') {
+      if (timer.phase === 'work' && ambientSound !== 'none') {
         void playAmbient(ambientSound, true);
       }
     } else if (timer.status === 'paused') {
       resumeTimer();
       playInteractionSound('start');
-      if (ambientPlaybackMode === 'focus' && timer.phase === 'work' && ambientSound !== 'none') {
+      if (timer.phase === 'work' && ambientSound !== 'none') {
         void playAmbient(ambientSound, true);
       }
     }
-  }, [ambientPlaybackMode, ambientSound, playAmbient, timer.phase, timer.status, startTimer, resumeTimer]);
+  }, [ambientSound, playAmbient, timer.phase, timer.status, startTimer, resumeTimer]);
 
   const handleVolumePointer = useCallback((clientX: number) => {
     const track = volumeTrackRef.current;
@@ -210,7 +222,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
           <div className="flex min-w-0 items-center gap-2">
             {settingsControl}
             <span className="shrink-0 text-[10px] text-[var(--text-muted)]">
-              {ambientSound === 'none' ? '环境音' : `${AMBIENT_SOUNDS[ambientSound]?.name}${ambientPlaybackMode === 'focus' && !isFocusAmbientActive ? ' · 待启动' : ''}`}
+              {ambientSound === 'none' ? '环境音' : `${AMBIENT_SOUNDS[ambientSound]?.name}${!isFocusAmbientActive ? ' · 待启动' : ''}`}
             </span>
             <div
               ref={volumeTrackRef}

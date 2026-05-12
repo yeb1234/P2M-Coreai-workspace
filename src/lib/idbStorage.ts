@@ -136,7 +136,7 @@ const lastLocalValues = new Map<string, string>();
 const lastLocalWriteAt = new Map<string, number>();
 const DEBOUNCE_MS = 3000;
 const LOCAL_MAX_WAIT_MS = 15000;
-const IMMEDIATE_LOCAL_STORAGE_NAMES = new Set(['p2m-pomodoro-storage']);
+const IMMEDIATE_LOCAL_STORAGE_NAMES = new Set(['p2m-pomodoro-storage', 'p2m-notification-storage']);
 
 function scheduleWrite(name: string, value: string) {
   const existing = pendingWrites.get(name);
@@ -199,6 +199,10 @@ function shouldWriteLocalImmediately(name: string): boolean {
   return IMMEDIATE_LOCAL_STORAGE_NAMES.has(baseLocalName(name));
 }
 
+function shouldWriteImmediately(name: string): boolean {
+  return IMMEDIATE_LOCAL_STORAGE_NAMES.has(baseLocalName(name));
+}
+
 function flushLocalWrites() {
   for (const [name, timer] of pendingLocalWrites.entries()) {
     clearTimeout(timer);
@@ -233,6 +237,12 @@ export const idbStorage: StateStorage = {
     return row?.value ?? null;
   },
   setItem: async (name: string, value: string) => {
+    if (shouldWriteImmediately(name)) {
+      const existing = pendingWrites.get(name);
+      if (existing) { clearTimeout(existing); pendingWrites.delete(name); }
+      await doWrite(name, value);
+      return;
+    }
     scheduleWrite(name, value);
   },
   removeItem: async (name: string) => {

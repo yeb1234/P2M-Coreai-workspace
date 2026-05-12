@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AmbientSound } from '../lib/sounds';
-import { ambientPlayer } from '../lib/sounds';
+import { AMBIENT_SOUNDS, ambientPlayer } from '../lib/sounds';
 import {
   createAmbientVolumeDefaults,
   getAmbientFocusPlan,
@@ -8,28 +8,85 @@ import {
   isAmbientFocusActive,
   type AmbientVolumeMap,
 } from '../lib/ambientSoundRules';
-import type { AmbientPlaybackMode, PomodoroPhase, PomodoroStatus } from '../types/pomodoro';
+import type { AmbientPlaybackMode, AmbientVolumeBySound, PomodoroPhase, PomodoroStatus } from '../types/pomodoro';
 
 interface UseAmbientSoundControllerOptions {
   mode: AmbientPlaybackMode;
   timerStatus: PomodoroStatus;
   timerPhase: PomodoroPhase;
+  enabled?: boolean;
+  selectedSound?: AmbientSound;
+  volumeBySound?: AmbientVolumeBySound;
+  ambientWasPlaying?: boolean;
+  onSelectedSoundChange?: (sound: AmbientSound) => void;
+  onPlaybackStateChange?: (sound: AmbientSound, isPlaying: boolean) => void;
+  onVolumeChange?: (sound: Exclude<AmbientSound, 'none'>, volume: number) => void;
 }
 
 interface AmbientControllerSnapshot {
   selectedSound: AmbientSound;
   volumeBySound: AmbientVolumeMap;
-  shouldResumeManualPlayback: boolean;
 }
 
 const ambientControllerSnapshot: AmbientControllerSnapshot = {
   selectedSound: 'none',
   volumeBySound: createAmbientVolumeDefaults(),
-  shouldResumeManualPlayback: false,
 };
 
 type AmbientControllerListener = () => void;
 const ambientControllerListeners = new Set<AmbientControllerListener>();
+const AMBIENT_PLAYBACK_STATE_KEY = 'p2m-ambient-playback-state-v1';
+
+interface AmbientPlaybackState {
+  sound: AmbientSound;
+  isPlaying: boolean;
+}
+
+function isKnownAmbientSound(sound: unknown): sound is AmbientSound {
+  return sound === 'none' || (typeof sound === 'string' && sound in AMBIENT_SOUNDS);
+}
+
+function clampVolumePercent(volume: unknown): number | null {
+  const numberValue = typeof volume === 'number' ? volume : Number(volume);
+  if (!Number.isFinite(numberValue)) return null;
+  return Math.max(0, Math.min(100, Math.round(numberValue)));
+}
+
+function mergeAmbientVolumes(volumeBySound?: AmbientVolumeBySound): AmbientVolumeMap {
+  const defaults = createAmbientVolumeDefaults();
+  if (!volumeBySound) return defaults;
+
+  (Object.keys(AMBIENT_SOUNDS) as Array<Exclude<AmbientSound, 'none'>>).forEach((sound) => {
+    const volume = clampVolumePercent(volumeBySound[sound]);
+    if (volume !== null) defaults[sound] = volume;
+  });
+
+  return defaults;
+}
+
+function areAmbientVolumesEqual(left: AmbientVolumeMap, right: AmbientVolumeMap): boolean {
+  return (Object.keys(AMBIENT_SOUNDS) as Array<Exclude<AmbientSound, 'none'>>).every(
+    (sound) => left[sound] === right[sound],
+  );
+}
+
+function readAmbientPlaybackState(): AmbientPlaybackState {
+  if (typeof localStorage === 'undefined') return { sound: 'none', isPlaying: false };
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AMBIENT_PLAYBACK_STATE_KEY) || '{}') as Partial<AmbientPlaybackState>;
+    return {
+      sound: isKnownAmbientSound(parsed.sound) ? parsed.sound : 'none',
+      isPlaying: parsed.isPlaying === true,
+    };
+  } catch {
+    return { sound: 'none', isPlaying: false };
+  }
+}
+
+function writeAmbientPlaybackState(sound: AmbientSound, isPlaying: boolean): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(AMBIENT_PLAYBACK_STATE_KEY, JSON.stringify({ sound, isPlaying }));
+}
 
 function notifyAmbientControllerListeners(): void {
   ambientControllerListeners.forEach((listener) => listener());
@@ -43,25 +100,43 @@ function subscribeAmbientController(listener: AmbientControllerListener): () => 
 export function resetAmbientControllerForTests(): void {
   ambientControllerSnapshot.selectedSound = 'none';
   ambientControllerSnapshot.volumeBySound = createAmbientVolumeDefaults();
-  ambientControllerSnapshot.shouldResumeManualPlayback = false;
+  writeAmbientPlaybackState('none', false);
   notifyAmbientControllerListeners();
   ambientPlayer.stop();
+}
+
+export function resetAmbientSoundSelection(): void {
+  ambientControllerSnapshot.selectedSound = 'none';
+  writeAmbientPlaybackState('none', false);
+  ambientPlayer.stop();
+  notifyAmbientControllerListeners();
 }
 
 export function useAmbientSoundController({
   mode,
   timerStatus,
   timerPhase,
+  enabled = true,
+  selectedSound,
+  volumeBySound: controlledVolumeBySound,
+  ambientWasPlaying,
+  onSelectedSoundChange,
+  onPlaybackStateChange,
+  onVolumeChange,
 }: UseAmbientSoundControllerOptions) {
+  const hasControlledSound = selectedSound !== undefined;
+  const hasControlledVolume = controlledVolumeBySound !== undefined;
+  const hasControlledPlaybackState = ambientWasPlaying !== undefined;
   const [sound, setSoundState] = useState<AmbientSound>(() => {
+    if (hasControlledSound) return selectedSound;
     const playingSound = ambientPlayer.getCurrentSound();
     if (ambientPlayer.getIsPlaying() && playingSound !== 'none') return playingSound;
     return ambientControllerSnapshot.selectedSound;
   });
   const [volumeBySound, setVolumeBySoundState] = useState<AmbientVolumeMap>(() => {
-    const current = {
-      ...ambientControllerSnapshot.volumeBySound,
-    };
+    const current = hasControlledVolume
+      ? mergeAmbientVolumes(controlledVolumeBySound)
+      : { ...ambientControllerSnapshot.volumeBySound };
     const playingSound = ambientPlayer.getCurrentSound();
     if (ambientPlayer.getIsPlaying() && playingSound !== 'none') {
       current[playingSound] = Math.round(ambientPlayer.getCurrentVolume() * 100);
@@ -81,8 +156,9 @@ export function useAmbientSoundController({
   const setSound = useCallback((nextSound: AmbientSound) => {
     ambientControllerSnapshot.selectedSound = nextSound;
     setSoundState(nextSound);
+    onSelectedSoundChange?.(nextSound);
     notifyAmbientControllerListeners();
-  }, []);
+  }, [onSelectedSoundChange]);
 
   const setVolumeBySound = useCallback((updater: (current: AmbientVolumeMap) => AmbientVolumeMap) => {
     setVolumeBySoundState((current) => {
@@ -99,17 +175,37 @@ export function useAmbientSoundController({
   }, []);
 
   const isFocusActive = useMemo(
-    () => isAmbientFocusActive(mode, timerStatus, timerPhase),
-    [mode, timerPhase, timerStatus],
+    () => isAmbientFocusActive(timerStatus, timerPhase),
+    [timerPhase, timerStatus],
   );
+
+  const recordPlaybackState = useCallback((nextSound: AmbientSound, isPlaying: boolean) => {
+    writeAmbientPlaybackState(nextSound, isPlaying);
+    onPlaybackStateChange?.(nextSound, isPlaying);
+  }, [onPlaybackStateChange]);
+
+  const canAutoPlayForCurrentState = useCallback((nextSound: AmbientSound) => {
+    if (nextSound === 'none') return false;
+    if (mode === 'focus') return isFocusActive;
+    if (!hasControlledSound) return true;
+    if (hasControlledPlaybackState) return ambientWasPlaying === true;
+    const previous = readAmbientPlaybackState();
+    return previous.isPlaying && previous.sound === nextSound;
+  }, [ambientWasPlaying, hasControlledPlaybackState, hasControlledSound, isFocusActive, mode]);
 
   const stop = useCallback(() => {
     commandRef.current += 1;
+    recordPlaybackState('none', false);
     ambientPlayer.stop();
-  }, []);
+  }, [recordPlaybackState]);
 
-  const stopAndForgetManualResume = useCallback(() => {
-    ambientControllerSnapshot.shouldResumeManualPlayback = false;
+  const pause = useCallback(() => {
+    commandRef.current += 1;
+    recordPlaybackState(soundRef.current, false);
+    ambientPlayer.pause();
+  }, [recordPlaybackState]);
+
+  const stopAndClearPlayback = useCallback(() => {
     stop();
   }, [stop]);
 
@@ -126,18 +222,17 @@ export function useAmbientSoundController({
 
     if (played) {
       setError('');
-      if (mode === 'manual') {
-        ambientControllerSnapshot.shouldResumeManualPlayback = true;
-      }
+      recordPlaybackState(nextSound, true);
       return;
     }
 
     ambientPlayer.stop();
-    ambientControllerSnapshot.shouldResumeManualPlayback = false;
+    setSound('none');
+    recordPlaybackState('none', false);
     if (showError) {
       setError('背景音播放失败，请确认浏览器允许声音播放。');
     }
-  }, [getVolumeForSound, mode, stop]);
+  }, [getVolumeForSound, recordPlaybackState, setSound, stop]);
 
   const toggle = useCallback(async (nextSound: AmbientSound) => {
     setError('');
@@ -156,20 +251,19 @@ export function useAmbientSoundController({
     }
 
     if (plan.playback === 'stop') {
-      stopAndForgetManualResume();
+      stopAndClearPlayback();
     }
 
     if (plan.playback === 'defer') {
       stop();
     }
-  }, [isFocusActive, mode, play, stop, stopAndForgetManualResume]);
+  }, [isFocusActive, mode, play, stop, stopAndClearPlayback]);
 
-  const resetForTimerReset = useCallback(() => {
-    stop();
-    ambientControllerSnapshot.shouldResumeManualPlayback = false;
-    if (mode === 'manual') setSound('none');
+  const stopForTimerReset = useCallback(() => {
+    setSound('none');
+    stopAndClearPlayback();
     setError('');
-  }, [mode, stop]);
+  }, [setSound, stopAndClearPlayback]);
 
   const updateVolume = useCallback((nextVolume: number) => {
     const currentSound = soundRef.current;
@@ -181,45 +275,69 @@ export function useAmbientSoundController({
       [currentSound]: clampedVolume,
     }));
     ambientPlayer.setVolume(clampedVolume / 100);
-  }, []);
+    onVolumeChange?.(currentSound, clampedVolume);
+  }, [onVolumeChange, setVolumeBySound]);
 
   useEffect(() => {
     return subscribeAmbientController(() => {
-      setSoundState(ambientControllerSnapshot.selectedSound);
-      setVolumeBySoundState({ ...ambientControllerSnapshot.volumeBySound });
+      if (!hasControlledSound) {
+        setSoundState(ambientControllerSnapshot.selectedSound);
+      }
+      if (!hasControlledVolume) {
+        setVolumeBySoundState({ ...ambientControllerSnapshot.volumeBySound });
+      }
     });
-  }, []);
+  }, [hasControlledSound, hasControlledVolume]);
 
   useEffect(() => {
+    if (!hasControlledSound) return;
+    if (selectedSound === soundRef.current && selectedSound === ambientControllerSnapshot.selectedSound) return;
+
+    ambientControllerSnapshot.selectedSound = selectedSound;
+    soundRef.current = selectedSound;
+    setSoundState(selectedSound);
+    notifyAmbientControllerListeners();
+  }, [hasControlledSound, selectedSound]);
+
+  useEffect(() => {
+    if (!hasControlledVolume) return;
+    const next = mergeAmbientVolumes(controlledVolumeBySound);
+    if (areAmbientVolumesEqual(volumeBySoundRef.current, next)) return;
+    ambientControllerSnapshot.volumeBySound = next;
+    volumeBySoundRef.current = next;
+    setVolumeBySoundState(next);
+    notifyAmbientControllerListeners();
+  }, [controlledVolumeBySound, hasControlledVolume]);
+
+  useEffect(() => {
+    if (!enabled) return;
     const plan = getAmbientFocusPlan({
       mode,
       selectedSound: soundRef.current,
       isFocusActive,
     });
 
-    if (plan === 'play') {
+    if (plan === 'play' && canAutoPlayForCurrentState(soundRef.current)) {
       void play(soundRef.current, false);
       return;
     }
 
+    if (plan === 'play') return;
+
     if (plan === 'stop') {
-      stop();
+      if (soundRef.current === 'none') {
+        stop();
+      } else {
+        pause();
+      }
     }
-  }, [isFocusActive, mode, play, stop, timerPhase, timerStatus]);
+  }, [canAutoPlayForCurrentState, enabled, isFocusActive, mode, pause, play, sound, stop, timerPhase, timerStatus]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (mode === 'manual') return;
     if (sound === 'none') stop();
-  }, [mode, sound, stop]);
-
-  useEffect(() => {
-    if (mode !== 'manual') return;
-    if (soundRef.current === 'none') return;
-    if (!ambientControllerSnapshot.shouldResumeManualPlayback) return;
-    if (ambientPlayer.getIsPlaying()) return;
-
-    void play(soundRef.current, false);
-  }, [mode, play]);
+  }, [enabled, mode, sound, stop]);
 
   return {
     sound,
@@ -229,7 +347,7 @@ export function useAmbientSoundController({
     play,
     stop,
     toggle,
-    resetForTimerReset,
+    stopForTimerReset,
     updateVolume,
   };
 }

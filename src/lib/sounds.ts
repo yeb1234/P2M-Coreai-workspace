@@ -159,7 +159,7 @@ export const AMBIENT_SOUNDS: Record<Exclude<AmbientSound, 'none'>, AmbientSoundC
   cafe: {
     name: '咖啡馆',
     url: '/sounds/cafe.ogg',
-    volume: 0.1,
+    volume: 0.3,
   },
   fireplace: {
     name: '壁炉',
@@ -193,6 +193,17 @@ export const AMBIENT_SOUNDS: Record<Exclude<AmbientSound, 'none'>, AmbientSoundC
   },
 };
 
+export const AMBIENT_PRELOAD_ORDER: Array<Exclude<AmbientSound, 'none'>> = [
+  'rain',
+  'fireplace',
+  'forest',
+  'ocean',
+  'countryside',
+  'stream',
+  'wind',
+  'cafe',
+];
+
 // Ambient sound player (singleton)
 class AmbientPlayer {
   private audio: HTMLAudioElement | null = null;
@@ -200,10 +211,129 @@ class AmbientPlayer {
   private isPlaying = false;
   private playRequestId = 0;
   private currentVolume = 0;
+  private preloadedAudio = new Map<Exclude<AmbientSound, 'none'>, HTMLAudioElement>();
+  private preloadPromises = new Map<Exclude<AmbientSound, 'none'>, Promise<boolean>>();
+  private preloadFailures = new Set<Exclude<AmbientSound, 'none'>>();
+  private preloadQueue: Array<Exclude<AmbientSound, 'none'>> = [];
+  private isPreloading = false;
+  private pendingPlay: {
+    sound: Exclude<AmbientSound, 'none'>;
+    audio: HTMLAudioElement;
+    promise: Promise<boolean>;
+  } | null = null;
 
   private toPerceivedVolume(volume: number): number {
     const clamped = Math.max(0, Math.min(1, volume));
     return clamped * clamped;
+  }
+
+  private createAmbientAudio(sound: Exclude<AmbientSound, 'none'>, volume?: number): HTMLAudioElement | null {
+    const config = AMBIENT_SOUNDS[sound];
+    if (!config) return null;
+
+    const audio = new Audio(config.url);
+    audio.loop = true;
+    audio.volume = this.toPerceivedVolume(volume ?? config.volume);
+    audio.preload = 'auto';
+    return audio;
+  }
+
+  private async preloadNow(sound: Exclude<AmbientSound, 'none'>): Promise<boolean> {
+    if (this.preloadedAudio.has(sound)) return true;
+
+    const existing = this.preloadPromises.get(sound);
+    if (existing) return existing;
+
+    const audio = this.createAmbientAudio(sound);
+    if (!audio) return false;
+
+    const promise = new Promise<boolean>((resolve) => {
+      let settled = false;
+      const cleanup = () => {
+        audio.removeEventListener('canplaythrough', onReady);
+        audio.removeEventListener('canplay', onReady);
+        audio.removeEventListener('loadeddata', onReady);
+        audio.removeEventListener('error', onError);
+      };
+      const finish = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        this.preloadPromises.delete(sound);
+        if (ok) {
+          this.preloadedAudio.set(sound, audio);
+          this.preloadFailures.delete(sound);
+        } else {
+          this.preloadFailures.add(sound);
+        }
+        resolve(ok);
+      };
+      const onReady = () => finish(true);
+      const onError = () => finish(false);
+
+      audio.addEventListener('canplaythrough', onReady, { once: true });
+      audio.addEventListener('canplay', onReady, { once: true });
+      audio.addEventListener('loadeddata', onReady, { once: true });
+      audio.addEventListener('error', onError, { once: true });
+
+      try {
+        audio.load();
+      } catch {
+        finish(false);
+      }
+    });
+
+    this.preloadPromises.set(sound, promise);
+    return promise;
+  }
+
+  private async drainPreloadQueue(): Promise<void> {
+    if (this.isPreloading) return;
+    this.isPreloading = true;
+
+    try {
+      while (this.preloadQueue.length > 0) {
+        const sound = this.preloadQueue.shift()!;
+        if (sound === this.currentSound && this.audio) continue;
+        if (this.preloadedAudio.has(sound) || this.preloadPromises.has(sound)) continue;
+        await this.preloadNow(sound);
+      }
+    } finally {
+      this.isPreloading = false;
+      if (this.preloadQueue.length > 0) {
+        void this.drainPreloadQueue();
+      }
+    }
+  }
+
+  preload(sound: AmbientSound, priority = false): void {
+    if (sound === 'none') return;
+    if (this.preloadedAudio.has(sound) || this.preloadPromises.has(sound)) return;
+    if (this.preloadQueue.includes(sound)) {
+      if (priority) {
+        this.preloadQueue = [sound, ...this.preloadQueue.filter((item) => item !== sound)];
+      }
+      return;
+    }
+
+    if (priority) {
+      this.preloadQueue.unshift(sound);
+    } else {
+      this.preloadQueue.push(sound);
+    }
+    void this.drainPreloadQueue();
+  }
+
+  preloadAll(preferredSound: AmbientSound = 'none'): void {
+    if (preferredSound !== 'none') {
+      this.preload(preferredSound, true);
+    }
+
+    AMBIENT_PRELOAD_ORDER.forEach((sound) => {
+      if (sound !== preferredSound) {
+        this.preload(sound);
+      }
+    });
   }
 
   async play(sound: AmbientSound, volume?: number): Promise<boolean> {
@@ -219,42 +349,92 @@ class AmbientPlayer {
       return true; // Already playing this sound
     }
 
+    if (this.pendingPlay?.sound === sound) {
+      if (typeof volume === 'number') {
+        this.currentVolume = Math.max(0, Math.min(1, volume));
+        this.pendingPlay.audio.volume = this.toPerceivedVolume(this.currentVolume);
+      }
+      return this.pendingPlay.promise;
+    }
+
+    if (this.currentSound === sound && this.audio && !this.isPlaying) {
+      if (typeof volume === 'number') {
+        this.setVolume(volume);
+      }
+      const requestId = this.playRequestId + 1;
+      this.playRequestId = requestId;
+      try {
+        await this.audio.play();
+        if (requestId !== this.playRequestId) return true;
+        this.isPlaying = true;
+        return true;
+      } catch (e) {
+        if (requestId !== this.playRequestId) return true;
+        const config = AMBIENT_SOUNDS[sound];
+        console.info(`Ambient sound "${config?.name ?? sound}" resume failed`, e);
+        return false;
+      }
+    }
+
     this.stop();
     const requestId = this.playRequestId;
 
     const config = AMBIENT_SOUNDS[sound];
     if (!config) return false;
 
-    const audio = new Audio(config.url);
-    audio.loop = true;
+    const audio = this.preloadedAudio.get(sound) ?? this.createAmbientAudio(sound, volume);
+    if (!audio) return false;
+    this.preloadedAudio.delete(sound);
+    this.preloadFailures.delete(sound);
     this.currentVolume = volume ?? config.volume;
     audio.volume = this.toPerceivedVolume(this.currentVolume);
+    audio.loop = true;
     audio.preload = 'auto';
 
-    try {
-      await audio.play();
-      if (requestId !== this.playRequestId) {
+    const playPromise = (async () => {
+      try {
+        await audio.play();
+        if (requestId !== this.playRequestId) {
+          audio.pause();
+          audio.currentTime = 0;
+          return true;
+        }
+        this.audio = audio;
+        this.currentSound = sound;
+        this.isPlaying = true;
+        return true;
+      } catch (e) {
         audio.pause();
-        audio.currentTime = 0;
+        if (requestId !== this.playRequestId) {
+          return true;
+        }
+        if (this.preloadedAudio.get(sound) === audio) {
+          this.preloadedAudio.delete(sound);
+        }
+        this.audio = null;
+        this.currentSound = 'none';
+        this.isPlaying = false;
+        this.currentVolume = 0;
+        console.info(`Ambient sound "${config.name}" not available: ${config.url}`, e);
         return false;
+      } finally {
+        if (this.pendingPlay?.audio === audio) {
+          this.pendingPlay = null;
+        }
       }
-      this.audio = audio;
-      this.currentSound = sound;
-      this.isPlaying = true;
-      return true;
-    } catch (e) {
-      audio.pause();
-      this.audio = null;
-      this.currentSound = 'none';
-      this.isPlaying = false;
-      this.currentVolume = 0;
-      console.info(`Ambient sound "${config.name}" not available: ${config.url}`, e);
-      return false;
-    }
+    })();
+
+    this.pendingPlay = { sound, audio, promise: playPromise };
+    return playPromise;
   }
 
   stop(): void {
     this.playRequestId += 1;
+    if (this.pendingPlay) {
+      this.pendingPlay.audio.pause();
+      this.pendingPlay.audio.currentTime = 0;
+      this.pendingPlay = null;
+    }
     if (this.audio) {
       this.audio.pause();
       this.audio.currentTime = 0;
@@ -263,6 +443,18 @@ class AmbientPlayer {
     this.currentSound = 'none';
     this.isPlaying = false;
     this.currentVolume = 0;
+  }
+
+  pause(): void {
+    this.playRequestId += 1;
+    if (this.pendingPlay) {
+      this.pendingPlay.audio.pause();
+      this.pendingPlay = null;
+    }
+    if (this.audio) {
+      this.audio.pause();
+    }
+    this.isPlaying = false;
   }
 
   setVolume(volume: number): void {

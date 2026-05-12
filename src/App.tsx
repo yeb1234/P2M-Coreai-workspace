@@ -4,7 +4,7 @@ import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
 import { useCrossModuleSync } from './hooks';
 import { registerAllPlugins } from './plugins';
-import { useAuthStore, useNotificationStore } from './stores';
+import { useAuthStore, useNotificationStore, useScheduleStore } from './stores';
 import { useRehydrateStores } from './hooks/useRehydrateStores';
 import { useApplyStoredTheme } from './hooks/useApplyStoredTheme';
 
@@ -40,11 +40,12 @@ function App() {
   }, [init]);
 
   // Rehydrate all stores with user-prefixed keys after login
-  useRehydrateStores(currentUser);
-  useApplyStoredTheme(initialized && Boolean(currentUser));
+  const storesReady = useRehydrateStores(currentUser);
+  const appDataReady = initialized && Boolean(currentUser) && storesReady;
+  useApplyStoredTheme(appDataReady);
 
   useEffect(() => {
-    if (initialized && currentUser) {
+    if (appDataReady) {
       queueMicrotask(() => {
         setShowWelcome(true);
         setReady(false);
@@ -52,9 +53,14 @@ function App() {
     } else if (initialized && !currentUser) {
       queueMicrotask(() => setReady(true));
     }
-  }, [initialized, currentUser]);
+  }, [appDataReady, initialized, currentUser]);
 
-  useCrossModuleSync();
+  useCrossModuleSync(appDataReady);
+
+  useEffect(() => {
+    if (!appDataReady) return;
+    void useScheduleStore.getState().loadItems();
+  }, [appDataReady]);
 
   // Listen for token expiration events from authFetch
   useEffect(() => {
@@ -85,7 +91,7 @@ function App() {
           }}
         />
       ) : ready ? (
-        <AppLayout />
+        <AppLayout storesReady={appDataReady} />
       ) : null}
     </HashRouter>
   );

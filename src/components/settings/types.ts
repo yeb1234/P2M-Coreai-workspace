@@ -82,6 +82,9 @@ export function transcriptionDtoToForm(dto: TranscriptionSettingsDto): Transcrip
 export const STORAGE_KEYS = [
   'p2m-ui-storage',
   'p2m-pomodoro-storage',
+  'p2m-pomodoro-runtime-v2',
+  'p2m-pomodoro-config-v2',
+  'p2m-pomodoro-history-v2',
   'p2m-todo-storage',
   'p2m-calendar-storage',
   'p2m-notes-storage',

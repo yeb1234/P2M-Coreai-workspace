@@ -47,12 +47,13 @@ describe('regression contracts', () => {
 
   it('keeps todo reminders scheduled without fixed polling', () => {
     const syncHook = readRepoFile('src/hooks/useCrossModuleSync.ts');
-    const reminderBlock = syncHook.match(/const runReminderCheck = \(\) => \{[\s\S]*?const unsubTodos = useTodoStore\.subscribe/)?.[0] ?? '';
+    const reminderBlock = syncHook.match(/const runReminderCheck = \(\) => \{[\s\S]*?const unsubTodos = useScheduleStore\.subscribe/)?.[0] ?? '';
     const appLayout = readRepoFile('src/components/layout/AppLayout.tsx');
     const popup = readRepoFile('src/components/layout/TodoReminderPopup.tsx');
 
     expect(reminderBlock).toContain('nextReminderAt');
     expect(reminderBlock).toContain('setTimeout(runReminderCheck');
+    expect(reminderBlock).toContain("todo.type !== 'todo'");
     expect(reminderBlock).not.toContain('setInterval');
     expect(syncHook).not.toContain('15000');
     expect(appLayout).toContain('TodoReminderPopup');
@@ -61,17 +62,56 @@ describe('regression contracts', () => {
     expect(popup).toContain('markAsRead(activeReminder.id)');
   });
 
-  it('keeps todo to calendar sync planned outside the effect hook', () => {
-    const syncHook = readRepoFile('src/hooks/useCrossModuleSync.ts');
-    const syncPlan = readRepoFile('src/hooks/todoCalendarSyncPlan.ts');
+  it('keeps pomodoro remote sync on explicit runtime actions instead of every tick', () => {
+    const store = readRepoFile('src/stores/pomodoroStore.ts');
+    const tickBlock = store.match(/tick: \(\) => \{[\s\S]*?\n      \},\n\n      completePhase:/)?.[0] ?? '';
 
-    expect(syncHook).toContain('buildTodoCalendarSyncPlan');
-    expect(syncHook).toContain('plan.add.forEach');
-    expect(syncPlan).toContain('export function buildTodoCalendarSyncPlan');
-    expect(syncPlan).toContain('TODO_DUE_MARKER');
-    expect(syncPlan).toContain('TODO_REMINDER_MARKER');
+    expect(store).toContain("syncPomodoroRuntime('start'");
+    expect(store).toContain("syncPomodoroRuntime('pause'");
+    expect(store).toContain("syncPomodoroRuntime('resume'");
+    expect(store).toContain("syncPomodoroRuntime('reset'");
+    expect(store).toContain("syncPomodoroRuntime('complete-phase'");
+    expect(tickBlock).not.toContain('syncPomodoroRuntime');
+    expect(tickBlock).not.toContain('savePomodoroRemoteRuntime');
+  });
+
+  it('keeps todos and calendars on unified schedule items instead of mirrored sync', () => {
+    const syncHook = readRepoFile('src/hooks/useCrossModuleSync.ts');
+    const scheduleStore = readRepoFile('src/stores/scheduleStore.ts');
+    const calendar2 = readRepoFile('src/components/calendar2/Calendar2Page.tsx');
+
+    expect(scheduleStore).toContain('addTodo');
+    expect(scheduleStore).toContain('addEvent');
+    expect(scheduleStore).toContain('startAt');
+    expect(scheduleStore).toContain('dueAt');
+    expect(calendar2).toContain("event.dataTransfer.setData('application/x-calendar2-item'");
+    expect(calendar2).toContain('dragOffsetRef');
+    expect(syncHook).not.toContain('buildTodoCalendarSyncPlan');
+    expect(syncHook).not.toContain('plan.add.forEach');
     expect(syncHook).not.toContain('const dueData =');
     expect(syncHook).not.toContain('const reminderData =');
+  });
+
+  it('keeps todo pomodoro starts derived from schedule time ranges', () => {
+    const todoForm = readRepoFile('src/components/todo/TodoForm.tsx');
+    const todoItem = readRepoFile('src/components/todo/TodoItem.tsx');
+    const pomodoroStore = readRepoFile('src/stores/pomodoroStore.ts');
+
+    expect(todoForm).not.toContain('这是番茄钟时间');
+    expect(todoForm).not.toContain('setIsPomodoro');
+    expect(todoItem).toContain('getSchedulePomodoroPlan');
+    expect(todoItem).toContain('pomodoroRounds: plannedRounds');
+    expect(pomodoroStore).toContain('calculateSchedulePomodoroRounds');
+    expect(pomodoroStore).toContain('useScheduleStore.getState().items');
+  });
+
+  it('keeps calendar2 overlapping events visibly separated', () => {
+    const calendar2 = readRepoFile('src/components/calendar2/Calendar2Page.tsx');
+
+    expect(calendar2).toContain('layoutWeekEvents');
+    expect(calendar2).toContain('data-conflict-column');
+    expect(calendar2).toContain('data-conflict-columns');
+    expect(calendar2).toContain('event.conflictColumn * (eventLaneWidth + EVENT_OVERLAP_GAP)');
   });
 
   it('keeps time center on the shared clock without an extra stopwatch interval', () => {
@@ -109,7 +149,7 @@ describe('regression contracts', () => {
     const app = readRepoFile('src/App.tsx');
     const themeHook = readRepoFile('src/hooks/useApplyStoredTheme.ts');
 
-    expect(app).toContain('useApplyStoredTheme(initialized && Boolean(currentUser))');
+    expect(app).toContain('useApplyStoredTheme(appDataReady)');
     expect(app).not.toContain('setTimeout(() =>');
     expect(themeHook).toContain('useUIStore');
     expect(themeHook).toContain('themeId');
@@ -133,6 +173,7 @@ describe('regression contracts', () => {
     expect(todoItem).toContain('timer.status');
     expect(todoItem).toContain('timer.linkedTodoId');
     expect(todoItem).toContain('linkedTodoTitle');
+    expect(todoItem).not.toContain('const timerStatus = usePomodoroStore((s) => s.timer)');
     expect(todoItem).not.toContain('const timer = usePomodoroStore');
     expect(todoItem).not.toContain('const todos = useTodoStore');
   });
@@ -182,17 +223,15 @@ describe('regression contracts', () => {
     const weekView = readRepoFile('src/components/calendar/WeekView.tsx');
     const calendarPage = readRepoFile('src/components/calendar/CalendarPage.tsx');
 
-    expect(helper).toContain('createCompletedTodoLookup');
-    expect(helper).toContain('groupTodosByCalendarDate');
-    expect(helper).toContain('shouldShowCalendarEvent');
-    expect(helper).toContain('getEventsForCalendarMonth');
-    expect(helper).toContain('getEventsForCalendarDates');
-    expect(helper).toContain('getEventsForCalendarDate');
-    expect(calendarGrid).toContain('calendarEvents');
-    expect(calendarGrid).toContain('groupTodosByCalendarDate');
-    expect(weekView).toContain('calendarEvents');
-    expect(weekView).toContain('groupTodosByCalendarDate');
-    expect(calendarPage).toContain('getEventsForCalendarDate');
+    expect(helper).toContain('groupScheduleItemsByDate');
+    expect(helper).toContain('getItemsForCalendarMonth');
+    expect(helper).toContain('getItemsForCalendarDates');
+    expect(helper).toContain('getScheduleItemsForDate');
+    expect(calendarGrid).toContain('scheduleItems');
+    expect(calendarGrid).toContain('groupScheduleItemsByDate');
+    expect(weekView).toContain('scheduleItems');
+    expect(weekView).toContain('groupScheduleItemsByDate');
+    expect(calendarPage).toContain('getScheduleItemsForDate');
     expect(calendarPage).not.toContain('Object.values(calendarEvents)');
     expect(calendarGrid).toContain('useMemo(() => getMonthDays(currentMonth)');
     expect(weekView).toContain('useMemo(() => getWeekDays(currentMonth)');
@@ -202,12 +241,12 @@ describe('regression contracts', () => {
     const calendarPage = readRepoFile('src/components/calendar/CalendarPage.tsx');
     const helper = readRepoFile('src/components/calendar/calendarDerivedData.ts');
 
-    expect(calendarPage).toContain('groupTodosByCalendarDate');
-    expect(calendarPage).toContain('handleDeleteTodo');
-    expect(calendarPage).toContain('deleteTodo(id)');
+    expect(calendarPage).toContain('getScheduleItemsForDate');
+    expect(calendarPage).toContain('handleDelete');
+    expect(calendarPage).toContain('deleteItem(id)');
     expect(calendarPage).toContain('playInteractionSound(\'delete\')');
     expect(calendarPage).toContain('移入垃圾箱');
-    expect(helper).toContain('groupTodosByCalendarDate');
+    expect(helper).toContain('groupScheduleItemsByDate');
   });
 
   it('keeps calendar todo planning modal local to calendar views', () => {

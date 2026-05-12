@@ -1,8 +1,10 @@
 import type { ID, ISODateTimeString } from './common';
+import type { AmbientSound } from '../lib/sounds';
 
 export type PomodoroPhase = 'work' | 'short_break' | 'long_break';
 export type PomodoroStatus = 'idle' | 'running' | 'paused';
 export type AmbientPlaybackMode = 'manual' | 'focus';
+export type AmbientVolumeBySound = Partial<Record<Exclude<AmbientSound, 'none'>, number>>;
 
 export interface PomodoroConfig {
   workDuration: number;
@@ -11,6 +13,9 @@ export interface PomodoroConfig {
   longBreakInterval: number;
   dailyGoal: number;
   ambientPlaybackMode: AmbientPlaybackMode;
+  ambientSound: AmbientSound;
+  ambientVolumeBySound: AmbientVolumeBySound;
+  ambientWasPlaying: boolean;
 }
 
 export interface PomodoroSession {
@@ -41,6 +46,9 @@ export const DEFAULT_CONFIG: PomodoroConfig = {
   longBreakInterval: 4,
   dailyGoal: 8,
   ambientPlaybackMode: 'manual',
+  ambientSound: 'none',
+  ambientVolumeBySound: {},
+  ambientWasPlaying: false,
 };
 
 export const PHASE_LABELS: Record<PomodoroPhase, string> = {

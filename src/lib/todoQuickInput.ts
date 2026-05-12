@@ -140,7 +140,7 @@ export function parseTodoQuickInput(input: string, nowDate = new Date()): Parsed
     }
   }
 
-  const timePattern = /(?:^|\s)(?:(今天|明天|后天)\s*)?(凌晨|早上|上午|中午|下午|晚上|夜里)?\s*(\d{1,2})(?:[:：](\d{1,2})|点(?:(半)|(\d{1,2})分?)?)?(?=\s|$)/;
+  const timePattern = /(?:^|\s)(?:(今天|明天|后天)\s*)?(凌晨|早上|上午|中午|下午|晚上|夜里)?\s*(\d{1,2})(?:(?:[:：](\d{1,2})|点(?:(半)|(\d{1,2})分?)?)(?=\s|$|[\u4e00-\u9fff])|(?=\s|$))/;
   const timeMatch = title.match(timePattern);
   if (timeMatch) {
     const [, dateWord, meridiem, hourText, colonMinuteText, halfMinuteText, pointMinuteText] = timeMatch;

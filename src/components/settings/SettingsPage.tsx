@@ -10,7 +10,7 @@ import { TranscriptionSettings } from './TranscriptionSettingsSection';
 import { AppearanceSettings } from './AppearanceSettings';
 import { SettingsNav } from './SettingsNav';
 import { SettingsButton, SettingsFieldLabel, SettingsHint, SettingsPanelTitle, SettingsSectionTitle, SettingsTextInput, ToggleSwitch } from './SettingsPrimitives';
-import { playInteractionSound } from '../../lib/sounds';
+import { AMBIENT_SOUNDS, playInteractionSound } from '../../lib/sounds';
 import { PrivacySettings, DataSettings, BackendHealthSettings } from './PrivacyDataSettings';
 
 const SECTIONS = [
@@ -28,13 +28,40 @@ const SECTIONS = [
 type SectionId = typeof SECTIONS[number]['id'];
 
 /* ─── Pomodoro ─── */
+type PomodoroSettingsForm = Pick<
+  PomodoroConfig,
+  | 'workDuration'
+  | 'shortBreakDuration'
+  | 'longBreakDuration'
+  | 'longBreakInterval'
+  | 'dailyGoal'
+  | 'ambientPlaybackMode'
+  | 'ambientSound'
+>;
+
+function createPomodoroSettingsForm(config: PomodoroConfig): PomodoroSettingsForm {
+  return {
+    workDuration: config.workDuration,
+    shortBreakDuration: config.shortBreakDuration,
+    longBreakDuration: config.longBreakDuration,
+    longBreakInterval: config.longBreakInterval,
+    dailyGoal: config.dailyGoal,
+    ambientPlaybackMode: config.ambientPlaybackMode,
+    ambientSound: config.ambientSound,
+  };
+}
+
 function PomodoroSettings() {
   const config = usePomodoroStore((s) => s.config);
   const updateConfig = usePomodoroStore((s) => s.updateConfig);
   const clearHistory = usePomodoroStore((s) => s.clearHistory);
   const sessions = usePomodoroStore((s) => s.sessions);
   const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({ ...config });
+  const [form, setForm] = useState<PomodoroSettingsForm>(() => createPomodoroSettingsForm(config));
+
+  useEffect(() => {
+    setForm(createPomodoroSettingsForm(config));
+  }, [config]);
 
   const handleSave = () => {
     updateConfig(form);
@@ -90,6 +117,20 @@ function PomodoroSettings() {
             </button>
           ))}
         </div>
+      </div>
+      <div>
+        <SettingsFieldLabel>默认背景音</SettingsFieldLabel>
+        <select
+          value={form.ambientSound ?? 'none'}
+          onChange={(e) => setForm((f) => ({ ...f, ambientSound: e.target.value as PomodoroConfig['ambientSound'] }))}
+          className="w-full rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[#c87d2f]"
+        >
+          <option value="none">不播放</option>
+          {Object.entries(AMBIENT_SOUNDS).map(([value, item]) => (
+            <option key={value} value={value}>{item.name}</option>
+          ))}
+        </select>
+        <SettingsHint className="mt-1">随专注计时时，新一轮专注会按这里保存的声音自动判断是否播放。</SettingsHint>
       </div>
       <div className="flex items-center gap-3">
         <SettingsButton onClick={handleSave}>

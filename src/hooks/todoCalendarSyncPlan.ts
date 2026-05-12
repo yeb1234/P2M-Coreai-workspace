@@ -8,6 +8,7 @@ export interface TodoCalendarEventData {
   title: string;
   date: string;
   startTime?: string;
+  endTime?: string;
   type: 'todo' | 'reminder';
   color: string;
   todoId: string;
@@ -30,10 +31,13 @@ function splitReminderDateTime(reminderAt: string): { date: string; time: string
 }
 
 function buildDueEventData(todo: Todo): TodoCalendarEventData | null {
-  if (!todo.dueDate) return null;
+  const date = todo.startDate || todo.dueDate;
+  if (!date) return null;
   return {
     title: todo.title,
-    date: todo.dueDate,
+    date,
+    startTime: todo.startTime || undefined,
+    endTime: todo.endTime || undefined,
     type: 'todo',
     color: PRIORITY_COLORS[todo.priority],
     todoId: todo.id,
@@ -44,6 +48,7 @@ function buildDueEventData(todo: Todo): TodoCalendarEventData | null {
 
 function buildReminderEventData(todo: Todo): TodoCalendarEventData | null {
   if (!todo.reminderAt) return null;
+  if (todo.startTime && todo.endTime) return null;
   const { date, time } = splitReminderDateTime(todo.reminderAt);
   return {
     title: `提醒：${todo.title}`,

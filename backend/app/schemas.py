@@ -380,3 +380,53 @@ class UserDataItem(BaseModel):
 class UserDataBulkImport(BaseModel):
     users: list[dict]
     kv_data: dict[str, str]
+
+
+class ScheduleItemBase(BaseModel):
+    type: Literal["todo", "event"] = "todo"
+    title: str = Field(min_length=1, max_length=240)
+    description: str = ""
+    status: Literal["pending", "in_progress", "completed"] = "pending"
+    priority: Literal["high", "medium", "low", "green"] = "green"
+    start_at: Optional[datetime] = None
+    due_at: Optional[datetime] = None
+    reminder_at: Optional[datetime] = None
+    pomodoro_count: int = Field(default=0, ge=0)
+    pomodoro_rounds: int = Field(default=0, ge=0)
+    total_focus_minutes: int = Field(default=0, ge=0)
+    completed_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+    sort_order: int = 0
+
+
+class ScheduleItemCreate(ScheduleItemBase):
+    id: Optional[str] = None
+
+
+class ScheduleItemUpdate(BaseModel):
+    type: Optional[Literal["todo", "event"]] = None
+    title: Optional[str] = Field(default=None, min_length=1, max_length=240)
+    description: Optional[str] = None
+    status: Optional[Literal["pending", "in_progress", "completed"]] = None
+    priority: Optional[Literal["high", "medium", "low", "green"]] = None
+    start_at: Optional[datetime] = None
+    due_at: Optional[datetime] = None
+    reminder_at: Optional[datetime] = None
+    pomodoro_count: Optional[int] = Field(default=None, ge=0)
+    pomodoro_rounds: Optional[int] = Field(default=None, ge=0)
+    total_focus_minutes: Optional[int] = Field(default=None, ge=0)
+    completed_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+    sort_order: Optional[int] = None
+
+
+class ScheduleItemOut(ScheduleItemBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ScheduleItemListOut(BaseModel):
+    items: list[ScheduleItemOut]

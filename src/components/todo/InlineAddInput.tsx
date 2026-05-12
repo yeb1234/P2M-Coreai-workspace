@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { useTodoStore } from '../../stores';
+import { useScheduleStore } from '../../stores';
 import { parseTodoQuickInput } from '../../lib/todoQuickInput';
 
 export const InlineAddInput: React.FC = () => {
-  const addTodo = useTodoStore((s) => s.addTodo);
+  const addTodo = useScheduleStore((s) => s.addTodo);
   const [active, setActive] = useState(false);
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -22,9 +22,10 @@ export const InlineAddInput: React.FC = () => {
         title: parsed.title,
         description: '',
         priority: parsed.priority || 'green',
-        dueDate: parsed.dueDate || null,
-        reminderAt: parsed.reminderAt || null,
-        pomodoroRounds: parsed.pomodoroRounds || 0,
+        startAt: null,
+        dueAt: null,
+        reminderAt: null,
+        pomodoroRounds: parsed.pomodoroRounds ?? 1,
       });
     }
     setValue('');
@@ -45,10 +46,10 @@ export const InlineAddInput: React.FC = () => {
     return (
       <button
         onClick={() => setActive(true)}
-        className="w-full flex items-center gap-3 px-3 py-3 text-sm text-[#b8b4ac] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-all group"
+        className="w-full flex items-center gap-3 px-3 py-3 text-sm text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-lg transition-all group"
       >
         <div className="w-4 flex-shrink-0" />
-        <div className="w-5 h-5 border-2 border-dashed border-[#d1cdc6] rounded-full flex items-center justify-center group-hover:border-[#c87d2f] transition-colors flex-shrink-0">
+        <div className="w-5 h-5 border-2 border-dashed border-[var(--border-medium)] rounded-full flex items-center justify-center group-hover:border-[var(--accent)] transition-colors flex-shrink-0">
           <Plus size={12} />
         </div>
         <span className="flex-1 text-left">新提醒事项</span>
@@ -58,10 +59,10 @@ export const InlineAddInput: React.FC = () => {
   }
 
   return (
-    <div className="flex items-center gap-3 px-3 py-3 rounded-lg border border-[#c87d2f] bg-[#faf9f7] shadow-sm">
+    <div className="flex items-center gap-3 px-3 py-3 rounded-lg border border-[var(--accent)] bg-[var(--bg-elevated)] shadow-sm">
       <div className="w-4 flex-shrink-0" />
-      <div className="w-5 h-5 border-2 border-[#c87d2f] rounded-full flex items-center justify-center flex-shrink-0">
-        <div className="w-2 h-2 bg-[#c87d2f] rounded-full" />
+      <div className="w-5 h-5 border-2 border-[var(--accent)] rounded-full flex items-center justify-center flex-shrink-0">
+        <div className="w-2 h-2 bg-[var(--accent)] rounded-full" />
       </div>
       <input
         ref={inputRef}
@@ -70,8 +71,8 @@ export const InlineAddInput: React.FC = () => {
         onChange={(e) => setValue(e.target.value)}
         onBlur={handleSubmit}
         onKeyDown={handleKeyDown}
-        className="flex-1 text-sm text-[#1a1a1a] bg-transparent outline-none placeholder:text-[#d1cdc6]"
-        placeholder="输入待办... 例：洗澡 下午6点 /t1 /g"
+        className="flex-1 text-sm text-[var(--text-primary)] bg-transparent outline-none placeholder:text-[var(--text-muted)]"
+        placeholder="输入待办... 例：洗澡 /t1 /g"
       />
       <div className="w-[76px] flex-shrink-0" />
     </div>

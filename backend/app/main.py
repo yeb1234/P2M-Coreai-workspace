@@ -6,12 +6,12 @@ import threading
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import func
 
 from app.database import Base, SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
-from app.routers import admin, ai_jobs, assistant, auth, categories, notes, user_data, videos
+from app.routers import admin, ai_jobs, assistant, auth, categories, notes, schedule_items, user_data, videos
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
 from app.worker import main as worker_main
@@ -71,6 +71,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(user_data.router)
+app.include_router(schedule_items.router)
 app.include_router(videos.router)
 app.include_router(categories.router)
 app.include_router(ai_jobs.router)
@@ -84,8 +85,20 @@ app.mount("/sprites", StaticFiles(directory=settings.sprite_dir), name="sprites"
 
 if (DIST_DIR / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="static-assets")
-if (DIST_DIR / "sounds").is_dir():
-    app.mount("/sounds", StaticFiles(directory=DIST_DIR / "sounds"), name="static-sounds")
+
+
+@app.get("/sounds/{full_path:path}")
+async def serve_sound_asset(full_path: str):
+    sounds_dir = DIST_DIR / "sounds"
+    sound_path = (sounds_dir / full_path).resolve()
+    if not sounds_dir.is_dir() or not sound_path.is_file() or sounds_dir.resolve() not in sound_path.parents:
+        return Response(status_code=404)
+    return FileResponse(
+        sound_path,
+        headers={
+            "Cache-Control": "public, max-age=604800",
+        },
+    )
 
 
 @app.get("/api/stats", response_model=StatsOut)

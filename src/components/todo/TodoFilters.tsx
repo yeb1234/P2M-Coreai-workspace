@@ -2,7 +2,7 @@ import React, { type ReactNode } from 'react';
 import { Filter, Search } from 'lucide-react';
 import type { TodoPriority, TodoStatus } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
-import { useTodoStore } from '../../stores';
+import { useScheduleStore } from '../../stores';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 
 interface TodoFiltersProps {
@@ -12,7 +12,7 @@ interface TodoFiltersProps {
 }
 
 export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children }) => {
-  const { filter, setFilter } = useTodoStore();
+  const { filter, setFilter } = useScheduleStore();
   const isMobile = useIsMobile();
 
   const statuses: { value: TodoStatus | 'all'; label: string }[] = [

@@ -1,8 +1,8 @@
 import React from 'react';
-import type { CalendarEvent } from '../../types';
+import type { ScheduleCalendarEvent } from '../../types';
 
 interface EventChipProps {
-  event: CalendarEvent;
+  event: ScheduleCalendarEvent;
   onClick?: () => void;
 }
 
@@ -12,9 +12,8 @@ export const EventChip: React.FC<EventChipProps> = React.memo(({ event, onClick 
       onClick={onClick}
       className="w-full text-left px-1.5 py-0.5 text-[11px] leading-tight rounded truncate transition-colors hover:opacity-80"
       style={{
-        backgroundColor: `${event.color}28`,
-        borderLeft: `2px solid ${event.color}`,
-        color: '#1a1a1a',
+        backgroundColor: event.color,
+        color: '#fff',
       }}
       title={event.title}
     >

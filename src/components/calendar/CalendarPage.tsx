@@ -1,28 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Plus, CalendarDays, Trash2 } from 'lucide-react';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarGrid } from './CalendarGrid';
 import { CalendarEventForm } from './CalendarEventForm';
 import { Modal, PageTitle } from '../shared';
 import { TodoForm } from '../todo/TodoForm';
-import { useCalendarStore, useTodoStore } from '../../stores';
+import { useCalendarStore, useScheduleStore } from '../../stores';
 import { toISODateString } from '../../lib/date';
 import type { ISODateString } from '../../types';
-import { createCompletedTodoLookup, getEventsForCalendarDate, groupTodosByCalendarDate } from './calendarDerivedData';
+import { getScheduleItemsForDate } from './calendarDerivedData';
+import { dateTimeParts, hasScheduleTime } from '../../lib/scheduleTime';
 import { playInteractionSound } from '../../lib/sounds';
 
 export const CalendarPage: React.FC = () => {
-  const { selectedDate } = useCalendarStore();
+  const selectedDate = useCalendarStore((s) => s.selectedDate);
   const [showEventForm, setShowEventForm] = useState(false);
   const [todoPlanDate, setTodoPlanDate] = useState<ISODateString | null>(null);
-
-  const handleDayDoubleClick = (date: ISODateString) => {
-    setTodoPlanDate(date);
-  };
-
-  const handleAddEvent = () => {
-    setShowEventForm(true);
-  };
 
   return (
     <div className="w-full pt-2">
@@ -31,10 +24,7 @@ export const CalendarPage: React.FC = () => {
         subtitle="点击日期查看事件"
         icon={<CalendarDays size={22} />}
         action={
-          <button
-            onClick={handleAddEvent}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] transition-colors"
-          >
+          <button onClick={() => setShowEventForm(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] transition-colors">
             <Plus size={16} />
             新建事件
           </button>
@@ -44,35 +34,18 @@ export const CalendarPage: React.FC = () => {
       <div className="calendar-paper rounded-xl border border-[#e5e2dd] p-4 mx-auto shadow-sm">
         <CalendarToolbar />
         <div className="mt-4">
-          <CalendarGrid onDayDoubleClick={handleDayDoubleClick} />
+          <CalendarGrid onDayDoubleClick={(date) => setTodoPlanDate(date)} />
         </div>
       </div>
 
-      {selectedDate && (
-        <SelectedDateEvents />
-      )}
+      {selectedDate && <SelectedDateEvents />}
 
-      <Modal
-        isOpen={showEventForm}
-        onClose={() => setShowEventForm(false)}
-        title="新建事件"
-      >
-        <CalendarEventForm
-          date={selectedDate || toISODateString(new Date())}
-          onClose={() => setShowEventForm(false)}
-        />
+      <Modal isOpen={showEventForm} onClose={() => setShowEventForm(false)} title="新建事件">
+        <CalendarEventForm date={selectedDate || toISODateString(new Date())} onClose={() => setShowEventForm(false)} />
       </Modal>
 
-      <Modal
-        isOpen={Boolean(todoPlanDate)}
-        onClose={() => setTodoPlanDate(null)}
-        title={todoPlanDate ? `${todoPlanDate} 的待办计划` : '新建待办'}
-      >
-        <TodoForm
-          defaultDate={todoPlanDate}
-          defaultPriority="medium"
-          onClose={() => setTodoPlanDate(null)}
-        />
+      <Modal isOpen={Boolean(todoPlanDate)} onClose={() => setTodoPlanDate(null)} title={todoPlanDate ? `${todoPlanDate} 的待办计划` : '新建待办'}>
+        <TodoForm defaultDate={todoPlanDate} defaultPriority="medium" onClose={() => setTodoPlanDate(null)} />
       </Modal>
     </div>
   );
@@ -80,24 +53,20 @@ export const CalendarPage: React.FC = () => {
 
 const SelectedDateEvents: React.FC = () => {
   const selectedDate = useCalendarStore((s) => s.selectedDate);
-  const calendarEvents = useCalendarStore((s) => s.events);
-  const todos = useTodoStore((s) => s.todos);
-  const deleteTodo = useTodoStore((s) => s.deleteTodo);
-  const completedTodoLookup = useMemo(() => createCompletedTodoLookup(todos), [todos]);
-  const { pendingByDate, completedByDate } = useMemo(() => groupTodosByCalendarDate(todos), [todos]);
-  const events = useMemo(
-    () => selectedDate
-      ? getEventsForCalendarDate(calendarEvents, selectedDate, completedTodoLookup)
-      : [],
-    [calendarEvents, completedTodoLookup, selectedDate],
+  const items = useScheduleStore((s) => s.items);
+  const deleteItem = useScheduleStore((s) => s.deleteItem);
+  const dayItems = useMemo(
+    () => selectedDate ? getScheduleItemsForDate(items, selectedDate) : [],
+    [items, selectedDate],
   );
-  const pendingTodos = selectedDate ? pendingByDate[selectedDate] || [] : [];
-  const completedTodos = selectedDate ? completedByDate[selectedDate] || [] : [];
+  const events = dayItems.filter((item) => item.type === 'event');
+  const pendingTodos = dayItems.filter((item) => item.type === 'todo' && item.status !== 'completed');
+  const completedTodos = dayItems.filter((item) => item.type === 'todo' && item.status === 'completed');
 
-  if (!selectedDate || events.length === 0 && pendingTodos.length === 0 && completedTodos.length === 0) return null;
+  if (!selectedDate || dayItems.length === 0) return null;
 
-  const handleDeleteTodo = (id: string) => {
-    deleteTodo(id);
+  const handleDelete = (id: string) => {
+    deleteItem(id);
     playInteractionSound('delete');
   };
 
@@ -110,31 +79,28 @@ const SelectedDateEvents: React.FC = () => {
           weekday: 'long',
         })}
       </h3>
-      <div className="space-y-2">
-        {events.map((event) => (
-          <div
-            key={event.id}
-            className="flex items-center gap-3 p-2 rounded-lg"
-            style={{ backgroundColor: `${event.color}10` }}
-          >
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: event.color }}
-            />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-[#1a1a1a]">{event.title}</p>
-              {event.startTime && (
-                <p className="text-xs text-[#6b7280]">
-                  {event.startTime}{event.endTime ? ` - ${event.endTime}` : ''}
-                </p>
-              )}
-            </div>
-            <span className="text-xs text-[#9ca3af] capitalize">
-              {event.type === 'todo' ? '待办' : event.type === 'pomodoro' ? '专注' : event.type === 'reminder' ? '提醒' : '事件'}
-            </span>
-          </div>
-        ))}
-      </div>
+
+      {events.length > 0 && (
+        <div className="space-y-2">
+          {events.map((event) => {
+            if (!hasScheduleTime(event)) return null;
+            const start = dateTimeParts(event.startAt);
+            const due = dateTimeParts(event.dueAt);
+            return (
+              <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg" style={{ backgroundColor: '#8b5cf610' }}>
+                <div className="w-2 h-2 rounded-full bg-[#8b5cf6]" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[#1a1a1a]">{event.title}</p>
+                  <p className="text-xs text-[#6b7280]">{start.time} - {due.time}</p>
+                </div>
+                <button type="button" onClick={() => handleDelete(event.id)} className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]" title="删除">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {pendingTodos.length > 0 && (
         <div className="mt-4">
@@ -142,20 +108,12 @@ const SelectedDateEvents: React.FC = () => {
           <div className="space-y-2">
             {pendingTodos.map((todo) => (
               <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-[#e5e2dd] bg-white px-3 py-2">
-                <div
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: todo.priority === 'high' ? '#e8a0a0' : todo.priority === 'medium' ? '#e8d4a0' : todo.priority === 'low' ? '#a0c4e8' : '#a0d4a0' }}
-                />
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: todo.priority === 'high' ? '#e8a0a0' : todo.priority === 'medium' ? '#e8d4a0' : todo.priority === 'low' ? '#a0c4e8' : '#a0d4a0' }} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-[#1a1a1a]">{todo.title}</p>
                   {todo.pomodoroRounds > 0 && <p className="text-[10px] text-[#9ca3af]">{todo.pomodoroRounds} 个番茄</p>}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteTodo(todo.id)}
-                  className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]"
-                  title="移入垃圾箱"
-                >
+                <button type="button" onClick={() => handleDelete(todo.id)} className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]" title="移入垃圾箱">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -174,12 +132,7 @@ const SelectedDateEvents: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-[#9ca3af] line-through">{todo.title}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteTodo(todo.id)}
-                  className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]"
-                  title="移入垃圾箱"
-                >
+                <button type="button" onClick={() => handleDelete(todo.id)} className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]" title="移入垃圾箱">
                   <Trash2 size={14} />
                 </button>
               </div>

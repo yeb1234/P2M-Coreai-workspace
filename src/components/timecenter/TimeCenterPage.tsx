@@ -144,14 +144,14 @@ export const TimeCenterPage: React.FC = () => {
     alarms.forEach((alarm) => {
       if (!alarm.enabled || alarm.lastTriggeredDate === today || alarm.time !== hhmm) return;
       markAlarmTriggered(alarm.id, today);
-      playNotificationSound();
-      addNotification({ type: 'system', title: '闹钟', message: alarm.label || alarm.time });
+      const added = addNotification({ type: 'system', title: '闹钟', message: alarm.label || alarm.time, sourceKey: `alarm:${alarm.id}:${today}` });
+      if (added) playNotificationSound();
     });
     reminders.forEach((reminder) => {
       if (!reminder.enabled || reminder.triggeredAt || new Date(reminder.remindAt).getTime() > now.getTime()) return;
       markReminderTriggered(reminder.id, now.toISOString());
-      playNotificationSound();
-      addNotification({ type: reminder.source === 'todo' ? 'todo' : 'system', title: '时间提醒', message: reminder.title });
+      const added = addNotification({ type: reminder.source === 'todo' ? 'todo' : 'system', title: '时间提醒', message: reminder.title, sourceKey: `time-reminder:${reminder.id}:${reminder.remindAt}` });
+      if (added) playNotificationSound();
     });
   }, [addNotification, alarms, markAlarmTriggered, markReminderTriggered, now, reminders]);
 
@@ -243,8 +243,8 @@ export const TimeCenterPage: React.FC = () => {
       delete next[id];
       return next;
     });
-    playNotificationSound();
-    addNotification({ type: 'system', title: '倒计时结束', message: label });
+    const added = addNotification({ type: 'system', title: '倒计时结束', message: label, sourceKey: `countdown:${id}:${countdownEndById[id] ?? 'done'}` });
+    if (added) playNotificationSound();
   };
   const createTask = () => {
     const title = taskTitle.trim() || typeMeta[taskType].label;

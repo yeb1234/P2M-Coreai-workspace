@@ -6,18 +6,38 @@ import type {
   PomodoroConfig,
   PomodoroTimerState,
   PomodoroPhase,
+  AmbientVolumeBySound,
   ID,
 } from '../types';
 import { DEFAULT_CONFIG } from '../types';
 import { generateId } from '../lib/id';
 import { toISODateTimeString, toLocalDateString } from '../lib/date';
-import { useTodoStore } from './todoStore';
+import {
+  buildPomodoroRemoteConfigSnapshot,
+  buildPomodoroRemoteHistorySnapshot,
+  buildPomodoroRemoteRuntimeSnapshot,
+  isRemotePomodoroConfigNewer,
+  isRemotePomodoroRuntimeNewer,
+  isRemotePomodoroSnapshotNewer,
+  loadPomodoroRemoteState,
+  mergePomodoroSessionHistories,
+  savePomodoroRemoteConfig,
+  savePomodoroRemoteHistory,
+  savePomodoroRemoteRuntime,
+} from '../lib/pomodoroSync';
+import { useScheduleStore } from './scheduleStore';
+import { calculateSchedulePomodoroRounds } from '../lib/pomodoroPlanning';
+import type { AmbientSound } from '../lib/sounds';
+import { AMBIENT_SOUNDS } from '../lib/sounds';
 
 interface PomodoroState {
   config: PomodoroConfig;
   timer: PomodoroTimerState;
   sessions: Record<ID, PomodoroSession>;
   _lastTickTimestamp: number | null;
+  _remoteRuntimeUpdatedAt: string | null;
+  _configUpdatedAt: string | null;
+  _historyUpdatedAt: string | null;
   startTimer: (todoId?: ID) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
@@ -25,6 +45,9 @@ interface PomodoroState {
   tick: () => void;
   completePhase: () => void;
   updateConfig: (config: Partial<PomodoroConfig>) => void;
+  updateAmbientSound: (sound: AmbientSound) => void;
+  updateAmbientPlaybackState: (sound: AmbientSound, isPlaying: boolean) => void;
+  updateAmbientVolume: (sound: Exclude<AmbientSound, 'none'>, volume: number) => void;
   linkToTodo: (todoId: ID | null) => void;
   updateSession: (id: ID, updates: Partial<PomodoroSession>) => void;
   getActiveSession: () => PomodoroSession | null;
@@ -35,6 +58,9 @@ interface PomodoroState {
   getPhaseDuration: (phase: PomodoroPhase) => number;
   clearHistory: () => void;
   restoreTimer: () => void;
+  restoreRemoteState: () => Promise<void>;
+  restoreRemoteRuntime: () => Promise<void>;
+  syncRemoteRuntime: (action?: string) => void;
 }
 
 const initialTimerState: PomodoroTimerState = {
@@ -78,6 +104,67 @@ function getRestorableSessions(sessions: Record<ID, PomodoroSession>, timer: Pom
   };
 }
 
+function syncPomodoroRuntime(action: string, state: Pick<PomodoroState, 'timer' | 'sessions' | '_lastTickTimestamp'>): string {
+  const snapshot = buildPomodoroRemoteRuntimeSnapshot(state.timer, state.sessions, state._lastTickTimestamp, action);
+  void savePomodoroRemoteRuntime(snapshot);
+  return snapshot.updatedAt;
+}
+
+function syncPomodoroConfig(config: PomodoroConfig): string {
+  const snapshot = buildPomodoroRemoteConfigSnapshot(config);
+  void savePomodoroRemoteConfig(snapshot);
+  return snapshot.updatedAt;
+}
+
+function syncPomodoroHistory(sessions: Record<ID, PomodoroSession>): string {
+  const snapshot = buildPomodoroRemoteHistorySnapshot(sessions);
+  void savePomodoroRemoteHistory(snapshot);
+  return snapshot.updatedAt;
+}
+
+function isKnownAmbientSound(sound: unknown): sound is AmbientSound {
+  return sound === 'none' || (typeof sound === 'string' && sound in AMBIENT_SOUNDS);
+}
+
+function clampConfigNumber(value: unknown, fallback: number, min: number, max: number): number {
+  const numberValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numberValue)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(numberValue)));
+}
+
+function sanitizeAmbientVolumeBySound(value: unknown): AmbientVolumeBySound {
+  if (!value || typeof value !== 'object') return {};
+
+  return Object.fromEntries(
+    Object.keys(AMBIENT_SOUNDS).flatMap((sound) => {
+      const rawVolume = (value as Record<string, unknown>)[sound];
+      if (rawVolume === undefined) return [];
+      const volume = typeof rawVolume === 'number' ? rawVolume : Number(rawVolume);
+      if (!Number.isFinite(volume)) return [];
+      return [[sound, Math.max(0, Math.min(100, Math.round(volume)))]];
+    }),
+  ) as AmbientVolumeBySound;
+}
+
+function sanitizePomodoroConfig(config: Partial<PomodoroConfig> | undefined): PomodoroConfig {
+  const rawConfig = config || {};
+  return {
+    ...DEFAULT_CONFIG,
+    ...rawConfig,
+    workDuration: clampConfigNumber(rawConfig.workDuration, DEFAULT_CONFIG.workDuration, 1, 120),
+    shortBreakDuration: clampConfigNumber(rawConfig.shortBreakDuration, DEFAULT_CONFIG.shortBreakDuration, 1, 30),
+    longBreakDuration: clampConfigNumber(rawConfig.longBreakDuration, DEFAULT_CONFIG.longBreakDuration, 1, 60),
+    longBreakInterval: clampConfigNumber(rawConfig.longBreakInterval, DEFAULT_CONFIG.longBreakInterval, 1, 10),
+    dailyGoal: clampConfigNumber(rawConfig.dailyGoal, DEFAULT_CONFIG.dailyGoal, 1, 20),
+    ambientPlaybackMode: rawConfig.ambientPlaybackMode === 'focus' || rawConfig.ambientPlaybackMode === 'manual'
+      ? rawConfig.ambientPlaybackMode
+      : DEFAULT_CONFIG.ambientPlaybackMode,
+    ambientSound: isKnownAmbientSound(rawConfig.ambientSound) ? rawConfig.ambientSound : DEFAULT_CONFIG.ambientSound,
+    ambientVolumeBySound: sanitizeAmbientVolumeBySound(rawConfig.ambientVolumeBySound),
+    ambientWasPlaying: rawConfig.ambientWasPlaying === true,
+  };
+}
+
 export function restorePomodoroRuntimeState(
   config: PomodoroConfig,
   timer: PomodoroTimerState | undefined,
@@ -114,8 +201,8 @@ export function restorePomodoroRuntimeState(
   };
 }
 
-export function sanitizePomodoroPersistedState(data: Partial<PomodoroState>): Pick<PomodoroState, 'config' | 'sessions' | 'timer' | '_lastTickTimestamp'> {
-  const config = { ...DEFAULT_CONFIG, ...(data.config || {}) };
+export function sanitizePomodoroPersistedState(data: Partial<PomodoroState>): Pick<PomodoroState, 'config' | 'sessions' | 'timer' | '_lastTickTimestamp' | '_remoteRuntimeUpdatedAt' | '_configUpdatedAt' | '_historyUpdatedAt'> {
+  const config = sanitizePomodoroConfig(data.config);
   const timer = data.timer || createPomodoroInitialTimer(config);
   const restored = restorePomodoroRuntimeState(config, timer, data._lastTickTimestamp);
   return {
@@ -123,14 +210,17 @@ export function sanitizePomodoroPersistedState(data: Partial<PomodoroState>): Pi
     sessions: getRestorableSessions((data.sessions || {}) as Record<ID, PomodoroSession>, restored.timer),
     timer: restored.timer,
     _lastTickTimestamp: restored.lastTickTimestamp,
+    _remoteRuntimeUpdatedAt: typeof data._remoteRuntimeUpdatedAt === 'string' ? data._remoteRuntimeUpdatedAt : null,
+    _configUpdatedAt: typeof data._configUpdatedAt === 'string' ? data._configUpdatedAt : null,
+    _historyUpdatedAt: typeof data._historyUpdatedAt === 'string' ? data._historyUpdatedAt : null,
   };
 }
 
-export function migratePomodoroPersistedState(persisted: unknown, version: number): Pick<PomodoroState, 'config' | 'sessions' | 'timer' | '_lastTickTimestamp'> {
+export function migratePomodoroPersistedState(persisted: unknown, version: number): Pick<PomodoroState, 'config' | 'sessions' | 'timer' | '_lastTickTimestamp' | '_remoteRuntimeUpdatedAt' | '_configUpdatedAt' | '_historyUpdatedAt'> {
   const data = persisted as Record<string, unknown>;
   const config = data.config && typeof data.config === 'object'
-    ? { ...DEFAULT_CONFIG, ...data.config } as PomodoroConfig
-    : { ...DEFAULT_CONFIG };
+    ? sanitizePomodoroConfig(data.config as Partial<PomodoroConfig>)
+    : sanitizePomodoroConfig(undefined);
   const timer = data.timer && typeof data.timer === 'object'
     ? { ...(data.timer as PomodoroTimerState) }
     : undefined;
@@ -157,15 +247,22 @@ export const usePomodoroStore = create<PomodoroState>()(
       timer: createPomodoroInitialTimer(DEFAULT_CONFIG),
       sessions: {},
       _lastTickTimestamp: null,
+      _remoteRuntimeUpdatedAt: null,
+      _configUpdatedAt: null,
+      _historyUpdatedAt: null,
 
       startTimer: (todoId) => {
         const state = get();
+        const nextPhase: PomodoroPhase = state.timer.status === 'idle' ? 'work' : state.timer.phase;
+        const nextTimeRemaining = state.timer.status === 'idle'
+          ? state.config.workDuration * 60
+          : state.timer.timeRemaining;
         const sessionId = generateId();
         const session: PomodoroSession = {
           id: sessionId,
           todoId: todoId || state.timer.linkedTodoId || null,
-          phase: state.timer.phase,
-          plannedDuration: state.getPhaseDuration(state.timer.phase),
+          phase: nextPhase,
+          plannedDuration: nextTimeRemaining / 60,
           actualDuration: 0,
           completed: false,
           startTime: toISODateTimeString(new Date()),
@@ -173,30 +270,47 @@ export const usePomodoroStore = create<PomodoroState>()(
           calendarEventId: null,
         };
 
-        set({
+        const nextState = {
           sessions: { ...state.sessions, [sessionId]: session },
           timer: {
             ...state.timer,
-            status: 'running',
+            status: 'running' as const,
+            phase: nextPhase,
+            timeRemaining: nextTimeRemaining,
+            sessionsCompleted: state.timer.status === 'idle' ? 0 : state.timer.sessionsCompleted,
             currentSessionId: sessionId,
             linkedTodoId: todoId || state.timer.linkedTodoId || null,
           },
           _lastTickTimestamp: Date.now(),
-        });
+          _remoteRuntimeUpdatedAt: null as string | null,
+        };
+        nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('start', { ...state, ...nextState });
+
+        set(nextState);
       },
 
       pauseTimer: () => {
-        set((state) => ({
-          timer: { ...state.timer, status: 'paused' },
-          _lastTickTimestamp: null,
-        }));
+        set((state) => {
+          const nextState = {
+            timer: { ...state.timer, status: 'paused' as const },
+            _lastTickTimestamp: null,
+            _remoteRuntimeUpdatedAt: null as string | null,
+          };
+          nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('pause', { ...state, ...nextState });
+          return nextState;
+        });
       },
 
       resumeTimer: () => {
-        set((state) => ({
-          timer: { ...state.timer, status: 'running' },
-          _lastTickTimestamp: Date.now(),
-        }));
+        set((state) => {
+          const nextState = {
+            timer: { ...state.timer, status: 'running' as const },
+            _lastTickTimestamp: Date.now(),
+            _remoteRuntimeUpdatedAt: null as string | null,
+          };
+          nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('resume', { ...state, ...nextState });
+          return nextState;
+        });
       },
 
       resetTimer: () => {
@@ -213,7 +327,7 @@ export const usePomodoroStore = create<PomodoroState>()(
           }
         }
 
-        set({
+        const nextState = {
           sessions,
           timer: {
             ...initialTimerState,
@@ -221,7 +335,15 @@ export const usePomodoroStore = create<PomodoroState>()(
             linkedTodoId: state.timer.linkedTodoId,
           },
           _lastTickTimestamp: null,
-        });
+          _remoteRuntimeUpdatedAt: null as string | null,
+          _historyUpdatedAt: state._historyUpdatedAt,
+        };
+        nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('reset', { ...state, ...nextState });
+        if (sessions !== state.sessions) {
+          nextState._historyUpdatedAt = syncPomodoroHistory(sessions);
+        }
+
+        set(nextState);
       },
 
       tick: () => {
@@ -265,16 +387,25 @@ export const usePomodoroStore = create<PomodoroState>()(
             const newSessionsCompleted = phase === 'work' ? sessionsCompleted + 1 : sessionsCompleted;
 
             if (linkedTodoId && phase === 'work') {
-              const todo = useTodoStore.getState().todos[linkedTodoId];
-              const plannedPomodoros = Math.max(0, todo?.pomodoroRounds || 0);
+              const todo = useScheduleStore.getState().items[linkedTodoId];
+              const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : 0;
               const nextCompletedPomodoros = (todo?.pomodoroCount || 0) + 1;
 
               if (plannedPomodoros > 0 && nextCompletedPomodoros >= plannedPomodoros) {
-                set({
+                const nextState = {
                   sessions: { ...state.sessions, [currentSessionId]: updatedSession },
-                  timer: { ...initialTimerState, linkedTodoId },
+                  timer: {
+                    ...initialTimerState,
+                    timeRemaining: state.config.workDuration * 60,
+                    linkedTodoId,
+                  },
                   _lastTickTimestamp: null,
-                });
+                  _remoteRuntimeUpdatedAt: null as string | null,
+                  _historyUpdatedAt: null as string | null,
+                };
+                nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('complete-linked-todo', { ...state, ...nextState });
+                nextState._historyUpdatedAt = syncPomodoroHistory(nextState.sessions);
+                set(nextState);
                 return;
               }
             }
@@ -294,17 +425,27 @@ export const usePomodoroStore = create<PomodoroState>()(
               nextPhase = 'work';
               nextTimeRemaining = state.config.workDuration * 60;
             } else {
-              // long_break completed — one full round done, stop the timer
-              set({
-                sessions: { ...state.sessions, [currentSessionId]: updatedSession },
-                timer: {
-                  ...initialTimerState,
-                  timeRemaining: state.config.workDuration * 60,
-                  linkedTodoId,
-                },
-                _lastTickTimestamp: null,
-              });
-              return;
+              const todo = linkedTodoId ? useScheduleStore.getState().items[linkedTodoId] : null;
+              const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : 0;
+              if (!linkedTodoId || plannedPomodoros === 0 || sessionsCompleted >= plannedPomodoros) {
+                const nextState = {
+                  sessions: { ...state.sessions, [currentSessionId]: updatedSession },
+                  timer: {
+                    ...initialTimerState,
+                    timeRemaining: state.config.workDuration * 60,
+                    linkedTodoId,
+                  },
+                  _lastTickTimestamp: null,
+                  _remoteRuntimeUpdatedAt: null as string | null,
+                  _historyUpdatedAt: null as string | null,
+                };
+                nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('complete-long-break', { ...state, ...nextState });
+                nextState._historyUpdatedAt = syncPomodoroHistory(nextState.sessions);
+                set(nextState);
+                return;
+              }
+              nextPhase = 'work';
+              nextTimeRemaining = state.config.workDuration * 60;
             }
 
             // Auto-start next phase
@@ -321,14 +462,14 @@ export const usePomodoroStore = create<PomodoroState>()(
               calendarEventId: null,
             };
 
-            set({
+            const nextState = {
               sessions: {
                 ...state.sessions,
                 [currentSessionId]: updatedSession,
                 [newSessionId]: nextSession,
               },
               timer: {
-                status: 'running',
+                status: 'running' as const,
                 phase: nextPhase,
                 timeRemaining: nextTimeRemaining,
                 sessionsCompleted: newSessionsCompleted,
@@ -336,20 +477,29 @@ export const usePomodoroStore = create<PomodoroState>()(
                 linkedTodoId,
               },
               _lastTickTimestamp: Date.now(),
-            });
+              _remoteRuntimeUpdatedAt: null as string | null,
+              _historyUpdatedAt: null as string | null,
+            };
+            nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('complete-phase', { ...state, ...nextState });
+            nextState._historyUpdatedAt = syncPomodoroHistory(nextState.sessions);
+
+            set(nextState);
 
             return;
           }
         }
 
-        set({
+        const nextState = {
           timer: {
             ...initialTimerState,
             timeRemaining: state.config.workDuration * 60,
             linkedTodoId,
           },
           _lastTickTimestamp: null,
-        });
+          _remoteRuntimeUpdatedAt: null as string | null,
+        };
+        nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('complete-phase-fallback', { ...state, ...nextState });
+        set(nextState);
       },
 
       updateConfig: (config) => {
@@ -363,25 +513,80 @@ export const usePomodoroStore = create<PomodoroState>()(
           if (changesCurrentPhaseDuration) {
             timer = { ...timer, timeRemaining: getPhaseDurationSeconds(newConfig, timer.phase) };
           }
-          return { config: newConfig, timer };
+          const configUpdatedAt = syncPomodoroConfig(newConfig);
+          const runtimeUpdatedAt = timer !== state.timer
+            ? syncPomodoroRuntime('config-duration-change', { ...state, timer })
+            : state._remoteRuntimeUpdatedAt;
+          return { config: newConfig, timer, _configUpdatedAt: configUpdatedAt, _remoteRuntimeUpdatedAt: runtimeUpdatedAt };
+        });
+      },
+
+      updateAmbientSound: (sound) => {
+        set((state) => ({
+          config: { ...state.config, ambientSound: sound, ambientWasPlaying: sound === 'none' ? false : state.config.ambientWasPlaying },
+          _configUpdatedAt: syncPomodoroConfig({
+            ...state.config,
+            ambientSound: sound,
+            ambientWasPlaying: sound === 'none' ? false : state.config.ambientWasPlaying,
+          }),
+        }));
+      },
+
+      updateAmbientPlaybackState: (sound, isPlaying) => {
+        set((state) => {
+          const config = {
+            ...state.config,
+            ambientSound: sound === 'none' ? state.config.ambientSound : sound,
+            ambientWasPlaying: sound !== 'none' && isPlaying,
+          };
+          return {
+            config,
+            _configUpdatedAt: syncPomodoroConfig(config),
+          };
+        });
+      },
+
+      updateAmbientVolume: (sound, volume) => {
+        set((state) => {
+          const clampedVolume = Math.max(0, Math.min(100, Math.round(volume)));
+          const config = {
+            ...state.config,
+            ambientVolumeBySound: {
+              ...state.config.ambientVolumeBySound,
+              [sound]: clampedVolume,
+            },
+          };
+          return {
+            config,
+            _configUpdatedAt: syncPomodoroConfig(config),
+          };
         });
       },
 
       linkToTodo: (todoId) => {
-        set((state) => ({
-          timer: { ...state.timer, linkedTodoId: todoId },
-        }));
+        set((state) => {
+          const timer = { ...state.timer, linkedTodoId: todoId };
+          return {
+            timer,
+            _remoteRuntimeUpdatedAt: syncPomodoroRuntime('link-todo', { ...state, timer }),
+          };
+        });
       },
 
       updateSession: (id, updates) => {
         set((state) => {
           const session = state.sessions[id];
           if (!session) return state;
+          const sessions = {
+            ...state.sessions,
+            [id]: { ...session, ...updates },
+          };
+          const historyUpdatedAt = sessions[id].completed
+            ? syncPomodoroHistory(sessions)
+            : state._historyUpdatedAt;
           return {
-            sessions: {
-              ...state.sessions,
-              [id]: { ...session, ...updates },
-            },
+            sessions,
+            _historyUpdatedAt: historyUpdatedAt,
           };
         });
       },
@@ -463,19 +668,79 @@ export const usePomodoroStore = create<PomodoroState>()(
       },
 
       clearHistory: () => {
-        set((state) => ({
-          sessions: state.timer.currentSessionId
+        set((state) => {
+          const sessions = state.timer.currentSessionId
             ? Object.fromEntries(
                 Object.entries(state.sessions).filter(([id]) => id === state.timer.currentSessionId),
               )
-            : {},
-        }));
+            : {};
+          return {
+            sessions,
+            _historyUpdatedAt: syncPomodoroHistory(sessions),
+          };
+        });
       },
 
       restoreTimer: () => {
         const state = get();
         const restored = restorePomodoroRuntimeState(state.config, state.timer, state._lastTickTimestamp);
         set({ timer: restored.timer, _lastTickTimestamp: restored.lastTickTimestamp });
+      },
+
+      restoreRemoteState: async () => {
+        const remote = await loadPomodoroRemoteState();
+
+        set((state) => {
+          let config = state.config;
+          let configUpdatedAt = state._configUpdatedAt;
+          let sessions = state.sessions;
+          let historyUpdatedAt = state._historyUpdatedAt;
+          let timer = state.timer;
+          let lastTickTimestamp = state._lastTickTimestamp;
+          let runtimeUpdatedAt = state._remoteRuntimeUpdatedAt;
+
+          if (remote.config && isRemotePomodoroConfigNewer(remote.config, configUpdatedAt)) {
+            config = sanitizePomodoroConfig(remote.config.config);
+            configUpdatedAt = remote.config.updatedAt;
+          }
+
+          if (remote.history && isRemotePomodoroSnapshotNewer(remote.history.updatedAt, historyUpdatedAt)) {
+            sessions = mergePomodoroSessionHistories(sessions, remote.history.sessions);
+            historyUpdatedAt = remote.history.updatedAt;
+          }
+
+          if (remote.runtime && isRemotePomodoroRuntimeNewer(remote.runtime, runtimeUpdatedAt)) {
+            const runtimeSessions = remote.runtime.activeSession && !remote.runtime.activeSession.completed
+              ? { ...sessions, [remote.runtime.activeSession.id]: remote.runtime.activeSession }
+              : sessions;
+            const restored = restorePomodoroRuntimeState(config, remote.runtime.timer, remote.runtime.lastTickTimestamp);
+            sessions = getRestorableSessions(runtimeSessions, restored.timer);
+            timer = restored.timer;
+            lastTickTimestamp = restored.lastTickTimestamp;
+            runtimeUpdatedAt = remote.runtime.updatedAt;
+          }
+
+          return {
+            config,
+            sessions,
+            timer,
+            _lastTickTimestamp: lastTickTimestamp,
+            _remoteRuntimeUpdatedAt: runtimeUpdatedAt,
+            _configUpdatedAt: configUpdatedAt,
+            _historyUpdatedAt: historyUpdatedAt,
+          };
+        });
+      },
+
+      restoreRemoteRuntime: async () => {
+        await get().restoreRemoteState();
+      },
+
+      syncRemoteRuntime: (action = 'heartbeat') => {
+        const state = get();
+        if (state.timer.status !== 'running' && action === 'heartbeat') return;
+        const updatedAt = syncPomodoroRuntime(action, state);
+        set({ _remoteRuntimeUpdatedAt: updatedAt });
       },
     }),
     {
@@ -490,6 +755,9 @@ export const usePomodoroStore = create<PomodoroState>()(
         sessions: getRestorableSessions(state.sessions, state.timer),
         timer: state.timer,
         _lastTickTimestamp: state._lastTickTimestamp,
+        _remoteRuntimeUpdatedAt: state._remoteRuntimeUpdatedAt,
+        _configUpdatedAt: state._configUpdatedAt,
+        _historyUpdatedAt: state._historyUpdatedAt,
       }),
       merge: (persisted, current) => {
         const saved = sanitizePomodoroPersistedState(persisted as Partial<PomodoroState>);

@@ -8,10 +8,9 @@ import {
 
 describe('ambient sound rules', () => {
   it('detects active focus only during running work sessions', () => {
-    expect(isAmbientFocusActive('focus', 'running', 'work')).toBe(true);
-    expect(isAmbientFocusActive('focus', 'running', 'short_break')).toBe(false);
-    expect(isAmbientFocusActive('focus', 'paused', 'work')).toBe(false);
-    expect(isAmbientFocusActive('manual', 'running', 'work')).toBe(false);
+    expect(isAmbientFocusActive('running', 'work')).toBe(true);
+    expect(isAmbientFocusActive('running', 'short_break')).toBe(false);
+    expect(isAmbientFocusActive('paused', 'work')).toBe(false);
   });
 
   it('toggles off the selected sound in either mode', () => {
@@ -30,7 +29,16 @@ describe('ambient sound rules', () => {
     })).toEqual({ nextSound: 'none', playback: 'stop' });
   });
 
-  it('plays immediately in manual mode', () => {
+  it('toggles off the selected focus sound outside active focus time', () => {
+    expect(getAmbientTogglePlan({
+      mode: 'focus',
+      currentSound: 'rain',
+      clickedSound: 'rain',
+      isFocusActive: false,
+    })).toEqual({ nextSound: 'none', playback: 'stop' });
+  });
+
+  it('plays manual selection immediately outside active focus time', () => {
     expect(getAmbientTogglePlan({
       mode: 'manual',
       currentSound: 'none',
@@ -73,10 +81,18 @@ describe('ambient sound rules', () => {
     })).toBe('play');
   });
 
+  it('keeps manual audio playing outside active focus time', () => {
+    expect(getAmbientFocusPlan({
+      mode: 'manual',
+      selectedSound: 'rain',
+      isFocusActive: false,
+    })).toBe('play');
+  });
+
   it('uses per-sound default volume percentages from sound configs', () => {
     const defaults = createAmbientVolumeDefaults();
 
-    expect(defaults.cafe).toBe(10);
+    expect(defaults.cafe).toBe(30);
     expect(defaults.fireplace).toBe(50);
     expect(defaults.rain).toBe(30);
   });

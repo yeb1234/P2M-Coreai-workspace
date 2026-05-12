@@ -6,14 +6,38 @@ describe('notificationStore', () => {
     useNotificationStore.setState({ notifications: [] });
   });
 
+  it('starts without demo notifications', () => {
+    expect(useNotificationStore.getInitialState().notifications).toEqual([]);
+  });
+
   it('adds a notification', () => {
-    useNotificationStore.getState().addNotification({
+    const added = useNotificationStore.getState().addNotification({
       type: 'pomodoro',
       title: 'Test',
       message: 'Hello',
     });
+    expect(added).toBe(true);
     expect(useNotificationStore.getState().notifications.length).toBe(1);
     expect(useNotificationStore.getState().notifications[0].title).toBe('Test');
+  });
+
+  it('deduplicates notifications by source key', () => {
+    const first = useNotificationStore.getState().addNotification({
+      type: 'todo',
+      title: '待办提醒',
+      message: '写报告',
+      sourceKey: 'todo-reminder:todo-1:2026-05-12T01:00:00.000Z',
+    });
+    const second = useNotificationStore.getState().addNotification({
+      type: 'todo',
+      title: '待办提醒',
+      message: '写报告',
+      sourceKey: 'todo-reminder:todo-1:2026-05-12T01:00:00.000Z',
+    });
+
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+    expect(useNotificationStore.getState().notifications).toHaveLength(1);
   });
 
   it('marks notification as read', () => {

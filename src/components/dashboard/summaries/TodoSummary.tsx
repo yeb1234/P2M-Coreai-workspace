@@ -1,20 +1,21 @@
 import React from 'react';
 import { AlertCircle, ListTodo } from 'lucide-react';
-import { useTodoStore, useUIStore } from '../../../stores';
+import { useScheduleStore, useUIStore } from '../../../stores';
 import { PRIORITY_COLORS } from '../../../types';
 import { toLocalDateString } from '../../../lib/date';
+import { datePart, hasScheduleTime } from '../../../lib/scheduleTime';
 
 export const TodoSummary: React.FC = () => {
-  const { todos } = useTodoStore();
+  const items = useScheduleStore((s) => s.items);
   const { setActiveView } = useUIStore();
-  const allTodos = Object.values(todos);
+  const allTodos = Object.values(items).filter((item) => item.type === 'todo' && !item.deletedAt);
   const pending = allTodos.filter((t) => t.status === 'pending').length;
   const inProgress = allTodos.filter((t) => t.status === 'in_progress').length;
   const completed = allTodos.filter((t) => t.status === 'completed').length;
   const total = allTodos.length;
   const today = toLocalDateString(new Date());
   const overdue = allTodos.filter(
-    (t) => t.dueDate && t.dueDate < today && t.status !== 'completed'
+    (t) => hasScheduleTime(t) && datePart(t.dueAt) < today && t.status !== 'completed'
   ).length;
 
   const urgentTodos = allTodos

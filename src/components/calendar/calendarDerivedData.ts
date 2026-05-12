@@ -1,125 +1,56 @@
-import type { CalendarEvent, Todo } from '../../types';
-import { toLocalDateString } from '../../lib/date';
+import type { ScheduleCalendarEvent, ScheduleItem } from '../../types';
+import { datePart, hasScheduleTime, scheduleItemToCalendarEvent } from '../../lib/scheduleTime';
 
-export interface CompletedTodoLookup {
-  ids: Set<string>;
-  titles: Set<string>;
-}
-
-export function createCompletedTodoLookup(todos: Record<string, Todo>): CompletedTodoLookup {
-  const ids = new Set<string>();
-  const titles = new Set<string>();
-
-  Object.values(todos).forEach((todo) => {
-    if (todo.status !== 'completed') return;
-    ids.add(todo.id);
-    titles.add(todo.title);
-  });
-
-  return { ids, titles };
-}
-
-export function shouldShowCalendarEvent(event: CalendarEvent, completedTodoLookup: CompletedTodoLookup): boolean {
-  if (event.type !== 'todo') return true;
-  if (event.todoId && completedTodoLookup.ids.has(event.todoId)) return false;
-  if (!event.todoId && completedTodoLookup.titles.has(event.title)) return false;
-  return true;
-}
-
-export function groupCalendarEventsByDate(
-  events: CalendarEvent[],
-  completedTodoLookup: CompletedTodoLookup,
-): Record<string, CalendarEvent[]> {
-  const byDate: Record<string, CalendarEvent[]> = {};
-
-  events.forEach((event) => {
-    if (event.type === 'pomodoro') return;
-    if (!shouldShowCalendarEvent(event, completedTodoLookup)) return;
-    if (!byDate[event.date]) byDate[event.date] = [];
-    byDate[event.date].push(event);
-  });
-
-  return byDate;
-}
-
-export function getEventsForCalendarMonth(
-  events: Record<string, CalendarEvent>,
+export function getItemsForCalendarMonth(
+  items: Record<string, ScheduleItem>,
   year: number,
   month: number,
-): CalendarEvent[] {
+): ScheduleItem[] {
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-  return Object.values(events).filter((event) => event.date.startsWith(monthPrefix));
+  return Object.values(items).filter((item) => !item.deletedAt && hasScheduleTime(item) && datePart(item.startAt).startsWith(monthPrefix));
 }
 
-export function getPomodoroHeatMapForMonth(
-  events: Record<string, CalendarEvent>,
-  year: number,
-  month: number,
-): Record<string, number> {
-  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const heatMap: Record<string, number> = {};
-
-  Object.values(events).forEach((event) => {
-    if (event.type !== 'pomodoro' || !event.date.startsWith(monthPrefix)) return;
-    heatMap[event.date] = (heatMap[event.date] || 0) + 1;
-  });
-
-  return heatMap;
-}
-
-export function getEventsForCalendarDates(
-  events: Record<string, CalendarEvent>,
+export function getItemsForCalendarDates(
+  items: Record<string, ScheduleItem>,
   dates: string[],
-  completedTodoLookup: CompletedTodoLookup,
-): Record<string, CalendarEvent[]> {
+): ScheduleItem[] {
   const dateSet = new Set(dates);
-  const byDate: Record<string, CalendarEvent[]> = {};
-
-  Object.values(events).forEach((event) => {
-    if (!dateSet.has(event.date)) return;
-    if (!shouldShowCalendarEvent(event, completedTodoLookup)) return;
-    if (!byDate[event.date]) byDate[event.date] = [];
-    byDate[event.date].push(event);
-  });
-
-  return byDate;
+  return Object.values(items).filter((item) => !item.deletedAt && hasScheduleTime(item) && dateSet.has(datePart(item.startAt)));
 }
 
-export function getEventsForCalendarDate(
-  events: Record<string, CalendarEvent>,
-  date: string,
-  completedTodoLookup: CompletedTodoLookup,
-): CalendarEvent[] {
-  return Object.values(events).filter(
-    (event) => event.date === date && shouldShowCalendarEvent(event, completedTodoLookup),
-  );
-}
+export function groupScheduleItemsByDate(items: ScheduleItem[]) {
+  const eventsByDate: Record<string, ScheduleCalendarEvent[]> = {};
+  const pendingByDate: Record<string, ScheduleItem[]> = {};
+  const completedByDate: Record<string, ScheduleItem[]> = {};
 
-export function groupTodosByCalendarDate(todos: Record<string, Todo>) {
-  const pendingByDate: Record<string, Todo[]> = {};
-  const completedByDate: Record<string, Todo[]> = {};
-
-  Object.values(todos).forEach((todo) => {
-    if (todo.status === 'completed') {
-      const date = todo.dueDate ?? (todo.completedAt ? toLocalDateString(todo.completedAt) : null);
-      if (!date) return;
-      if (!completedByDate[date]) completedByDate[date] = [];
-      completedByDate[date].push(todo);
+  items.forEach((item) => {
+    if (!hasScheduleTime(item)) return;
+    const date = datePart(item.startAt);
+    if (item.type === 'event') {
+      if (!eventsByDate[date]) eventsByDate[date] = [];
+      eventsByDate[date].push(scheduleItemToCalendarEvent(item));
       return;
     }
 
-    if (!todo.dueDate) return;
-    if (!pendingByDate[todo.dueDate]) pendingByDate[todo.dueDate] = [];
-    pendingByDate[todo.dueDate].push(todo);
+    const target = item.status === 'completed' ? completedByDate : pendingByDate;
+    if (!target[date]) target[date] = [];
+    target[date].push(item);
   });
 
-  Object.values(completedByDate).forEach((items) => {
-    items.sort((a, b) => {
-      const aTime = new Date(a.completedAt ?? a.updatedAt ?? a.createdAt).getTime();
-      const bTime = new Date(b.completedAt ?? b.updatedAt ?? b.createdAt).getTime();
-      return bTime - aTime;
-    });
-  });
+  Object.values(eventsByDate).forEach((events) => events.sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))));
+  Object.values(pendingByDate).forEach((todos) => todos.sort((a, b) => new Date(a.startAt ?? 0).getTime() - new Date(b.startAt ?? 0).getTime()));
+  Object.values(completedByDate).forEach((todos) => todos.sort((a, b) => new Date(b.completedAt ?? b.updatedAt).getTime() - new Date(a.completedAt ?? a.updatedAt).getTime()));
 
-  return { pendingByDate, completedByDate };
+  return { eventsByDate, pendingByDate, completedByDate };
+}
+
+export function getScheduleItemsForDate(items: Record<string, ScheduleItem>, date: string): ScheduleItem[] {
+  return Object.values(items).filter((item) => !item.deletedAt && hasScheduleTime(item) && datePart(item.startAt) === date);
+}
+
+export function getCalendarEventsForDate(items: Record<string, ScheduleItem>, date: string): ScheduleCalendarEvent[] {
+  return getScheduleItemsForDate(items, date).flatMap((item) => {
+    if (item.type !== 'event' || !hasScheduleTime(item)) return [];
+    return [scheduleItemToCalendarEvent(item)];
+  });
 }

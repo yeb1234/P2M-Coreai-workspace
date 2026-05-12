@@ -64,6 +64,19 @@ describe('TodoForm defaults', () => {
     expect(night.reminderAt).toBe(new Date(2026, 4, 12, 6, 0, 0).toISOString());
   });
 
+  it('parses bare hour when it is written before Chinese todo text', () => {
+    const morning = parseTodoQuickInput('9点洗澡', new Date(2026, 4, 11, 8, 0, 0));
+    const afternoon = parseTodoQuickInput('9点洗澡', new Date(2026, 4, 11, 10, 0, 0));
+    const nextMorning = parseTodoQuickInput('9点洗澡', new Date(2026, 4, 11, 22, 0, 0));
+    const explicitNight = parseTodoQuickInput('下午9点洗澡', new Date(2026, 4, 11, 10, 0, 0));
+
+    expect(morning.title).toBe('洗澡');
+    expect(morning.reminderAt).toBe(new Date(2026, 4, 11, 9, 0, 0).toISOString());
+    expect(afternoon.reminderAt).toBe(new Date(2026, 4, 11, 21, 0, 0).toISOString());
+    expect(nextMorning.reminderAt).toBe(new Date(2026, 4, 12, 9, 0, 0).toISOString());
+    expect(explicitNight.reminderAt).toBe(new Date(2026, 4, 11, 21, 0, 0).toISOString());
+  });
+
   it('never parses explicit reminder time into the past', () => {
     const sameDayAfternoon = parseTodoQuickInput('洗澡 下午6点', new Date(2026, 4, 11, 19, 0, 0));
     const explicitToday = parseTodoQuickInput('洗澡 今天下午6点', new Date(2026, 4, 11, 19, 0, 0));
