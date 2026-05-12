@@ -28,7 +28,8 @@ export const toISODateString = (date: Date): ISODateString => {
 };
 
 export const toISODateTimeString = (date: Date): string => {
-  return date.toISOString();
+  const d = date;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 };
 
 /** Get local date string (YYYY-MM-DD) from a Date or ISO string */

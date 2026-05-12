@@ -3,6 +3,7 @@ import { useCalendarStore, usePomodoroStore, useNotificationStore, useScheduleSt
 import { PRIORITY_COLORS, type PomodoroSession } from '../types';
 import { playBreakSound, playPomodoroCue, playNotificationSound } from '../lib/sounds';
 import { toLocalDateString } from '../lib/date';
+import { calculateSchedulePomodoroRounds } from '../lib/pomodoroPlanning';
 
 const TODO_REMINDER_GRACE_MS = 2 * 60 * 1000;
 
@@ -64,30 +65,41 @@ export const useCrossModuleSync = (enabled = true) => {
     if (!enabled) return;
     let prevPhase: string | null = null;
     let prevStatus: string | null = null;
+    let prevSessionsCompleted = 0;
 
     const unsub = usePomodoroStore.subscribe((state) => {
-      const { phase, status } = state.timer;
+      const { phase, status, sessionsCompleted } = state.timer;
 
       // Skip the initial fire
       if (prevPhase === null) {
         prevPhase = phase;
         prevStatus = status;
+        prevSessionsCompleted = sessionsCompleted;
         return;
       }
 
       const phaseChanged = phase !== prevPhase;
       const stoppedRunning = prevStatus === 'running' && status !== 'running';
+      const sessionCompleted = sessionsCompleted > prevSessionsCompleted;
 
       if (phaseChanged || stoppedRunning) {
         if (phaseChanged && prevPhase === 'work') {
-          playBreakSound();
-          const completedSessions = state.timer.sessionsCompleted;
-          const longBreakInterval = state.config.longBreakInterval;
-          useNotificationStore.getState().addNotification({
-            type: 'pomodoro',
-            title: '专注完成!',
-            message: `已完成 ${completedSessions} 个番茄钟${completedSessions % longBreakInterval === 0 ? '，该长休息了' : ''}`,
-          });
+          if (sessionCompleted) {
+            playBreakSound();
+            const completedSessions = state.timer.sessionsCompleted;
+            const longBreakInterval = state.config.longBreakInterval;
+            useNotificationStore.getState().addNotification({
+              type: 'pomodoro',
+              title: '专注完成!',
+              message: `已完成 ${completedSessions} 个番茄钟${completedSessions % longBreakInterval === 0 ? '，该长休息了' : ''}`,
+            });
+          } else {
+            useNotificationStore.getState().addNotification({
+              type: 'pomodoro',
+              title: '已跳过',
+              message: '当前专注阶段已跳过，不计入完成番茄',
+            });
+          }
         } else if (phaseChanged && phase === 'work') {
           playPomodoroCue('start');
         } else if (stoppedRunning) {
@@ -97,6 +109,7 @@ export const useCrossModuleSync = (enabled = true) => {
 
       prevPhase = phase;
       prevStatus = status;
+      prevSessionsCompleted = sessionsCompleted;
     });
     return unsub;
   }, [enabled]);
@@ -167,32 +180,39 @@ export const useCrossModuleSync = (enabled = true) => {
       if (pending.length === 0) return;
 
       // Defer to avoid mutating stores inside a subscription callback
-      setTimeout(() => {
+      setTimeout(async () => {
         const scheduleStore = useScheduleStore.getState();
         const calendarStore = useCalendarStore.getState();
 
-        pending.forEach((session) => {
+        for (const session of pending) {
           const linkedTodo = scheduleStore.items[session.todoId!];
           if (linkedTodo) {
+            const nextPomodoroCount = linkedTodo.pomodoroCount + 1;
+            const pomodoroConfig = usePomodoroStore.getState().config;
+            const plannedPomodoros = calculateSchedulePomodoroRounds(linkedTodo, pomodoroConfig);
+            const reachedTarget = plannedPomodoros > 0 && nextPomodoroCount >= plannedPomodoros;
             scheduleStore.updateItem(linkedTodo.id, {
-              pomodoroCount: linkedTodo.pomodoroCount + 1,
+              pomodoroCount: nextPomodoroCount,
               totalFocusMinutes: linkedTodo.totalFocusMinutes + session.actualDuration,
-              status: 'in_progress',
+              status: reachedTarget ? 'completed' : 'in_progress',
             });
           }
           const color = linkedTodo ? PRIORITY_COLORS[linkedTodo.priority] : '#10b981';
 
-          const eventId = calendarStore.addEvent({
-            title: `专注 ${session.actualDuration}分钟`,
-            date: toLocalDateString(session.startTime),
-            type: 'pomodoro',
-            color,
-            todoId: session.todoId,
-            pomodoroSessionId: session.id,
-          });
-
-          usePomodoroStore.getState().updateSession(session.id, { calendarEventId: eventId });
-        });
+          try {
+            const eventId = await calendarStore.addEvent({
+              title: `专注 ${session.actualDuration}分钟`,
+              date: toLocalDateString(session.startTime),
+              type: 'pomodoro',
+              color,
+              todoId: session.todoId,
+              pomodoroSessionId: session.id,
+            });
+            usePomodoroStore.getState().updateSession(session.id, { calendarEventId: eventId });
+          } catch {
+            // 保存日历事件失败时不阻塞 pomodoro 状态更新
+          }
+        }
       }, 0);
     });
 

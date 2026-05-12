@@ -218,3 +218,24 @@ class ScheduleItem(Base):
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class CalendarEvent(Base):
+    __tablename__ = "calendar_events"
+    __table_args__ = (
+        Index("ix_calendar_events_user_date", "user_id", "date"),
+    )
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    date = Column(String, nullable=False)
+    start_time = Column(String, nullable=True)
+    end_time = Column(String, nullable=True)
+    type = Column(String, nullable=False, default="event")
+    color = Column(String, nullable=False, default="#8b5cf6")
+    todo_id = Column(String, nullable=True)
+    pomodoro_session_id = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

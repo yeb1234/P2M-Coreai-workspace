@@ -4,9 +4,10 @@ import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
 import { useCrossModuleSync } from './hooks';
 import { registerAllPlugins } from './plugins';
-import { useAuthStore, useNotificationStore, useScheduleStore } from './stores';
+import { useAuthStore, useNotificationStore, useScheduleStore, useCalendarStore } from './stores';
 import { useRehydrateStores } from './hooks/useRehydrateStores';
 import { useApplyStoredTheme } from './hooks/useApplyStoredTheme';
+import { clearIDBKvData } from './lib/idbStorage';
 
 registerAllPlugins();
 
@@ -59,7 +60,9 @@ function App() {
 
   useEffect(() => {
     if (!appDataReady) return;
+    void clearIDBKvData();
     void useScheduleStore.getState().loadItems();
+    void useCalendarStore.getState().loadEvents();
   }, [appDataReady]);
 
   // Listen for token expiration events from authFetch

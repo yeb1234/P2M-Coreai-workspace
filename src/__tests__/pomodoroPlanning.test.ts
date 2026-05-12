@@ -14,6 +14,7 @@ describe('pomodoro planning from schedule time range', () => {
     expect(calculateSchedulePomodoroRounds({
       startAt: '2026-05-12T09:00:00.000Z',
       dueAt: '2026-05-12T11:00:00.000Z',
+      pomodoroRounds: 0,
     }, { workDuration: 25, shortBreakDuration: 5 })).toBe(4);
   });
 
@@ -21,6 +22,24 @@ describe('pomodoro planning from schedule time range', () => {
     expect(calculateSchedulePomodoroRounds({
       startAt: null,
       dueAt: null,
+      pomodoroRounds: 0,
     }, { workDuration: 25, shortBreakDuration: 5 })).toBe(1);
+  });
+
+  it('prefers user-set pomodoroRounds over time-range calculation', () => {
+    // 用户设定只做2个番茄钟，即使时间区间可以容纳4个
+    expect(calculateSchedulePomodoroRounds({
+      startAt: '2026-05-12T09:00:00.000Z',
+      dueAt: '2026-05-12T11:00:00.000Z',
+      pomodoroRounds: 2,
+    }, { workDuration: 25, shortBreakDuration: 5 })).toBe(2);
+  });
+
+  it('falls back to time-range when pomodoroRounds is 0 or unset', () => {
+    expect(calculateSchedulePomodoroRounds({
+      startAt: '2026-05-12T09:00:00.000Z',
+      dueAt: '2026-05-12T11:00:00.000Z',
+      pomodoroRounds: 0,
+    }, { workDuration: 25, shortBreakDuration: 5 })).toBe(4);
   });
 });

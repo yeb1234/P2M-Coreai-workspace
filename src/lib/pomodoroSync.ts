@@ -93,13 +93,43 @@ async function loadJson<T>(key: string, guard: (value: unknown) => value is T): 
   }
 }
 
-async function saveJson(key: string, value: unknown): Promise<void> {
+const DEBOUNCE_MS = 500;
+const pendingSaves = new Map<string, { value: unknown; timer: ReturnType<typeof setTimeout> }>();
+
+async function immediateSaveJson(key: string, value: unknown): Promise<void> {
   if (!hasAuthToken()) return;
   try {
     await setUserData(key, JSON.stringify(value));
   } catch {
     // Local timer state remains authoritative when the backend is unavailable.
   }
+}
+
+function scheduleSaveJson(key: string, value: unknown): void {
+  const existing = pendingSaves.get(key);
+  if (existing) clearTimeout(existing.timer);
+  const timer = setTimeout(() => {
+    void immediateSaveJson(key, value);
+    pendingSaves.delete(key);
+  }, DEBOUNCE_MS);
+  pendingSaves.set(key, { value, timer });
+}
+
+export function flushPendingPomodoroSaves(): void {
+  for (const [key, { value, timer }] of pendingSaves) {
+    clearTimeout(timer);
+    void immediateSaveJson(key, value);
+  }
+  pendingSaves.clear();
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => flushPendingPomodoroSaves());
+}
+
+// 保留对外兼容性（立即保存）
+export async function saveJson(key: string, value: unknown): Promise<void> {
+  await immediateSaveJson(key, value);
 }
 
 export function buildPomodoroRemoteRuntimeSnapshot(
@@ -145,16 +175,16 @@ export function buildPomodoroRemoteHistorySnapshot(
   };
 }
 
-export async function savePomodoroRemoteRuntime(snapshot: PomodoroRemoteRuntimeSnapshot): Promise<void> {
-  await saveJson(POMODORO_REMOTE_RUNTIME_KEY, snapshot);
+export function savePomodoroRemoteRuntime(snapshot: PomodoroRemoteRuntimeSnapshot): void {
+  scheduleSaveJson(POMODORO_REMOTE_RUNTIME_KEY, snapshot);
 }
 
-export async function savePomodoroRemoteConfig(snapshot: PomodoroRemoteConfigSnapshot): Promise<void> {
-  await saveJson(POMODORO_REMOTE_CONFIG_KEY, snapshot);
+export function savePomodoroRemoteConfig(snapshot: PomodoroRemoteConfigSnapshot): void {
+  void immediateSaveJson(POMODORO_REMOTE_CONFIG_KEY, snapshot);
 }
 
-export async function savePomodoroRemoteHistory(snapshot: PomodoroRemoteHistorySnapshot): Promise<void> {
-  await saveJson(POMODORO_REMOTE_HISTORY_KEY, snapshot);
+export function savePomodoroRemoteHistory(snapshot: PomodoroRemoteHistorySnapshot): void {
+  scheduleSaveJson(POMODORO_REMOTE_HISTORY_KEY, snapshot);
 }
 
 export async function loadPomodoroRemoteRuntime(): Promise<PomodoroRemoteRuntimeSnapshot | null> {

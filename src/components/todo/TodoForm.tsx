@@ -6,7 +6,7 @@ import { useScheduleStore, useUIStore } from '../../stores';
 import { toISODateString } from '../../lib/date';
 import { playInteractionSound } from '../../lib/sounds';
 import { parseTodoQuickInput } from '../../lib/todoQuickInput';
-import { combineLocalDateTime, dateTimeParts, defaultDueAt } from '../../lib/scheduleTime';
+import { combineLocalDateTime, dateTimeParts, defaultDueAt, getNextWholeHour, toMinuteISOString } from '../../lib/scheduleTime';
 
 const PRIORITY_SHORTCUTS: Record<string, TodoPriority> = {
   '/g': 'green',
@@ -19,7 +19,7 @@ function getReminderDefaultParts(startDate: string, startTime: string, fallbackD
   if (startDate && startTime) {
     const startAt = new Date(combineLocalDateTime(startDate, startTime));
     startAt.setMinutes(startAt.getMinutes() - 30);
-    return dateTimeParts(startAt.toISOString());
+    return dateTimeParts(toMinuteISOString(startAt));
   }
   return {
     date: startDate || fallbackDate || toISODateString(new Date()),
@@ -72,6 +72,48 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
     event.preventDefault();
     descriptionInputRef.current?.focus();
   }, []);
+
+  const handleStartTimeFocus = useCallback(() => {
+    if (!startTime) {
+      const defaults = getNextWholeHour();
+      if (!startDate) setStartDate(defaults.date);
+      setStartTime(defaults.startTime);
+      if (!endTime) {
+        setEndTime(defaults.endTime);
+        if (!dueDate) setDueDate(defaults.endDate);
+      }
+    }
+  }, [startTime, endTime, startDate, dueDate]);
+
+  const handleEndTimeFocus = useCallback(() => {
+    if (!endTime) {
+      if (startTime && startDate) {
+        const startAt = new Date(`${startDate}T${startTime}:00`);
+        const endAt = new Date(startAt.getTime() + 60 * 60 * 1000);
+        const { date, time } = dateTimeParts(toMinuteISOString(endAt));
+        setEndTime(time);
+        if (!dueDate) setDueDate(date);
+      } else {
+        const defaults = getNextWholeHour();
+        setEndTime(defaults.endTime);
+        if (!dueDate) setDueDate(defaults.endDate);
+      }
+    }
+  }, [endTime, startTime, startDate, dueDate]);
+
+  const handleStartDateFocus = useCallback(() => {
+    if (!startDate) {
+      const today = toISODateString(new Date());
+      setStartDate(today);
+      if (!dueDate) setDueDate(today);
+    }
+  }, [startDate, dueDate]);
+
+  const handleDueDateFocus = useCallback(() => {
+    if (!dueDate) {
+      setDueDate(startDate || toISODateString(new Date()));
+    }
+  }, [dueDate, startDate]);
 
   const handleReminderToggle = useCallback((checked: boolean) => {
     setReminderEnabled(checked);
@@ -201,6 +243,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
                 setStartDate(event.target.value);
                 if (!dueDate) setDueDate(event.target.value);
               }}
+              onFocus={handleStartDateFocus}
               className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
             />
             <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
@@ -209,6 +252,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
             type="time"
             value={startTime}
             onChange={(event) => setStartTime(event.target.value)}
+            onFocus={handleStartTimeFocus}
             step="60"
             className="w-28 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           />
@@ -223,6 +267,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
               type="date"
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
+              onFocus={handleDueDateFocus}
               className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
             />
             <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
@@ -231,6 +276,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
             type="time"
             value={endTime}
             onChange={(event) => setEndTime(event.target.value)}
+            onFocus={handleEndTimeFocus}
             step="60"
             className="w-28 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           />

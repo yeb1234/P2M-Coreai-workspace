@@ -14,14 +14,25 @@ export function calculatePomodoroRounds(durationMinutes: number, config: Pick<Po
   return Math.max(1, Math.floor(durationMinutes / cycleMinutes));
 }
 
-export function calculateSchedulePomodoroRounds(item: Pick<ScheduleItem, 'startAt' | 'dueAt'>, config: Pick<PomodoroConfig, 'workDuration' | 'shortBreakDuration'>): number {
+export function calculateSchedulePomodoroRounds(
+  item: Pick<ScheduleItem, 'startAt' | 'dueAt' | 'pomodoroRounds'>,
+  config: Pick<PomodoroConfig, 'workDuration' | 'shortBreakDuration'>
+): number {
+  // 用户明确设定了 pomodoroRounds（>0），直接用它作为番茄钟个数
+  if (item.pomodoroRounds > 0) return item.pomodoroRounds;
   if (!item.startAt || !item.dueAt) return 1;
   return calculatePomodoroRounds(getScheduleDurationMinutes(item.startAt, item.dueAt), config);
 }
 
-export function getSchedulePomodoroPlan(item: Pick<ScheduleItem, 'startAt' | 'dueAt'>, config: Pick<PomodoroConfig, 'workDuration' | 'shortBreakDuration'>) {
+export function getSchedulePomodoroPlan(
+  item: Pick<ScheduleItem, 'startAt' | 'dueAt' | 'pomodoroRounds'>,
+  config: Pick<PomodoroConfig, 'workDuration' | 'shortBreakDuration'>
+) {
   const durationMinutes = getScheduleDurationMinutes(item.startAt, item.dueAt);
-  const rounds = item.startAt && item.dueAt ? calculatePomodoroRounds(durationMinutes, config) : 1;
+  // 用户明确设定了 pomodoroRounds（>0），优先使用
+  const rounds = item.pomodoroRounds > 0
+    ? item.pomodoroRounds
+    : (item.startAt && item.dueAt ? calculatePomodoroRounds(durationMinutes, config) : 1);
   const cycleMinutes = Math.max(1, config.workDuration + config.shortBreakDuration);
   return {
     durationMinutes,

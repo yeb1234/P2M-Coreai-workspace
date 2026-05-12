@@ -100,7 +100,7 @@ describe('regression contracts', () => {
     expect(todoForm).not.toContain('这是番茄钟时间');
     expect(todoForm).not.toContain('setIsPomodoro');
     expect(todoItem).toContain('getSchedulePomodoroPlan');
-    expect(todoItem).toContain('pomodoroRounds: plannedRounds');
+    expect(todoItem).toContain('effectiveRounds');
     expect(pomodoroStore).toContain('calculateSchedulePomodoroRounds');
     expect(pomodoroStore).toContain('useScheduleStore.getState().items');
   });

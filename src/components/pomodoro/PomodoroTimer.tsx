@@ -1,7 +1,9 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { Play, Pause, RotateCcw, SkipForward, CloudRain, Coffee, Flame, Trees, Waves, Droplets, Wheat, Wind } from 'lucide-react';
 import { usePomodoroStore, useScheduleStore } from '../../stores';
+import { POMODORO_VIRTUAL_TODO_ID } from '../../stores/pomodoroStore';
 import { formatTime, toLocalDateString } from '../../lib/date';
+import { getSchedulePomodoroPlan } from '../../lib/pomodoroPlanning';
 import { PHASE_LABELS } from '../../types';
 import { type AmbientSound, AMBIENT_SOUNDS, playInteractionSound, playPomodoroCue } from '../../lib/sounds';
 import { useAmbientSoundController } from '../../hooks/useAmbientSoundController';
@@ -40,17 +42,21 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
   const pauseTimer = usePomodoroStore((s) => s.pauseTimer);
   const resumeTimer = usePomodoroStore((s) => s.resumeTimer);
   const resetTimer = usePomodoroStore((s) => s.resetTimer);
-  const completePhase = usePomodoroStore((s) => s.completePhase);
+  const skipPhase = usePomodoroStore((s) => s.skipPhase);
   const getPhaseDuration = usePomodoroStore((s) => s.getPhaseDuration);
-  const longBreakInterval = usePomodoroStore((s) => s.config.longBreakInterval);
-  const ambientPlaybackMode = usePomodoroStore((s) => s.config.ambientPlaybackMode ?? 'manual');
+  const config = usePomodoroStore((s) => s.config);
+  const longBreakInterval = config.longBreakInterval;
+  const ambientPlaybackMode = config.ambientPlaybackMode ?? 'manual';
   const configuredAmbientSound = usePomodoroStore((s) => s.config.ambientSound ?? 'none');
   const ambientVolumeBySound = usePomodoroStore((s) => s.config.ambientVolumeBySound);
   const ambientWasPlaying = usePomodoroStore((s) => s.config.ambientWasPlaying);
   const updateAmbientSound = usePomodoroStore((s) => s.updateAmbientSound);
   const updateAmbientPlaybackState = usePomodoroStore((s) => s.updateAmbientPlaybackState);
   const updateStoredAmbientVolume = usePomodoroStore((s) => s.updateAmbientVolume);
-  const linkedTodo = useScheduleStore((s) => timer.linkedTodoId ? s.items[timer.linkedTodoId] : null);
+  const linkedTodo = useScheduleStore((s) => {
+    if (!timer.linkedTodoId || timer.linkedTodoId === POMODORO_VIRTUAL_TODO_ID) return null;
+    return s.items[timer.linkedTodoId] ?? null;
+  });
 
   const volumeTrackRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -86,14 +92,33 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
     ).length;
   }, [sessions]);
 
+  const plannedPomodoros = useMemo(() => {
+    if (linkedTodo) {
+      const rounds = linkedTodo.pomodoroRounds > 0
+        ? linkedTodo.pomodoroRounds
+        : getSchedulePomodoroPlan(linkedTodo, config).rounds;
+      return Math.max(1, rounds);
+    }
+    return longBreakInterval;
+  }, [linkedTodo, config, longBreakInterval]);
+
+  const completedPomodoros = linkedTodo?.pomodoroCount ?? timer.sessionsCompleted;
+
   const handleReset = useCallback(() => {
     stopForTimerReset();
     resetTimer();
   }, [resetTimer, stopForTimerReset]);
 
+  const linkToTodo = usePomodoroStore((s) => s.linkToTodo);
+
   const handleStart = useCallback(() => {
     if (timer.status === 'idle') {
-      startTimer();
+      if (!timer.linkedTodoId) {
+        linkToTodo(POMODORO_VIRTUAL_TODO_ID);
+        startTimer(POMODORO_VIRTUAL_TODO_ID);
+      } else {
+        startTimer();
+      }
       playPomodoroCue('start');
       if (timer.phase === 'work' && ambientSound !== 'none') {
         void playAmbient(ambientSound, true);
@@ -105,7 +130,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
         void playAmbient(ambientSound, true);
       }
     }
-  }, [ambientSound, playAmbient, timer.phase, timer.status, startTimer, resumeTimer]);
+  }, [ambientSound, playAmbient, timer.phase, timer.status, timer.linkedTodoId, startTimer, resumeTimer, linkToTodo]);
 
   const handleVolumePointer = useCallback((clientX: number) => {
     const track = volumeTrackRef.current;
@@ -203,7 +228,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
 
         {timer.status === 'running' && (
           <button
-            onClick={completePhase}
+            onClick={skipPhase}
             className="p-3 md:p-2.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-xl transition-colors"
             title="跳过"
           >
@@ -213,7 +238,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
       </div>
 
       <div className="flex items-center gap-4 text-xs text-[var(--text-muted)]">
-        <span>本轮: {timer.sessionsCompleted % longBreakInterval}/{longBreakInterval}</span>
+        <span>本轮: {completedPomodoros}/{plannedPomodoros}</span>
         <span>今日: {todayPomodoros}</span>
       </div>
 

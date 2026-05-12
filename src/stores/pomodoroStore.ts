@@ -30,6 +30,9 @@ import { calculateSchedulePomodoroRounds } from '../lib/pomodoroPlanning';
 import type { AmbientSound } from '../lib/sounds';
 import { AMBIENT_SOUNDS } from '../lib/sounds';
 
+/** 虚拟占位任务 ID：番茄钟在没有关联真实 todo 时，使用此 ID 作为挂起任务，方便其他 todo 检测覆盖 */
+export const POMODORO_VIRTUAL_TODO_ID = '__pomodoro_virtual__';
+
 interface PomodoroState {
   config: PomodoroConfig;
   timer: PomodoroTimerState;
@@ -44,6 +47,7 @@ interface PomodoroState {
   resetTimer: () => void;
   tick: () => void;
   completePhase: () => void;
+  skipPhase: () => void;
   updateConfig: (config: Partial<PomodoroConfig>) => void;
   updateAmbientSound: (sound: AmbientSound) => void;
   updateAmbientPlaybackState: (sound: AmbientSound, isPlaying: boolean) => void;
@@ -332,7 +336,7 @@ export const usePomodoroStore = create<PomodoroState>()(
           timer: {
             ...initialTimerState,
             timeRemaining: state.config.workDuration * 60,
-            linkedTodoId: state.timer.linkedTodoId,
+            linkedTodoId: null,
           },
           _lastTickTimestamp: null,
           _remoteRuntimeUpdatedAt: null as string | null,
@@ -499,6 +503,97 @@ export const usePomodoroStore = create<PomodoroState>()(
           _remoteRuntimeUpdatedAt: null as string | null,
         };
         nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('complete-phase-fallback', { ...state, ...nextState });
+        set(nextState);
+      },
+
+      skipPhase: () => {
+        const state = get();
+        const { currentSessionId, phase, sessionsCompleted, linkedTodoId } = state.timer;
+        let sessions = state.sessions;
+
+        if (currentSessionId) {
+          const session = state.sessions[currentSessionId];
+          if (session && !session.completed) {
+            const updatedSessions = { ...state.sessions };
+            delete updatedSessions[currentSessionId];
+            sessions = updatedSessions;
+          }
+        }
+
+        let nextPhase: PomodoroPhase;
+        let nextTimeRemaining: number;
+
+        if (phase === 'work') {
+          if (sessionsCompleted % state.config.longBreakInterval === 0 && sessionsCompleted > 0) {
+            nextPhase = 'long_break';
+            nextTimeRemaining = state.config.longBreakDuration * 60;
+          } else {
+            nextPhase = 'short_break';
+            nextTimeRemaining = state.config.shortBreakDuration * 60;
+          }
+        } else if (phase === 'short_break') {
+          nextPhase = 'work';
+          nextTimeRemaining = state.config.workDuration * 60;
+        } else {
+          const todo = linkedTodoId ? useScheduleStore.getState().items[linkedTodoId] : null;
+          const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : 0;
+          if (!linkedTodoId || plannedPomodoros === 0 || sessionsCompleted >= plannedPomodoros) {
+            const nextState = {
+              sessions,
+              timer: {
+                ...initialTimerState,
+                timeRemaining: state.config.workDuration * 60,
+                linkedTodoId,
+              },
+              _lastTickTimestamp: null,
+              _remoteRuntimeUpdatedAt: null as string | null,
+              _historyUpdatedAt: state._historyUpdatedAt,
+            };
+            nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('skip-long-break', { ...state, ...nextState });
+            if (sessions !== state.sessions) {
+              nextState._historyUpdatedAt = syncPomodoroHistory(sessions);
+            }
+            set(nextState);
+            return;
+          }
+          nextPhase = 'work';
+          nextTimeRemaining = state.config.workDuration * 60;
+        }
+
+        const newSessionId = generateId();
+        const nextSession: PomodoroSession = {
+          id: newSessionId,
+          todoId: linkedTodoId,
+          phase: nextPhase,
+          plannedDuration: nextTimeRemaining / 60,
+          actualDuration: 0,
+          completed: false,
+          startTime: toISODateTimeString(new Date()),
+          endTime: null,
+          calendarEventId: null,
+        };
+
+        const nextState = {
+          sessions: {
+            ...sessions,
+            [newSessionId]: nextSession,
+          },
+          timer: {
+            status: 'running' as const,
+            phase: nextPhase,
+            timeRemaining: nextTimeRemaining,
+            sessionsCompleted,
+            currentSessionId: newSessionId,
+            linkedTodoId,
+          },
+          _lastTickTimestamp: Date.now(),
+          _remoteRuntimeUpdatedAt: null as string | null,
+          _historyUpdatedAt: state._historyUpdatedAt,
+        };
+        nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('skip-phase', { ...state, ...nextState });
+        if (sessions !== state.sessions) {
+          nextState._historyUpdatedAt = syncPomodoroHistory(sessions);
+        }
         set(nextState);
       },
 

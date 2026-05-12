@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getDefaultReminderInputValue, parseTodoQuickInput } from '../lib/todoQuickInput';
+import { toMinuteISOString } from '../lib/scheduleTime';
 
 describe('TodoForm defaults', () => {
   it('defaults reminder focus to at least 30 minutes later on a half-hour boundary', () => {
@@ -19,7 +20,7 @@ describe('TodoForm defaults', () => {
 
     expect(parsed.title).toBe('洗澡');
     expect(parsed.dueDate).toBe('2026-05-11');
-    expect(parsed.reminderAt).toBe(new Date(2026, 4, 11, 18, 0, 0).toISOString());
+    expect(parsed.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 11, 18, 0, 0)));
   });
 
   it('parses tomorrow afternoon reminders from quick todo text', () => {
@@ -27,7 +28,7 @@ describe('TodoForm defaults', () => {
 
     expect(parsed.title).toBe('洗澡');
     expect(parsed.dueDate).toBe('2026-05-12');
-    expect(parsed.reminderAt).toBe(new Date(2026, 4, 12, 18, 0, 0).toISOString());
+    expect(parsed.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 12, 18, 0, 0)));
   });
 
   it('keeps tomato shortcuts as individual pomodoros', () => {
@@ -51,7 +52,7 @@ describe('TodoForm defaults', () => {
 
     expect(parsed.title).toBe('预约体检');
     expect(parsed.dueDate).toBe('2026-05-09');
-    expect(parsed.reminderAt).toBe(new Date(2026, 4, 9, 18, 0, 0).toISOString());
+    expect(parsed.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 9, 18, 0, 0)));
   });
 
   it('parses bare hour as the next likely occurrence', () => {
@@ -59,9 +60,9 @@ describe('TodoForm defaults', () => {
     const midday = parseTodoQuickInput('洗澡 6点', new Date(2026, 4, 11, 9, 0, 0));
     const night = parseTodoQuickInput('洗澡 6点', new Date(2026, 4, 11, 19, 0, 0));
 
-    expect(morning.reminderAt).toBe(new Date(2026, 4, 11, 6, 0, 0).toISOString());
-    expect(midday.reminderAt).toBe(new Date(2026, 4, 11, 18, 0, 0).toISOString());
-    expect(night.reminderAt).toBe(new Date(2026, 4, 12, 6, 0, 0).toISOString());
+    expect(morning.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 11, 6, 0, 0)));
+    expect(midday.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 11, 18, 0, 0)));
+    expect(night.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 12, 6, 0, 0)));
   });
 
   it('parses bare hour when it is written before Chinese todo text', () => {
@@ -71,10 +72,10 @@ describe('TodoForm defaults', () => {
     const explicitNight = parseTodoQuickInput('下午9点洗澡', new Date(2026, 4, 11, 10, 0, 0));
 
     expect(morning.title).toBe('洗澡');
-    expect(morning.reminderAt).toBe(new Date(2026, 4, 11, 9, 0, 0).toISOString());
-    expect(afternoon.reminderAt).toBe(new Date(2026, 4, 11, 21, 0, 0).toISOString());
-    expect(nextMorning.reminderAt).toBe(new Date(2026, 4, 12, 9, 0, 0).toISOString());
-    expect(explicitNight.reminderAt).toBe(new Date(2026, 4, 11, 21, 0, 0).toISOString());
+    expect(morning.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 11, 9, 0, 0)));
+    expect(afternoon.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 11, 21, 0, 0)));
+    expect(nextMorning.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 12, 9, 0, 0)));
+    expect(explicitNight.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 11, 21, 0, 0)));
   });
 
   it('never parses explicit reminder time into the past', () => {
@@ -82,8 +83,8 @@ describe('TodoForm defaults', () => {
     const explicitToday = parseTodoQuickInput('洗澡 今天下午6点', new Date(2026, 4, 11, 19, 0, 0));
     const monthDayPastTime = parseTodoQuickInput('预约体检 5月9 下午6点', new Date(2026, 4, 9, 19, 0, 0));
 
-    expect(sameDayAfternoon.reminderAt).toBe(new Date(2026, 4, 12, 18, 0, 0).toISOString());
-    expect(explicitToday.reminderAt).toBe(new Date(2026, 4, 12, 18, 0, 0).toISOString());
-    expect(monthDayPastTime.reminderAt).toBe(new Date(2026, 4, 10, 18, 0, 0).toISOString());
+    expect(sameDayAfternoon.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 12, 18, 0, 0)));
+    expect(explicitToday.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 12, 18, 0, 0)));
+    expect(monthDayPastTime.reminderAt).toBe(toMinuteISOString(new Date(2026, 4, 10, 18, 0, 0)));
   });
 });

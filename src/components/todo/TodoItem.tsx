@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { Check, Clock, Trash2, Play, Edit, Calendar, GripVertical } from 'lucide-react';
 import type { ScheduleItem } from '../../types';
 import { usePomodoroStore, useScheduleStore } from '../../stores';
+import { POMODORO_VIRTUAL_TODO_ID } from '../../stores/pomodoroStore';
 import { formatDate, formatDuration } from '../../lib/date';
 import { dateTimeParts, hasScheduleTime } from '../../lib/scheduleTime';
 import { getSchedulePomodoroPlan } from '../../lib/pomodoroPlanning';
@@ -69,10 +70,12 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
     setEditing(false);
   }, [editValue, todo.id, todo.title, updateItem]);
 
-  const totalPomodoros = Math.max(0, plannedRounds);
+  // 用户明确设定了 pomodoroRounds 就用它，否则 fallback 到时间区间推导值
+  const effectiveRounds = Math.max(1, todo.pomodoroRounds > 0 ? todo.pomodoroRounds : plannedRounds);
+  const totalPomodoros = effectiveRounds;
   const { plannedMinutes, completedMinutes } = useMemo(() => {
     const { workDuration, shortBreakDuration, longBreakDuration, longBreakInterval } = config;
-    const plannedPomodoros = Math.max(0, plannedRounds);
+    const plannedPomodoros = effectiveRounds;
     const plannedShortBreaks = Math.max(0, plannedPomodoros - 1);
     const plannedLongBreaks = Math.max(0, Math.floor((plannedPomodoros - 1) / longBreakInterval));
     const planned = plannedPomodoros * workDuration + plannedShortBreaks * shortBreakDuration + plannedLongBreaks * longBreakDuration;
@@ -81,17 +84,16 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
     const completedLongBreaks = Math.max(0, Math.floor((completedPomodoros - 1) / longBreakInterval));
     const completed = completedPomodoros * workDuration + completedShortBreaks * shortBreakDuration + completedLongBreaks * longBreakDuration;
     return { plannedMinutes: planned, completedMinutes: completed };
-  }, [config, plannedRounds, todo.pomodoroCount]);
+  }, [config, effectiveRounds, todo.pomodoroCount]);
 
   const doStartPomodoro = useCallback(() => {
     updateItem(todo.id, {
-      pomodoroRounds: plannedRounds,
       status: todo.status === 'pending' ? 'in_progress' : todo.status,
     });
     linkToTodo(todo.id);
     startTimer(todo.id);
     playNotificationSound();
-  }, [plannedRounds, todo.id, todo.status, linkToTodo, startTimer, updateItem]);
+  }, [todo.id, todo.status, linkToTodo, startTimer, updateItem]);
 
   const resetTimerForTodoStart = useCallback(() => {
     resetAmbientSoundSelection();
@@ -100,15 +102,24 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
   }, [resetTimer, updateAmbientSound]);
 
   const handleStartPomodoro = useCallback(() => {
-    const isRunningOnDifferentTodo = timerStatus === 'running' && linkedTodoId && linkedTodoId !== todo.id;
+    const hasRealTask = timerStatus === 'running' && linkedTodoId && linkedTodoId !== POMODORO_VIRTUAL_TODO_ID;
+    const isRunningOnDifferentTodo = hasRealTask && linkedTodoId !== todo.id;
+
     if (isRunningOnDifferentTodo) {
       setShowOverrideConfirm(true);
+    } else if (timerStatus === 'running' && linkedTodoId === todo.id) {
+      // 正在专注当前任务，不重复操作
+      return;
+    } else if (timerStatus === 'running' && (!linkedTodoId || linkedTodoId === POMODORO_VIRTUAL_TODO_ID)) {
+      // 当前是虚拟任务或无任务，直接重置并开始
+      resetTimerForTodoStart();
+      doStartPomodoro();
     } else if (todo.pomodoroCount > 0) {
       setShowResetConfirm(true);
     } else {
       doStartPomodoro();
     }
-  }, [todo.pomodoroCount, todo.id, timerStatus, linkedTodoId, doStartPomodoro]);
+  }, [todo.pomodoroCount, todo.id, timerStatus, linkedTodoId, doStartPomodoro, resetTimerForTodoStart]);
 
   const stickyColor = STICKY_COLORS[todo.priority] || STICKY_COLORS.medium;
   const cardStyle = useMemo(() => ({
@@ -221,15 +232,15 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
                 未排期
               </span>
             )}
-            {plannedRounds > 0 && (
+            {effectiveRounds > 0 && (
               <span className="flex items-center gap-1 text-[#16a34a]">
                 <Clock size={12} />
-                {plannedRounds - todo.pomodoroCount > 0 ? `预计${plannedRounds}个番茄` : '已完成'}
+                {effectiveRounds - todo.pomodoroCount > 0 ? `预计${effectiveRounds}个番茄钟` : '已完成'}
               </span>
             )}
           </div>
 
-          {plannedRounds > 0 && (
+          {effectiveRounds > 0 && (
             <div className="hidden md:block mt-1 md:mt-2">
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-1 md:h-1.5 bg-[#e5e2dd] rounded-full overflow-hidden">
@@ -252,7 +263,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
         </div>
 
         <div className="flex items-center gap-1">
-          {todo.status !== 'completed' && plannedRounds > 0 && (
+          {todo.status !== 'completed' && effectiveRounds > 0 && (
             <button onClick={handleStartPomodoro} className="p-1.5 rounded-lg bg-[#f0fdf4] text-[#16a34a] hover:bg-[#dcfce7] transition-colors" title="开始专注">
               <Play size={16} />
             </button>

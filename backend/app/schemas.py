@@ -430,3 +430,43 @@ class ScheduleItemOut(ScheduleItemBase):
 
 class ScheduleItemListOut(BaseModel):
     items: list[ScheduleItemOut]
+
+
+class CalendarEventBase(BaseModel):
+    title: str = Field(min_length=1, max_length=240)
+    date: str = Field(min_length=10, max_length=10)
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    type: str = "event"
+    color: str = "#8b5cf6"
+    todo_id: Optional[str] = None
+    pomodoro_session_id: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CalendarEventCreate(CalendarEventBase):
+    id: Optional[str] = None
+
+
+class CalendarEventUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=240)
+    date: Optional[str] = Field(default=None, min_length=10, max_length=10)
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    type: Optional[str] = None
+    color: Optional[str] = None
+    todo_id: Optional[str] = None
+    pomodoro_session_id: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CalendarEventOut(CalendarEventBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CalendarEventListOut(BaseModel):
+    items: list[CalendarEventOut]

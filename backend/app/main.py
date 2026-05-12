@@ -11,7 +11,7 @@ from sqlalchemy import func
 
 from app.database import Base, SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
-from app.routers import admin, ai_jobs, assistant, auth, categories, notes, schedule_items, user_data, videos
+from app.routers import admin, ai_jobs, assistant, auth, calendar_events, categories, notes, schedule_items, user_data, videos
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
 from app.worker import main as worker_main

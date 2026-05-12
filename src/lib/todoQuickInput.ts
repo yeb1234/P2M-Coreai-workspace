@@ -1,4 +1,5 @@
 import type { TodoPriority } from '../types';
+import { toMinuteISOString } from './scheduleTime';
 
 export interface ParsedTodoQuickInput {
   title: string;
@@ -166,7 +167,7 @@ export function parseTodoQuickInput(input: string, nowDate = new Date()): Parsed
       if (!reminderDate) return result;
       reminderDate = moveReminderToFuture(reminderDate, nowDate, !dateWord && !meridiem);
       result.dueDate = formatLocalDate(reminderDate);
-      result.reminderAt = reminderDate.toISOString();
+      result.reminderAt = toMinuteISOString(reminderDate);
       title = title.replace(timeMatch[0], ' ').trim();
     }
   } else {

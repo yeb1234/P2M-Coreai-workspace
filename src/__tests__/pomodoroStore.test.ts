@@ -17,6 +17,7 @@ vi.mock('../lib/authApi', () => ({
 }));
 
 import { getUserData, setUserData } from '../lib/authApi';
+import { flushPendingPomodoroSaves } from '../lib/pomodoroSync';
 
 const completedSession: PomodoroSession = {
   id: 'done',
@@ -380,11 +381,13 @@ describe('pomodoro persistence boundaries', () => {
 
   it('writes remote runtime for key timer actions', () => {
     usePomodoroStore.getState().startTimer('todo-1');
+    flushPendingPomodoroSaves();
 
     expect(setUserData).toHaveBeenCalledWith('p2m-pomodoro-runtime-v2', expect.stringContaining('"action":"start"'));
 
     vi.mocked(setUserData).mockClear();
     usePomodoroStore.getState().pauseTimer();
+    flushPendingPomodoroSaves();
 
     expect(setUserData).toHaveBeenCalledWith('p2m-pomodoro-runtime-v2', expect.stringContaining('"action":"pause"'));
   });
@@ -509,6 +512,7 @@ describe('pomodoro persistence boundaries', () => {
     });
 
     usePomodoroStore.getState().syncRemoteRuntime('heartbeat');
+    flushPendingPomodoroSaves();
 
     expect(setUserData).toHaveBeenCalledWith('p2m-pomodoro-runtime-v2', expect.stringContaining('"action":"heartbeat"'));
   });

@@ -225,10 +225,15 @@ export const Calendar2Page: React.FC = () => {
   const [monthCollapsed, setMonthCollapsed] = useState(false);
   const [visiblePriorities, setVisiblePriorities] = useState<Record<TodoPriority, boolean>>({ high: true, medium: true, low: true, green: true });
   const [visibleStatuses, setVisibleStatuses] = useState<Record<TodoStatus, boolean>>({ pending: true, in_progress: true, completed: true });
+  const [resizing, setResizing] = useState<{ id: string; startMinutes: number; dayIndex: number; newEndMinutes: number } | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
   const gridFrameRef = useRef<HTMLElement | null>(null);
   const dragOffsetRef = useRef(0);
+
+  useEffect(() => {
+    void useScheduleStore.getState().loadItems();
+  }, []);
 
   useEffect(() => {
     const node = pageRef.current;
@@ -633,11 +638,13 @@ export const Calendar2Page: React.FC = () => {
             ))}
 
             {laidOutEvents.filter((event) => event.dayIndex >= visibleDayOffset && event.dayIndex < visibleDayOffset + visibleDayCount).map((event) => {
-              const eventHeight = durationToHeight(event.startMinutes, event.endMinutes) - 8;
+              const displayEndMinutes = resizing?.id === event.id ? resizing.newEndMinutes : event.endMinutes;
+              const eventHeight = durationToHeight(event.startMinutes, displayEndMinutes) - 8;
               const isShortEvent = eventHeight <= SHORT_EVENT_HEIGHT;
               const isCompactEvent = eventHeight <= COMPACT_EVENT_HEIGHT;
               const eventLaneWidth = Math.max(28, (dayWidth - EVENT_SIDE_INSET * 2 - EVENT_OVERLAP_GAP * (event.conflictColumns - 1)) / event.conflictColumns);
               const eventLeft = LEFT_GUTTER + (event.dayIndex - visibleDayOffset) * dayWidth + EVENT_SIDE_INSET + event.conflictColumn * (eventLaneWidth + EVENT_OVERLAP_GAP);
+              const showResizeHandle = eventHeight >= 24;
               return (
                 <div
                   key={event.id}
@@ -661,8 +668,42 @@ export const Calendar2Page: React.FC = () => {
                   <p className={`truncate font-semibold leading-none ${isShortEvent ? 'text-[11px]' : 'text-[10px]'}`}>{event.title}</p>
                   {!isShortEvent && (
                     <p className={`truncate font-medium opacity-95 ${isCompactEvent ? 'mt-0.5 text-[8px] leading-none' : 'mt-1 text-[9px] leading-none'}`}>
-                      {formatTime(event.startMinutes)} - {formatTime(event.endMinutes)}
+                      {formatTime(event.startMinutes)} - {formatTime(displayEndMinutes)}
                     </p>
+                  )}
+                  {showResizeHandle && (
+                    <div
+                      data-resize-handle
+                      draggable={false}
+                      className="absolute bottom-0 left-0 right-0 z-20 h-2 cursor-ns-resize"
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                        setResizing({ id: event.id, startMinutes: event.startMinutes, dayIndex: event.dayIndex, newEndMinutes: displayEndMinutes });
+                      }}
+                      onPointerMove={(e) => {
+                        if (e.buttons !== 1 || !gridRef.current) return;
+                        const rect = gridRef.current.getBoundingClientRect();
+                        const y = e.clientY - rect.top;
+                        const rawMinutes = START_HOUR * 60 + (y / HOUR_HEIGHT) * 60;
+                        const newEndMinutes = clamp(snapMinutes(rawMinutes), event.startMinutes + SNAP_MINUTES, END_HOUR * 60);
+                        setResizing({ id: event.id, startMinutes: event.startMinutes, dayIndex: event.dayIndex, newEndMinutes });
+                      }}
+                      onPointerUp={() => {
+                        setResizing((current) => {
+                          if (!current || current.id !== event.id) return null;
+                          const item = scheduleItems[event.id];
+                          if (item) {
+                            const date = weekDateStrings[event.dayIndex];
+                            const dueAt = combineLocalDateTime(date, formatTimeInput(current.newEndMinutes));
+                            updateItem(event.id, { dueAt, reminderAt: item.reminderAt ? item.startAt : item.reminderAt });
+                            playInteractionSound('save');
+                          }
+                          return null;
+                        });
+                      }}
+                    />
                   )}
                 </div>
               );

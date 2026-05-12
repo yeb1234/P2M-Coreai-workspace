@@ -11,7 +11,8 @@ export function floorToMinute(date: Date): Date {
 }
 
 export function toMinuteISOString(date: Date): string {
-  return floorToMinute(date).toISOString();
+  const d = floorToMinute(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:00`;
 }
 
 export function combineLocalDateTime(date: string, time: string): string {
@@ -39,6 +40,29 @@ export function dateTimeParts(iso: string): { date: string; time: string } {
 
 export function hasScheduleTime<T extends Pick<ScheduleItem, 'startAt' | 'dueAt'>>(item: T): item is T & { startAt: ISODateTimeString; dueAt: ISODateTimeString } {
   return Boolean(item.startAt && item.dueAt);
+}
+
+export function getNextWholeHour(now = new Date()): { date: string; startTime: string; endTime: string; endDate: string } {
+  const d = new Date(now);
+  if (d.getMinutes() !== 0 || d.getSeconds() !== 0 || d.getMilliseconds() !== 0) {
+    d.setHours(d.getHours() + 1, 0, 0, 0);
+  } else {
+    d.setMinutes(0, 0, 0);
+  }
+  const startDate = toLocalDateString(d);
+  const startHour = d.getHours();
+
+  const endD = new Date(d);
+  endD.setHours(startHour + 1, 0, 0, 0);
+  const endDate = toLocalDateString(endD);
+  const endHour = endD.getHours();
+
+  return {
+    date: startDate,
+    startTime: `${String(startHour).padStart(2, '0')}:00`,
+    endTime: `${String(endHour).padStart(2, '0')}:00`,
+    endDate,
+  };
 }
 
 export function defaultStartAtForDate(date?: string | null): string {

@@ -41,7 +41,7 @@ describe('todo reminder opt-in', () => {
     fireEvent.click(screen.getByRole('button', { name: '创建' }));
 
     const todo = Object.values(useScheduleStore.getState().items)[0];
-    expect(todo.reminderAt).toBe('2026-05-12T01:00:00.000Z');
+    expect(todo.reminderAt).toBe('2026-05-12T09:00:00');
   });
 
   it('defaults enabled reminder to half an hour before the start time', () => {
@@ -64,7 +64,7 @@ describe('todo reminder opt-in', () => {
     fireEvent.click(screen.getByRole('button', { name: '创建' }));
 
     const todo = Object.values(useScheduleStore.getState().items)[0];
-    expect(todo.reminderAt).toBe('2026-05-12T00:30:00.000Z');
+    expect(todo.reminderAt).toBe('2026-05-12T08:30:00');
   });
 
   it('writes schedule times only when date and time fields are complete', () => {
@@ -80,8 +80,8 @@ describe('todo reminder opt-in', () => {
     fireEvent.click(screen.getByRole('button', { name: '创建' }));
 
     const todo = Object.values(useScheduleStore.getState().items)[0];
-    expect(todo.startAt).toBe('2026-05-12T01:00:00.000Z');
-    expect(todo.dueAt).toBe('2026-05-12T02:00:00.000Z');
+    expect(todo.startAt).toBe('2026-05-12T09:00:00');
+    expect(todo.dueAt).toBe('2026-05-12T10:00:00');
   });
 
   it('keeps inline add todos reminder-free because there is no reminder switch there', () => {

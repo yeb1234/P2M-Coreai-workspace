@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, CalendarDays, Trash2 } from 'lucide-react';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarGrid } from './CalendarGrid';
@@ -16,6 +16,10 @@ export const CalendarPage: React.FC = () => {
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const [showEventForm, setShowEventForm] = useState(false);
   const [todoPlanDate, setTodoPlanDate] = useState<ISODateString | null>(null);
+
+  useEffect(() => {
+    void useScheduleStore.getState().loadItems();
+  }, []);
 
   return (
     <div className="w-full pt-2">

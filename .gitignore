@@ -45,3 +45,11 @@ test-results/
 *.njsproj
 *.sln
 *.sw?
+
+# AI assistant artifacts (not for release)
+.claude/
+prompts/
+.env-*.local
+kiminote
+ai-job-center-refactor-report.md
+*.prompt.md

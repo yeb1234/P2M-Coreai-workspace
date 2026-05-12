@@ -151,10 +151,10 @@ async function doWrite(name: string, value: string) {
   if (hasAuthToken()) {
     try {
       await setUserData(name, value);
-      return;
     } catch {
-      // Fall through to local storage
+      // 有 token 时写后端失败也不写本地
     }
+    return;
   }
   if (!db) { memoryKv.set(name, value); return; }
   await db.kv.put({ key: name, value });
@@ -229,7 +229,8 @@ export const idbStorage: StateStorage = {
         const result = await getUserData(name);
         return result ?? null;
       } catch {
-        // Fall through to local storage
+        // 有 token 时读后端失败也不读本地
+        return null;
       }
     }
     if (!db) return memoryKv.get(name) ?? null;
@@ -251,10 +252,10 @@ export const idbStorage: StateStorage = {
     if (hasAuthToken()) {
       try {
         await deleteUserData(name);
-        return;
       } catch {
-        // Fall through to local storage
+        // 有 token 时删后端失败也不删本地
       }
+      return;
     }
     if (!db) { memoryKv.delete(name); return; }
     await db.kv.delete(name);
@@ -264,6 +265,7 @@ export const idbStorage: StateStorage = {
 // Pure local storage — never touches backend API, always uses IndexedDB
 export const localOnlyStorage: StateStorage = {
   getItem: async (name: string) => {
+    if (hasAuthToken()) return null;
     const scopedName = scopedLocalName(name);
     if (!db) return memoryKv.get(scopedName) ?? memoryKv.get(name) ?? null;
     const row = await db.kv.get(scopedName) ?? await db.kv.get(name);
@@ -272,6 +274,7 @@ export const localOnlyStorage: StateStorage = {
     return row?.value ?? null;
   },
   setItem: async (name: string, value: string) => {
+    if (hasAuthToken()) return;
     const scopedName = scopedLocalName(name);
     if (shouldWriteLocalImmediately(scopedName)) {
       const existing = pendingLocalWrites.get(scopedName);
@@ -284,6 +287,7 @@ export const localOnlyStorage: StateStorage = {
     scheduleLocalWrite(scopedName, value);
   },
   removeItem: async (name: string) => {
+    if (hasAuthToken()) return;
     const scopedName = scopedLocalName(name);
     const existing = pendingLocalWrites.get(scopedName);
     if (existing) { clearTimeout(existing); pendingLocalWrites.delete(scopedName); }
@@ -293,3 +297,8 @@ export const localOnlyStorage: StateStorage = {
     await db.kv.delete(scopedName);
   },
 };
+
+export async function clearIDBKvData(): Promise<void> {
+  if (!db) { memoryKv.clear(); return; }
+  await db.kv.clear();
+}
