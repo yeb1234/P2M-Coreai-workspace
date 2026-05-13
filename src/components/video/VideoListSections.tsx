@@ -73,8 +73,8 @@ function VideoCardPreviewFrame({
 
   useEffect(() => {
     if (!showSprite) {
-      setFrame(0);
-      return;
+      const id = setTimeout(() => setFrame(0), 0);
+      return () => clearTimeout(id);
     }
 
     const interval = window.setInterval(() => {
@@ -437,11 +437,12 @@ export function VideoGridSection({
   const clientTotalPages = Math.max(1, Math.ceil(videos.length / CLIENT_PAGE_SIZE));
 
   // Reset page when gridMode changes or videos change
-  const prevRef = useRef({ gridMode, len: videos.length });
-  if (prevRef.current.gridMode !== gridMode || prevRef.current.len !== videos.length) {
-    prevRef.current = { gridMode, len: videos.length };
-    if (historyPage !== 1) setHistoryPage(1);
-  }
+  useEffect(() => {
+    if (historyPage !== 1) {
+      const id = setTimeout(() => setHistoryPage(1), 0);
+      return () => clearTimeout(id);
+    }
+  }, [gridMode, videos.length, historyPage]);
 
   const showPagination = gridMode === 'normal' ? totalPages > 1 : clientTotalPages > 1;
   const displayVideos = gridMode === 'normal'

@@ -155,7 +155,7 @@ export function parseTodoQuickInput(input: string, nowDate = new Date()): Parsed
       : 0;
     const hour = normalizeHour(rawHour, meridiem);
     if (hour >= 0 && hour <= 23 && rawMinute >= 0 && rawMinute <= 59) {
-      let reminderDate: Date | null = null;
+      let reminderDate: Date | null;
       if (explicitMonthDay) {
         reminderDate = new Date(explicitMonthDay);
         reminderDate.setHours(hour, rawMinute, 0, 0);

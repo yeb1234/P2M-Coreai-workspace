@@ -225,7 +225,7 @@ export function VideoList() {
       setRescanLoading(false);
       setTimeout(() => setRescanMsg(''), 4000);
     }
-  }, [currentCategoryId, loadCategoryTree, loadVideos, searchQuery, selectedFolderIds]);
+  }, [loadCategoryTree, loadVideos, searchQuery, selectedFolderIds]);
 
   const handleRefreshFolders = useCallback(() => {
     void loadCategoryTree();
@@ -243,7 +243,8 @@ export function VideoList() {
   useEffect(() => { loadCategoryTree(); }, [loadCategoryTree]);
   useEffect(() => {
     restoreNavigation();
-    setNavRestored(true);
+    const id = setTimeout(() => setNavRestored(true), 0);
+    return () => clearTimeout(id);
   }, [restoreNavigation]);
   useEffect(() => {
     const onHashChange = () => {
@@ -257,17 +258,20 @@ export function VideoList() {
   useEffect(() => { selectionChangedRef.current = false; setSelectedFolderIds([]); }, [currentCategoryId, setSelectedFolderIds]);
 
   useEffect(() => {
-    if (navRestored && searchQuery) setInputVal(searchQuery);
+    if (navRestored && searchQuery) {
+      const id = setTimeout(() => setInputVal(searchQuery), 0);
+      return () => clearTimeout(id);
+    }
   }, [navRestored, searchQuery]);
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => {
+    const id = setTimeout(() => {
       if (cancelled) return;
       setContinueVideo(null);
       setHistoryVideos([]);
       setRecentVideos([]);
       setRecentVideosFallback(false);
-    });
+    }, 0);
 
     fetchContinueVideo()
       .then((video) => { if (!cancelled) setContinueVideo(video); })
@@ -291,6 +295,7 @@ export function VideoList() {
 
     return () => {
       cancelled = true;
+      clearTimeout(id);
     };
   }, [currentCategoryId]);
 
@@ -320,7 +325,7 @@ export function VideoList() {
     return () => { clearTimeout(timer); };
   }, [videos, historyVideos, recentVideos, continueVideo, selectedFolderIds, loadVideos, searchQuery, currentCategoryId]);
 
-  const children = useMemo(() => getCurrentChildren(), [getCurrentChildren, categoryTree, currentCategoryId]);
+  const children = useMemo(() => getCurrentChildren(), [getCurrentChildren]);
   const isSearching = !!inputVal.trim();
 
   const handleSearch = useCallback(() => {

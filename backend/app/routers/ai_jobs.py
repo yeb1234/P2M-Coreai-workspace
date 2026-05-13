@@ -29,6 +29,7 @@ def _job_list_item(job: AiJob) -> AiJobListItem:
         word_limit=job.word_limit,
         cpu_threads=job.cpu_threads,
         compute_type=job.compute_type,
+        device_type=job.device_type,
         subtitle_correction_enabled=job.subtitle_correction_enabled,
         subtitle_correction_scope=job.subtitle_correction_scope,
         subtitle_correction_prompt=job.subtitle_correction_prompt,
@@ -41,7 +42,7 @@ def _job_list_item(job: AiJob) -> AiJobListItem:
 @router.get("", response_model=AiJobListOut)
 def list_ai_jobs(
     status: str | None = Query(default=None),
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=999999),
     db: Session = Depends(get_db),
 ):
     query = db.query(AiJob).outerjoin(Video)

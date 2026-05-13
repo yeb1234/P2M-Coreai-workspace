@@ -17,12 +17,12 @@ export function useRehydrateStores(currentUser: string | null) {
 
   useEffect(() => {
     if (!currentUser) {
-      setReady(true);
-      return;
+      const id = setTimeout(() => setReady(true), 0);
+      return () => clearTimeout(id);
     }
 
     let cancelled = false;
-    setReady(false);
+    const loadingId = setTimeout(() => setReady(false), 0);
 
     // Force all stores to rehydrate with the user-prefixed keys
     void Promise.allSettled(
@@ -33,6 +33,7 @@ export function useRehydrateStores(currentUser: string | null) {
 
     return () => {
       cancelled = true;
+      clearTimeout(loadingId);
     };
   }, [currentUser]);
 

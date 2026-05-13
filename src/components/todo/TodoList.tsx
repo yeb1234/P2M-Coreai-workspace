@@ -39,7 +39,6 @@ export const TodoList: React.FC = () => {
   const [collapsedTrash, setCollapsedTrash] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-  const [dropPosition, setDropPosition] = useState<'top' | 'bottom'>('bottom');
   const [collapsedFilters, setCollapsedFilters] = useState(false);
   const trashRef = useRef<HTMLDivElement>(null);
 
@@ -262,12 +261,11 @@ export const TodoList: React.FC = () => {
                 todo={todo}
                 onEdit={(item) => { setEditingTodo(item); setShowForm(true); }}
                 onDragStart={setDragId}
-                onDragOver={(id, pos) => { setOverId(id); setDropPosition(pos); }}
+                onDragOver={(id) => setOverId(id)}
                 onDrop={handleDrop}
                 onDragEnd={() => { setDragId(null); setOverId(null); }}
                 isDragging={dragId === todo.id}
                 isDropTarget={overId === todo.id && dragId !== todo.id}
-                dropPosition={overId === todo.id ? dropPosition : 'bottom'}
               />
             ))}
           </div>
@@ -284,12 +282,11 @@ export const TodoList: React.FC = () => {
                   todo={todo}
                   onEdit={(item) => { setEditingTodo(item); setShowForm(true); }}
                   onDragStart={setDragId}
-                  onDragOver={(id, pos) => { setOverId(id); setDropPosition(pos); }}
+                  onDragOver={(id) => setOverId(id)}
                   onDrop={handleDrop}
                   onDragEnd={() => { setDragId(null); setOverId(null); }}
                   isDragging={dragId === todo.id}
                   isDropTarget={overId === todo.id && dragId !== todo.id}
-                  dropPosition={overId === todo.id ? dropPosition : 'bottom'}
                 />
               ))}
               <div className="flex justify-end">

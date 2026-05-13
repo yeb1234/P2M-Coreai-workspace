@@ -107,7 +107,7 @@ export const TimeCenterPage: React.FC = () => {
   const [stopwatchBaseElapsed, setStopwatchBaseElapsed] = useState(0);
   const [zoneLabel, setZoneLabel] = useState('');
   const [zoneValue, setZoneValue] = useState('Asia/Shanghai');
-  const stopwatchStartRef = useRef<number | null>(null);
+  const [stopwatchStart, setStopwatchStart] = useState<number | null>(null);
   const [countdownEndById, setCountdownEndById] = useState<Record<string, number>>({});
   const completedCountdownRef = useRef<Set<string>>(new Set());
 
@@ -134,8 +134,8 @@ export const TimeCenterPage: React.FC = () => {
   const addTodo = useTodoStore((s) => s.addTodo);
   const addNotification = useNotificationStore((s) => s.addNotification);
 
-  const stopwatchElapsed = stopwatchRunning && stopwatchStartRef.current != null
-    ? Math.max(0, Math.floor((nowMs - stopwatchStartRef.current) / 1000))
+  const stopwatchElapsed = stopwatchRunning && stopwatchStart != null
+    ? Math.max(0, Math.floor((nowMs - stopwatchStart) / 1000))
     : stopwatchBaseElapsed;
 
   useEffect(() => {
@@ -207,18 +207,18 @@ export const TimeCenterPage: React.FC = () => {
   }, [alarms, countdownEndById, countdownPresets, reminders, stopwatchElapsed, stopwatchRunning, todos]);
 
   const startStopwatch = () => {
-    stopwatchStartRef.current = Date.now() - stopwatchBaseElapsed * 1000;
+    setStopwatchStart(Date.now() - stopwatchBaseElapsed * 1000);
     setStopwatchRunning(true);
   };
   const pauseStopwatch = () => {
-    if (stopwatchStartRef.current != null) {
-      setStopwatchBaseElapsed(Math.max(0, Math.floor((Date.now() - stopwatchStartRef.current) / 1000)));
+    if (stopwatchStart != null) {
+      setStopwatchBaseElapsed(Math.max(0, Math.floor((Date.now() - stopwatchStart) / 1000)));
     }
-    stopwatchStartRef.current = null;
+    setStopwatchStart(null);
     setStopwatchRunning(false);
   };
   const resetStopwatch = () => {
-    stopwatchStartRef.current = null;
+    setStopwatchStart(null);
     setStopwatchBaseElapsed(0);
     setStopwatchRunning(false);
   };

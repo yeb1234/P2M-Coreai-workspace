@@ -56,6 +56,7 @@ export function transcriptionFormToDto(form: TranscriptionDraft): TranscriptionS
     subtitle_correction_scope: form.subtitleCorrectionScope,
     subtitle_correction_prompt: form.subtitleCorrectionPrompt,
     llm_usage_policy: form.llmUsagePolicy,
+    device_type: form.deviceType,
   };
 }
 
@@ -76,6 +77,7 @@ export function transcriptionDtoToForm(dto: TranscriptionSettingsDto): Transcrip
     subtitleCorrectionScope: dto.subtitle_correction_scope === 'off' ? 'off' : 'full',
     subtitleCorrectionPrompt: dto.subtitle_correction_prompt,
     llmUsagePolicy: dto.llm_usage_policy,
+    deviceType: dto.device_type ?? 'auto',
   };
 }
 

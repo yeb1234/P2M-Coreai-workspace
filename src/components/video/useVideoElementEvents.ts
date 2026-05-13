@@ -82,6 +82,7 @@ export function useVideoElementEvents({
       });
     }
   }, [
+    currentVideo,
     videoDuration,
     watchProgress,
     hideCurrentTextTracks,

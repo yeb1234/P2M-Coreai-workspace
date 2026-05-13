@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时间中心 - 方案B 卡片化重构</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .clock-face { width:120px; height:120px; border:3px solid #f59e0b; border-radius:50%; position:relative; background:#fffbeb; }
+  .clock-hand { position:absolute; bottom:50%; left:50%; transform-origin:bottom center; background:#1a1a1a; border-radius:2px; }
+  .clock-hand.hour { width:3px; height:32px; }
+  .clock-hand.min { width:2px; height:44px; }
+  .clock-hand.sec { width:1px; height:48px; background:#dc3545; }
+  .clock-dot { width:6px; height:6px; background:#1a1a1a; border-radius:50%; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10; }
+  .theme-card { background:#faf9f7; border:1px solid #e5e2dd; border-radius:12px; }
+  .theme-card-dark { background:#1e1e1e; border:1px solid #333; border-radius:12px; }
+  .accent { color:#f59e0b; }
+  .accent-bg { background:#f59e0b; }
+  body { font-family: system-ui,-apple-system,sans-serif; background:#f3f2ef; }
+</style>
+</head>
+<body class="min-h-screen p-4 md:p-6">
+
+<div class="max-w-6xl mx-auto space-y-5">
+
+  <!-- 标题 -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg accent-bg flex items-center justify-center text-white font-bold text-sm">⏱</div>
+      <div>
+        <h1 class="text-lg font-bold text-gray-900">时间中心</h1>
+        <p class="text-xs text-gray-500">统一管理计时、倒计时、闹钟与提醒</p>
+      </div>
+    </div>
+    <div class="text-right">
+      <p class="font-mono text-2xl font-semibold text-gray-900">14:32:18</p>
+      <p class="text-xs text-gray-500">2026年5月12日 星期一</p>
+    </div>
+  </div>
+
+  <!-- === 活跃计时区（视觉焦点）=== -->
+  <section class="theme-card p-5">
+    <h2 class="text-xs font-medium text-gray-500 mb-3 flex items-center gap-1">🔥 活跃计时</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- 正计时卡片 -->
+      <div class="bg-white rounded-xl p-4 border border-amber-200 shadow-sm flex items-center gap-4">
+        <div class="clock-face shrink-0">
+          <div class="clock-hand hour" style="transform:translateX(-50%) rotate(87deg)"></div>
+          <div class="clock-hand min" style="transform:translateX(-50%) rotate(193deg)"></div>
+          <div class="clock-hand sec" style="transform:translateX(-50%) rotate(108deg)"></div>
+          <div class="clock-dot"></div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-gray-500 mb-1">正计时</p>
+          <p class="font-mono text-3xl font-bold text-gray-900">00:12:45</p>
+          <div class="flex gap-2 mt-2">
+            <button class="w-8 h-8 rounded-lg accent-bg text-white flex items-center justify-center text-xs">▶</button>
+            <button class="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center text-xs">⏹</button>
+            <button class="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center text-xs">↺</button>
+          </div>
+        </div>
+      </div>
+      <!-- 运行中的倒计时 -->
+      <div class="bg-white rounded-xl p-4 border border-blue-200 shadow-sm flex items-center gap-4">
+        <div class="w-[120px] h-[120px] shrink-0 rounded-full border-4 border-blue-400 flex items-center justify-center bg-blue-50">
+          <div class="text-center">
+            <p class="font-mono text-2xl font-bold text-blue-600">08:23</p>
+            <p class="text-[10px] text-blue-400">剩余</p>
+          </div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-gray-500 mb-1">倒计时 · 专注25分钟</p>
+          <div class="w-full bg-gray-100 rounded-full h-2 mb-2">
+            <div class="bg-blue-400 h-2 rounded-full" style="width:66%"></div>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-xs">暂停</button>
+            <button class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-xs">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- === 快捷预设 === -->
+  <section class="theme-card p-5">
+    <h2 class="text-xs font-medium text-gray-500 mb-3">⚡ 快捷倒计时</h2>
+    <div class="flex flex-wrap gap-2">
+      <button class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:border-amber-400 hover:text-amber-600 transition">5 分钟</button>
+      <button class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:border-amber-400 hover:text-amber-600 transition">15 分钟</button>
+      <button class="px-4 py-2 rounded-xl bg-white border border-amber-400 text-sm font-medium text-amber-600 shadow-sm">25 分钟</button>
+      <button class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:border-amber-400 hover:text-amber-600 transition">45 分钟</button>
+      <button class="px-4 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:border-amber-400 hover:text-amber-600 transition">60 分钟</button>
+      <div class="flex items-center gap-2 ml-auto">
+        <input type="number" placeholder="自定义" class="w-20 px-3 py-2 rounded-xl border border-gray-200 text-sm text-center" />
+        <button class="px-3 py-2 rounded-xl accent-bg text-white text-sm">开始</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- === 世界时钟 === -->
+  <section class="theme-card p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xs font-medium text-gray-500">🌍 世界时钟</h2>
+      <div class="flex gap-2">
+        <input placeholder="名称" class="px-2 py-1.5 rounded-lg border border-gray-200 text-xs w-20" />
+        <select class="px-2 py-1.5 rounded-lg border border-gray-200 text-xs">
+          <option>东京 · Asia/Tokyo</option>
+          <option>纽约 · America/New_York</option>
+          <option>伦敦 · Europe/London</option>
+        </select>
+        <button class="px-2 py-1.5 rounded-lg accent-bg text-white text-xs">+ 时区</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div class="bg-white rounded-xl p-3 text-center border border-gray-100 hover:border-amber-300 transition group relative">
+        <p class="text-[10px] text-gray-400">本地</p>
+        <p class="font-mono text-lg font-semibold text-amber-600 mt-1">14:32</p>
+        <p class="text-[10px] text-gray-400 mt-0.5">Asia/Shanghai</p>
+      </div>
+      <div class="bg-white rounded-xl p-3 text-center border border-gray-100 hover:border-amber-300 transition group relative">
+        <p class="text-[10px] text-gray-400">东京</p>
+        <p class="font-mono text-lg font-semibold text-gray-700 mt-1">15:32</p>
+        <button class="absolute top-1 right-1 w-5 h-5 rounded text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-xs">×</button>
+      </div>
+      <div class="bg-white rounded-xl p-3 text-center border border-gray-100 hover:border-amber-300 transition group relative">
+        <p class="text-[10px] text-gray-400">纽约</p>
+        <p class="font-mono text-lg font-semibold text-gray-700 mt-1">01:32</p>
+        <button class="absolute top-1 right-1 w-5 h-5 rounded text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-xs">×</button>
+      </div>
+      <div class="bg-white rounded-xl p-3 text-center border border-gray-100 hover:border-amber-300 transition group relative">
+        <p class="text-[10px] text-gray-400">伦敦</p>
+        <p class="font-mono text-lg font-semibold text-gray-700 mt-1">06:32</p>
+        <button class="absolute top-1 right-1 w-5 h-5 rounded text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-xs">×</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- === 任务列表（卡片化）=== -->
+  <section class="theme-card p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xs font-medium text-gray-500">📋 时间任务</h2>
+      <div class="flex gap-2">
+        <select class="px-2 py-1.5 rounded-lg border border-gray-200 text-xs">
+          <option>倒计时</option><option>闹钟</option><option>提醒</option><option>待办提醒</option>
+        </select>
+        <input placeholder="任务名称" class="px-2 py-1.5 rounded-lg border border-gray-200 text-xs w-32" />
+        <button class="px-3 py-1.5 rounded-lg accent-bg text-white text-xs">+ 添加</button>
+      </div>
+    </div>
+
+    <!-- 闹钟 -->
+    <div class="mb-3">
+      <h3 class="text-[10px] font-medium text-gray-400 mb-2 flex items-center gap-1">⏰ 闹钟</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="bg-white rounded-xl p-3 border border-gray-100 flex items-center justify-between hover:shadow-md transition">
+          <div>
+            <p class="text-sm font-medium text-gray-900">早起闹钟</p>
+            <p class="font-mono text-lg text-gray-700">07:00</p>
+          </div>
+          <div class="flex gap-1">
+            <button class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-xs">开</button>
+            <button class="w-8 h-8 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center text-xs hover:text-red-500">🗑</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-3 border border-gray-100 flex items-center justify-between hover:shadow-md transition opacity-60">
+          <div>
+            <p class="text-sm font-medium text-gray-900">午休提醒</p>
+            <p class="font-mono text-lg text-gray-700">12:30</p>
+          </div>
+          <div class="flex gap-1">
+            <button class="w-8 h-8 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center text-xs">关</button>
+            <button class="w-8 h-8 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center text-xs hover:text-red-500">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 倒计时预设 -->
+    <div class="mb-3">
+      <h3 class="text-[10px] font-medium text-gray-400 mb-2 flex items-center gap-1">⏳ 倒计时预设</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="bg-white rounded-xl p-3 border border-gray-100 flex items-center justify-between hover:shadow-md transition">
+          <div>
+            <p class="text-sm font-medium text-gray-900">番茄专注</p>
+            <p class="text-xs text-gray-500">25 分钟</p>
+          </div>
+          <button class="w-8 h-8 rounded-lg accent-bg text-white flex items-center justify-center text-xs">▶</button>
+        </div>
+        <div class="bg-white rounded-xl p-3 border border-gray-100 flex items-center justify-between hover:shadow-md transition">
+          <div>
+            <p class="text-sm font-medium text-gray-900">休息</p>
+            <p class="text-xs text-gray-500">5 分钟</p>
+          </div>
+          <button class="w-8 h-8 rounded-lg accent-bg text-white flex items-center justify-center text-xs">▶</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提醒 -->
+    <div>
+      <h3 class="text-[10px] font-medium text-gray-400 mb-2 flex items-center gap-1">🔔 提醒</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="bg-white rounded-xl p-3 border border-gray-100 flex items-center justify-between hover:shadow-md transition">
+          <div>
+            <p class="text-sm font-medium text-gray-900">会议提醒</p>
+            <p class="text-xs text-gray-500">05-12 15:00 · 待提醒</p>
+          </div>
+          <div class="flex gap-1">
+            <button class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-xs">开</button>
+            <button class="w-8 h-8 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center text-xs hover:text-red-500">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>

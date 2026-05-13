@@ -28,6 +28,7 @@ export interface TranscriptionSettings {
   subtitleCorrectionScope: 'full' | 'off';
   subtitleCorrectionPrompt: string;
   llmUsagePolicy: 'local_first' | 'external_first' | 'local_only' | 'external_only';
+  deviceType: 'auto' | 'cuda' | 'cpu';
 }
 
 interface TranscriptionState extends TranscriptionSettings {
@@ -51,6 +52,7 @@ export const DEFAULT_TRANSCRIPTION_SETTINGS: TranscriptionSettings = {
   subtitleCorrectionScope: 'full',
   subtitleCorrectionPrompt: DEFAULT_SUBTITLE_CORRECTION_PROMPT,
   llmUsagePolicy: 'local_first',
+  deviceType: 'auto',
 };
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -90,6 +92,7 @@ function sanitizeSettings(value: Partial<TranscriptionSettings>): TranscriptionS
     llmUsagePolicy: value.llmUsagePolicy === 'external_first' || value.llmUsagePolicy === 'local_only' || value.llmUsagePolicy === 'external_only'
       ? value.llmUsagePolicy
       : 'local_first',
+    deviceType: value.deviceType === 'cuda' || value.deviceType === 'cpu' ? value.deviceType : 'auto',
   };
 }
 

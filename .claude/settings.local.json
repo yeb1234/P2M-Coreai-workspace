@@ -111,7 +111,8 @@
       "Bash(grep -v \":0$\")",
       "Bash(taskkill //F //PID 9704)",
       "Bash(taskkill //F //PID 6460)",
-      "Bash(awk '{print $5}')"
+      "Bash(awk '{print $5}')",
+      "Bash(ls -la \"C:\\\\\\\\SiteYeb\\\\\\\\src\\\\\\\\components\\\\\\\\calendar2\\\\\\\\\")"
     ]
   }
 }

@@ -51,7 +51,7 @@ start "SiteYeb Backend" /D "%ROOT%backend" cmd /k ".venv311\Scripts\python -m uv
 exit /b
 
 :start_frontend
-echo Starting frontend dev server (port 8000)...
+echo Starting frontend dev server (port 5002)...
 start "SiteYeb Frontend" /D "%ROOT%" cmd /k "npm run dev"
 exit /b
 

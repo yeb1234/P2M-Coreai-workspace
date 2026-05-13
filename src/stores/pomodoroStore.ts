@@ -390,30 +390,6 @@ export const usePomodoroStore = create<PomodoroState>()(
 
             const newSessionsCompleted = phase === 'work' ? sessionsCompleted + 1 : sessionsCompleted;
 
-            if (linkedTodoId && phase === 'work') {
-              const todo = useScheduleStore.getState().items[linkedTodoId];
-              const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : 0;
-              const nextCompletedPomodoros = (todo?.pomodoroCount || 0) + 1;
-
-              if (plannedPomodoros > 0 && nextCompletedPomodoros >= plannedPomodoros) {
-                const nextState = {
-                  sessions: { ...state.sessions, [currentSessionId]: updatedSession },
-                  timer: {
-                    ...initialTimerState,
-                    timeRemaining: state.config.workDuration * 60,
-                    linkedTodoId,
-                  },
-                  _lastTickTimestamp: null,
-                  _remoteRuntimeUpdatedAt: null as string | null,
-                  _historyUpdatedAt: null as string | null,
-                };
-                nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('complete-linked-todo', { ...state, ...nextState });
-                nextState._historyUpdatedAt = syncPomodoroHistory(nextState.sessions);
-                set(nextState);
-                return;
-              }
-            }
-
             let nextPhase: PomodoroPhase;
             let nextTimeRemaining: number;
 
@@ -425,9 +401,6 @@ export const usePomodoroStore = create<PomodoroState>()(
                 nextPhase = 'short_break';
                 nextTimeRemaining = state.config.shortBreakDuration * 60;
               }
-            } else if (phase === 'short_break') {
-              nextPhase = 'work';
-              nextTimeRemaining = state.config.workDuration * 60;
             } else {
               const todo = linkedTodoId ? useScheduleStore.getState().items[linkedTodoId] : null;
               const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : 0;
@@ -443,7 +416,8 @@ export const usePomodoroStore = create<PomodoroState>()(
                   _remoteRuntimeUpdatedAt: null as string | null,
                   _historyUpdatedAt: null as string | null,
                 };
-                nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime('complete-long-break', { ...state, ...nextState });
+                const reason = phase === 'short_break' ? 'complete-short-break' : 'complete-long-break';
+                nextState._remoteRuntimeUpdatedAt = syncPomodoroRuntime(reason, { ...state, ...nextState });
                 nextState._historyUpdatedAt = syncPomodoroHistory(nextState.sessions);
                 set(nextState);
                 return;

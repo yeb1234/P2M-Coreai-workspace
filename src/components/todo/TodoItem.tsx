@@ -22,15 +22,14 @@ interface TodoItemProps {
   todo: ScheduleItem;
   onEdit: (todo: ScheduleItem) => void;
   onDragStart?: (id: string) => void;
-  onDragOver?: (id: string, position: 'top' | 'bottom') => void;
+  onDragOver?: (id: string) => void;
   onDrop?: (id: string) => void;
   onDragEnd?: () => void;
   isDragging?: boolean;
   isDropTarget?: boolean;
-  dropPosition?: 'top' | 'bottom';
 }
 
-export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDropTarget, dropPosition }) => {
+export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDropTarget }) => {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -136,7 +135,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
         data-todo-card
         className={`group relative flex items-center gap-2 md:gap-3 px-2.5 py-1.5 md:px-3 md:py-3 rounded-lg border transition-all cursor-default ${
           todo.status === 'completed' ? 'opacity-50' : ''
-        } ${isDragging ? 'opacity-60 shadow-xl scale-[1.02] z-10' : 'hover:shadow-md'}`}
+        } ${isDragging ? 'opacity-60 shadow-xl scale-[1.02] z-10' : 'hover:shadow-md'} ${isDropTarget ? 'border-[var(--accent)] bg-[var(--accent-bg)]' : ''}`}
         style={cardStyle}
         onDoubleClick={() => {
           setEditValue(todo.title);
@@ -145,8 +144,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
         onDragOver={(event) => {
           event.preventDefault();
           event.dataTransfer.dropEffect = 'move';
-          const rect = event.currentTarget.getBoundingClientRect();
-          onDragOver?.(todo.id, event.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom');
+          onDragOver?.(todo.id);
         }}
         onDrop={(event) => {
           event.preventDefault();
@@ -278,9 +276,6 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
           </div>
         </div>
 
-        {isDropTarget && (
-          <div className={`absolute left-2 right-2 h-0.5 bg-[#b8b4ac] rounded-full pointer-events-none ${dropPosition === 'top' ? '-top-px' : '-bottom-px'}`} />
-        )}
       </div>
 
       <ConfirmDialog

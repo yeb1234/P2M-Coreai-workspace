@@ -27,14 +27,14 @@ cd backend
 - 本机：http://localhost
 - 局域网：`http://你的电脑IP`
 
-前端开发使用 8000 端口，支持 Vite 热更新：
+前端开发使用 5002 端口，支持 Vite 热更新：
 
 ```bash
 npm install
 npm run dev
 ```
 
-- 前端开发：http://localhost:8000
+- 前端开发：http://localhost:5002
 - API 自动代理到 80 端口
 
 ## 端口
@@ -42,7 +42,7 @@ npm run dev
 | 端口 | 用途 |
 | --- | --- |
 | 80 | 后端 / 生产入口，局域网直接访问 |
-| 8000 | 前端开发，Vite 热更新 |
+| 5002 | 前端开发，Vite 热更新 |
 | 1234 | LM Studio / OpenAI-compatible 本地模型常用端口 |
 | 11434 | Ollama 默认端口 |
 

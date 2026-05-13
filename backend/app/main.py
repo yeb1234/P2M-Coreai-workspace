@@ -77,6 +77,7 @@ app.include_router(categories.router)
 app.include_router(ai_jobs.router)
 app.include_router(assistant.router)
 app.include_router(notes.router)
+app.include_router(calendar_events.router)
 app.include_router(admin.router)
 
 app.mount("/output", StaticFiles(directory=settings.output_dir), name="output")

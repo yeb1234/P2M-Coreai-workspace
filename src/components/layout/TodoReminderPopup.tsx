@@ -1,35 +1,28 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Check, ListTodo, X } from 'lucide-react';
 import { useNotificationStore } from '../../stores';
-import type { Notification } from '../../stores/notificationStore';
 
 const TODO_REMINDER_POPUP_WINDOW_MS = 5 * 60 * 1000;
 
 export const TodoReminderPopup: React.FC = () => {
   const notifications = useNotificationStore((s) => s.notifications);
   const markAsRead = useNotificationStore((s) => s.markAsRead);
-  const latestTodoReminder = useMemo(
-    () => notifications.find((item) => {
-      if (!(item.type === 'todo' && item.title === '待办提醒' && !item.read)) return false;
-      const createdAt = new Date(item.createdAt).getTime();
-      return Number.isFinite(createdAt) && Date.now() - createdAt <= TODO_REMINDER_POPUP_WINDOW_MS;
-    }) ?? null,
-    [notifications],
-  );
-  const [activeReminder, setActiveReminder] = useState<Notification | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set());
 
-  useEffect(() => {
-    if (!latestTodoReminder || dismissedIds.has(latestTodoReminder.id)) return;
-    setActiveReminder(latestTodoReminder);
-  }, [dismissedIds, latestTodoReminder]);
+  const [now] = useState(() => Date.now());
+  const cutoff = now - TODO_REMINDER_POPUP_WINDOW_MS;
+  const latestTodoReminder = notifications.find((item) => {
+    if (!(item.type === 'todo' && item.title === '待办提醒' && !item.read)) return false;
+    const createdAt = new Date(item.createdAt).getTime();
+    return Number.isFinite(createdAt) && createdAt >= cutoff;
+  }) ?? null;
 
+  const activeReminder = latestTodoReminder && !dismissedIds.has(latestTodoReminder.id) ? latestTodoReminder : null;
   if (!activeReminder || dismissedIds.has(activeReminder.id)) return null;
 
   const close = (markRead: boolean) => {
     setDismissedIds((prev) => new Set(prev).add(activeReminder.id));
     if (markRead) markAsRead(activeReminder.id);
-    setActiveReminder(null);
   };
 
   return (

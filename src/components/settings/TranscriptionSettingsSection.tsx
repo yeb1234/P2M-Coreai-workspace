@@ -32,6 +32,7 @@ export function TranscriptionSettings() {
     subtitleCorrectionScope: settings.subtitleCorrectionScope,
     subtitleCorrectionPrompt: settings.subtitleCorrectionPrompt,
     llmUsagePolicy: settings.llmUsagePolicy,
+    deviceType: settings.deviceType,
   });
   const [drafts, setDrafts] = useState<NumberDrafts>({
     wordLimit: String(settings.wordLimit),
@@ -42,35 +43,6 @@ export function TranscriptionSettings() {
   });
   const [envChecks, setEnvChecks] = useState<Array<{ name: string; ok: boolean; message: string }> | null>(null);
   const [envLoading, setEnvLoading] = useState(false);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      setForm({
-        whisperEngine: settings.whisperEngine,
-        whisperModel: settings.whisperModel,
-        language: settings.language,
-        doSummary: settings.doSummary,
-        wordLimit: settings.wordLimit,
-        cpuThreads: settings.cpuThreads,
-        computeType: settings.computeType,
-        beamSize: settings.beamSize,
-        bestOf: settings.bestOf,
-        temperature: settings.temperature,
-        vadFilter: settings.vadFilter,
-        subtitleCorrectionEnabled: settings.subtitleCorrectionEnabled,
-        subtitleCorrectionScope: settings.subtitleCorrectionScope,
-        subtitleCorrectionPrompt: settings.subtitleCorrectionPrompt,
-        llmUsagePolicy: settings.llmUsagePolicy,
-      });
-      setDrafts({
-        wordLimit: String(settings.wordLimit),
-        cpuThreads: String(settings.cpuThreads),
-        beamSize: String(settings.beamSize),
-        bestOf: String(settings.bestOf),
-        temperature: String(settings.temperature),
-      });
-    });
-  }, [settings.whisperEngine, settings.whisperModel, settings.language, settings.doSummary, settings.wordLimit, settings.cpuThreads, settings.computeType, settings.beamSize, settings.bestOf, settings.temperature, settings.vadFilter, settings.subtitleCorrectionEnabled, settings.subtitleCorrectionScope, settings.subtitleCorrectionPrompt, settings.llmUsagePolicy]);
 
   const updateForm = (updates: Partial<TranscriptionDraft>) => {
     setForm((current) => ({ ...current, ...updates }));
@@ -122,17 +94,13 @@ export function TranscriptionSettings() {
   const installedWhisperModels = new Set((whisperModels?.items ?? []).filter((item) => item.installed).map((item) => item.id));
   const hasWhisperModelScan = Boolean(whisperModels);
 
-  const loadWhisperModels = async () => {
-    setModelsError('');
-    try {
-      setWhisperModels(await fetchWhisperModels());
-    } catch (err) {
-      setModelsError(err instanceof Error ? err.message : '模型扫描失败');
-    }
-  };
+  const loadWhisperModels = async () => fetchWhisperModels();
 
   useEffect(() => {
-    void loadWhisperModels();
+    const id = setTimeout(() => setModelsError(''), 0);
+    void loadWhisperModels()
+      .then((models) => setWhisperModels(models))
+      .catch((err) => setModelsError(err instanceof Error ? err.message : '模型扫描失败'));
     void fetchTranscriptionSettings()
       .then((dto) => {
         const remote = transcriptionDtoToForm(dto);
@@ -143,7 +111,8 @@ export function TranscriptionSettings() {
       .catch(() => {
         // Browser IndexedDB settings remain the fallback when the backend is unavailable.
       });
-  }, []);
+    return () => clearTimeout(id);
+  }, [updateSettings]);
 
   const setNumberDraft = (key: keyof NumberDrafts, value: string) => {
     setDrafts((current) => ({ ...current, [key]: value }));
@@ -285,6 +254,27 @@ export function TranscriptionSettings() {
           <option value="whisper.cpp">whisper.cpp 外部引擎（可接 Vulkan/HIP）</option>
         </select>
         <p className="text-[10px] text-[#9ca3af] mt-1">7800 XT 路线建议先用 whisper.cpp 的 Vulkan/HIP 版本单独验证，再在后端 .env 配置可执行文件和模型路径。</p>
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-[#6b7280] mb-1.5">运行设备</label>
+        <div className="flex gap-2">
+          {(['auto', 'cuda', 'cpu'] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => updateForm({ deviceType: d })}
+              className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
+                form.deviceType === d
+                  ? 'border-[#c87d2f] bg-[#fff7ed] text-[#9a5a1e]'
+                  : 'border-[#e5e2dd] text-[#5f5a52] hover:border-[#c87d2f]/50'
+              }`}
+            >
+              {d === 'auto' ? '自动' : d === 'cuda' ? 'CUDA' : 'CPU'}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-[#9ca3af] mt-1">只对 faster-whisper 生效。whisper.cpp 外部引擎的设备选择取决于 whisper-cli.exe 的编译参数和 .env 配置。</p>
       </div>
 
       <div>

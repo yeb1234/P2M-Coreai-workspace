@@ -16,7 +16,8 @@ export function useAssistantPageContext(active: boolean) {
 
   useEffect(() => {
     if (!active) return;
-    setPageContext(getAssistantPageContext());
+    const id = setTimeout(() => setPageContext(getAssistantPageContext()), 0);
+    return () => clearTimeout(id);
   }, [
     active,
     activeView,

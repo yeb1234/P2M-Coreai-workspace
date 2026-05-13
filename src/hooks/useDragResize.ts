@@ -18,8 +18,11 @@ export function useDragResize({ initialWidth, minWidth, maxWidth, side, onWidthC
   const [width, setWidth] = useState(initialWidth);
 
   useEffect(() => {
-    setWidth(initialWidth);
-    liveRef.current = initialWidth;
+    const id = setTimeout(() => {
+      setWidth(initialWidth);
+      liveRef.current = initialWidth;
+    }, 0);
+    return () => clearTimeout(id);
   }, [initialWidth]);
 
   const startResize = useCallback((clientX: number) => {

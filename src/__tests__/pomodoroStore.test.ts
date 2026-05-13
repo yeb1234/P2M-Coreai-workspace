@@ -488,10 +488,23 @@ describe('pomodoro persistence boundaries', () => {
 
     usePomodoroStore.getState().completePhase();
 
+    // 最后一个 focus 完成后进入 short break，break 完成后才 idle
     const state = usePomodoroStore.getState();
-    expect(state.timer.status).toBe('idle');
-    expect(state.timer.phase).toBe('work');
-    expect(state.timer.timeRemaining).toBe(DEFAULT_CONFIG.workDuration * 60);
+    expect(state.timer.status).toBe('running');
+    expect(state.timer.phase).toBe('short_break');
+    expect(state.timer.sessionsCompleted).toBe(1);
+    expect(state.sessions.active.completed).toBe(true);
+
+    // 模拟 break 完成
+    usePomodoroStore.setState({
+      timer: { ...state.timer, phase: 'short_break' as const, timeRemaining: 1 },
+    });
+    usePomodoroStore.getState().completePhase();
+
+    const finalState = usePomodoroStore.getState();
+    expect(finalState.timer.status).toBe('idle');
+    expect(finalState.timer.phase).toBe('work');
+    expect(finalState.timer.timeRemaining).toBe(DEFAULT_CONFIG.workDuration * 60);
   });
 
   it('writes heartbeat snapshots only while running', () => {
@@ -647,8 +660,66 @@ describe('pomodoro persistence boundaries', () => {
 
     usePomodoroStore.getState().completePhase();
 
-    expect(usePomodoroStore.getState().timer.status).toBe('idle');
+    // 最后一个 focus 完成后应进入 break，而不是直接 idle
+    expect(usePomodoroStore.getState().timer.status).toBe('running');
+    expect(usePomodoroStore.getState().timer.phase).toBe('long_break');
     expect(usePomodoroStore.getState().timer.linkedTodoId).toBe('todo-1');
     expect(usePomodoroStore.getState().sessions.active.completed).toBe(true);
+    expect(usePomodoroStore.getState().timer.sessionsCompleted).toBe(4);
+  });
+
+  it('stops timer after the final long break when target rounds are reached', () => {
+    useScheduleStore.setState({
+      items: {
+        'todo-1': {
+          id: 'todo-1',
+          type: 'todo',
+          title: 'Two hour task',
+          description: '',
+          status: 'in_progress',
+          priority: 'green',
+          startAt: '2026-05-12T09:00:00.000Z',
+          dueAt: '2026-05-12T11:00:00.000Z',
+          reminderAt: null,
+          pomodoroCount: 3,
+          pomodoroRounds: 4,
+          totalFocusMinutes: 75,
+          completedAt: null,
+          deletedAt: null,
+          sortOrder: 0,
+          createdAt: '2026-05-12T08:00:00.000Z',
+          updatedAt: '2026-05-12T08:00:00.000Z',
+        },
+      },
+    });
+    const breakSessionId = 'break-session';
+    usePomodoroStore.setState({
+      config: DEFAULT_CONFIG,
+      timer: {
+        status: 'running',
+        phase: 'long_break',
+        timeRemaining: 1,
+        sessionsCompleted: 4,
+        currentSessionId: breakSessionId,
+        linkedTodoId: 'todo-1',
+      },
+      sessions: {
+        [breakSessionId]: {
+          ...activeSession,
+          id: breakSessionId,
+          todoId: 'todo-1',
+          phase: 'long_break',
+          plannedDuration: 15,
+          startTime: new Date(Date.now() - 15 * 60_000).toISOString(),
+        },
+      },
+      _lastTickTimestamp: Date.now(),
+    });
+
+    usePomodoroStore.getState().completePhase();
+
+    expect(usePomodoroStore.getState().timer.status).toBe('idle');
+    expect(usePomodoroStore.getState().timer.linkedTodoId).toBe('todo-1');
+    expect(usePomodoroStore.getState().sessions[breakSessionId].completed).toBe(true);
   });
 });

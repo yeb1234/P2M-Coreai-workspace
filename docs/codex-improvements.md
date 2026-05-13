@@ -192,3 +192,63 @@ python -m compileall backend/app
 ```
 
 备注：`rg` 扫到的 TypeScript `??` 是空值合并运算符，不代表乱码；真正要关注的是连续问号文案、mojibake 字符串和浏览器里的可见乱码。
+
+## AI 任务中心稳定性评估（2026-05-13）
+
+评估范围：后端 Worker 崩溃/重启、整机断电重启、浏览器刷新/恢复三类场景。
+
+### 1. Worker 崩溃/重启
+
+已有防护：
+
+- `worker.py:31-32`：启动时自动调用 `requeue_interrupted_ai_jobs()`
+- `ai_jobs.py:354-372`：把 `status == "running"` 的任务重置为 `queued`
+- `database.py:89-92`：SQLite WAL 模式，崩溃后数据库可自动恢复
+- `ai_jobs.py:643-650`：`finally` 块清理临时 WAV 文件
+- `ai_jobs.py:602-651`：`run_ai_job` 整体 try-except 包裹，失败自动标记 `failed`
+
+隐患：
+
+- **队列暂停状态丢失**：`ai_queue.py:6` 的 `_paused` 是纯内存 `threading.Event`，worker 重启后恢复为未暂停，用户手动暂停的设置会失效。
+- **Worker 线程异常没兜底**：`worker.py:64-65` 的 `future.result()` 没有 try-except，某个任务抛异常可能导致整个 worker 线程崩溃。
+
+### 2. 整机断电重启
+
+恢复机制：
+
+1. SQLite WAL 保证数据库完整。
+2. Worker 启动后所有 `running` 任务被 requeue。
+3. 重新认领后从头执行。
+
+问题：没有断点续传。比如一个视频已转写 90%，正在总结时断电，重启后会**从头重新提取音频、重新转写**。
+
+原因：
+
+- `.vtt` 和 `.md` 只在 `_finalize_job` 最后才写
+- `_step_transcribe` 不会读取已存在的 `transcript_segments`，直接重新调用 `transcribe_wav`
+- 系统崩溃时 ffmpeg 可能留下不完整的临时 WAV，虽然下次会被覆盖，但 work_dir 可能有垃圾文件积累
+
+### 3. 浏览器刷新/恢复
+
+已有防护：
+
+- `idbStorage.ts:236-240`：`pagehide` / `visibilitychange` 时 flush pending 写入
+- `IMMEDIATE_LOCAL_STORAGE_NAMES` 中的 store 跳过 debounce
+- `useRehydrateStores.ts:28-30`：登录切换时强制 rehydrate
+
+问题：
+
+- AI 任务中心的数据（`aiJobs`）是内存态，刷新后从后端重新拉取——本身不是问题。
+- **筛选状态、批量设置会丢失**：比如选了"只看失败"或改了 batch limit，刷新后重置。
+- 后端挂了时的 fallback 有 gap：`doWrite` 先写后端，后端挂了才写 IndexedDB；如果在这 gap 期间浏览器崩溃，IndexedDB 没数据。
+
+### 4. 额外需要考虑的地方
+
+| 优先级 | 问题 | 建议 |
+| --- | --- | --- |
+| **高** | 队列暂停状态重启丢失 | 把 `_paused` 持久化到 `app_settings` 表，启动时读取 |
+| **高** | Worker 线程异常可能整体崩溃 | `worker.py:65` 的 `future.result()` 包上 try-except |
+| **中** | 没有断点续传，崩溃后全部重做 | 大改动；短期可考虑在 `_step_write_outputs` 中间增加 checkpoint（比如转写完成后把结果写进 job 的 `transcript_segments` 字段，下次检测到已有结果可跳过转写） |
+| **中** | 没有定时自动 recover stuck jobs | `recover_stuck_ai_jobs` 只能手动调用，建议 worker idle 时或 health check 中自动执行（比如 running > 60 分钟无更新自动 requeue） |
+| **低** | 临时文件可能泄漏 | 崩溃残留的 `.wav` 和 `.json` 可能积累，可加启动时清理逻辑 |
+| **低** | 前端筛选状态不持久化 | 把 `aiJobStatusFilter`、`batchMode` 等存入 `localStorage` 或 IndexedDB |

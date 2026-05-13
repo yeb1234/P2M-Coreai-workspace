@@ -67,6 +67,7 @@ class AiJobOptions:
     best_of: int | None
     temperature: float | None
     vad_filter: bool | None
+    device_type: str | None
     subtitle_correction_enabled: bool | None
     subtitle_correction_scope: str | None
     subtitle_correction_prompt: str | None
@@ -94,6 +95,7 @@ def _build_job_options(
     best_of: int | None = None,
     temperature: float | None = None,
     vad_filter: bool | None = None,
+    device_type: str | None = None,
     subtitle_correction_enabled: bool | None = None,
     subtitle_correction_scope: str | None = None,
     subtitle_correction_prompt: str | None = None,
@@ -119,6 +121,7 @@ def _build_job_options(
         best_of=best_of if best_of is not None else stored.get("best_of"),
         temperature=temperature if temperature is not None else stored.get("temperature"),
         vad_filter=vad_filter if vad_filter is not None else stored.get("vad_filter"),
+        device_type=device_type if device_type is not None else stored.get("device_type"),
         subtitle_correction_enabled=subtitle_correction_enabled if subtitle_correction_enabled is not None else stored.get("subtitle_correction_enabled"),
         subtitle_correction_scope=resolved_correction_scope,
         subtitle_correction_prompt=(subtitle_correction_prompt.strip() if subtitle_correction_prompt else stored.get("subtitle_correction_prompt") or None),
@@ -138,6 +141,7 @@ def _apply_job_options(job: AiJob, options: AiJobOptions) -> None:
     job.best_of = options.best_of
     job.temperature = options.temperature
     job.vad_filter = options.vad_filter
+    job.device_type = options.device_type
     job.subtitle_correction_enabled = options.subtitle_correction_enabled
     job.subtitle_correction_scope = options.subtitle_correction_scope
     job.subtitle_correction_prompt = options.subtitle_correction_prompt
@@ -170,6 +174,7 @@ def create_ai_job(
     best_of: int | None = None,
     temperature: float | None = None,
     vad_filter: bool | None = None,
+    device_type: str | None = None,
     subtitle_correction_enabled: bool | None = None,
     subtitle_correction_scope: str | None = None,
     subtitle_correction_prompt: str | None = None,
@@ -187,6 +192,7 @@ def create_ai_job(
         best_of=best_of,
         temperature=temperature,
         vad_filter=vad_filter,
+        device_type=device_type,
         subtitle_correction_enabled=subtitle_correction_enabled,
         subtitle_correction_scope=subtitle_correction_scope,
         subtitle_correction_prompt=subtitle_correction_prompt,
@@ -240,6 +246,7 @@ def create_ai_job_from_payload(db, video_id: int, payload) -> AiJob:
         best_of=payload.best_of,
         temperature=payload.temperature,
         vad_filter=payload.vad_filter,
+        device_type=payload.device_type,
         subtitle_correction_enabled=payload.subtitle_correction_enabled,
         subtitle_correction_scope=payload.subtitle_correction_scope,
         subtitle_correction_prompt=payload.subtitle_correction_prompt,
@@ -383,6 +390,7 @@ def _step_transcribe(db, job, video, paths):
         best_of=job.best_of,
         temperature=job.temperature,
         vad_filter=job.vad_filter,
+        device_type=job.device_type,
     )
     return result["text"], result["segments"]
 

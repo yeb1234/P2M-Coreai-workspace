@@ -25,7 +25,7 @@ async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
       signal: controller.signal,
     });
   } catch (err) {
-    if (controller.signal.aborted) throw new Error(`API timeout: ${path}`);
+    if (controller.signal.aborted) throw new Error(`API timeout: ${path}`, { cause: err });
     throw err;
   } finally {
     window.clearTimeout(timeout);
@@ -168,6 +168,7 @@ export interface AiJobListItem {
   word_limit: number;
   cpu_threads: number | null;
   compute_type: string | null;
+  device_type: string | null;
   subtitle_correction_enabled: boolean | null;
   subtitle_correction_scope: 'full' | 'off' | null;
   subtitle_correction_prompt: string | null;
@@ -251,6 +252,7 @@ export interface TranscriptionSettingsDto {
   subtitle_correction_scope: 'full' | 'off';
   subtitle_correction_prompt: string;
   llm_usage_policy: 'local_first' | 'external_first' | 'local_only' | 'external_only';
+  device_type: 'auto' | 'cuda' | 'cpu';
 }
 
 export type LlmUsagePolicy = 'local_first' | 'external_first' | 'local_only' | 'external_only';
@@ -320,7 +322,7 @@ export async function fetchVideos(page = 1, pageSize = 20, categoryId?: number, 
     params.set('category_id', String(categoryId));
   }
   if (search) params.set('search', search);
-  return apiFetch<VideoPage>(`/api/videos?${params}`, { timeoutMs: 15000 });
+  return apiFetch<VideoPage>(`/api/videos?${params}`, { timeoutMs: 300000 });
 }
 
 export async function fetchVideo(videoId: number): Promise<VideoItem> {
@@ -446,6 +448,7 @@ export async function startAiJob(
     best_of?: number;
     temperature?: number;
     vad_filter?: boolean;
+    device_type?: string;
     subtitle_correction_enabled?: boolean;
     subtitle_correction_scope?: 'full' | 'off';
     subtitle_correction_prompt?: string;
@@ -466,6 +469,7 @@ export async function startAiJob(
       best_of: opts?.best_of,
       temperature: opts?.temperature,
       vad_filter: opts?.vad_filter,
+      device_type: opts?.device_type,
       subtitle_correction_enabled: opts?.subtitle_correction_enabled,
       subtitle_correction_scope: opts?.subtitle_correction_scope,
       subtitle_correction_prompt: opts?.subtitle_correction_prompt,
@@ -493,6 +497,7 @@ export async function batchAiJobs(
 ): Promise<AiJobBatchOut> {
   return apiFetch<AiJobBatchOut>('/api/ai-jobs/batch', {
     method: 'POST',
+    timeoutMs: 300000,
     body: JSON.stringify({
       video_ids: videoIds,
       mode: opts.mode ?? 'missing_subtitles',
@@ -510,6 +515,7 @@ export async function batchAiJobs(
       best_of: opts.best_of,
       temperature: opts.temperature,
       vad_filter: opts.vad_filter,
+      device_type: opts.device_type,
       subtitle_correction_enabled: opts.subtitle_correction_enabled,
       subtitle_correction_scope: opts.subtitle_correction_scope,
       subtitle_correction_prompt: opts.subtitle_correction_prompt,
@@ -531,8 +537,16 @@ export interface CategoryTree {
   children: CategoryTree[];
 }
 
+export interface CategoryTreeWithVideos extends CategoryTree {
+  video_ids: number[];
+}
+
 export async function fetchCategoryTree(): Promise<CategoryTree[]> {
   return apiFetch<CategoryTree[]>('/api/categories/tree');
+}
+
+export async function fetchCategoryTreeWithVideos(): Promise<CategoryTreeWithVideos[]> {
+  return apiFetch<CategoryTreeWithVideos[]>('/api/categories/tree/videos');
 }
 
 export async function clearActiveAiJobs(): Promise<{ cleared: number }> {

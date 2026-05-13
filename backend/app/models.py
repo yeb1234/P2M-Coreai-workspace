@@ -86,6 +86,7 @@ class AiJob(Base):
     best_of = Column(Integer, nullable=True)
     temperature = Column(Float, nullable=True)
     vad_filter = Column(Boolean, nullable=True)
+    device_type = Column(String, nullable=True)
     subtitle_correction_enabled = Column(Boolean, nullable=True)
     subtitle_correction_scope = Column(String, nullable=True)
     subtitle_correction_prompt = Column(Text, nullable=True)

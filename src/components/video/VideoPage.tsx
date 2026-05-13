@@ -172,7 +172,7 @@ function VideoPlayerView() {
       setPlaybackRate(settingsRef.current.playbackRate);
       setMediaError('');
     });
-  }, [currentVideo?.id, resetActiveSubtitle]);
+  }, [currentVideo?.id, resetActiveSubtitle, clearHover, setPlaybackRate, settingsRef]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;

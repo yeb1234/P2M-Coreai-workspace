@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useEffect } from 'react';
 import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { usePomodoroStore, useUIStore, useAuthStore, useNotificationStore } from '../../stores';
@@ -58,10 +57,6 @@ function PomodoroSettings() {
   const sessions = usePomodoroStore((s) => s.sessions);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState<PomodoroSettingsForm>(() => createPomodoroSettingsForm(config));
-
-  useEffect(() => {
-    setForm(createPomodoroSettingsForm(config));
-  }, [config]);
 
   const handleSave = () => {
     updateConfig(form);
@@ -260,10 +255,6 @@ function NotificationSettings() {
   const [draft, setDraft] = useState({ ...settings });
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    setDraft({ ...settings });
-  }, [settings]);
-
   const handleToggle = (key: keyof typeof settings) => {
     setDraft((current) => ({ ...current, [key]: !current[key] }));
   };
@@ -339,7 +330,7 @@ export const SettingsPage: React.FC = () => {
         icon={<Settings size={22} />}
       />
       <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-        <SettingsNav sections={SECTIONS} activeSection={activeSection} onSelect={setActiveSection} />
+        <SettingsNav sections={SECTIONS} activeSection={activeSection} onSelect={(id) => setActiveSection(id)} />
         <div className="flex-1 rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4 md:p-5">
           {renderSection()}
         </div>

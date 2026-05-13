@@ -169,7 +169,7 @@ def _collect_descendant_ids(db: Session, category_id: int) -> list[int]:
 @router.get("", response_model=VideoPage)
 def get_videos(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=999999),
     category_id: int | None = None,
     category_ids: str | None = None,
     search: str | None = None,

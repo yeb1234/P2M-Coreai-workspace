@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { useScheduleStore } from '../../stores';
-import { toISODateString } from '../../lib/date';
+import { useScheduleStore, useTodoStore } from '../../stores';
+import { toISODateString, formatDate } from '../../lib/date';
 import { playInteractionSound } from '../../lib/sounds';
 import { PRIORITY_COLORS, type ScheduleItem, type TodoPriority, type TodoStatus } from '../../types';
 import { combineLocalDateTime, datePart, hasScheduleTime } from '../../lib/scheduleTime';
@@ -208,11 +208,12 @@ function layoutWeekEvents(events: WeekEvent[]): LaidOutWeekEvent[] {
 }
 
 export const Calendar2Page: React.FC = () => {
-  const scheduleItems = useScheduleStore((s) => s.items);
+  const todos = useTodoStore((s) => s.todos);
+  const items = useScheduleStore((s) => s.items);
   const addTodo = useScheduleStore((s) => s.addTodo);
   const addEvent = useScheduleStore((s) => s.addEvent);
-  const updateItem = useScheduleStore((s) => s.updateItem);
   const deleteItem = useScheduleStore((s) => s.deleteItem);
+  const updateItem = useScheduleStore((s) => s.updateItem);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [draft, setDraft] = useState<DraftSelection | null>(null);
   const [dragAnchor, setDragAnchor] = useState<DraftSelection | null>(null);
@@ -281,20 +282,36 @@ export const Calendar2Page: React.FC = () => {
   }, [gridAvailableWidth, pageWidth, visibleDayCount]);
   const gridWidth = gridAvailableWidth ? Math.max(0, gridAvailableWidth) : LEFT_GUTTER + visibleDayCount * dayWidth;
 
-  const items = useMemo(() => Object.values(scheduleItems).filter((item) => !item.deletedAt), [scheduleItems]);
+  const visibleItems = useMemo(() => Object.values(items).filter((item) => !item.deletedAt), [items]);
   const todoPool = useMemo(() => {
+    const weekStartStr = formatDate(weekStart, 'yyyy-MM-dd');
     const weekEnd = addDays(weekStart, 6);
-    return items
-      .filter((item) => item.type === 'todo' && hasScheduleTime(item) && visiblePriorities[item.priority] && visibleStatuses[item.status])
-      .filter((item) => {
-        if (!hasScheduleTime(item)) return false;
-        const due = new Date(`${datePart(item.startAt)}T12:00:00`);
-        return due >= weekStart && due <= weekEnd;
+    const weekEndStr = formatDate(weekEnd, 'yyyy-MM-dd');
+    return Object.values(todos)
+      .filter((todo) => {
+        if (todo.status === 'completed') return false;
+        if (!visiblePriorities[todo.priority]) return false;
+        const time = todo.startDate ?? todo.dueDate;
+        if (!time) return false;
+        const date = time.slice(0, 10);
+        return date >= weekStartStr && date <= weekEndStr;
       })
-      .sort((a, b) => new Date(a.startAt ?? 0).getTime() - new Date(b.startAt ?? 0).getTime());
-  }, [items, visiblePriorities, visibleStatuses, weekStart]);
+      .map((todo) => ({
+        id: todo.id,
+        type: 'todo' as const,
+        title: todo.title,
+        startAt: todo.startDate ?? todo.dueDate,
+        scheduleTime: null,
+        dueDate: todo.dueDate,
+        status: todo.status,
+        priority: todo.priority,
+        color: PRIORITY_COLORS[todo.priority] ?? '#16a34a',
+        categoryId: null,
+      }))
+      .sort((a, b) => (a.startAt ?? '').localeCompare(b.startAt ?? ''));
+  }, [todos, visiblePriorities, weekStart]);
 
-  const events = useMemo<WeekEvent[]>(() => items
+  const events = useMemo<WeekEvent[]>(() => visibleItems
     .flatMap((item): WeekEvent[] => {
       if (!hasScheduleTime(item) || !(item.type === 'event' || visiblePriorities[item.priority] && visibleStatuses[item.status])) return [];
       const dayIndex = weekDateStrings.indexOf(datePart(item.startAt));
@@ -310,7 +327,7 @@ export const Calendar2Page: React.FC = () => {
         color: eventColor(item),
         item,
       }];
-    }), [items, visiblePriorities, visibleStatuses, weekDateStrings]);
+    }), [visibleItems, visiblePriorities, visibleStatuses, weekDateStrings]);
   const laidOutEvents = useMemo(() => layoutWeekEvents(events), [events]);
 
   const monthTitle = `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月`;
@@ -360,7 +377,7 @@ export const Calendar2Page: React.FC = () => {
     const dueAt = combineLocalDateTime(date, formatTimeInput(editingDraft.endMinutes));
 
     if (editingDraft.itemId) {
-      const existingItem = scheduleItems[editingDraft.itemId];
+      const existingItem = items[editingDraft.itemId];
       updateItem(editingDraft.itemId, { title, startAt, dueAt, reminderAt: existingItem?.reminderAt ? startAt : existingItem?.reminderAt ?? null });
     } else if (createTodo) {
       addTodo({
@@ -381,7 +398,7 @@ export const Calendar2Page: React.FC = () => {
 
     playInteractionSound('success');
     closeDraftEditor();
-  }, [addEvent, addTodo, closeDraftEditor, createTodo, draftTitle, editingDraft, scheduleItems, updateItem, weekDateStrings]);
+  }, [addEvent, addTodo, closeDraftEditor, createTodo, draftTitle, editingDraft, items, updateItem, weekDateStrings]);
 
   const handleLaneDragStart = useCallback((event: React.DragEvent<HTMLElement>, lane: CalendarLane) => {
     event.dataTransfer.effectAllowed = 'copy';
@@ -427,7 +444,7 @@ export const Calendar2Page: React.FC = () => {
     const startMinutes = clamp(point.minutes - dragOffsetRef.current, START_HOUR * 60, END_HOUR * 60 - SNAP_MINUTES);
 
     if (itemId) {
-      const item = scheduleItems[itemId];
+      const item = items[itemId];
       if (!item || !hasScheduleTime(item)) return;
       const duration = Math.max(SNAP_MINUTES, Math.round((new Date(item.dueAt).getTime() - new Date(item.startAt).getTime()) / 60000));
       const endMinutes = clamp(startMinutes + duration, startMinutes + SNAP_MINUTES, END_HOUR * 60);
@@ -458,7 +475,7 @@ export const Calendar2Page: React.FC = () => {
     } catch {
       setDraft(null);
     }
-  }, [dayWidth, scheduleItems, updateItem, visibleDayCount, visibleDayOffset, weekDateStrings]);
+  }, [dayWidth, items, updateItem, visibleDayCount, visibleDayOffset, weekDateStrings]);
 
   const handleEventContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>, item: WeekEvent) => {
     event.preventDefault();
@@ -693,7 +710,7 @@ export const Calendar2Page: React.FC = () => {
                       onPointerUp={() => {
                         setResizing((current) => {
                           if (!current || current.id !== event.id) return null;
-                          const item = scheduleItems[event.id];
+                          const item = items[event.id];
                           if (item) {
                             const date = weekDateStrings[event.dayIndex];
                             const dueAt = combineLocalDateTime(date, formatTimeInput(current.newEndMinutes));

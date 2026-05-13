@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     subtitle_correction_batch_size: int = 60
     subtitle_correction_timeout_s: int = 180
     whisper_engine: str = "faster-whisper"
+    device_type: str = "auto"
     whisper_cpp_exe: str = ""
     whisper_cpp_model: str = ""
     whisper_cpp_extra_args: str = ""
@@ -168,6 +169,7 @@ def ensure_runtime_schema() -> None:
             ("best_of", "INTEGER"),
             ("temperature", "FLOAT"),
             ("vad_filter", "BOOLEAN"),
+            ("device_type", "TEXT"),
             ("subtitle_correction_enabled", "BOOLEAN"),
             ("subtitle_correction_scope", "TEXT"),
             ("subtitle_correction_prompt", "TEXT"),

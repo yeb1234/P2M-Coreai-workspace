@@ -10,7 +10,7 @@ interface WeekViewProps {
 
 export const WeekView: React.FC<WeekViewProps> = ({ onDayDoubleClick }) => {
   const rawMonth = useCalendarStore((s) => s.currentMonth);
-  const currentMonth = rawMonth instanceof Date ? rawMonth : new Date(rawMonth);
+  const currentMonth = useMemo(() => rawMonth instanceof Date ? rawMonth : new Date(rawMonth), [rawMonth]);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
   const scheduleItems = useScheduleStore((s) => s.items);

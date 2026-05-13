@@ -14,7 +14,7 @@ interface CalendarGridProps {
 
 export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) => {
   const rawMonth = useCalendarStore((s) => s.currentMonth);
-  const currentMonth = rawMonth instanceof Date ? rawMonth : new Date(rawMonth);
+  const currentMonth = useMemo(() => rawMonth instanceof Date ? rawMonth : new Date(rawMonth), [rawMonth]);
   const currentView = useCalendarStore((s) => s.currentView);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);

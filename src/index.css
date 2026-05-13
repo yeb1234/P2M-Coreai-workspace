@@ -302,6 +302,64 @@ body {
   flex-direction: column;
 }
 
+/* TimeCenter widget grid */
+.tc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-flow: dense;
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 1024px) {
+  .tc-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+@media (max-width: 768px) {
+  .tc-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.tc-widget {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  grid-column: span 1;
+  height: 200px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tc-widget[data-size="large"] {
+  grid-column: span 2;
+}
+.tc-widget[data-size="full"] {
+  grid-column: span 3;
+}
+@media (max-width: 1024px) {
+  .tc-widget[data-size="large"],
+  .tc-widget[data-size="full"] {
+    grid-column: span 2;
+  }
+}
+@media (max-width: 768px) {
+  .tc-widget,
+  .tc-widget[data-size="large"],
+  .tc-widget[data-size="full"] {
+    grid-column: span 1;
+    height: 200px;
+  }
+}
+.tc-widget > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  justify-content: center;
+}
+
 /* Calendar paper effect */
 .calendar-paper {
   background: linear-gradient(160deg, var(--paper-bg) 0%, var(--bg-elevated) 40%, var(--bg-base) 100%);
@@ -498,7 +556,7 @@ button.primary:hover,
 
 .auto-grid-panels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 1rem;
 }
 

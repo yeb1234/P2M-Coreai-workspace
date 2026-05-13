@@ -48,17 +48,29 @@ def _apply_thread_env(cpu_threads: int) -> None:
             os.environ[key] = str(cpu_threads)
 
 
-def get_whisper_model(model_size: str, cpu_threads: Optional[int] = None, compute_type: Optional[str] = None):
+def _resolve_device(device_type: Optional[str] = None) -> str:
+    value = (device_type or "auto").strip().lower()
+    if value == "auto":
+        try:
+            import torch
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            return "cpu"
+    return value if value in ("cuda", "cpu") else "cpu"
+
+
+def get_whisper_model(model_size: str, cpu_threads: Optional[int] = None, compute_type: Optional[str] = None, device_type: Optional[str] = None):
     resolved_threads = _resolve_cpu_threads(cpu_threads)
     resolved_compute_type = (compute_type or settings.whisper_compute_type).strip()
+    resolved_device = _resolve_device(device_type)
     _apply_thread_env(resolved_threads)
-    key = (model_size, resolved_compute_type, resolved_threads)
+    key = (model_size, resolved_compute_type, resolved_threads, resolved_device)
     if key not in _MODEL_CACHE:
         from faster_whisper import WhisperModel
 
         _MODEL_CACHE[key] = WhisperModel(
             model_size,
-            device="cpu",
+            device=resolved_device,
             compute_type=resolved_compute_type,
             cpu_threads=resolved_threads,
             num_workers=1,
@@ -149,6 +161,7 @@ def transcribe_wav(
     best_of: Optional[int] = None,
     temperature: Optional[float] = None,
     vad_filter: Optional[bool] = None,
+    device_type: Optional[str] = None,
 ) -> dict:
     if _normalize_engine(engine) == "whisper.cpp":
         return _transcribe_with_whisper_cpp(
@@ -158,7 +171,7 @@ def transcribe_wav(
             cpu_threads=cpu_threads,
         )
 
-    model = get_whisper_model(model_size, cpu_threads=cpu_threads, compute_type=compute_type)
+    model = get_whisper_model(model_size, cpu_threads=cpu_threads, compute_type=compute_type, device_type=device_type)
     segments, _info = model.transcribe(
         str(wav_path),
         language=language or None,

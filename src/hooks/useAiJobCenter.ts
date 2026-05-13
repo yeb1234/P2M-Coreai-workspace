@@ -86,7 +86,9 @@ export function useAiJobCenter(
 
   // Track current filter to avoid stale closure
   const statusFilterRef = useRef(aiJobStatusFilter);
-  statusFilterRef.current = aiJobStatusFilter;
+  useEffect(() => {
+    statusFilterRef.current = aiJobStatusFilter;
+  }, [aiJobStatusFilter]);
 
   // Build base options from transcription settings
   const baseOptions = useMemo(() => ({

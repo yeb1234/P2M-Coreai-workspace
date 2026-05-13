@@ -48,6 +48,7 @@ export const NotesPage: React.FC = () => {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [insertPosition, setInsertPosition] = useState<NoteInsertPosition>('after');
+  const [hoveredNoteId, setHoveredNoteId] = useState<string | null>(null);
 
   const trashedNotes = getTrashedNotes();
 
@@ -132,7 +133,18 @@ export const NotesPage: React.FC = () => {
   const handleEditContentKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== 'Enter') return;
     const shouldSave = noteEnterBehavior === 'enter_save' ? !event.altKey : event.altKey;
-    if (!shouldSave) return;
+    if (!shouldSave) {
+      event.preventDefault();
+      const target = event.currentTarget;
+      const { selectionStart, selectionEnd } = target;
+      const newValue = target.value.slice(0, selectionStart) + '\n' + target.value.slice(selectionEnd);
+      setEdit((prev) => ({ ...prev, content: newValue }));
+      requestAnimationFrame(() => {
+        const el = contentInputRef.current;
+        if (el) el.selectionStart = el.selectionEnd = selectionStart + 1;
+      });
+      return;
+    }
     event.preventDefault();
     saveEdit();
   }, [noteEnterBehavior, saveEdit]);
@@ -261,14 +273,18 @@ export const NotesPage: React.FC = () => {
       );
     }
 
+    const isHovered = hoveredNoteId === note.id;
+
     return (
       <div
         key={note.id}
         data-note-card
         data-note-id={note.id}
-        className={`${note.color} relative rounded-xl p-4 cursor-pointer transition-all group ${
-          dragId === note.id ? 'opacity-55 shadow-2xl scale-[1.015] z-10' : 'hover:shadow-md'
+        className={`${note.color} relative rounded-xl p-4 cursor-pointer transition-all duration-300 group ${
+          dragId === note.id ? 'opacity-55 shadow-2xl scale-[1.015] z-10' : isHovered ? 'shadow-xl z-20 scale-[1.02]' : 'hover:shadow-md'
         }`}
+        onMouseEnter={() => setHoveredNoteId(note.id)}
+        onMouseLeave={() => setHoveredNoteId((id) => id === note.id ? null : id)}
         onDragOver={(event) => handleNoteDragOver(event, note.id)}
         onDrop={(event) => handleNoteDrop(event, note.id)}
         onClick={() => startEdit(note)}
@@ -309,7 +325,7 @@ export const NotesPage: React.FC = () => {
           <Trash2 size={12} />
         </button>
         <h3 className="text-sm font-semibold text-[#1a1a1a] mb-2 pl-4 pr-12">{note.title}</h3>
-        <p className="text-xs text-[#374151] leading-relaxed line-clamp-4 whitespace-pre-wrap">{note.content || '空笔记'}</p>
+        <p className={`text-xs text-[#374151] leading-relaxed whitespace-pre-wrap ${isHovered ? '' : 'line-clamp-4'}`}>{note.content || '空笔记'}</p>
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#d1cdc6]/20">
           <div className="flex min-w-0 flex-wrap gap-1">
             {getNoteTags(note).slice(0, 3).map((tag) => (

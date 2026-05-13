@@ -38,6 +38,10 @@ class CategoryTreeOut(CategoryOut):
     children: list["CategoryTreeOut"] = Field(default_factory=list)
 
 
+class CategoryTreeWithVideosOut(CategoryTreeOut):
+    video_ids: list[int] = Field(default_factory=list)
+
+
 class VideoOut(BaseModel):
     id: int
     title: str
@@ -100,6 +104,7 @@ class AiJobCreate(BaseModel):
     best_of: Optional[int] = Field(default=None, ge=1, le=10)
     temperature: Optional[float] = Field(default=None, ge=0, le=1)
     vad_filter: Optional[bool] = None
+    device_type: Optional[Literal["auto", "cuda", "cpu"]] = None
     subtitle_correction_enabled: Optional[bool] = None
     subtitle_correction_scope: Optional[Literal["full", "off"]] = None
     subtitle_correction_prompt: Optional[str] = None
@@ -118,6 +123,7 @@ class AiJobOut(BaseModel):
     do_summary: bool
     word_limit: int
     ollama_model: Optional[str] = None
+    device_type: Optional[Literal["auto", "cuda", "cpu"]] = None
     transcript: Optional[str] = None
     transcript_segments: list[TranscriptSegment] = Field(default_factory=list)
     subtitle_correction_scope: Optional[str] = None
@@ -147,6 +153,7 @@ class AiJobListItem(BaseModel):
     word_limit: int
     cpu_threads: Optional[int] = None
     compute_type: Optional[str] = None
+    device_type: Optional[Literal["auto", "cuda", "cpu"]] = None
     subtitle_correction_enabled: Optional[bool] = None
     subtitle_correction_scope: Optional[str] = None
     subtitle_correction_prompt: Optional[str] = None
@@ -165,9 +172,9 @@ class AiJobListOut(BaseModel):
 
 
 class AiJobBatchCreate(AiJobCreate):
-    video_ids: list[int] = Field(min_length=1, max_length=500)
+    video_ids: list[int] = Field(min_length=1, max_length=999999)
     mode: str = "missing_subtitles"
-    max_enqueue: int = Field(default=20, ge=1, le=500)
+    max_enqueue: int = Field(default=20, ge=1, le=999999)
     dry_run: bool = True
 
 
@@ -208,6 +215,7 @@ class TranscriptionSettingsOut(BaseModel):
     subtitle_correction_scope: Literal["full", "off"]
     subtitle_correction_prompt: str
     llm_usage_policy: Literal["local_first", "external_first", "local_only", "external_only"]
+    device_type: Literal["auto", "cuda", "cpu"]
 
 
 class TranscriptionSettingsIn(BaseModel):
@@ -226,6 +234,7 @@ class TranscriptionSettingsIn(BaseModel):
     subtitle_correction_scope: Optional[Literal["full", "off"]] = None
     subtitle_correction_prompt: Optional[str] = None
     llm_usage_policy: Optional[Literal["local_first", "external_first", "local_only", "external_only"]] = None
+    device_type: Optional[Literal["auto", "cuda", "cpu"]] = None
 
 
 class AssistantRuntimeSettingsOut(BaseModel):

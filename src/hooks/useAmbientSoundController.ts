@@ -148,8 +148,10 @@ export function useAmbientSoundController({
   const soundRef = useRef<AmbientSound>('none');
   const volumeBySoundRef = useRef(volumeBySound);
 
-  soundRef.current = sound;
-  volumeBySoundRef.current = volumeBySound;
+  useEffect(() => {
+    soundRef.current = sound;
+    volumeBySoundRef.current = volumeBySound;
+  }, [sound, volumeBySound]);
 
   const volume = sound === 'none' ? 0 : volumeBySound[sound];
 
@@ -257,7 +259,7 @@ export function useAmbientSoundController({
     if (plan.playback === 'defer') {
       stop();
     }
-  }, [isFocusActive, mode, play, stop, stopAndClearPlayback]);
+  }, [isFocusActive, mode, play, stop, stopAndClearPlayback, setSound]);
 
   const stopForTimerReset = useCallback(() => {
     setSound('none');

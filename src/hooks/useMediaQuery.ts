@@ -9,9 +9,12 @@ export function useMediaQuery(query: string, initialValue?: boolean) {
   useEffect(() => {
     const mq = window.matchMedia(query);
     const handler = (event: MediaQueryListEvent) => setMatches(event.matches);
-    setMatches(mq.matches);
+    const id = setTimeout(() => setMatches(mq.matches), 0);
     mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    return () => {
+      mq.removeEventListener('change', handler);
+      clearTimeout(id);
+    };
   }, [query]);
 
   return matches;

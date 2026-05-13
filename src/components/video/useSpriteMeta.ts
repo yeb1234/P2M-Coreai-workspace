@@ -12,12 +12,12 @@ export function useSpriteMeta(videoId: number | null, enabled = true) {
 
   useEffect(() => {
     if (!videoId || !enabled) {
-      setState({ status: 'idle', meta: null });
-      return;
+      const id = setTimeout(() => setState({ status: 'idle', meta: null }), 0);
+      return () => clearTimeout(id);
     }
 
     let cancelled = false;
-    setState({ status: 'loading', meta: null });
+    const loadingId = setTimeout(() => setState({ status: 'loading', meta: null }), 0);
 
     fetch(getSpriteUrl(videoId))
       .then((response) => {
@@ -34,7 +34,10 @@ export function useSpriteMeta(videoId: number | null, enabled = true) {
         if (!cancelled) setState({ status: 'error', meta: null });
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(loadingId);
+    };
   }, [enabled, videoId]);
 
   return videoId && enabled ? state : ({ status: 'idle', meta: null } satisfies SpriteMetaState);

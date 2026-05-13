@@ -132,13 +132,15 @@ export async function clearIDBData(): Promise<void> {
 
 const pendingWrites = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingLocalWrites = new Map<string, ReturnType<typeof setTimeout>>();
+const lastValues = new Map<string, string>();
 const lastLocalValues = new Map<string, string>();
 const lastLocalWriteAt = new Map<string, number>();
 const DEBOUNCE_MS = 3000;
 const LOCAL_MAX_WAIT_MS = 15000;
-const IMMEDIATE_LOCAL_STORAGE_NAMES = new Set(['p2m-pomodoro-storage', 'p2m-notification-storage']);
+const IMMEDIATE_LOCAL_STORAGE_NAMES = new Set(['p2m-pomodoro-storage', 'p2m-notification-storage', 'p2m-plugin-storage', 'p2m-ui-storage']);
 
 function scheduleWrite(name: string, value: string) {
+  lastValues.set(name, value);
   const existing = pendingWrites.get(name);
   if (existing) clearTimeout(existing);
   pendingWrites.set(name, setTimeout(() => {
@@ -151,10 +153,10 @@ async function doWrite(name: string, value: string) {
   if (hasAuthToken()) {
     try {
       await setUserData(name, value);
+      return;
     } catch {
-      // 有 token 时写后端失败也不写本地
+      // Fall through to local storage as fallback
     }
-    return;
   }
   if (!db) { memoryKv.set(name, value); return; }
   await db.kv.put({ key: name, value });
@@ -203,6 +205,17 @@ function shouldWriteImmediately(name: string): boolean {
   return IMMEDIATE_LOCAL_STORAGE_NAMES.has(baseLocalName(name));
 }
 
+function flushWrites() {
+  for (const [name, timer] of pendingWrites.entries()) {
+    clearTimeout(timer);
+    pendingWrites.delete(name);
+    const value = lastValues.get(name);
+    if (value !== undefined) {
+      void doWrite(name, value);
+    }
+  }
+}
+
 function flushLocalWrites() {
   for (const [name, timer] of pendingLocalWrites.entries()) {
     clearTimeout(timer);
@@ -215,10 +228,15 @@ function flushLocalWrites() {
   }
 }
 
+function flushAllPending() {
+  flushWrites();
+  flushLocalWrites();
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', flushLocalWrites);
+  window.addEventListener('pagehide', flushAllPending);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushLocalWrites();
+    if (document.visibilityState === 'hidden') flushAllPending();
   });
 }
 
@@ -229,8 +247,7 @@ export const idbStorage: StateStorage = {
         const result = await getUserData(name);
         return result ?? null;
       } catch {
-        // 有 token 时读后端失败也不读本地
-        return null;
+        // Fall through to local storage
       }
     }
     if (!db) return memoryKv.get(name) ?? null;
@@ -252,10 +269,10 @@ export const idbStorage: StateStorage = {
     if (hasAuthToken()) {
       try {
         await deleteUserData(name);
+        return;
       } catch {
-        // 有 token 时删后端失败也不删本地
+        // Fall through to local storage
       }
-      return;
     }
     if (!db) { memoryKv.delete(name); return; }
     await db.kv.delete(name);

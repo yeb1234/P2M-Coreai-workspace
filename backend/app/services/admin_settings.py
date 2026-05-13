@@ -101,6 +101,7 @@ def default_transcription_settings() -> dict:
         "subtitle_correction_scope": "off" if settings.subtitle_correction_scope == "off" else "full",
         "subtitle_correction_prompt": DEFAULT_SUBTITLE_CORRECTION_PROMPT,
         "llm_usage_policy": settings.llm_usage_policy if settings.llm_usage_policy in LLM_USAGE_POLICIES else "local_first",
+        "device_type": settings.device_type if settings.device_type in {"auto", "cuda", "cpu"} else "auto",
     }
 
 
@@ -120,6 +121,7 @@ def coerce_transcription_settings(raw: dict | None = None) -> dict:
     data["subtitle_correction_enabled"] = bool(data.get("subtitle_correction_enabled"))
     data["subtitle_correction_scope"] = "off" if data.get("subtitle_correction_scope") == "off" else "full"
     data["llm_usage_policy"] = data["llm_usage_policy"] if data.get("llm_usage_policy") in LLM_USAGE_POLICIES else "local_first"
+    data["device_type"] = data["device_type"] if data.get("device_type") in {"auto", "cuda", "cpu"} else "auto"
     prompt = str(data.get("subtitle_correction_prompt") or DEFAULT_SUBTITLE_CORRECTION_PROMPT)
     if "????" in prompt or "\u5fd9" in prompt or "\ufffd" in prompt or "\u00e6" in prompt or "\u929d" in prompt:
         prompt = DEFAULT_SUBTITLE_CORRECTION_PROMPT

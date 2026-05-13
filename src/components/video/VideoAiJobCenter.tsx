@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -229,7 +229,7 @@ function IconButton({
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
         danger
           ? 'text-[var(--danger)] hover:border-[color-mix(in_srgb,var(--danger)_38%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]'
           : 'text-[var(--text-secondary)] hover:border-[var(--border-light)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]'
@@ -249,7 +249,7 @@ export function VideoAiJobCenter({
   batchLoading = false,
   batchProgress,
   batchMode = 'unfinished',
-  batchLimit = 20,
+  batchLimit = 100,
   batchCorrectionEnabled = false,
   batchPreview,
   queuePaused = false,
@@ -270,12 +270,17 @@ export function VideoAiJobCenter({
   const [collapsed, setCollapsed] = useState(false);
   const [limitDraft, setLimitDraft] = useState(String(batchLimit));
 
-  useEffect(() => {
-    setLimitDraft(String(batchLimit));
-  }, [batchLimit]);
-
   const items = jobs?.items ?? [];
   const previewEnqueueCount = batchPreview ? Math.min(batchPreview.eligible, batchPreview.max_enqueue) : batchLimit;
+  const statusCount = (value: string | null) => {
+    switch (value) {
+      case 'running': return jobs?.running ?? 0;
+      case 'queued': return jobs?.queued ?? 0;
+      case 'failed': return jobs?.failed ?? 0;
+      case 'completed': return jobs?.completed ?? 0;
+      default: return jobs?.total ?? 0;
+    }
+  };
   const batchScopeLabel = batchScope === 'descendants' ? '全部视频范围' : '当前文件夹';
   const currentBatchMode = BATCH_MODES.find((mode) => mode.value === batchMode) ?? BATCH_MODES[0];
   const skippedSummary = summarizeSkippedItems(batchPreview);
@@ -290,14 +295,14 @@ export function VideoAiJobCenter({
       setLimitDraft(String(batchLimit));
       return;
     }
-    const next = Math.max(1, Math.min(500, parsed));
+    const next = Math.max(1, Math.min(999999, parsed));
     setLimitDraft(String(next));
     onBatchLimitChange?.(next);
   };
 
   return (
-    <div className="theme-surface min-w-0 overflow-hidden rounded-xl border px-4 py-3">
-      <div className={`flex min-w-0 gap-2 ${collapsed ? 'items-center' : 'items-start'}`}>
+    <div className="theme-surface min-w-0 overflow-hidden rounded-xl border px-5 py-4">
+      <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
@@ -328,29 +333,29 @@ export function VideoAiJobCenter({
         </div>
 
         {!collapsed && (
-          <div className="flex min-w-0 max-w-full flex-wrap justify-end gap-1 pl-1">
+          <div className="flex shrink-0 flex-nowrap items-center gap-1 pl-1">
             <IconButton title={queueButtonTitle} onClick={canToggleQueue ? onToggleQueue : undefined} disabled={!canToggleQueue}>
-              {queuePaused ? <Play size={14} /> : <Pause size={14} />}
+              {queuePaused ? <Play size={13} /> : <Pause size={13} />}
             </IconButton>
             <IconButton title="刷新任务状态" onClick={onRefresh} disabled={loading}>
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </IconButton>
             <IconButton title="清除已完成任务" onClick={onClearCompleted}>
-              <CheckCircle2 size={14} />
+              <CheckCircle2 size={13} />
             </IconButton>
             <IconButton title="同步排队任务设置" onClick={onSyncQueuedSettings}>
-              <SearchCheck size={14} />
+              <SearchCheck size={13} />
             </IconButton>
             <IconButton title="清除全部任务" onClick={onClearAll} danger>
-              <Trash2 size={14} />
+              <Trash2 size={13} />
             </IconButton>
           </div>
         )}
       </div>
 
       {!collapsed && (
-        <div className="mt-3 min-w-0 space-y-3">
-          <div className="min-w-0 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] p-3">
+        <div className="mt-4 min-w-0 space-y-4">
+          <div className="min-w-0 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
             <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-[var(--text-primary)]">批处理{batchScopeLabel}</p>
@@ -449,21 +454,27 @@ export function VideoAiJobCenter({
             )}
           </div>
 
-          <div className="flex min-w-0 flex-wrap gap-1">
-            {STATUS_FILTERS.map((filter) => (
-              <button
-                key={filter.value ?? 'all'}
-                type="button"
-                onClick={() => onStatusChange(filter.value)}
-                className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
-                  selectedStatus === filter.value
-                    ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
-                    : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          <div className="flex min-w-0 flex-wrap gap-2">
+            {STATUS_FILTERS.map((filter) => {
+              const count = statusCount(filter.value);
+              return (
+                <button
+                  key={filter.value ?? 'all'}
+                  type="button"
+                  onClick={() => onStatusChange(filter.value)}
+                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                    selectedStatus === filter.value
+                      ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                      : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                  }`}
+                >
+                  <span>{filter.label}</span>
+                  <span className="rounded-full bg-[var(--bg-accent)] px-1 text-[10px] tabular-nums text-[var(--text-muted)]">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="min-w-0 space-y-2">

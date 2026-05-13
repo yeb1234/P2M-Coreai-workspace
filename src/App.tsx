@@ -7,8 +7,6 @@ import { registerAllPlugins } from './plugins';
 import { useAuthStore, useNotificationStore, useScheduleStore, useCalendarStore } from './stores';
 import { useRehydrateStores } from './hooks/useRehydrateStores';
 import { useApplyStoredTheme } from './hooks/useApplyStoredTheme';
-import { clearIDBKvData } from './lib/idbStorage';
-
 registerAllPlugins();
 
 function WelcomeScreen({ username, onDone }: { username: string; onDone: () => void }) {
@@ -43,7 +41,7 @@ function App() {
   // Rehydrate all stores with user-prefixed keys after login
   const storesReady = useRehydrateStores(currentUser);
   const appDataReady = initialized && Boolean(currentUser) && storesReady;
-  useApplyStoredTheme(appDataReady);
+  useApplyStoredTheme(initialized);
 
   useEffect(() => {
     if (appDataReady) {
@@ -60,7 +58,6 @@ function App() {
 
   useEffect(() => {
     if (!appDataReady) return;
-    void clearIDBKvData();
     void useScheduleStore.getState().loadItems();
     void useCalendarStore.getState().loadEvents();
   }, [appDataReady]);

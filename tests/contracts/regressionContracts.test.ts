@@ -149,7 +149,7 @@ describe('regression contracts', () => {
     const app = readRepoFile('src/App.tsx');
     const themeHook = readRepoFile('src/hooks/useApplyStoredTheme.ts');
 
-    expect(app).toContain('useApplyStoredTheme(appDataReady)');
+    expect(app).toContain('useApplyStoredTheme(initialized)');
     expect(app).not.toContain('setTimeout(() =>');
     expect(themeHook).toContain('useUIStore');
     expect(themeHook).toContain('themeId');
