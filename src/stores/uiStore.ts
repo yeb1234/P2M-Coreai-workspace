@@ -107,7 +107,9 @@ export const useUIStore = create<UIState>()(
           const order = [...state.navOrder];
           const fromIdx = order.indexOf(fromId);
           const toIdx = order.indexOf(toId);
-          if (fromIdx === -1 || toIdx === -1) return state;
+          if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) {
+            return { navOrder: order };
+          }
           order.splice(fromIdx, 1);
           order.splice(toIdx, 0, fromId);
           return { navOrder: order };
@@ -183,10 +185,13 @@ export const useUIStore = create<UIState>()(
         videoRightPanelCollapsed: state.videoRightPanelCollapsed,
       }),
       merge: (persisted, current) => {
-        if (!persisted) return current;
+        if (!persisted || typeof persisted !== 'object') return current;
         const storageValue = persisted as Record<string, unknown>;
-        const saved = (storageValue.state !== undefined ? storageValue.state : persisted) as Partial<UIState>;
-        if (!saved) return current;
+        const saved =
+          storageValue.state !== undefined && storageValue.state !== null
+            ? (storageValue.state as Partial<UIState>)
+            : (persisted as Partial<UIState>);
+        if (!saved || typeof saved !== 'object') return current;
         const savedOrder = (saved.navOrder || []) as ActiveView[];
         const savedHidden = (saved.hiddenNavItems || []) as ActiveView[];
         const validSet = new Set(DEFAULT_NAV_ORDER);
@@ -197,6 +202,9 @@ export const useUIStore = create<UIState>()(
           }
         }
         const validHidden = savedHidden.filter((id) => validSet.has(id));
+        if (import.meta.env?.DEV) {
+          console.log('[uiStore merge] persisted:', persisted, 'savedOrder:', savedOrder, 'savedHidden:', savedHidden, 'merged:', merged, 'validHidden:', validHidden);
+        }
         return {
           ...current,
           ...saved,

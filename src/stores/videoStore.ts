@@ -73,6 +73,14 @@ function loadNavState(): SavedNavState | null {
   } catch { return null; }
 }
 
+function categoryExistsInTree(nodes: CategoryTree[], id: number): boolean {
+  for (const node of nodes) {
+    if (node.id === id) return true;
+    if (categoryExistsInTree(node.children, id)) return true;
+  }
+  return false;
+}
+
 let currentVideoRequestSeq = 0;
 let videoListRequestSeq = 0;
 
@@ -142,6 +150,7 @@ interface VideoState {
   restoreNavigation: () => void;
   setSelectedFolderIds: (ids: number[]) => void;
   toggleFavorite: (videoId: number, nextFavorite: boolean) => Promise<void>;
+  updateCurrentSegmentText: (segmentIndex: number, text: string) => void;
 }
 
 export const useVideoStore = create<VideoState>()((set, get) => ({
@@ -309,6 +318,22 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     try {
       const tree = await fetchCategoryTree();
       set({ categoryTree: tree });
+
+      const currentId = get().currentCategoryId;
+      if (currentId !== null && !categoryExistsInTree(tree, currentId)) {
+        set({
+          currentCategoryId: null,
+          breadcrumb: [{ id: null, name: '全部视频' }],
+          videos: [],
+          page: 1,
+          selectedFolderIds: [],
+        });
+        pushVideoCategoryHash(null);
+        saveNavState({ currentCategoryId: null, breadcrumb: [{ id: null, name: '全部视频' }], searchQuery: get().searchQuery, page: 1 });
+        get().loadVideos(1);
+        return;
+      }
+
       const urlCategoryId = parseVideoCategoryFromHash();
       if (urlCategoryId) {
         const breadcrumb = findCategoryBreadcrumb(tree, urlCategoryId);
@@ -325,6 +350,10 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
 
   enterCategory: (id, name) => {
     const { breadcrumb } = get();
+    // 如果目标 id 已经是当前所在文件夹，不重复追加
+    if (breadcrumb.length > 0 && breadcrumb[breadcrumb.length - 1].id === id) {
+      return;
+    }
     const nextBreadcrumb = [...breadcrumb, { id, name }];
     pushVideoCategoryHash(id);
     set({
@@ -438,5 +467,17 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         error: e instanceof Error ? e.message : String(e),
       });
     }
+  },
+
+  updateCurrentSegmentText: (segmentIndex, text) => {
+    const { currentSegments, currentVideo } = get();
+    if (!currentVideo || segmentIndex < 0 || segmentIndex >= currentSegments.length) return;
+    const nextSegments = currentSegments.map((seg, idx) =>
+      idx === segmentIndex ? { ...seg, text } : seg
+    );
+    set({
+      currentSegments: nextSegments,
+      currentVideo: { ...currentVideo, transcript_segments: nextSegments },
+    });
   },
 }));

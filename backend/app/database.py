@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "p2m-local-dev-secret-change-in-prod"
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 2160
+    redis_url: str = "redis://localhost:6379/0"
 
     model_config = SettingsConfigDict(env_file=str(ROOT_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
 

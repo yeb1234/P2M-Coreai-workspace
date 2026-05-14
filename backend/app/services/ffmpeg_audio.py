@@ -15,7 +15,7 @@ def _resolve_threads(cpu_threads: int | None = None) -> int | None:
         return None
 
 
-def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | None = None) -> None:
+def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | None = None, job_id: str | None = None) -> None:
     wav_path.parent.mkdir(parents=True, exist_ok=True)
 
     if shutil.which("ffmpeg") is None:
@@ -38,6 +38,16 @@ def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | No
     resolved_threads = _resolve_threads(cpu_threads)
     if resolved_threads is not None:
         cmd[2:2] = ["-threads", str(resolved_threads)]
-    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if process.returncode != 0:
-        raise RuntimeError(process.stderr.strip() or "ffmpeg failed")
+
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        stdout, stderr = process.communicate()
+        if process.returncode != 0:
+            raise RuntimeError(stderr.strip() or "ffmpeg failed")
+    finally:
+        pass

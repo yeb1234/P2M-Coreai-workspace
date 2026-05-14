@@ -11,10 +11,13 @@ router = APIRouter(prefix="/api/categories", tags=["categories"])
 
 
 def build_full_path(node: Category, by_id: dict[int, Category]) -> str:
-    parts = [node.name]
+    def _single_name(n: Category) -> str:
+        return n.name.split(" / ")[-1] if " / " in n.name else n.name
+
+    parts = [_single_name(node)]
     parent = by_id.get(node.parent_id)
     while parent:
-        parts.append(parent.name)
+        parts.append(_single_name(parent))
         parent = by_id.get(parent.parent_id)
     return " / ".join(reversed(parts))
 

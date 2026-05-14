@@ -406,7 +406,7 @@ export const Calendar2Page: React.FC = () => {
     event.dataTransfer.setData('text/plain', lane.title);
   }, []);
 
-  const handleTodoDragStart = useCallback((event: React.DragEvent<HTMLElement>, item: ScheduleItem) => {
+  const handleTodoDragStart = useCallback((event: React.DragEvent<HTMLElement>, item: Pick<ScheduleItem, 'id' | 'title'>) => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('application/x-calendar2-item', item.id);
     event.dataTransfer.setData('text/plain', item.title);
@@ -489,7 +489,7 @@ export const Calendar2Page: React.FC = () => {
   return (
     <div ref={pageRef} className="flex h-full min-h-0 flex-col gap-5 px-4 py-5 lg:px-8 lg:py-7">
       <PageTitle
-        title="日历2"
+        title="周历"
         subtitle="周视图：拖动安排待办和事件"
         icon={<CalendarDays size={22} />}
         action={

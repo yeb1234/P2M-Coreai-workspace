@@ -11,6 +11,7 @@
 - 番茄钟使用本地每秒计时 + 后台关键事件/15 秒快照同步，局域网设备刷新后可以恢复当前阶段、设置和完成历史。
 - 番茄钟配置会同步完整小参数、环境音策略、当前背景音、各背景音音量和上次播放状态。
 - 本地视频学习、字幕转录、AI 总结、播放进度。
+- 字幕转录王：文件夹勾选批量转写、AI 任务队列控制、模型下载状态可视化。
 - 灵境小助手，支持本地 LLM 和 OpenAI-compatible 外部 LLM。
 - 主题系统、声音系统、背景音、通知。
 - 左侧插件式导航，后续大量 AI 页面都会继续接到插件里。
@@ -83,6 +84,7 @@ cd backend && .venv311/Scripts/python -m compileall app
 ## 文档
 
 - [更新日志](docs/changelog.md)
+- [2.8 技术改进报告](docs/2026-05-13-2.8-technical-report.md)
 - [2.7 技术改进报告](docs/2026-05-12-2.7-technical-report.md)
 - [踩坑与维护记录](docs/today-fixes-and-pitfalls.md)
 - [待办、提醒时间和番茄快捷输入规则](docs/todo-reminder-input-rules.md)

@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayCircle, ArrowLeft } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { useVideoStore } from '../../stores/videoStore';
-import { saveWatchHistory } from '../../lib/videoApi';
+import { saveWatchHistory, updateSubtitleSegment } from '../../lib/videoApi';
 import { useAiJobCenter } from '../../hooks/useAiJobCenter';
 import { VideoList } from './VideoList';
 import { VideoAiSummaryPanel } from './VideoAiSummaryPanel';
 import { MediaErrorOverlay, PausedOverlay, SubtitleOverlay } from './VideoOverlays';
+import { SubtitleEditDialog } from './SubtitleEditDialog';
 import { VideoPlayerControls } from './VideoPlayerControls';
 import { VideoPlaylistPanel } from './VideoPlaylistPanel';
 import { VideoAiJobCenter } from './VideoAiJobCenter';
@@ -103,6 +104,7 @@ function VideoPlayerView() {
     hasVideoDetails,
   } = useVideoPlayerMedia({ currentVideo, currentSegments });
   const {
+    activeSegIdx,
     activeSubtitleText,
     resetActiveSubtitle,
     toggleSubtitles,
@@ -243,6 +245,24 @@ function VideoPlayerView() {
     e.stopPropagation();
   }, []);
 
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const handleSubtitleDoubleClick = useCallback(() => {
+    if (activeSegIdx < 0 || !currentVideo) return;
+    setIsEditDialogOpen(true);
+  }, [activeSegIdx, currentVideo]);
+
+  const handleConfirmSubtitleEdit = useCallback(async (newText: string) => {
+    if (!currentVideo || activeSegIdx < 0) return;
+    try {
+      await updateSubtitleSegment(currentVideo.id, activeSegIdx, newText);
+      useVideoStore.getState().updateCurrentSegmentText(activeSegIdx, newText);
+      setIsEditDialogOpen(false);
+    } catch {
+      // error is surfaced in the dialog
+    }
+  }, [currentVideo, activeSegIdx]);
+
   useVideoKeyboardShortcuts({
     enabled: !!currentVideo,
     videoRef,
@@ -310,7 +330,7 @@ function VideoPlayerView() {
             />
 
             <MediaErrorOverlay message={mediaError} />
-            <SubtitleOverlay visible={showSubtitles} text={activeSubtitleText} opacity={subtitleOpacity} size={subtitleSize} />
+            <SubtitleOverlay visible={showSubtitles} text={activeSubtitleText} opacity={subtitleOpacity} size={subtitleSize} onDoubleClick={handleSubtitleDoubleClick} />
             <PausedOverlay isPlaying={isPlaying} />
 
             <VideoPlayerControls
@@ -358,6 +378,12 @@ function VideoPlayerView() {
             />
           </div>
 
+          <SubtitleEditDialog
+            isOpen={isEditDialogOpen}
+            onClose={() => setIsEditDialogOpen(false)}
+            onConfirm={handleConfirmSubtitleEdit}
+            initialText={activeSegIdx >= 0 ? normalizedSegments[activeSegIdx]?.text || '' : ''}
+          />
           <VideoAiSummaryPanel
             summary={currentVideo.summary}
             isProcessing={isProcessing}

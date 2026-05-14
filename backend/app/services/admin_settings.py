@@ -12,6 +12,15 @@ WHISPER_MODEL_FILES = {
     "medium": "ggml-medium.bin",
     "large": "ggml-large.bin",
     "large-v3": "ggml-large-v3.bin",
+    "large-v3-turbo": "ggml-large-v3-turbo.bin",
+    "distil-large-v3.5": "distil-large-v3.5-ct2",
+}
+
+# Compute types accepted by faster-whisper / CTranslate2. Validation uses these
+# to surface obviously wrong UI input early.
+ALLOWED_COMPUTE_TYPES = {
+    "auto", "default", "int8", "int16", "int8_float16", "int8_bfloat16",
+    "float16", "bfloat16", "float32",
 }
 
 TRANSCRIPTION_SETTINGS_KEY = "transcription_settings"
@@ -113,7 +122,14 @@ def coerce_transcription_settings(raw: dict | None = None) -> dict:
     data["do_summary"] = bool(data.get("do_summary"))
     data["word_limit"] = max(50, min(2000, int(data.get("word_limit") or 200)))
     data["cpu_threads"] = max(1, min(128, int(data.get("cpu_threads") or settings.whisper_cpu_threads)))
-    data["compute_type"] = str(data.get("compute_type") or settings.whisper_compute_type).strip() or settings.whisper_compute_type
+    data["device_type"] = data["device_type"] if data.get("device_type") in {"auto", "cuda", "cpu"} else "auto"
+    raw_compute = str(data.get("compute_type") or settings.whisper_compute_type).strip() or settings.whisper_compute_type
+    if raw_compute not in ALLOWED_COMPUTE_TYPES:
+        raw_compute = settings.whisper_compute_type if settings.whisper_compute_type in ALLOWED_COMPUTE_TYPES else "int8"
+    # CPU cannot use float16/bfloat16 variants; auto-correct to int8 to avoid runtime errors.
+    if data["device_type"] == "cpu" and raw_compute in {"float16", "bfloat16", "int8_float16", "int8_bfloat16"}:
+        raw_compute = "int8"
+    data["compute_type"] = raw_compute
     data["beam_size"] = max(1, min(10, int(data.get("beam_size") or settings.whisper_beam_size)))
     data["best_of"] = max(1, min(10, int(data.get("best_of") or settings.whisper_best_of)))
     data["temperature"] = max(0.0, min(1.0, float(data.get("temperature") if data.get("temperature") is not None else settings.whisper_temperature)))

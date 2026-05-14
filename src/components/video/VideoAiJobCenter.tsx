@@ -39,6 +39,7 @@ interface VideoAiJobCenterProps {
   onCancelJob?: (jobId: string) => void;
   onResumeJob?: (jobId: string) => void;
   onSyncQueuedSettings?: () => void;
+  onApplySettings?: () => void;
   onClearCompleted?: () => void;
   onClearAll?: () => void;
   onRefresh: () => void;
@@ -96,6 +97,8 @@ function statusLabel(status: string) {
       return '失败';
     case 'cancelled':
       return '已取消';
+    case 'cancelling':
+      return '正在停止';
     default:
       return status || '未知';
   }
@@ -119,6 +122,8 @@ function stageLabel(stage: string | null | undefined) {
     case 'queued':
     case 'claimed':
       return '排队';
+    case 'cancelling':
+      return '正在停止';
     default:
       return stage || '等待';
   }
@@ -157,6 +162,10 @@ function messageLabel(message: string | null | undefined) {
       return '已停止';
     case 'Cancelled by clear all':
       return '清除全部时已停止';
+    case 'Stopping worker (will finalize after current step)':
+      return '正在停止，等待当前步骤完成';
+    case 'Paused by user':
+      return '已暂停';
     default:
       return message || '';
   }
@@ -176,12 +185,14 @@ const PROCESS_STEPS = [
 function normalizedStage(job: AiJobListItem) {
   if (job.status === 'completed') return 'completed';
   if (job.status === 'queued') return 'queued';
+  if (job.status === 'cancelling') return 'cancelling';
   if (job.stage === 'correcting') return 'correcting-subtitles';
   return job.stage || job.status;
 }
 
 function statusIcon(status: string) {
   if (status === 'running') return <Loader2 size={13} className="animate-spin text-[var(--accent)]" />;
+  if (status === 'cancelling') return <Loader2 size={13} className="animate-spin text-[var(--text-muted)]" />;
   if (status === 'completed') return <CheckCircle2 size={13} className="text-[var(--success)]" />;
   if (status === 'failed') return <AlertCircle size={13} className="text-[var(--danger)]" />;
   return <Clock3 size={13} className="text-[var(--text-muted)]" />;
@@ -263,6 +274,7 @@ export function VideoAiJobCenter({
   onCancelJob,
   onResumeJob,
   onSyncQueuedSettings,
+  onApplySettings,
   onClearCompleted,
   onClearAll,
   onRefresh,
@@ -287,7 +299,6 @@ export function VideoAiJobCenter({
   const totalActive = (jobs?.running ?? 0) + (jobs?.queued ?? 0);
   const hasQueuedOrRunningJobs = totalActive > 0;
   const canToggleQueue = queuePaused || hasQueuedOrRunningJobs;
-  const queueButtonTitle = queuePaused ? '开始任务' : hasQueuedOrRunningJobs ? '暂停任务' : '没有可开始的任务';
 
   const commitLimit = () => {
     const parsed = Number.parseInt(limitDraft, 10);
@@ -334,9 +345,20 @@ export function VideoAiJobCenter({
 
         {!collapsed && (
           <div className="flex shrink-0 flex-nowrap items-center gap-1 pl-1">
-            <IconButton title={queueButtonTitle} onClick={canToggleQueue ? onToggleQueue : undefined} disabled={!canToggleQueue}>
+            <button
+              type="button"
+              onClick={canToggleQueue ? onToggleQueue : undefined}
+              disabled={!canToggleQueue}
+              className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                queuePaused
+                  ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
+                  : 'border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              }`}
+              title={queuePaused ? '开始任务（恢复新任务入队）' : hasQueuedOrRunningJobs ? '暂停任务（运行中任务不受影响）' : '没有可暂停的任务'}
+            >
               {queuePaused ? <Play size={13} /> : <Pause size={13} />}
-            </IconButton>
+              <span>{queuePaused ? '开始任务' : hasQueuedOrRunningJobs ? '暂停任务' : '队列空闲'}</span>
+            </button>
             <IconButton title="刷新任务状态" onClick={onRefresh} disabled={loading}>
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </IconButton>
@@ -346,7 +368,7 @@ export function VideoAiJobCenter({
             <IconButton title="同步排队任务设置" onClick={onSyncQueuedSettings}>
               <SearchCheck size={13} />
             </IconButton>
-            <IconButton title="清除全部任务" onClick={onClearAll} danger>
+            <IconButton title="清除全部（运行中任务不受影响）" onClick={onClearAll} danger>
               <Trash2 size={13} />
             </IconButton>
           </div>
@@ -372,6 +394,16 @@ export function VideoAiJobCenter({
                 >
                   <SearchCheck size={13} />
                   预览
+                </button>
+                <button
+                  type="button"
+                  onClick={onApplySettings}
+                  disabled={batchLoading}
+                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+                  title="将左侧当前转写设置保存到后端并同步给排队中的任务"
+                >
+                  <RefreshCw size={13} />
+                  应用当前设置
                 </button>
                 <button
                   type="button"
@@ -477,7 +509,7 @@ export function VideoAiJobCenter({
             })}
           </div>
 
-          <div className="min-w-0 space-y-2">
+          <div className="min-w-0 max-h-[480px] space-y-2 overflow-y-auto pr-1">
             {items.length === 0 ? (
               <div className="rounded-lg border border-dashed border-[var(--border-light)] px-3 py-4 text-center text-xs text-[var(--text-muted)]">
                 {loading ? '正在读取任务...' : '暂无 AI 任务'}
@@ -501,6 +533,18 @@ export function VideoAiJobCenter({
                           <p className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-primary)]" title={job.video_title || `视频 ${job.video_id}`}>
                             {job.video_title || `视频 ${job.video_id}`}
                           </p>
+                          {job.duration != null && (
+                            <span className="shrink-0 rounded bg-[var(--bg-accent)] px-1 py-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
+                              {(() => {
+                                const sec = Math.round(job.duration);
+                                const h = Math.floor(sec / 3600);
+                                const m = Math.floor((sec % 3600) / 60);
+                                const s = sec % 60;
+                                if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                                return `${m}:${String(s).padStart(2, '0')}`;
+                              })()}
+                            </span>
+                          )}
                           <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{compactDate(job.updated_at)}</span>
                         </div>
                         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--text-muted)]">
@@ -531,9 +575,20 @@ export function VideoAiJobCenter({
                           </div>
                         )}
                         {message && (
-                          <p className="mt-1 truncate text-[11px] text-[var(--text-secondary)]" title={job.message}>
-                            {message}
-                          </p>
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                            <span className="truncate" title={job.message}>{message}</span>
+                            {job.status === 'completed' && job.duration != null && job.started_at != null && (
+                              <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] px-1.5 py-0.5 text-[9px] leading-none text-[var(--success)]">
+                                {(() => {
+                                  const started = new Date(job.started_at!).getTime();
+                                  const ended = new Date(job.updated_at).getTime();
+                                  const processingSec = Math.max(1, (ended - started) / 1000);
+                                  const speed = job.duration! / processingSec;
+                                  return `${speed.toFixed(1)}x`;
+                                })()}
+                              </span>
+                            )}
+                          </div>
                         )}
                         {(job.error || job.summary_error) && (
                           <p className="mt-1 line-clamp-2 text-[11px] text-[var(--danger)]" title={job.error || job.summary_error || undefined}>
@@ -547,7 +602,12 @@ export function VideoAiJobCenter({
                             <RotateCcw size={13} />
                           </IconButton>
                         )}
-                        {['running', 'queued'].includes(job.status) && (
+                        {job.status === 'running' && (
+                          <IconButton title="运行中不可停止" disabled>
+                            <X size={13} className="opacity-45" />
+                          </IconButton>
+                        )}
+                        {job.status === 'queued' && (
                           <IconButton title="停止这个任务" onClick={() => onCancelJob?.(job.id)} danger>
                             <X size={13} />
                           </IconButton>

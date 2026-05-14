@@ -97,6 +97,7 @@ class AiJob(Base):
     markdown_path = Column(String, nullable=True)
     subtitle_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
+    started_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     video = relationship("Video", back_populates="ai_jobs")

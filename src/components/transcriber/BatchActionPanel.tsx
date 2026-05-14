@@ -1,4 +1,4 @@
-import { Loader2, Play, SearchCheck } from 'lucide-react';
+import { Loader2, Play, RefreshCw, SearchCheck } from 'lucide-react';
 import type { AiJobBatchOut } from '../../lib/videoApi';
 
 const SKIP_REASON_LABELS: Record<string, string> = {
@@ -23,10 +23,11 @@ interface BatchActionPanelProps {
   batchPreview: AiJobBatchOut | null;
   batchError?: string | null;
   onPreview: () => void;
+  onApplySettings?: () => void;
   onEnqueue: () => void;
 }
 
-export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPreview, batchError, onPreview, onEnqueue }: BatchActionPanelProps) {
+export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPreview, batchError, onPreview, onApplySettings, onEnqueue }: BatchActionPanelProps) {
   return (
     <div className="min-w-0 space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -36,24 +37,34 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
             已选 {selectedVideoCount} 个视频
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={onPreview}
             disabled={batchLoading || selectedVideoCount === 0}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border-light)] px-3 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
           >
             <SearchCheck size={13} />
             预览
           </button>
           <button
             type="button"
+            onClick={onApplySettings}
+            disabled={batchLoading}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+            title="将左侧当前转写设置保存到后端并同步给排队中的任务"
+          >
+            <RefreshCw size={13} />
+            应用当前设置
+          </button>
+          <button
+            type="button"
             onClick={onEnqueue}
             disabled={batchLoading || selectedVideoCount === 0}
-            className="inline-flex h-8 items-center gap-1 rounded-md bg-[var(--accent)] px-3 text-[11px] text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
+            className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-[11px] text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
           >
             {batchLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-            开始转录
+            入队
           </button>
         </div>
       </div>

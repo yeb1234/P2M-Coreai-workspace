@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useTranscriptionStore, WHISPER_MODELS, DEFAULT_TRANSCRIPTION_SETTINGS, DEFAULT_SUBTITLE_CORRECTION_PROMPT } from '../../stores';
-import { clearActiveAiJobs, fetchBackendHealth, fetchTranscriptionSettings, fetchWhisperModels, saveTranscriptionSettings, type WhisperModelsOut } from '../../lib/videoApi';
+import { clearActiveAiJobs, downloadWhisperModel, fetchBackendHealth, fetchDownloadStatus, fetchTranscriptionSettings, fetchWhisperModels, saveTranscriptionSettings, type WhisperModelsOut } from '../../lib/videoApi';
 import type { TranscriptionDraft, NumberDrafts } from './types';
 import { transcriptionFormToDto, transcriptionDtoToForm, TRANSCRIPTION_PARAM_HELP } from './types';
 import { playInteractionSound } from '../../lib/sounds';
@@ -15,6 +15,43 @@ export function TranscriptionSettings() {
   const [fieldHint, setFieldHint] = useState('');
   const [whisperModels, setWhisperModels] = useState<WhisperModelsOut | null>(null);
   const [modelsError, setModelsError] = useState('');
+  interface DownloadState {
+    status: string;
+    error?: string;
+  }
+  const [downloadStates, setDownloadStates] = useState<Record<string, DownloadState>>({});
+
+  const hasActiveDownload = Object.values(downloadStates).some(
+    (s) => s.status === 'started' || s.status === 'running'
+  );
+
+  useEffect(() => {
+    if (!hasActiveDownload) return;
+    const timer = setInterval(() => {
+      const modelIds = (whisperModels?.items ?? [])
+        .filter((i) => i.auto_downloadable)
+        .map((i) => i.id);
+      if (modelIds.length === 0) return;
+      void Promise.allSettled(modelIds.map((id) => fetchDownloadStatus(id)))
+        .then((results) => {
+          const next: Record<string, DownloadState> = {};
+          let hasCompleted = false;
+          results.forEach((res, idx) => {
+            if (res.status === 'fulfilled') {
+              const val = res.value;
+              next[modelIds[idx]] = { status: val.status, error: val.error };
+              if (val.status === 'completed') hasCompleted = true;
+            }
+          });
+          setDownloadStates((prev) => ({ ...prev, ...next }));
+          if (hasCompleted) {
+            void fetchWhisperModels().then((m) => setWhisperModels(m));
+          }
+        });
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [hasActiveDownload, whisperModels]);
+
   const [savingSettings, setSavingSettings] = useState(false);
   const [form, setForm] = useState<TranscriptionDraft>({
     whisperEngine: settings.whisperEngine,
@@ -92,6 +129,7 @@ export function TranscriptionSettings() {
   const threadLabel = 'CPU 转写线程';
   const threadHint = '只在 faster-whisper CPU 模式生效，用于限制 CTranslate2/OpenMP/BLAS 线程；whisper.cpp 转写不会读取这个值。字幕校对走 LM Studio/OpenAI 兼容接口。';
   const installedWhisperModels = new Set((whisperModels?.items ?? []).filter((item) => item.installed).map((item) => item.id));
+  const autoDownloadableModels = new Set((whisperModels?.items ?? []).filter((item) => item.auto_downloadable).map((item) => item.id));
   const hasWhisperModelScan = Boolean(whisperModels);
 
   const loadWhisperModels = async () => fetchWhisperModels();
@@ -99,7 +137,23 @@ export function TranscriptionSettings() {
   useEffect(() => {
     const id = setTimeout(() => setModelsError(''), 0);
     void loadWhisperModels()
-      .then((models) => setWhisperModels(models))
+      .then((models) => {
+        setWhisperModels(models);
+        if (models) {
+          const autoDlIds = models.items.filter((i) => i.auto_downloadable).map((i) => i.id);
+          void Promise.allSettled(autoDlIds.map((id) => fetchDownloadStatus(id)))
+            .then((results) => {
+              const next: Record<string, DownloadState> = {};
+              results.forEach((res, idx) => {
+                if (res.status === 'fulfilled') {
+                  const val = res.value;
+                  next[autoDlIds[idx]] = { status: val.status, error: val.error };
+                }
+              });
+              setDownloadStates((prev) => ({ ...prev, ...next }));
+            });
+        }
+      })
       .catch((err) => setModelsError(err instanceof Error ? err.message : '模型扫描失败'));
     void fetchTranscriptionSettings()
       .then((dto) => {
@@ -191,21 +245,26 @@ export function TranscriptionSettings() {
             onClick={() => applyPreset(
               {
                 whisperEngine: 'faster-whisper',
-                cpuThreads: 12,
-                computeType: 'int8',
-                beamSize: 1,
+                whisperModel: 'large-v3',
+                cpuThreads: 20,
+                computeType: 'int8_float16',
+                beamSize: 3,
                 bestOf: 1,
                 temperature: 0,
                 vadFilter: true,
                 subtitleCorrectionEnabled: false,
                 subtitleCorrectionScope: 'off',
               },
-              '低占用模式：faster-whisper CPU，12 个 CPU 转写线程、低搜索参数、关闭字幕校对。'
+              'Faster-Whisper路线：large-v3 / int8_float16 / 20 线程 / beam 3 / 关闭字幕校对。'
             )}
-            className="rounded-lg border border-[#e5e2dd] bg-white px-3 py-2 text-left transition-colors hover:border-[#c87d2f]/50 hover:bg-[#fff7ed]"
+            className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+              form.whisperEngine === 'faster-whisper'
+                ? 'border-[#c87d2f] bg-[#fff7ed] text-[#9a5a1e]'
+                : 'border-[#e5e2dd] bg-white text-[#1a1a1a] hover:border-[#c87d2f]/50'
+            }`}
           >
-            <p className="text-sm font-medium text-[#1a1a1a]">低占用模式</p>
-            <p className="mt-1 text-[11px] leading-4 text-[#8a8178]">CPU 路线，参数保守，适合后台慢慢跑。</p>
+            <p className="text-sm font-medium">Faster-Whisper路线</p>
+            <p className={`mt-1 text-[11px] leading-4 ${form.whisperEngine === 'faster-whisper' ? 'text-[#9a5a1e]/70' : 'text-[#8a8178]'}`}>CPU/CUDA路线，参数保守，适合后台慢慢跑。</p>
           </button>
           <button
             onClick={() => {
@@ -221,13 +280,17 @@ export function TranscriptionSettings() {
                   subtitleCorrectionEnabled: false,
                   subtitleCorrectionScope: 'full',
                 },
-                `高性能模式：whisper.cpp + large-v3。转写走 whisper.cpp 外部/GPU 引擎，不使用 CPU 转写线程设置。字幕校对只在单独点击校对或批处理开关开启时运行。`
+                `Whisper.cpp路线：whisper.cpp + large-v3。转写走 whisper.cpp 外部/GPU 引擎，不使用 CPU 转写线程设置。字幕校对只在单独点击校对或批处理开关开启时运行。`
               );
             }}
-            className="rounded-lg border border-[#c87d2f] bg-[#c87d2f] px-3 py-2 text-left text-white transition-colors hover:bg-[#b06d20]"
+            className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+              form.whisperEngine === 'whisper.cpp'
+                ? 'border-[#c87d2f] bg-[#fff7ed] text-[#9a5a1e]'
+                : 'border-[#e5e2dd] bg-white text-[#1a1a1a] hover:border-[#c87d2f]/50'
+            }`}
           >
-            <p className="text-sm font-medium">高性能模式</p>
-            <p className="mt-1 text-[11px] leading-4 text-white/80">whisper.cpp 外部引擎，适合 GPU 转写。</p>
+            <p className="text-sm font-medium">Whisper.cpp路线</p>
+            <p className={`mt-1 text-[11px] leading-4 ${form.whisperEngine === 'whisper.cpp' ? 'text-[#9a5a1e]/70' : 'text-[#8a8178]'}`}>whisper.cpp 外部引擎，适合 GPU 转写。</p>
           </button>
           <button
             onClick={() => {
@@ -286,9 +349,23 @@ export function TranscriptionSettings() {
         >
           {WHISPER_MODELS.map((model) => {
             const installed = !hasWhisperModelScan || installedWhisperModels.has(model.id);
+            const autoDl = autoDownloadableModels.has(model.id);
+            const isFasterWhisper = form.whisperEngine === 'faster-whisper';
+            const canSelect = installed || (isFasterWhisper && autoDl);
+            const dlState = downloadStates[model.id];
+            let suffix = installed ? model.desc : `未安装`;
+            if (dlState) {
+              if (dlState.status === 'started' || dlState.status === 'running') {
+                suffix = '下载中...';
+              } else if (dlState.status === 'failed') {
+                suffix = '下载失败';
+              } else if (dlState.status === 'completed') {
+                suffix = '下载完成';
+              }
+            }
             return (
-              <option key={model.id} value={model.id} disabled={!installed}>
-                {model.name} - {installed ? model.desc : `未安装，需要放入模型文件夹`}
+              <option key={model.id} value={model.id} disabled={!canSelect}>
+                {model.name} - {suffix}
               </option>
             );
           })}
@@ -300,6 +377,64 @@ export function TranscriptionSettings() {
           <button type="button" onClick={() => void loadWhisperModels()} className="text-[#c87d2f] hover:underline">
             重新扫描
           </button>
+          {form.whisperEngine === 'faster-whisper' && autoDownloadableModels.has(form.whisperModel) && (
+            <button
+              type="button"
+              disabled={(() => {
+                const s = downloadStates[form.whisperModel];
+                return s?.status === 'started' || s?.status === 'running';
+              })()}
+              onClick={async () => {
+                const s = downloadStates[form.whisperModel];
+                if (s?.status === 'started' || s?.status === 'running') return;
+                setDownloadStates((prev) => ({ ...prev, [form.whisperModel]: { status: 'started' } }));
+                setFieldHint(`正在下载 ${form.whisperModel}...`);
+                try {
+                  await downloadWhisperModel(form.whisperModel);
+                  playInteractionSound('success');
+                  setFieldHint(`${form.whisperModel} 下载完成！`);
+                  void loadWhisperModels().then((models) => setWhisperModels(models));
+                } catch (err) {
+                  playInteractionSound('error');
+                  const msg = err instanceof Error ? err.message : '下载失败';
+                  setDownloadStates((prev) => ({ ...prev, [form.whisperModel]: { status: 'failed', error: msg } }));
+                  setFieldHint(`下载失败: ${msg}`);
+                }
+              }}
+              className="text-[#c87d2f] hover:underline disabled:text-[#9ca3af] disabled:opacity-50 group"
+            >
+              {(() => {
+                const s = downloadStates[form.whisperModel];
+                const installed = installedWhisperModels.has(form.whisperModel);
+                if (s?.status === 'started' || s?.status === 'running') {
+                  return (
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 size={12} className="animate-spin" /> 下载中...
+                    </span>
+                  );
+                }
+                if (s?.status === 'failed') {
+                  return <span className="text-[#dc3545]">下载失败，点击重试</span>;
+                }
+                if (installed || s?.status === 'completed') {
+                  return (
+                    <>
+                      <span className="group-hover:hidden">下载完成</span>
+                      <span className="hidden group-hover:inline">重新下载</span>
+                    </>
+                  );
+                }
+                return '立即下载';
+              })()}
+            </button>
+          )}
+          {(() => {
+            const s = downloadStates[form.whisperModel];
+            if (s?.status === 'failed' && s?.error) {
+              return <span className="text-[10px] text-[#dc3545]">{s.error}</span>;
+            }
+            return null;
+          })()}
         </div>
       </div>
 
@@ -394,20 +529,20 @@ export function TranscriptionSettings() {
             />
             <p className="mt-1 text-[10px] leading-4 text-[#9ca3af]">随机度。0 最稳定，适合字幕；调高可能更灵活但更容易误识别。</p>
           </div>
-          <div className="flex items-center justify-between py-2">
-            <div>
+          <div className="flex items-center justify-between py-2 sm:col-span-2">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-[#1a1a1a]">VAD 过滤</p>
               <p className="text-xs text-[#9ca3af]">去掉长静音，减少空字幕；噪声很重时可关闭测试。</p>
             </div>
             <button
               onClick={() => updateForm({ vadFilter: !form.vadFilter })}
-              className={`relative w-10 h-5 rounded-full transition-colors ${form.vadFilter ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
+              className={`relative shrink-0 ml-2 w-10 h-5 rounded-full transition-colors ${form.vadFilter ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
             >
               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.vadFilter ? 'left-[22px]' : 'left-0.5'}`} />
             </button>
           </div>
           <div className="flex items-center justify-between py-2 sm:col-span-2">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-[#1a1a1a]">字幕校对</p>
               <p className="text-xs text-[#9ca3af]">字幕生成后整份交给 AI 校对，不改时间轴。</p>
             </div>
@@ -416,7 +551,7 @@ export function TranscriptionSettings() {
                 subtitleCorrectionEnabled: !form.subtitleCorrectionEnabled,
                 subtitleCorrectionScope: form.subtitleCorrectionEnabled ? 'off' : 'full',
               })}
-              className={`relative w-10 h-5 rounded-full transition-colors ${form.subtitleCorrectionEnabled ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
+              className={`relative shrink-0 ml-2 w-10 h-5 rounded-full transition-colors ${form.subtitleCorrectionEnabled ? 'bg-[#c87d2f]' : 'bg-[#d1cdc6]'}`}
             >
               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.subtitleCorrectionEnabled ? 'left-[22px]' : 'left-0.5'}`} />
             </button>

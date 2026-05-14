@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { RefreshCw, X, PlayCircle } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { CategoryTree, collectVideoIds } from './CategoryTree';
@@ -16,6 +16,9 @@ import {
   cancelAiJob,
   resumeAiJob,
   syncQueuedAiJobSettings,
+  saveTranscriptionSettings,
+  fetchTranscriptionSettings,
+  type TranscriptionSettingsDto,
   clearCompletedAiJobs,
   clearAllAiJobs,
   clearActiveAiJobs,
@@ -25,6 +28,7 @@ import {
   type AiJobListOut,
   type VideoItem,
 } from '../../lib/videoApi';
+import { transcriptionFormToDto, transcriptionDtoToForm } from '../settings/types';
 import { useTranscriptionStore } from '../../stores';
 import { VideoAiJobCenter } from '../video/VideoAiJobCenter';
 
@@ -53,6 +57,34 @@ export function TranscriberPage() {
   // Global transcription settings
   const settings = useTranscriptionStore((s) => s);
   const updateSettings = useTranscriptionStore((s) => s.updateSettings);
+
+  // On mount, fetch backend settings and merge into store
+  useEffect(() => {
+    let cancelled = false;
+    fetchTranscriptionSettings()
+      .then((dto) => {
+        if (cancelled) return;
+        const remote = transcriptionDtoToForm(dto);
+        updateSettings(remote);
+      })
+      .catch(() => {
+        // fallback to store values
+      });
+    return () => { cancelled = true; };
+  }, [updateSettings]);
+
+  // Debounce-save to backend when settings change from the panel
+  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSettingsChange = useCallback((updates: Partial<typeof settings>) => {
+    updateSettings(updates);
+    if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
+    saveDebounceRef.current = setTimeout(() => {
+      const current = useTranscriptionStore.getState();
+      saveTranscriptionSettings(transcriptionFormToDto(current)).catch(() => {
+        // silently fail
+      });
+    }, 800);
+  }, [updateSettings]);
 
   const loadTree = useCallback(async () => {
     setTreeLoading(true);
@@ -113,6 +145,31 @@ export function TranscriberPage() {
   const handleSyncQueuedSettings = useCallback(() => {
     void withJobsRefresh(() => syncQueuedAiJobSettings());
   }, [withJobsRefresh]);
+
+  const handleApplySettings = useCallback(() => {
+    void withJobsRefresh(async () => {
+      const dto: TranscriptionSettingsDto = {
+        whisper_engine: settings.whisperEngine,
+        whisper_model: settings.whisperModel,
+        language: settings.language,
+        do_summary: settings.doSummary,
+        word_limit: settings.wordLimit,
+        cpu_threads: settings.cpuThreads,
+        compute_type: settings.computeType,
+        beam_size: settings.beamSize,
+        best_of: settings.bestOf,
+        temperature: settings.temperature,
+        vad_filter: settings.vadFilter,
+        subtitle_correction_enabled: settings.subtitleCorrectionEnabled,
+        subtitle_correction_scope: settings.subtitleCorrectionScope,
+        subtitle_correction_prompt: settings.subtitleCorrectionPrompt,
+        llm_usage_policy: settings.llmUsagePolicy,
+        device_type: settings.deviceType,
+      };
+      await saveTranscriptionSettings(dto);
+      await syncQueuedAiJobSettings();
+    });
+  }, [withJobsRefresh, settings]);
 
   const handleClearCompleted = useCallback(() => {
     void withJobsRefresh(() => clearCompletedAiJobs());
@@ -339,7 +396,7 @@ export function TranscriberPage() {
 
         {/* Center: Settings + Batch Action */}
         <div className="theme-surface flex min-w-0 flex-1 flex-col gap-3 overflow-hidden rounded-xl border p-4">
-          <TranscriptionSettingsPanel settings={settings} onChange={updateSettings} />
+          <TranscriptionSettingsPanel settings={settings} onChange={handleSettingsChange} />
 
           {/* Selected Videos */}
           <div className="border-t border-[var(--border-light)] pt-3 min-h-0 flex flex-col">
@@ -399,6 +456,7 @@ export function TranscriberPage() {
               batchPreview={batchPreview}
               batchError={batchError}
               onPreview={handlePreview}
+              onApplySettings={handleApplySettings}
               onEnqueue={handleEnqueue}
             />
           </div>
@@ -424,6 +482,7 @@ export function TranscriberPage() {
             onCancelJob={handleCancelJob}
             onResumeJob={handleResumeJob}
             onSyncQueuedSettings={handleSyncQueuedSettings}
+            onApplySettings={handleApplySettings}
             onClearCompleted={handleClearCompleted}
             onClearAll={handleClearAll}
             onBatchModeChange={setRightBatchMode}

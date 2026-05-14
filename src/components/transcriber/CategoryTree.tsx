@@ -83,6 +83,20 @@ const TreeNodeRow = memo(function TreeNodeRow({
   );
 });
 
+function deduplicateTree(nodes: CategoryTreeWithVideos[], seen = new Set<number>()): CategoryTreeWithVideos[] {
+  const result: CategoryTreeWithVideos[] = [];
+  for (const node of nodes) {
+    if (seen.has(node.id)) {
+      console.warn('CategoryTree: duplicate node id detected, skipping:', node.id, node.full_path);
+      continue;
+    }
+    seen.add(node.id);
+    const dedupedChildren = deduplicateTree(node.children as CategoryTreeWithVideos[], seen);
+    result.push({ ...node, children: dedupedChildren });
+  }
+  return result;
+}
+
 export function CategoryTree({ nodes, selectedIds, onToggle }: CategoryTreeProps) {
   if (nodes.length === 0) {
     return (
@@ -92,9 +106,11 @@ export function CategoryTree({ nodes, selectedIds, onToggle }: CategoryTreeProps
     );
   }
 
+  const uniqueNodes = deduplicateTree(nodes);
+
   return (
     <div className="min-w-0 space-y-0.5">
-      {nodes.map((node) => (
+      {uniqueNodes.map((node) => (
         <TreeNodeRow key={node.id} node={node} level={0} selectedIds={selectedIds} onToggle={onToggle} />
       ))}
     </div>

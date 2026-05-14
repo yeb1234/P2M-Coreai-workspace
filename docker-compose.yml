@@ -1,6 +1,13 @@
 version: "3.8"
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: siteyeb-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
   backend:
     build:
       context: .
@@ -31,6 +38,9 @@ services:
       - EXTERNAL_LLM_BASE_URL=${EXTERNAL_LLM_BASE_URL}
       - EXTERNAL_LLM_API_KEY=${EXTERNAL_LLM_API_KEY}
       - EXTERNAL_LLM_MODEL=${EXTERNAL_LLM_MODEL}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
 
   frontend:
     build:

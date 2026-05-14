@@ -1,18 +1,41 @@
+"""RQ-based AI queue management.
+
+Replaces the hand-rolled ThreadPoolExecutor + memory-flag system with
+Redis Queue for reliable enqueue, execution, cancellation and recovery.
+"""
+
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 
 from sqlalchemy import and_, or_
 
 from app.database import SessionLocal
 from app.models import AiJob, Video
+import sys
+
 from app.services.admin_settings import load_transcription_settings
-from app.services.ai_queue import is_queue_paused, pause_queue, resume_queue
+from app.services.rq_client import (
+    ai_jobs_queue,
+    cancel_job,
+    clear_job_cancelled,
+    get_redis_connection,
+    is_job_cancelled,
+    send_kill_to_worker,
+)
+
+_PAUSE_KEY = "ai_queue:paused"
+
+
+def _is_queue_paused() -> bool:
+    return bool(get_redis_connection().exists(_PAUSE_KEY))
 
 
 def ai_queue_state() -> dict:
     db = SessionLocal()
     try:
         return {
-            "paused": is_queue_paused(),
+            "paused": _is_queue_paused(),
             "running": db.query(AiJob).filter(AiJob.status == "running").count(),
             "queued": db.query(AiJob).filter(AiJob.status == "queued").count(),
             "failed": db.query(AiJob).filter(AiJob.status == "failed").count(),
@@ -27,11 +50,15 @@ def clear_queued_ai_jobs() -> dict:
     try:
         jobs = db.query(AiJob).filter(AiJob.status == "queued").all()
         video_ids = {job.video_id for job in jobs}
+        queue = ai_jobs_queue()
         for job in jobs:
             job.status = "cancelled"
             job.stage = "cancelled"
             job.message = "Cancelled before processing"
             job.error = "Cancelled before processing"
+            rq_job = queue.fetch_job(job.id)
+            if rq_job:
+                rq_job.cancel()
         if video_ids:
             videos = db.query(Video).filter(Video.id.in_(video_ids)).all()
             for video in videos:
@@ -73,7 +100,11 @@ def recover_stuck_ai_jobs(minutes: int = 60, correction_minutes: int = 15, force
             video = db.query(Video).filter(Video.id == job.video_id).first()
             job.status = "queued"
             job.stage = "queued"
-            job.message = "Recovered from stale subtitle correction state" if was_correcting_subtitles else "Recovered from stale running state"
+            job.message = (
+                "Recovered from stale subtitle correction state"
+                if was_correcting_subtitles
+                else "Recovered from stale running state"
+            )
             job.error = None
             if video:
                 video.ai_status = "queued"
@@ -91,12 +122,13 @@ def recover_stuck_ai_jobs(minutes: int = 60, correction_minutes: int = 15, force
 
 
 def pause_ai_queue() -> dict:
-    pause_queue()
+    get_redis_connection().set(_PAUSE_KEY, "1")
     return {"paused": True}
 
 
 def resume_ai_queue() -> dict:
-    resume_queue()
+    get_redis_connection().delete(_PAUSE_KEY)
+    sync_db_queue_to_rq()
     return {"paused": False}
 
 
@@ -106,19 +138,29 @@ def cancel_ai_job(job_id: str) -> dict:
         job = db.query(AiJob).filter(AiJob.id == job_id).first()
         if not job:
             return {"cancelled": False, "reason": "not_found"}
-        if job.status not in ("queued", "running"):
+        if job.status not in ("queued", "running", "cancelling"):
             return {"cancelled": False, "reason": "not_active"}
         video = db.query(Video).filter(Video.id == job.video_id).first()
-        job.status = "cancelled"
-        job.stage = "cancelled"
-        job.message = "Cancelled by user"
-        job.error = "Cancelled by user"
-        if video:
-            video.ai_status = "idle"
-            video.ai_stage = None
-            video.ai_error = None
+        queue = ai_jobs_queue()
+        if job.status in ("running", "cancelling"):
+            # Running jobs cannot be stopped mid-flight on Windows
+            # (SimpleWorker runs in-process). They must finish the
+            # current step and then exit gracefully.
+            return {"cancelled": False, "reason": "running_not_cancellable"}
+        else:
+            rq_job = queue.fetch_job(job_id)
+            if rq_job:
+                rq_job.cancel()
+            job.status = "cancelled"
+            job.stage = "cancelled"
+            job.message = "Cancelled by user"
+            job.error = "Cancelled by user"
+            if video and video.ai_status == "queued":
+                video.ai_status = "idle"
+                video.ai_stage = None
+                video.ai_error = None
         db.commit()
-        return {"cancelled": True}
+        return {"cancelled": True, "status": job.status}
     finally:
         db.close()
 
@@ -139,7 +181,6 @@ def resume_ai_job(job_id: str) -> dict:
         video = db.query(Video).filter(Video.id == job.video_id).first()
         if not video:
             return {"resumed": False, "reason": "missing_video"}
-
         job.status = "queued"
         job.stage = "queued"
         job.message = "Resumed by user"
@@ -148,9 +189,29 @@ def resume_ai_job(job_id: str) -> dict:
         video.ai_stage = "queued"
         video.ai_error = None
         db.commit()
+        if not _is_queue_paused():
+            queue = ai_jobs_queue()
+            queue.enqueue(
+                "app.services.ai_job_tasks.run_ai_job_task",
+                args=(job_id,),
+                job_id=job_id,
+            )
         return {"resumed": True, "job_id": job.id}
     finally:
         db.close()
+
+
+def enqueue_ai_jobs(job_ids: list[str]) -> None:
+    """Enqueue a list of job IDs into the RQ queue."""
+    if not job_ids:
+        return
+    queue = ai_jobs_queue()
+    for job_id in job_ids:
+        queue.enqueue(
+            "app.services.ai_job_tasks.run_ai_job_task",
+            args=(job_id,),
+            job_id=job_id,
+        )
 
 
 def sync_queued_ai_job_settings() -> dict:
@@ -185,21 +246,43 @@ def sync_queued_ai_job_settings() -> dict:
 def clear_active_ai_jobs() -> dict:
     db = SessionLocal()
     try:
-        jobs = db.query(AiJob).filter(AiJob.status.in_(("queued", "running"))).all()
-        video_ids = {job.video_id for job in jobs}
-        for job in jobs:
+        running_jobs = db.query(AiJob).filter(AiJob.status.in_(("running", "cancelling"))).all()
+        queued_jobs = db.query(AiJob).filter(AiJob.status == "queued").all()
+        queue = ai_jobs_queue()
+        for job in running_jobs:
+            cancel_job(job.id)
+            rq_job = queue.fetch_job(job.id)
+            if rq_job and rq_job.get_status() == "started":
+                send_kill_to_worker(rq_job.worker_name)
+            job.status = "cancelling"
+            job.stage = "cancelling"
+            job.message = "Stopping worker (will finalize after current step)"
+            job.error = None
+        for job in queued_jobs:
+            rq_job = queue.fetch_job(job.id)
+            if rq_job:
+                rq_job.cancel()
             job.status = "cancelled"
             job.stage = "cancelled"
             job.message = "Cancelled by user"
             job.error = "Cancelled by user"
-        if video_ids:
-            videos = db.query(Video).filter(Video.id.in_(video_ids)).all()
+        all_video_ids = {job.video_id for job in running_jobs} | {job.video_id for job in queued_jobs}
+        if all_video_ids:
+            videos = db.query(Video).filter(Video.id.in_(all_video_ids)).all()
             for video in videos:
-                video.ai_status = "idle"
-                video.ai_stage = None
-                video.ai_error = None
+                if video.id in {job.video_id for job in running_jobs}:
+                    video.ai_status = "cancelling"
+                    video.ai_stage = "cancelling"
+                else:
+                    video.ai_status = "idle"
+                    video.ai_stage = None
+                    video.ai_error = None
         db.commit()
-        return {"cleared": len(jobs)}
+        return {
+            "cleared": len(running_jobs) + len(queued_jobs),
+            "running_stopped": len(running_jobs),
+            "queued_cancelled": len(queued_jobs),
+        }
     finally:
         db.close()
 
@@ -207,12 +290,13 @@ def clear_active_ai_jobs() -> dict:
 def clear_finished_ai_jobs() -> dict:
     db = SessionLocal()
     try:
-        jobs = db.query(AiJob).filter(AiJob.status.in_(("completed", "failed", "cancelled"))).all()
-        count = len(jobs)
-        for job in jobs:
-            db.delete(job)
+        count = (
+            db.query(AiJob)
+            .filter(AiJob.status.in_(("completed", "failed", "cancelled")))
+            .delete(synchronize_session=False)
+        )
         db.commit()
-        return {"cleared": count}
+        return {"cleared": int(count)}
     finally:
         db.close()
 
@@ -220,12 +304,13 @@ def clear_finished_ai_jobs() -> dict:
 def clear_completed_ai_jobs() -> dict:
     db = SessionLocal()
     try:
-        jobs = db.query(AiJob).filter(AiJob.status == "completed").all()
-        count = len(jobs)
-        for job in jobs:
-            db.delete(job)
+        count = (
+            db.query(AiJob)
+            .filter(AiJob.status == "completed")
+            .delete(synchronize_session=False)
+        )
         db.commit()
-        return {"cleared": count}
+        return {"cleared": int(count)}
     finally:
         db.close()
 
@@ -233,25 +318,61 @@ def clear_completed_ai_jobs() -> dict:
 def clear_all_ai_jobs() -> dict:
     db = SessionLocal()
     try:
-        jobs = db.query(AiJob).all()
-        video_ids = {job.video_id for job in jobs}
-        count = len(jobs)
-        for job in jobs:
-            if job.status == "running":
-                job.status = "cancelled"
-                job.stage = "cancelled"
-                job.message = "Cancelled by clear all"
-                job.error = "Cancelled by clear all"
-            else:
-                db.delete(job)
-        if video_ids:
-            videos = db.query(Video).filter(Video.id.in_(video_ids)).all()
-            for video in videos:
-                if video.ai_status in ("queued", "running", "failed", "cancelled"):
-                    video.ai_status = "idle"
-                    video.ai_stage = None
-                    video.ai_error = None
+        running_jobs = db.query(AiJob).filter(AiJob.status.in_(("running", "cancelling"))).all()
+        running_video_ids = {job.video_id for job in running_jobs}
+        deleted = (
+            db.query(AiJob)
+            .filter(AiJob.status.in_(("queued", "completed", "failed", "cancelled")))
+            .delete(synchronize_session=False)
+        )
+        # Only reset videos that are NOT tied to a running job
+        all_videos = db.query(Video).filter(Video.ai_status.in_(("queued", "running", "failed", "cancelled", "cancelling"))).all()
+        for video in all_videos:
+            if video.id in running_video_ids:
+                # Leave running jobs untouched
+                continue
+            video.ai_status = "idle"
+            video.ai_stage = None
+            video.ai_error = None
         db.commit()
-        return {"cleared": count}
+        return {
+            "cleared": int(deleted),
+            "deleted": int(deleted),
+            "running_preserved": len(running_jobs),
+        }
+    finally:
+        db.close()
+
+
+def sync_db_queue_to_rq() -> int:
+    """Push any DB 'queued' jobs that are not yet in the RQ queue.
+
+    Called on startup, resume, and after recover so that jobs created
+    while Redis was temporarily unavailable still get executed.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    db = SessionLocal()
+    try:
+        queued_jobs = db.query(AiJob).filter(AiJob.status == "queued").order_by(AiJob.created_at.asc()).all()
+        if not queued_jobs:
+            return 0
+        queue = ai_jobs_queue()
+        enqueued = 0
+        for job in queued_jobs:
+            try:
+                rq_job = queue.fetch_job(job.id)
+                if rq_job is None:
+                    queue.enqueue(
+                        "app.services.ai_job_tasks.run_ai_job_task",
+                        args=(job.id,),
+                        job_id=job.id,
+                    )
+                    enqueued += 1
+            except Exception:
+                logger.exception("Failed to enqueue job %s to RQ", job.id)
+        logger.info("sync_db_queue_to_rq: pushed %d/%d queued jobs to RQ", enqueued, len(queued_jobs))
+        return enqueued
     finally:
         db.close()

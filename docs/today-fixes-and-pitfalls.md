@@ -902,3 +902,204 @@ python -m compileall backend/app
 本轮验证里 `npm run test` 和 `npm run build` 已通过。
 
 完整 Playwright 布局截图套件当前仍有既有快照差异和缺失基线。不要顺手更新截图文件，除非这次任务明确要刷新视觉基线。
+
+---
+
+# 2026-05-14 追加：侧边栏图标顺序与隐藏状态持久化
+
+## 现象
+
+- 左侧侧边栏拖拽调整图标顺序后刷新，顺序回到默认。
+- 点击图标上的"隐藏"后刷新，被隐藏的图标又全部显示出来。
+
+## 根因分析
+
+涉及文件：
+
+- `src/stores/uiStore.ts`
+- `src/components/layout/Sidebar.tsx`
+- `src/lib/idbStorage.ts`
+
+### 根因 1：reorderNav 返回原引用
+
+- `reorderNav` 在 `fromIdx === toIdx`（拖放到同一位置）时直接 `return { navOrder: order }`，但 `order` 是 `state.navOrder` 的浅拷贝 `[...state.navOrder]`，而 `fromIdx === toIdx` 时 `order` 没有任何改动。
+- Zustand 的 `set` 如果返回的 state 引用与当前相同，不会触发订阅，也不会触发 `persist` middleware 的 `setItem`。
+- 更隐蔽的是，即使实际移动了位置，如果拖拽结束后的 `fromIdx === toIdx`，同样不会保存。
+
+修复：
+
+- `fromIdx === toIdx` 时仍然返回 `{ navOrder: order }`，其中 `order` 是新的数组引用，确保 persist 被触发。
+
+### 根因 2：merge 缺少异常格式防御
+
+- Zustand v5 的 `persist` middleware 在 rehydration 时调用自定义 `merge(persisted, current)`。
+- 如果 storage 返回 `null`、`undefined` 或非对象值，`storageValue.state` 读取会抛异常或产生非法合并结果。
+- 原实现只检查了 `!persisted`，没检查 `typeof persisted !== 'object'`。
+
+修复：
+
+- `merge` 开头增加双重检查：`!persisted || typeof persisted !== 'object'` 时直接返回 `current`。
+- 提取 `saved` 后再检查 `!saved || typeof saved !== 'object'`，异常时安全回退。
+- DEV 模式下增加 `console.log('[uiStore merge] ...')`，浏览器端可实时查看 hydration 数据。
+
+### 根因 3：hideNav / showNav 的状态变更链路
+
+- `hideNav` 和 `showNav` 本身逻辑正确，将 `id` 加入或移出 `hiddenNavItems`。
+- 但如果 `merge` 崩溃，整个 rehydration 失败，刷新后 `hiddenNavItems` 回到初始空数组。
+
+## 新增测试
+
+- `src/__tests__/uiStore.test.ts`：
+  - `preserves navOrder after reordering`
+  - `preserves hiddenNavItems after hiding`
+  - `preserves both order and hidden state together`
+
+## 验证
+
+- `npm test`：25 files / 190 tests 全部通过。
+- `npx tsc --noEmit`：0 errors。
+
+## 维护原则
+
+- Zustand persist 的 `merge` 必须对 `persisted` 做防御检查：它可能是 `null`、`undefined`、字符串、数字或 `{}`。
+- 任何改变数组的 store action，返回的新数组引用必须明确创建（`[...arr]`、`arr.filter(...)` 等），不能依赖旧引用。
+- 侧边栏的 `navOrder` 和 `hiddenNavItems` 都属于用户偏好，应随 `uiStore` 一起持久化；不要把它们拆到独立 storage 里。
+
+---
+
+# 2026-05-14 追加：IT 视频站文件夹系统崩溃
+
+## 现象
+
+- 用户点击"前端"文件夹后界面没反应，以为没点中，连续点击多次。
+- 最终 breadcrumb 变成 `[全部视频, 前端, 前端, 前端, ...]`，渲染时 key 重复导致 React 崩溃。
+- 报错信息类似 "Multiple elements with the same key..."
+
+## 根因分析
+
+涉及文件：
+
+- `src/components/video/VideoList.tsx`
+- `src/stores/videoStore.ts`
+- `src/components/transcriber/CategoryTree.tsx`
+
+### 根因 1：useMemo 依赖是函数引用
+
+- `const children = useMemo(() => getCurrentChildren(), [getCurrentChildren])`
+- 依赖项是 `getCurrentChildren` 函数引用（Zustand store 中的函数引用永远不会变化）。
+- `currentCategoryId` 变化后 `children` 从不重新计算，界面永远卡在根目录。
+- 用户连续点击，每次点击都触发 `enterCategory`，但 children 没更新，用户以为操作失败。
+
+修复：
+
+- `useMemo` 依赖从 `[getCurrentChildren]` 改为 `[categoryTree, currentCategoryId]`，确保切换文件夹后 children 正确更新。
+
+### 根因 2：breadcrumb 重复入栈
+
+- `enterCategory` 向 breadcrumb 追加目标 id，没有判断是否已经是最后一项。
+- 用户连续点击同一文件夹，breadcrumb 变成 `[全部视频, 前端, 前端, 前端, ...]`。
+
+修复：
+
+- 追加 breadcrumb 前先判断，如果目标 id 已经是当前最后一项，直接 return。
+
+### 根因 3：key 重复导致 React 崩溃
+
+- breadcrumb 渲染 key 是 `b.id ?? 'root'`，重复 id 导致 key 冲突。
+- CategoryTree 如果后端返回了重复节点（网络重试或数据异常），同样会 key 重复。
+
+修复：
+
+- breadcrumb key 改为 `` `${b.id ?? 'root'}-${i}` ``，即使出现极端情况也不会因 key 重复崩溃。
+- `CategoryTree.tsx` 新增 `deduplicateTree()` 函数，渲染前递归去重树节点。
+
+## 维护原则
+
+- `useMemo` 的依赖项必须是**会变化的数据**，不能是 store 中稳定的函数引用。
+- 任何 push/append 操作前都要考虑是否需要去重或防重入。
+- React list key 在极端情况下也应保证唯一性，可以加上索引做兜底。
+
+---
+
+# 2026-05-14 追加：Whisper 模型下载状态可视化改进
+
+## 现象
+
+- 设置页和转写面板的 Whisper 模型下载按钮，点完没有进度反馈，用户不知道下载是否在进行。
+- 多点几次按钮，前端状态混乱（"卡死"），因为多个下载请求并发触发。
+- 刷新页面后，下载中的状态丢失，按钮又变回"立即下载"。
+
+## 根因分析
+
+涉及文件：
+
+- `src/components/settings/TranscriptionSettingsSection.tsx`
+- `src/components/transcriber/TranscriptionSettingsPanel.tsx`
+
+### 根因 1：状态粒度过粗
+
+- 原来用 `downloadingModel: string | null` 和 `downloadError: string` 两个独立 state。
+- 只能记录"当前正在下载的模型"，不能记录多个模型的状态，也不能记录已完成/失败的状态。
+- 刷新后 state 重置，所有下载状态全部丢失。
+
+修复：
+
+- 替换为 `downloadStates: Record<string, { status: string; error?: string }>`。
+- 每个模型独立一条记录，支持同时追踪多个模型的下载状态。
+
+### 根因 2：没有初始化查询
+
+- 组件 mount 时只请求模型列表，不查询后端下载任务状态。
+- 如果用户刷新页面时后台正在下载，前端完全不知情。
+
+修复：
+
+- mount / 重新扫描后，遍历所有 `auto_downloadable` 模型，批量调用 `fetchDownloadStatus()` 初始化状态。
+- `Promise.allSettled` 处理，单个查询失败不影响其他模型。
+
+### 根因 3：轮询范围太窄
+
+- 原来只在 `downloadingModel` 非空时轮询，且只查询那一个模型。
+- 如果下载完成后再启动新下载，轮询不会自动恢复。
+
+修复：
+
+- 用 `hasActiveDownload = Object.values(downloadStates).some(s => s.status === 'started' || s.status === 'running')` 判断是否需要轮询。
+- 轮询时批量查询所有 `auto_downloadable` 模型，每 3 秒一次。
+- `completed` 时自动调用 `fetchWhisperModels()` 刷新模型列表，`failed` 时保留错误信息。
+
+### 根因 4：前端没有防重入
+
+- 下载按钮的 `onClick` 没有检查当前是否正在下载，直接调用 API。
+- 后端虽然有 `_DOWNLOAD_JOBS` 防重入，但前端状态会被覆盖。
+
+修复：
+
+- `disabled` 和 `onClick` 开头都检查 `downloadStates[modelId]`，如果是 `started`/`running` 直接 return。
+- 点击后立即在本地设置 `status: 'started'`，不用等后端响应，UI 立刻反馈。
+
+## 按钮状态设计
+
+| 状态 | 显示 | 颜色 | 可点击 |
+|------|------|------|--------|
+| 未下载 | 立即下载 | 主题 accent 色 | 是 |
+| 下载中 | Loader2 旋转图标 + "下载中..." | 灰色 | 否（disabled） |
+| 下载失败 | "下载失败，点击重试" | 红色 (#dc3545) | 是 |
+| 下载完成 | 默认"下载完成"，hover 显示"重新下载" | accent 色 | 是 |
+
+## 下拉选项状态后缀
+
+每个 `<option>` 除了模型名称和描述，还根据 `downloadStates` 显示：
+
+- `模型名 - 下载中...`
+- `模型名 - 下载失败`
+- `模型名 - 下载完成`
+- `模型名 - 未安装`
+
+## 维护原则
+
+- 异步操作的状态不要用单个字符串/null 来记，用 Record 给每个实体独立状态。
+- 前端 mount 时主动向后端查询正在进行的任务，刷新后也能恢复状态。
+- 轮询的触发条件应该是"有没有活跃任务"，而不是"用户有没有点过按钮"。
+- 按钮的 `disabled`、`onClick` 和显示文案必须基于同一套状态，避免"disable 但还能点"或"点了没反馈"。
+- 后端已有防重入时，前端也要做同样的检查，减少无效请求。

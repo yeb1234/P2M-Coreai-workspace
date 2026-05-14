@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 import logging
+import os
 import signal
-import threading
+import sys
 import time
 
 from app.database import Base, engine, ensure_runtime_schema, settings
-from app.services.ai_jobs import claim_next_ai_job, requeue_interrupted_ai_jobs, run_ai_job
-from app.services.file_scanner import generate_missing_thumbnails, generate_missing_sprites
+from app.services.admin_ai_queue import sync_db_queue_to_rq
+from app.services.ai_jobs import requeue_interrupted_ai_jobs
+from app.services.rq_client import ai_jobs_queue, get_redis_connection
+from rq.worker import SimpleWorker
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +22,34 @@ def _stop(_signum, _frame) -> None:
     _running = False
 
 
+def _clean_dead_workers(redis_conn) -> None:
+    """Remove stale worker registrations from Redis on Windows restart."""
+    from rq import Worker
+    for w in Worker.all(connection=redis_conn):
+        try:
+            w.register_death()
+        except Exception:
+            pass
+
+
+class NoOpDeathPenalty:
+    """No-op context manager that disables RQ's Unix-only death penalty on Windows."""
+    def __init__(self, *args, **kwargs):
+        pass
+    def __enter__(self):
+        pass
+    def __exit__(self, *args):
+        pass
+
+
+class WindowsWorker(SimpleWorker):
+    """Windows-compatible worker that disables Unix-only death penalty."""
+    death_penalty_class = NoOpDeathPenalty
+
+
 def main() -> None:
-    logger.info("AI worker starting in thread: %s", threading.current_thread().name)
-    if threading.current_thread() is threading.main_thread():
+    logger.info("AI RQ worker starting...")
+    if sys.platform != "win32":
         signal.signal(signal.SIGINT, _stop)
         signal.signal(signal.SIGTERM, _stop)
 
@@ -30,49 +57,42 @@ def main() -> None:
     ensure_runtime_schema()
     if settings.ai_worker_requeue_running_on_start:
         requeue_interrupted_ai_jobs()
-    logger.info("AI worker initialized, polling for jobs...")
+    # Push any DB queued jobs that were created while Redis was unavailable
+    sync_db_queue_to_rq()
+    logger.info("AI worker initialized, waiting for jobs...")
 
-    max_workers = max(1, int(settings.ai_worker_concurrency or 1))
-    idle_cycles = 0
-    futures = set()
+    # Import rq here to avoid issues if Redis is not available at import time
+    from rq import Worker
 
-    with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="ai-worker") as executor:
-        while _running:
-            futures = {future for future in futures if not future.done()}
+    redis_conn = get_redis_connection()
+    queue = ai_jobs_queue()
 
-            claimed = False
-            while len(futures) < max_workers:
-                job_id = claim_next_ai_job()
-                if not job_id:
-                    break
-                logger.info("Claimed job: %s", job_id)
-                claimed = True
-                futures.add(executor.submit(run_ai_job, job_id))
-            if not claimed and not futures:
-                logger.debug("No jobs to claim, sleeping...")
+    # Clean stale worker registrations so this new process can register
+    _clean_dead_workers(redis_conn)
 
-            if claimed:
-                idle_cycles = 0
-                continue
+    WorkerCls = WindowsWorker if sys.platform == "win32" else Worker
+    worker = WorkerCls(
+        queues=[queue],
+        connection=redis_conn,
+        name=f"ai-worker-{os.getpid()}",
+    )
 
-            if futures:
-                done, futures = wait(
-                    futures,
-                    timeout=settings.ai_worker_poll_interval,
-                    return_when=FIRST_COMPLETED,
-                )
-                for future in done:
-                    future.result()
-                continue
+    # On Windows RQ uses SimpleWorker which runs jobs in the same process.
+    # When a job is force-killed the worker process itself dies; the user
+    # must restart it (same as restarting the backend today).
+    while _running:
+        try:
+            # burst=True processes all queued jobs then returns.
+            # If a job is killed mid-flight work() exits with an error,
+            # caught below, and the loop restarts.
+            worker.work(burst=True, with_scheduler=False)
+        except Exception:
+            logger.exception("Worker error")
+        if _running:
+            # No jobs in queue or worker was killed; pause briefly
+            time.sleep(2)
 
-            idle_cycles += 1
-            thumbnail_cycles = max(1, int(settings.thumbnail_background_idle_cycles or 10))
-            thumbnail_limit = max(1, int(settings.thumbnail_background_limit or 1))
-            if settings.thumbnail_background_enabled and idle_cycles % thumbnail_cycles == 0:
-                generate_missing_thumbnails(limit=thumbnail_limit)
-            if settings.sprite_background_enabled and idle_cycles % thumbnail_cycles == 0:
-                generate_missing_sprites(limit=thumbnail_limit)
-            time.sleep(settings.ai_worker_poll_interval)
+    logger.info("AI RQ worker stopped.")
 
 
 if __name__ == "__main__":

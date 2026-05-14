@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
+import subprocess
+import sys
 import threading
 
 from fastapi import FastAPI, Request
@@ -14,7 +16,6 @@ from app.models import AiJob, Category, Video, WatchHistory
 from app.routers import admin, ai_jobs, assistant, auth, calendar_events, categories, notes, schedule_items, user_data, videos
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
-from app.worker import main as worker_main
 
 DIST_DIR = Path(__file__).resolve().parents[2] / "dist"
 
@@ -30,28 +31,44 @@ def run_startup_scan() -> None:
         logger.exception("Startup video scan failed")
 
 
+def _run_background_thumbnails() -> None:
+    import time
+    idle_cycles = 0
+    while True:
+        time.sleep(max(1, settings.ai_worker_poll_interval or 2))
+        idle_cycles += 1
+        thumbnail_cycles = max(1, int(settings.thumbnail_background_idle_cycles or 10))
+        thumbnail_limit = max(1, int(settings.thumbnail_background_limit or 1))
+        if settings.thumbnail_background_enabled and idle_cycles % thumbnail_cycles == 0:
+            from app.services.file_scanner import generate_missing_thumbnails
+            generate_missing_thumbnails(limit=thumbnail_limit)
+        if settings.sprite_background_enabled and idle_cycles % thumbnail_cycles == 0:
+            from app.services.file_scanner import generate_missing_sprites
+            generate_missing_sprites(limit=thumbnail_limit)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_runtime_schema()
     start_file_watcher()
     threading.Thread(target=run_startup_scan, name="startup-video-scan", daemon=True).start()
-    def run_worker():
-        try:
-            import sys
-            print("Starting AI worker thread...", file=sys.stderr, flush=True)
-            worker_main()
-        except Exception:
-            import sys
-            print("AI worker failed:", file=sys.stderr, flush=True)
-            import traceback
-            traceback.print_exc(file=sys.stderr)
-    t = threading.Thread(target=run_worker, name="ai-worker", daemon=True)
-    t.start()
-    import sys
-    print(f"AI worker thread started: {t.is_alive()}", file=sys.stderr, flush=True)
+    # Start background thumbnail/sprite worker thread
+    threading.Thread(target=_run_background_thumbnails, name="thumbnail-worker", daemon=True).start()
+    # Start AI RQ worker as a subprocess (independent process, can be killed)
+    backend_dir = str(Path(__file__).resolve().parent.parent)
+    worker_proc = subprocess.Popen(
+        [sys.executable, "-m", "app.worker"],
+        cwd=backend_dir,
+    )
+    print(f"AI RQ worker subprocess started: pid={worker_proc.pid}", file=sys.stderr, flush=True)
     yield
     stop_file_watcher()
+    try:
+        worker_proc.terminate()
+        worker_proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        worker_proc.kill()
 
 
 app = FastAPI(

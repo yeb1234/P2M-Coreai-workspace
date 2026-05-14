@@ -6,7 +6,7 @@ import { CalendarSummary } from '../components/dashboard/summaries/CalendarSumma
 export const calendarPlugin: Plugin = {
   metadata: {
     id: 'calendar',
-    name: '日历',
+    name: '日历看板',
     icon: <Calendar size={20} />,
     description: '查看和管理您的日程',
     defaultPosition: 1,

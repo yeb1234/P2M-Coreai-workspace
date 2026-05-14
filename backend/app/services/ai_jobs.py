@@ -8,7 +8,6 @@ from app.database import SessionLocal, settings
 from app.models import AiJob, Note, SubtitleSegment, Video
 from app.services.admin_settings import load_assistant_runtime_settings, load_transcription_settings
 from app.services.ffmpeg_audio import extract_wav_16k_mono
-from app.services.ai_queue import is_queue_paused
 from app.services.ollama_summarize import summarize_with_ollama, summarize_with_openai
 from app.services.subtitle_corrector import correct_segments_with_openai
 from app.services.subtitle_writer import write_vtt_output
@@ -254,15 +253,31 @@ def create_ai_job_from_payload(db, video_id: int, payload) -> AiJob:
 
 
 def update_job_state(db, job: AiJob, video: Video, **values) -> None:
+    # Refresh from DB first: if API/admin already flipped status to cancelled,
+    # bail out instead of overwriting that decision with a stale cached object.
+    # SessionLocal uses expire_on_commit=False, so without this refresh the worker
+    # would silently resurrect cancelled jobs back to running on the next step.
+    try:
+        db.refresh(job)
+    except Exception:
+        # Row may have been deleted by clear-all; short-circuit the whole job.
+        raise RuntimeError("Job row no longer exists")
+    if job.status in ("cancelled", "cancelling"):
+        raise RuntimeError("Job cancelled")
     for key, value in values.items():
         setattr(job, key, value)
     job.updated_at = datetime.now()
-    if "status" in values:
-        video.ai_status = values["status"]
-    if "stage" in values:
-        video.ai_stage = values["stage"]
-    if "error" in values:
-        video.ai_error = values["error"]
+    if video is not None:
+        try:
+            db.refresh(video)
+        except Exception:
+            pass
+        if "status" in values:
+            video.ai_status = values["status"]
+        if "stage" in values:
+            video.ai_stage = values["stage"]
+        if "error" in values:
+            video.ai_error = values["error"]
     db.commit()
 
 
@@ -305,79 +320,52 @@ def replace_subtitle_segments(db, video: Video, segments: list[dict]) -> None:
     db.commit()
 
 
-def claim_next_ai_job() -> str | None:
-    if is_queue_paused():
-        return None
-
-    db = SessionLocal()
-    try:
-        running_count = db.query(AiJob).filter(AiJob.status == "running").count()
-        if running_count >= max(1, settings.ai_worker_concurrency):
-            return None
-
-        job = (
-            db.query(AiJob)
-            .filter(AiJob.status == "queued")
-            .order_by(AiJob.created_at.asc())
-            .first()
-        )
-        if not job:
-            return None
-
-        video = db.query(Video).filter(Video.id == job.video_id).first()
-        if job.status != "queued":
-            return None
-        job.status = "running"
-        job.stage = "claimed"
-        job.message = "Worker claimed job"
-        job.updated_at = datetime.now()
-        if video:
-            video.ai_status = "running"
-            video.ai_stage = "claimed"
-            video.ai_error = None
-        db.commit()
-        return job.id
-    finally:
-        db.close()
-
-
-def is_job_cancelled(db, job_id: str) -> bool:
-    job = db.query(AiJob).filter(AiJob.id == job_id).first()
-    return bool(job and job.status == "cancelled")
-
-
-def raise_if_cancelled(db, job_id: str) -> None:
-    if is_job_cancelled(db, job_id):
-        raise RuntimeError("Job cancelled")
-
-
 def requeue_interrupted_ai_jobs() -> int:
+    """Recover after worker restart:
+    - 'running' rows have no live worker → requeue them
+    - 'cancelling' rows had a cancel signal but the worker died before finalizing
+      → finalize them as 'cancelled' so they don't get stuck forever
+    """
     db = SessionLocal()
     try:
-        jobs = db.query(AiJob).filter(AiJob.status == "running").all()
-        for job in jobs:
-            video = db.query(Video).filter(Video.id == job.video_id).first()
+        running_jobs = db.query(AiJob).filter(AiJob.status == "running").all()
+        cancelling_jobs = db.query(AiJob).filter(AiJob.status == "cancelling").all()
+        affected_video_ids = {job.video_id for job in running_jobs} | {job.video_id for job in cancelling_jobs}
+        for job in running_jobs:
             job.status = "queued"
             job.stage = "queued"
             job.message = "Requeued after worker restart"
             job.error = None
-            if video:
-                video.ai_status = "queued"
-                video.ai_stage = "queued"
-                video.ai_error = None
-        if jobs:
+        for job in cancelling_jobs:
+            job.status = "cancelled"
+            job.stage = "cancelled"
+            job.message = "Cancelled (finalized after worker restart)"
+            job.error = "Cancelled by user"
+        if affected_video_ids:
+            videos = db.query(Video).filter(Video.id.in_(affected_video_ids)).all()
+            running_video_ids = {job.video_id for job in running_jobs}
+            for video in videos:
+                if video.id in running_video_ids:
+                    video.ai_status = "queued"
+                    video.ai_stage = "queued"
+                    video.ai_error = None
+                else:
+                    video.ai_status = "idle"
+                    video.ai_stage = None
+                    video.ai_error = None
+        if running_jobs or cancelling_jobs:
             db.commit()
-        return len(jobs)
+        return len(running_jobs) + len(cancelling_jobs)
     finally:
         db.close()
 
 
-def _step_extract_audio(db, job, video, paths):
+def _step_extract_audio(db, job, video, paths, job_id: str):
     update_job_state(db, job, video, status="running", stage="extracting", message="Extracting audio")
-    extract_wav_16k_mono(paths.source, paths.wav, cpu_threads=job.cpu_threads)
+    extract_wav_16k_mono(paths.source, paths.wav, cpu_threads=job.cpu_threads, job_id=job_id)
 
 
-def _step_transcribe(db, job, video, paths):
+def _step_transcribe(db, job, video, paths, job_id: str):
     update_job_state(db, job, video, status="running", stage="transcribing", message="Transcribing audio")
     result = transcribe_wav(
         wav_path=paths.wav,
@@ -391,6 +379,7 @@ def _step_transcribe(db, job, video, paths):
         temperature=job.temperature,
         vad_filter=job.vad_filter,
         device_type=job.device_type,
+        job_id=job_id,
     )
     return result["text"], result["segments"]
 
@@ -553,14 +542,27 @@ def _step_write_outputs(db, job, video, paths, transcript, segments, summary, su
 
 
 def _finalize_job(db, job, video, paths, transcript, segments, summary, summary_error):
-    video.transcription = transcript
-    video.transcript_segments = dump_segments(segments)
-    video.summary = summary
-    video.markdown_path = str(paths.markdown)
-    video.subtitle_path = str(paths.subtitle)
-    video.ai_status = "completed"
-    video.ai_stage = "completed"
-    video.ai_error = summary_error if summary_error and not summary else None
+    # Defensive: if API/admin flipped status to cancelled/cancelling while we were
+    # still in summarize/write-outputs, do NOT resurrect the row to "completed".
+    try:
+        db.refresh(job)
+    except Exception:
+        return  # row deleted by clear-all; skip silently
+    if job.status in ("cancelled", "cancelling"):
+        raise RuntimeError("Job cancelled")
+    try:
+        db.refresh(video)
+    except Exception:
+        video = None
+    if video is not None:
+        video.transcription = transcript
+        video.transcript_segments = dump_segments(segments)
+        video.summary = summary
+        video.markdown_path = str(paths.markdown)
+        video.subtitle_path = str(paths.subtitle)
+        video.ai_status = "completed"
+        video.ai_stage = "completed"
+        video.ai_error = summary_error if summary_error and not summary else None
 
     job.status = "completed"
     job.stage = "completed"
@@ -575,15 +577,29 @@ def _finalize_job(db, job, video, paths, transcript, segments, summary, summary_
 
 
 def _handle_job_failure(db, job_id, exc):
+    # Use a fresh session-local rollback so any half-aborted state doesn't poison
+    # the upcoming writes. The caller's session may already be in a bad state
+    # after an update_job_state("cancelled") refresh-then-raise.
+    try:
+        db.rollback()
+    except Exception:
+        pass
     job = db.query(AiJob).filter(AiJob.id == job_id).first()
     if not job:
-        return
+        return  # row deleted by clear-all; nothing to finalize
     video = db.query(Video).filter(Video.id == job.video_id).first()
-    if is_job_cancelled(db, job_id):
+
+    exc_str = str(exc)
+    cancelled = (
+        exc_str in ("Job cancelled", "Job row no longer exists")
+        or (job is not None and job.status in ("cancelled", "cancelling"))
+    )
+    if cancelled:
         if video:
             video.ai_status = "idle"
             video.ai_stage = None
             video.ai_error = None
+        job.status = "cancelled"
         job.stage = "cancelled"
         job.message = "Cancelled by user"
         job.error = "Cancelled by user"
@@ -592,60 +608,10 @@ def _handle_job_failure(db, job_id, exc):
     if video:
         video.ai_status = "failed"
         video.ai_stage = job.stage
-        video.ai_error = str(exc)
+        video.ai_error = exc_str
     job.status = "failed"
-    job.error = str(exc)
-    job.message = str(exc)
+    job.error = exc_str
+    job.message = exc_str
     db.commit()
 
 
-def run_ai_job(job_id: str) -> None:
-    db = SessionLocal()
-    paths: AiJobPaths | None = None
-    try:
-        job = db.query(AiJob).filter(AiJob.id == job_id).first()
-        if not job:
-            return
-        video = db.query(Video).filter(Video.id == job.video_id).first()
-        if not video:
-            job.status = "failed"
-            job.stage = "missing-video"
-            job.error = "Video not found"
-            db.commit()
-            return
-
-        paths = _build_job_paths(video, job)
-        if not paths.source.exists():
-            update_job_state(db, job, video, status="failed", stage="missing-video",
-                             message="Video file is missing", error="Video file does not exist")
-            return
-
-        _step_extract_audio(db, job, video, paths)
-        raise_if_cancelled(db, job_id)
-
-        transcript, segments = _step_transcribe(db, job, video, paths)
-        raise_if_cancelled(db, job_id)
-
-        transcript, segments, correction_error = _step_correct_subtitles(db, job, video, transcript, segments)
-        if correction_error:
-            job.error = correction_error
-            db.commit()
-        raise_if_cancelled(db, job_id)
-
-        summary, summary_error = _step_summarize(db, job, video, transcript)
-        raise_if_cancelled(db, job_id)
-
-        _step_write_outputs(db, job, video, paths, transcript, segments, summary, summary_error)
-        raise_if_cancelled(db, job_id)
-
-        _finalize_job(db, job, video, paths, transcript, segments, summary, summary_error)
-
-    except Exception as exc:
-        _handle_job_failure(db, job_id, exc)
-    finally:
-        if paths and paths.wav.exists():
-            try:
-                paths.wav.unlink()
-            except OSError:
-                pass
-        db.close()

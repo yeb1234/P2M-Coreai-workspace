@@ -4,12 +4,9 @@ import { idbStorage } from '../lib/idbStorage';
 import { DEFAULT_SUBTITLE_CORRECTION_PROMPT } from '../lib/aiPromptDefaults';
 
 export const WHISPER_MODELS = [
-  { id: 'tiny', name: 'tiny', desc: '最快，适合临时预览，准确率最低' },
-  { id: 'base', name: 'base', desc: '很快，适合粗略字幕' },
-  { id: 'small', name: 'small', desc: '速度和质量比较均衡' },
   { id: 'medium', name: 'medium', desc: '中文和技术课推荐，质量更稳' },
-  { id: 'large', name: 'large', desc: 'large 系列基础版本' },
   { id: 'large-v3', name: 'large-v3', desc: '高质量推荐，资源占用最高' },
+  { id: 'large-v3-turbo', name: 'large-v3-turbo (CT2)', desc: 'faster-whisper 专用，速度比 medium 快，准确率几乎=large-v3' },
 ];
 
 export interface TranscriptionSettings {

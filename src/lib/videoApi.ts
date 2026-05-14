@@ -157,6 +157,7 @@ export interface AiJobListItem {
   id: string;
   video_id: number;
   video_title: string | null;
+  duration: number | null;
   status: string;
   stage: string;
   message: string;
@@ -174,6 +175,7 @@ export interface AiJobListItem {
   subtitle_correction_prompt: string | null;
   summary_error: string | null;
   created_at: string;
+  started_at: string | null;
   updated_at: string;
 }
 
@@ -229,6 +231,7 @@ export interface WhisperModelStatus {
   installed: boolean;
   path: string;
   size: number | null;
+  auto_downloadable: boolean;
 }
 
 export interface WhisperModelsOut {
@@ -426,6 +429,13 @@ export async function saveWatchHistory(videoId: number, progress: number, durati
   });
 }
 
+export async function updateSubtitleSegment(videoId: number, segmentIndex: number, text: string): Promise<void> {
+  await apiFetch(`/api/videos/${videoId}/segments/${segmentIndex}`, {
+    method: 'PUT',
+    body: JSON.stringify({ text }),
+  });
+}
+
 export async function setVideoFavorite(videoId: number, isFavorite: boolean): Promise<VideoItem> {
   return apiFetch<VideoItem>(`/api/videos/${videoId}/favorite`, {
     method: 'POST',
@@ -495,13 +505,13 @@ export async function batchAiJobs(
     dry_run?: boolean;
   } = {}
 ): Promise<AiJobBatchOut> {
-  return apiFetch<AiJobBatchOut>('/api/ai-jobs/batch', {
-    method: 'POST',
-    timeoutMs: 300000,
-    body: JSON.stringify({
-      video_ids: videoIds,
+  const CHUNK_SIZE = 100;
+
+  function buildBody(ids: number[], chunkMaxEnqueue: number): string {
+    return JSON.stringify({
+      video_ids: ids,
       mode: opts.mode ?? 'missing_subtitles',
-      max_enqueue: opts.max_enqueue ?? 20,
+      max_enqueue: chunkMaxEnqueue,
       dry_run: opts.dry_run ?? true,
       whisper_engine: opts.whisper_engine,
       whisper_model: opts.whisper_model ?? '',
@@ -519,8 +529,53 @@ export async function batchAiJobs(
       subtitle_correction_enabled: opts.subtitle_correction_enabled,
       subtitle_correction_scope: opts.subtitle_correction_scope,
       subtitle_correction_prompt: opts.subtitle_correction_prompt,
-    }),
-  });
+    });
+  }
+
+  if (videoIds.length <= CHUNK_SIZE) {
+    return apiFetch<AiJobBatchOut>('/api/ai-jobs/batch', {
+      method: 'POST',
+      timeoutMs: 300000,
+      body: buildBody(videoIds, opts.max_enqueue ?? 20),
+    });
+  }
+
+  const chunks: number[][] = [];
+  for (let i = 0; i < videoIds.length; i += CHUNK_SIZE) {
+    chunks.push(videoIds.slice(i, i + CHUNK_SIZE));
+  }
+
+  let merged: AiJobBatchOut | null = null;
+  let remainingMaxEnqueue = opts.max_enqueue ?? 20;
+
+  for (const chunk of chunks) {
+    const chunkMax = Math.min(chunk.length, remainingMaxEnqueue);
+    const result = await apiFetch<AiJobBatchOut>('/api/ai-jobs/batch', {
+      method: 'POST',
+      timeoutMs: 300000,
+      body: buildBody(chunk, chunkMax),
+    });
+
+    if (!merged) {
+      merged = result;
+    } else {
+      merged.requested += result.requested;
+      merged.eligible += result.eligible;
+      merged.enqueued += result.enqueued;
+      merged.skipped += result.skipped;
+      merged.active += result.active;
+      merged.already_done += result.already_done;
+      merged.failed += result.failed;
+      merged.job_ids.push(...result.job_ids);
+      merged.skipped_items.push(...result.skipped_items);
+      merged.limited = merged.limited || result.limited;
+    }
+
+    remainingMaxEnqueue -= result.enqueued;
+    if (remainingMaxEnqueue <= 0) break;
+  }
+
+  return merged!;
 }
 
 // ── Category Tree ──
@@ -606,6 +661,17 @@ export async function fetchBackendHealth(): Promise<BackendHealthOut> {
 
 export async function fetchWhisperModels(): Promise<WhisperModelsOut> {
   return apiFetch<WhisperModelsOut>('/api/admin/whisper-models');
+}
+
+export async function downloadWhisperModel(modelId: string): Promise<{ model_id: string; actual: string; status: string; downloaded?: boolean }> {
+  return apiFetch<{ model_id: string; actual: string; status: string; downloaded?: boolean }>(`/api/admin/download-whisper-model/${encodeURIComponent(modelId)}`, {
+    method: 'POST',
+    timeoutMs: 30000,
+  });
+}
+
+export async function fetchDownloadStatus(modelId: string): Promise<{ model_id: string; status: string; error?: string }> {
+  return apiFetch<{ model_id: string; status: string; error?: string }>(`/api/admin/download-whisper-model/${encodeURIComponent(modelId)}`);
 }
 
 export async function fetchTranscriptionSettings(): Promise<TranscriptionSettingsDto> {

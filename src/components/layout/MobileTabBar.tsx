@@ -12,7 +12,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: 'todo', label: '待办', icon: <ListTodo size={24} /> },
-  { id: 'calendar', label: '日历', icon: <Calendar size={24} /> },
+  { id: 'calendar', label: '日历看板', icon: <Calendar size={24} /> },
   { id: 'notes', label: '笔记', icon: <StickyNote size={24} /> },
   { id: 'pomodoro', label: '番茄钟', icon: <Timer size={24} /> },
   { id: 'video', label: 'IT视频站', icon: <PlayCircle size={24} /> },

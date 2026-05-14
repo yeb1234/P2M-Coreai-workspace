@@ -1,5 +1,76 @@
 # 更新日志
 
+## 2.8.0 - 2026-05-14
+
+这一版重点围绕字幕转录、AI 任务中心和侧边栏体验继续打磨。
+
+### 新增：字幕转录王
+
+- 新增独立插件页面 `TranscriberPage`，左侧文件夹树勾选视频，右侧批量预览与入队。
+- 支持递归勾选/取消文件夹，勾选状态与视频列表实时联动。
+- 批量操作区三按钮：预览（dry-run）、应用当前设置、入队。
+- AI 任务中心（右侧）全部按钮接入：暂停队列、取消任务、恢复任务、清除已完成/全部/活跃任务、批处理预览。
+- 任务列表上限同步拉到 999999，支持大目录一整晚自动跑。
+
+### AI 任务中心打磨
+
+- 批处理预览支持"继续未完成"/"全部重跑"/"只失败"/"只补总结"等模式。
+- 右侧高级批处理面板增加"同时校对字幕"开关，开启后自动切换 `large-v3` + `subtitle_correction_enabled`。
+- 队列管理：支持暂停/恢复整个队列，取消单条任务，清除各类任务（已完成/全部/活跃/已完成）。
+
+### 视频字幕手动纠错
+
+- 播放视频时双击字幕文字区域，弹出 `SubtitleEditDialog` 编辑当前字幕句。
+- 后端新增 `PUT /api/videos/{video_id}/segments/{segment_index}`：同步更新 `SubtitleSegment` 表、`transcript_segments` JSON、`transcription` 文本和 VTT 文件。
+- 弹窗支持 Enter 确认、Esc 取消、异步保存和错误提示；保存成功后就地刷新，不与双击全屏冲突。
+
+### 字幕转写与模型下载
+
+- Whisper 模型下载状态可视化：前端状态从 per-click 字符串升级为 `Record<string, {status, error}>` 的 `downloadStates`。
+- 下拉选项增加实时状态后缀：下载中... / 下载失败 / 下载完成 / 未安装。
+- 下载按钮状态完善：下载中旋转禁用、下载失败红色"点击重试"、下载完成 hover 显示"重新下载"。
+- 前端防重复点击：`started`/`running` 时直接 return，不发重复请求。
+- 状态持久化：组件 mount 后主动查询所有 `auto_downloadable` 模型状态，刷新后重进仍能看到"下载中..."。
+- 轮询全局化：每 3 秒批量查询，completed 时自动刷新模型列表。
+
+### IT 视频站
+
+- 修复 80 端口看不到"字幕转录王"：`vite.config.ts` 临时添加 `emptyOutDir: false`，避免 nginx 占用 `dist/assets` 导致构建失败。
+- 修复文件夹系统崩溃：`VideoList.tsx` `useMemo` 依赖从函数引用改为 `categoryTree` + `currentCategoryId`。
+- 修复 breadcrumb 重复点击爆炸：`videoStore.ts` 的 `enterCategory` 追加前先判断目标 id 是否已是最后一项。
+- `breadcrumb` key 改为 `${b.id ?? 'root'}-${i}`，极端情况也不因 key 重复崩溃。
+- `CategoryTree.tsx` 新增 `deduplicateTree()`，渲染前递归去重树节点。
+
+### 批量入队性能
+
+- 后端删除循环内逐条 `db.commit()`，统一构建 `AiJob` 后一次事务提交。
+- 前端自动分块（`CHUNK_SIZE = 100`），超过 100 个 videoIds 时拆成多请求顺序发送，合并预览结果。
+- 解决 600+ 视频批量入队时后端处理超 5 分钟导致浏览器 `Failed to fetch` 超时断开的问题。
+
+### 转录任务生命周期
+
+- 取消/暂停/恢复操作现在会真正终止 `ffmpeg` / `whisper-cli.exe` 子进程。
+- `faster-whisper` Python 调用在 segment 迭代中可被中断（`_cancelled` 标记）。
+- 后端新增 `job_lifecycle.py` 统一管理任务状态流转和进程终止。
+
+### 转录设置优化
+
+- Faster-Whisper 与 Whisper.cpp 双路线预设按钮，动态高亮当前引擎对应按钮。
+- CUDA 自动检测修复：`_resolve_device` 改用 `ctranslate2` 探测而非 `torch.cuda.is_available()`，解决环境无 torch 时 auto 永远回退 CPU 的问题。
+- 健康检查新增 "CUDA / GPU" 项，报告 ctranslate2 检测到的设备数量。
+- 设置页 VAD 过滤开关错位修复：补 `sm:col-span-2`。
+- 转录王面板 ↔ 设置页双向同步：以后端数据库为持久化中心，Zustand store 为前端共享缓存。
+
+### 侧边栏
+
+- 修复拖拽调整图标顺序后刷新回默认：`reorderNav` 确保返回新数组引用，触发 Zustand persist。
+- 修复 `merge` 缺少异常格式防御：增加 `persisted` 类型检查，防止 storage 返回非对象值时崩溃。
+- `navOrder` 和 `hiddenNavItems` 持久化到 `uiStore`。
+
+### 测试
+
+- 全量测试覆盖 190/190 通过（Vitest），新增 `uiStore` 侧边栏持久化单元测试。
+
 ## 2.7.0 - 2026-05-12
 
 这一版继续围绕日常真实使用体验打磨，重点修复时区偏移、番茄钟显示逻辑、日历交互和数据库写入性能。
@@ -33,10 +104,6 @@
 ### 后端
 
 - 修复打开日历页面时大量 405 报错：`backend/app/main.py` 中遗漏了 `app.include_router(calendar_events.router)`，导致 `/api/calendar-events` 请求落入仅支持 GET 的 SPA catch-all 路由。
-
-### 测试
-
-- 全量测试覆盖 187/187 通过（Vitest）。
 
 ## 2.6.0 - 2026-05-11
 

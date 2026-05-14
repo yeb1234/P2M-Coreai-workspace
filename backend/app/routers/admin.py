@@ -4,7 +4,9 @@ from app.schemas import AssistantRuntimeSettingsIn, AssistantRuntimeSettingsOut,
 from app.services import admin_ai_queue
 from app.services.admin_health import backend_health as collect_backend_health
 from app.services.admin_library import (
+    download_whisper_model,
     generate_thumbnails_for_ids as generate_thumbnails_for_video_ids,
+    get_download_status,
     rescan_library as rescan_video_library,
     whisper_models as list_whisper_models,
 )
@@ -32,6 +34,19 @@ def generate_thumbnails_for_ids(payload: dict):
 @router.get("/whisper-models")
 def whisper_models():
     return list_whisper_models()
+
+
+@router.post("/download-whisper-model/{model_id}")
+def whisper_model_download(model_id: str):
+    return download_whisper_model(model_id)
+
+
+@router.get("/download-whisper-model/{model_id}")
+def whisper_model_download_status(model_id: str):
+    status = get_download_status(model_id)
+    if status is None:
+        return {"model_id": model_id, "status": "unknown"}
+    return {"model_id": model_id, **status}
 
 
 @router.get("/transcription-settings", response_model=TranscriptionSettingsOut)

@@ -196,6 +196,7 @@ export function VideoList() {
   const [historySort, setHistorySort] = useState<HistorySortMode>('newest');
   const [columnsPerRow, setColumnsPerRow] = useState(loadVideoGridColumns);
   const [rescanLoading, setRescanLoading] = useState(false);
+  const [refreshLoading, setRefreshLoading] = useState(false);
   const [rescanMsg, setRescanMsg] = useState('');
   const selectedFolderIdSet = useMemo(() => new Set(selectedFolderIds), [selectedFolderIds]);
   const selectionChangedRef = React.useRef(false);
@@ -215,9 +216,10 @@ export function VideoList() {
       const result = await rescanVideos();
       playInteractionSound('success');
       setRescanMsg(`扫描完成：新增 ${result.added}，删除 ${result.removed}，共 ${result.total} 个视频`);
-      loadCategoryTree();
-      const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;
-      loadVideos(1, searchQuery || undefined, ids);
+      await loadCategoryTree();
+      const state = useVideoStore.getState();
+      const ids = state.selectedFolderIds.length > 0 ? state.selectedFolderIds : undefined;
+      await loadVideos(1, state.searchQuery || undefined, ids);
     } catch {
       playInteractionSound('error');
       setRescanMsg('扫描失败');
@@ -225,20 +227,27 @@ export function VideoList() {
       setRescanLoading(false);
       setTimeout(() => setRescanMsg(''), 4000);
     }
-  }, [loadCategoryTree, loadVideos, searchQuery, selectedFolderIds]);
+  }, [loadCategoryTree, loadVideos]);
 
-  const handleRefreshFolders = useCallback(() => {
-    void loadCategoryTree();
-    const ids = selectedFolderIds.length > 0 ? selectedFolderIds : undefined;
-    loadVideos(page, searchQuery || undefined, ids);
-    fetchRecentVideos(20, currentCategoryId)
-      .then((recent) => {
-        setRecentVideos(recent.items);
-        setRecentVideosFallback(recent.fallback);
-      })
-      .catch(() => {});
-    fetchRecentHistory(30).then((history) => setHistoryVideos(history)).catch(() => {});
-  }, [currentCategoryId, loadCategoryTree, loadVideos, page, searchQuery, selectedFolderIds]);
+  const handleRefreshFolders = useCallback(async () => {
+    setRefreshLoading(true);
+    try {
+      await loadCategoryTree();
+      const state = useVideoStore.getState();
+      const ids = state.selectedFolderIds.length > 0 ? state.selectedFolderIds : undefined;
+      await loadVideos(state.page, state.searchQuery || undefined, ids);
+      const recent = await fetchRecentVideos(20, state.currentCategoryId);
+      setRecentVideos(recent.items);
+      setRecentVideosFallback(recent.fallback);
+      const history = await fetchRecentHistory(30);
+      setHistoryVideos(history);
+    } catch (e: any) {
+      setRescanMsg(`刷新失败: ${e?.message ?? '未知错误'}`);
+      setTimeout(() => setRescanMsg(''), 4000);
+    } finally {
+      setRefreshLoading(false);
+    }
+  }, [loadCategoryTree, loadVideos]);
 
   useEffect(() => { loadCategoryTree(); }, [loadCategoryTree]);
   useEffect(() => {
@@ -325,7 +334,7 @@ export function VideoList() {
     return () => { clearTimeout(timer); };
   }, [videos, historyVideos, recentVideos, continueVideo, selectedFolderIds, loadVideos, searchQuery, currentCategoryId]);
 
-  const children = useMemo(() => getCurrentChildren(), [getCurrentChildren]);
+  const children = useMemo(() => getCurrentChildren(), [categoryTree, currentCategoryId]);
   const isSearching = !!inputVal.trim();
 
   const handleSearch = useCallback(() => {
@@ -431,7 +440,7 @@ export function VideoList() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-sm flex-wrap">
             {breadcrumb.map((b, i) => (
-              <React.Fragment key={b.id ?? 'root'}>
+              <React.Fragment key={`${b.id ?? 'root'}-${i}`}>
                 {i > 0 && <ChevronRight size={12} className="text-[var(--text-muted)]" />}
                 <button
                   onClick={() => { setGridMode('normal'); goToBreadcrumb(b.id); }}
@@ -443,8 +452,8 @@ export function VideoList() {
             ))}
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={handleRefreshFolders} className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]" title="刷新当前目录和视频列表">
-              <RefreshCw size={14} />
+            <button onClick={handleRefreshFolders} disabled={refreshLoading} className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-50" title="刷新当前目录和视频列表">
+              {refreshLoading ? <RefreshCw size={14} className="animate-spin" /> : <Folder size={14} />}
             </button>
             <button onClick={handleRescan} disabled={rescanLoading} className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-50" title="重新扫描视频文件">
               {rescanLoading ? <RefreshCw size={14} className="animate-spin" /> : <Scan size={14} />}

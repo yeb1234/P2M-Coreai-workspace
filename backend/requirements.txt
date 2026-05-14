@@ -7,5 +7,10 @@ python-multipart==0.0.12
 watchdog==5.0.3
 requests==2.32.3
 faster-whisper==1.0.3
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
+nvidia-cuda-runtime-cu12
 aiofiles==24.1.0
 PyJWT==2.9.0
+rq==1.16.2
+redis==5.0.8

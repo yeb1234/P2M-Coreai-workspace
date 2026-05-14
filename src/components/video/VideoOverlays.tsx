@@ -21,14 +21,19 @@ interface SubtitleOverlayProps {
   text: string;
   opacity: number;
   size: number;
+  onDoubleClick?: () => void;
 }
 
-export function SubtitleOverlay({ visible, text, opacity, size }: SubtitleOverlayProps) {
+export function SubtitleOverlay({ visible, text, opacity, size, onDoubleClick }: SubtitleOverlayProps) {
   if (!visible || !text) return null;
   return (
     <div className="absolute inset-x-4 bottom-16 z-10 pointer-events-none flex justify-center" style={{ opacity }}>
       <div
-        className="max-w-[86%] rounded-md bg-black/65 px-3 py-1.5 text-center text-white leading-snug shadow-lg"
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          onDoubleClick?.();
+        }}
+        className="max-w-[86%] rounded-md bg-black/65 px-3 py-1.5 text-center text-white leading-snug shadow-lg pointer-events-auto cursor-text select-text"
         style={{ fontSize: `${Math.max(12, Math.round(18 * size / 100))}px` }}
       >
         {text}

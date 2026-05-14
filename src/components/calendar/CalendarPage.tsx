@@ -24,7 +24,7 @@ export const CalendarPage: React.FC = () => {
   return (
     <div className="w-full pt-2">
       <PageTitle
-        title="日历"
+        title="日历看板"
         subtitle="点击日期查看事件"
         icon={<CalendarDays size={22} />}
         action={

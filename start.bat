@@ -50,6 +50,11 @@ echo Starting backend (port 80)...
 start "SiteYeb Backend" /D "%ROOT%backend" cmd /k ".venv311\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload"
 exit /b
 
+:start_worker
+echo Starting AI RQ worker...
+start "SiteYeb AI Worker" /D "%ROOT%backend" cmd /k ".venv311\Scripts\python -m app.worker"
+exit /b
+
 :start_frontend
 echo Starting frontend dev server (port 5002)...
 start "SiteYeb Frontend" /D "%ROOT%" cmd /k "npm run dev"
@@ -57,14 +62,12 @@ exit /b
 
 :stop_backend
 echo Stopping backend...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$root=(Resolve-Path '%ROOT%backend').Path; Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine -like '*uvicorn*app.main:app*' -and $_.CommandLine -like ('*' + $root + '*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>nul
-taskkill /FI "WINDOWTITLE eq SiteYeb Backend*" /T /F >nul 2>nul
+python "%~dp0stop.py" backend
 exit /b
 
 :stop_frontend
 echo Stopping frontend...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$root=(Resolve-Path '%ROOT%').Path.TrimEnd('\'); Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and (($_.CommandLine -like '*npm*run*dev*') -or ($_.CommandLine -like '*vite*')) -and $_.CommandLine -like ('*' + $root + '*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>nul
-taskkill /FI "WINDOWTITLE eq SiteYeb Frontend*" /T /F >nul 2>nul
+python "%~dp0stop.py" frontend
 exit /b
 
 :after_action

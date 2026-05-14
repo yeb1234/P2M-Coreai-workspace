@@ -21,6 +21,10 @@ class SubtitleSegmentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SubtitleSegmentUpdate(BaseModel):
+    text: str = Field(min_length=1)
+
+
 class CategoryOut(BaseModel):
     id: int
     name: str
@@ -142,6 +146,7 @@ class AiJobListItem(BaseModel):
     id: str
     video_id: int
     video_title: str | None = None
+    duration: Optional[float] = None
     status: str
     stage: str
     message: str
@@ -159,6 +164,7 @@ class AiJobListItem(BaseModel):
     subtitle_correction_prompt: Optional[str] = None
     summary_error: Optional[str] = None
     created_at: datetime
+    started_at: datetime | None = None
     updated_at: datetime
 
 

@@ -1,4 +1,5 @@
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -10,7 +11,7 @@ def safe_stem(value: str) -> str:
 
 
 def unique_suffix() -> str:
-    return datetime.now().strftime("%Y%m%d%H%M%S%f")
+    return datetime.now().strftime("%Y%m%d%H%M%S%f") + uuid.uuid4().hex[:8]
 
 
 def ensure_parent(path: Path) -> Path:

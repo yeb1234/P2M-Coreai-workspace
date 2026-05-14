@@ -5,7 +5,11 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import AiJob, Note, SubtitleSegment, Video
 from app.schemas import AiJobBatchCreate, AiJobBatchOut, AiJobBatchSkippedItem, AiJobListItem, AiJobListOut, AiJobOut
-from app.services.ai_jobs import create_ai_job_from_payload
+from app.services.ai_jobs import _apply_job_options, _build_job_options
+from app.utils.files import unique_suffix
+import logging
+
+from app.services.admin_ai_queue import _is_queue_paused, enqueue_ai_jobs
 from app.services.ai_job_rules import is_batch_eligible
 from app.utils.serialization import load_segments, to_output_url
 
@@ -18,6 +22,7 @@ def _job_list_item(job: AiJob) -> AiJobListItem:
         id=job.id,
         video_id=job.video_id,
         video_title=job.video.title if job.video else None,
+        duration=job.video.duration if job.video else None,
         status=job.status,
         stage=job.stage,
         message=job.message,
@@ -32,6 +37,7 @@ def _job_list_item(job: AiJob) -> AiJobListItem:
         device_type=job.device_type,
         subtitle_correction_enabled=job.subtitle_correction_enabled,
         subtitle_correction_scope=job.subtitle_correction_scope,
+        started_at=job.started_at,
         subtitle_correction_prompt=job.subtitle_correction_prompt,
         summary_error=job.summary_error,
         created_at=job.created_at,
@@ -45,11 +51,12 @@ def list_ai_jobs(
     limit: int = Query(default=20, ge=1, le=999999),
     db: Session = Depends(get_db),
 ):
-    query = db.query(AiJob).outerjoin(Video)
+    base_query = db.query(AiJob).outerjoin(Video)
+    total_all = base_query.count()
+
+    query = base_query
     if status:
         query = query.filter(AiJob.status == status)
-
-    total = query.count()
     if status == "queued":
         jobs = query.order_by(AiJob.created_at.asc(), AiJob.id.asc()).limit(limit).all()
     elif status == "running":
@@ -78,7 +85,7 @@ def list_ai_jobs(
 
     return AiJobListOut(
         items=[_job_list_item(job) for job in jobs],
-        total=total,
+        total=total_all,
         running=db.query(AiJob).filter(AiJob.status == "running").count(),
         queued=db.query(AiJob).filter(AiJob.status == "queued").count(),
         failed=db.query(AiJob).filter(AiJob.status == "failed").count(),
@@ -172,12 +179,50 @@ def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
     limited = len(eligible) > len(selected)
     job_ids: list[str] = []
     if not payload.dry_run:
+        options = _build_job_options(
+            whisper_model=payload.whisper_model,
+            whisper_engine=payload.whisper_engine,
+            language=payload.language,
+            do_summary=payload.do_summary,
+            word_limit=payload.word_limit,
+            ollama_model=payload.ollama_model,
+            cpu_threads=payload.cpu_threads,
+            compute_type=payload.compute_type,
+            beam_size=payload.beam_size,
+            best_of=payload.best_of,
+            temperature=payload.temperature,
+            vad_filter=payload.vad_filter,
+            device_type=payload.device_type,
+            subtitle_correction_enabled=payload.subtitle_correction_enabled,
+            subtitle_correction_scope=payload.subtitle_correction_scope,
+            subtitle_correction_prompt=payload.subtitle_correction_prompt,
+        )
         for video in selected:
             if payload.mode == "all":
                 _prepare_force_rerun(db, video)
-                db.commit()
-            job = create_ai_job_from_payload(db, video.id, payload)
+            job = AiJob(
+                id=unique_suffix(),
+                video_id=video.id,
+                status="queued",
+                stage="queued",
+                message="Queued for processing",
+            )
+            _apply_job_options(job, options)
+            db.add(job)
+            video.ai_status = "queued"
+            video.ai_stage = "queued"
+            video.ai_error = None
             job_ids.append(job.id)
+        db.commit()
+        if not _is_queue_paused():
+            try:
+                enqueue_ai_jobs(job_ids)
+            except Exception:
+                logging.getLogger(__name__).exception("Failed to enqueue jobs to RQ")
+        else:
+            # Queue is paused; jobs are queued in DB only and will be pushed
+            # to RQ when resume is called.
+            logging.getLogger(__name__).info("Queue is paused; %d jobs queued in DB only", len(job_ids))
 
     return AiJobBatchOut(
         mode=payload.mode,

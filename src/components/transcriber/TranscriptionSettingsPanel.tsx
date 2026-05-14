@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import { WHISPER_MODELS, DEFAULT_TRANSCRIPTION_SETTINGS } from '../../stores/transcriptionStore';
+import { downloadWhisperModel, fetchDownloadStatus, fetchWhisperModels, type WhisperModelsOut } from '../../lib/videoApi';
 
 export interface TranscriptionSettings {
   whisperEngine: string;
@@ -34,7 +37,20 @@ export const DEFAULT_SETTINGS: TranscriptionSettings = {
   subtitleCorrectionScope: DEFAULT_TRANSCRIPTION_SETTINGS.subtitleCorrectionScope,
 };
 
-const COMPUTE_TYPES = ['int8', 'int8_float16', 'int16', 'float16', 'float32'];
+const COMPUTE_TYPES_CPU = ['int8', 'int16', 'float32'];
+const COMPUTE_TYPES_GPU = ['int8_float16', 'float16', 'int8', 'bfloat16', 'float32'];
+const COMPUTE_TYPES_ALL = ['int8', 'int8_float16', 'int16', 'float16', 'bfloat16', 'float32'];
+
+function allowedComputeTypes(engine: string, deviceType: 'auto' | 'cuda' | 'cpu'): string[] {
+  if (engine === 'whisper.cpp') return COMPUTE_TYPES_ALL; // whisper.cpp ignores this anyway
+  if (deviceType === 'cpu') return COMPUTE_TYPES_CPU;
+  if (deviceType === 'cuda') return COMPUTE_TYPES_GPU;
+  return COMPUTE_TYPES_ALL;
+}
+
+function allowedModels(_engine: string): typeof WHISPER_MODELS {
+  return WHISPER_MODELS;
+}
 
 interface TranscriptionSettingsPanelProps {
   settings: TranscriptionSettings;
@@ -42,13 +58,92 @@ interface TranscriptionSettingsPanelProps {
 }
 
 export function TranscriptionSettingsPanel({ settings, onChange }: TranscriptionSettingsPanelProps) {
+  const [whisperModels, setWhisperModels] = useState<WhisperModelsOut | null>(null);
+  interface DownloadState {
+    status: string;
+    error?: string;
+  }
+  const [downloadStates, setDownloadStates] = useState<Record<string, DownloadState>>({});
+
+  useEffect(() => {
+    void fetchWhisperModels().then((m) => {
+      setWhisperModels(m);
+      if (m) {
+        const autoDlIds = m.items.filter((i) => i.auto_downloadable).map((i) => i.id);
+        void Promise.allSettled(autoDlIds.map((id) => fetchDownloadStatus(id)))
+          .then((results) => {
+            const next: Record<string, DownloadState> = {};
+            results.forEach((res, idx) => {
+              if (res.status === 'fulfilled') {
+                const val = res.value;
+                next[autoDlIds[idx]] = { status: val.status, error: val.error };
+              }
+            });
+            setDownloadStates((prev) => ({ ...prev, ...next }));
+          });
+      }
+    }).catch(() => setWhisperModels(null));
+  }, []);
   const isWhisperCpp = settings.whisperEngine === 'whisper.cpp';
+  const isCuda = !isWhisperCpp && settings.deviceType === 'cuda';
+  const computeOptions = allowedComputeTypes(settings.whisperEngine, settings.deviceType);
+  const modelOptions = allowedModels(settings.whisperEngine);
+  const computeTypeInvalid = !isWhisperCpp && !computeOptions.includes(settings.computeType);
+  const modelInvalid = !modelOptions.some((m) => m.id === settings.whisperModel);
+  const installedModels = new Set((whisperModels?.items ?? []).filter((i) => i.installed).map((i) => i.id));
+  const autoDlModels = new Set((whisperModels?.items ?? []).filter((i) => i.auto_downloadable).map((i) => i.id));
+  const hasActiveDownload = Object.values(downloadStates).some(
+    (s) => s.status === 'started' || s.status === 'running'
+  );
+
+  useEffect(() => {
+    if (!hasActiveDownload) return;
+    const timer = setInterval(() => {
+      const modelIds = (whisperModels?.items ?? [])
+        .filter((i) => i.auto_downloadable)
+        .map((i) => i.id);
+      if (modelIds.length === 0) return;
+      void Promise.allSettled(modelIds.map((id) => fetchDownloadStatus(id)))
+        .then((results) => {
+          const next: Record<string, DownloadState> = {};
+          let hasCompleted = false;
+          results.forEach((res, idx) => {
+            if (res.status === 'fulfilled') {
+              const val = res.value;
+              next[modelIds[idx]] = { status: val.status, error: val.error };
+              if (val.status === 'completed') hasCompleted = true;
+            }
+          });
+          setDownloadStates((prev) => ({ ...prev, ...next }));
+          if (hasCompleted) {
+            void fetchWhisperModels().then((m) => setWhisperModels(m));
+          }
+        });
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [hasActiveDownload, whisperModels]);
+
+  // CUDA preset: faster-whisper + large-v3-turbo + float16
+  const applyCudaTurbo = () => onChange({
+    whisperEngine: 'faster-whisper',
+    whisperModel: 'large-v3-turbo',
+    deviceType: 'cuda',
+    computeType: 'int8_float16',
+    beamSize: 5,
+    bestOf: 1,
+    temperature: 0,
+    vadFilter: true,
+    subtitleCorrectionEnabled: false,
+    subtitleCorrectionScope: 'off',
+  });
 
   const applyLowUsage = () => onChange({
     whisperEngine: 'faster-whisper',
-    cpuThreads: 12,
+    whisperModel: 'medium',
+    deviceType: 'cpu',
+    cpuThreads: 6,
     computeType: 'int8',
-    beamSize: 1,
+    beamSize: 3,
     bestOf: 1,
     temperature: 0,
     vadFilter: true,
@@ -70,6 +165,19 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
 
   const applyDefault = () => onChange({ ...DEFAULT_SETTINGS });
 
+  const handleEngineChange = (engine: string) => {
+    onChange({ whisperEngine: engine });
+  };
+
+  const handleDeviceChange = (d: 'auto' | 'cuda' | 'cpu') => {
+    const updates: Partial<TranscriptionSettings> = { deviceType: d };
+    const next = allowedComputeTypes(settings.whisperEngine, d);
+    if (!next.includes(settings.computeType)) {
+      updates.computeType = d === 'cpu' ? 'int8' : 'int8_float16';
+    }
+    onChange(updates);
+  };
+
   return (
     <div className="min-w-0 space-y-3">
       {/* Presets */}
@@ -78,24 +186,45 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           <p className="text-[11px] font-semibold text-[var(--text-primary)]">模式预设</p>
           <p className="text-[10px] text-[var(--text-muted)]">先选预设，再微调</p>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
+          <button
+            type="button"
+            onClick={applyCudaTurbo}
+            className={`rounded-md border px-2 py-1.5 text-left transition-colors ${
+              isCuda && settings.whisperModel === 'large-v3-turbo'
+                ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                : 'border-[var(--border-light)] bg-[var(--theme-surface,white)] text-[var(--text-primary)] hover:border-[var(--accent)]'
+            }`}
+            title="3070Ti（8G显存）推荐：faster-whisper + large-v3-turbo + int8_float16"
+          >
+            <p className="text-[11px] font-medium">3070Ti（8G显存）推荐</p>
+            <p className="mt-0.5 text-[10px] leading-3 text-[var(--text-muted)]">large-v3-turbo</p>
+          </button>
           <button
             type="button"
             onClick={applyLowUsage}
-            className="rounded-md border border-[var(--border-light)] bg-[var(--theme-surface,white)] px-2 py-1.5 text-left transition-colors hover:border-[var(--accent)]"
+            className={`rounded-md border px-2 py-1.5 text-left transition-colors ${
+              settings.whisperEngine === 'faster-whisper' && settings.deviceType !== 'cuda'
+                ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                : 'border-[var(--border-light)] bg-[var(--theme-surface,white)] text-[var(--text-primary)] hover:border-[var(--accent)]'
+            }`}
             title="faster-whisper CPU，参数保守，适合后台慢慢跑"
           >
-            <p className="text-[11px] font-medium text-[var(--text-primary)]">低占用</p>
-            <p className="mt-0.5 text-[10px] leading-3 text-[var(--text-muted)]">CPU 路线</p>
+            <p className="text-[11px] font-medium">CPU 低占用</p>
+            <p className="mt-0.5 text-[10px] leading-3 text-[var(--text-muted)]">faster-whisper</p>
           </button>
           <button
             type="button"
             onClick={applyHighPerf}
-            className="rounded-md border border-[var(--accent)] bg-[var(--accent)] px-2 py-1.5 text-left text-white transition-colors hover:opacity-90"
+            className={`rounded-md border px-2 py-1.5 text-left transition-colors ${
+              settings.whisperEngine === 'whisper.cpp'
+                ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                : 'border-[var(--border-light)] bg-[var(--theme-surface,white)] text-[var(--text-primary)] hover:border-[var(--accent)]'
+            }`}
             title="whisper.cpp + large-v3，适合 GPU/Vulkan/HIP 转写"
           >
-            <p className="text-[11px] font-medium">高性能</p>
-            <p className="mt-0.5 text-[10px] leading-3 text-white/80">whisper.cpp</p>
+            <p className="text-[11px] font-medium">Whisper.cpp</p>
+            <p className="mt-0.5 text-[10px] leading-3 text-[var(--text-muted)]">外部引擎</p>
           </button>
           <button
             type="button"
@@ -114,7 +243,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
         <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">转写引擎</label>
         <select
           value={settings.whisperEngine}
-          onChange={(e) => onChange({ whisperEngine: e.target.value })}
+          onChange={(e) => handleEngineChange(e.target.value)}
           className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
         >
           <option value="faster-whisper">faster-whisper CPU（稳定默认）</option>
@@ -129,12 +258,92 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           onChange={(e) => onChange({ whisperModel: e.target.value })}
           className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
         >
-          {WHISPER_MODELS.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name} — {m.desc}
-            </option>
-          ))}
+          {modelOptions.map((m) => {
+            const installed = !whisperModels || installedModels.has(m.id);
+            const autoDl = autoDlModels.has(m.id);
+            const canSelect = installed || (!isWhisperCpp && autoDl);
+            const dlState = downloadStates[m.id];
+            let suffix = installed ? m.desc : `未安装`;
+            if (dlState) {
+              if (dlState.status === 'started' || dlState.status === 'running') {
+                suffix = '下载中...';
+              } else if (dlState.status === 'failed') {
+                suffix = '下载失败';
+              } else if (dlState.status === 'completed') {
+                suffix = '下载完成';
+              }
+            }
+            return (
+              <option key={m.id} value={m.id} disabled={!canSelect}>
+                {m.name} — {suffix}
+              </option>
+            );
+          })}
         </select>
+        {modelInvalid && (
+          <p className="mt-1 text-[10px] text-amber-600">
+            当前模型与所选引擎不兼容，请重新选择。
+          </p>
+        )}
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--text-muted)]">
+          {whisperModels && <span>模型目录：{whisperModels.model_dir}</span>}
+          <button type="button" onClick={() => void fetchWhisperModels().then((m) => setWhisperModels(m)).catch(() => setWhisperModels(null))} className="text-[var(--accent)] hover:underline">
+            重新扫描
+          </button>
+          {!isWhisperCpp && autoDlModels.has(settings.whisperModel) && (
+            <button
+              type="button"
+              disabled={(() => {
+                const s = downloadStates[settings.whisperModel];
+                return s?.status === 'started' || s?.status === 'running';
+              })()}
+              onClick={async () => {
+                const s = downloadStates[settings.whisperModel];
+                if (s?.status === 'started' || s?.status === 'running') return;
+                setDownloadStates((prev) => ({ ...prev, [settings.whisperModel]: { status: 'started' } }));
+                try {
+                  await downloadWhisperModel(settings.whisperModel);
+                  void fetchWhisperModels().then((m) => setWhisperModels(m));
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : '下载失败';
+                  setDownloadStates((prev) => ({ ...prev, [settings.whisperModel]: { status: 'failed', error: msg } }));
+                }
+              }}
+              className="text-[var(--accent)] hover:underline disabled:text-[var(--text-muted)] disabled:opacity-50 group"
+            >
+              {(() => {
+                const s = downloadStates[settings.whisperModel];
+                const installed = installedModels.has(settings.whisperModel);
+                if (s?.status === 'started' || s?.status === 'running') {
+                  return (
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 size={12} className="animate-spin" /> 下载中...
+                    </span>
+                  );
+                }
+                if (s?.status === 'failed') {
+                  return <span className="text-[#dc3545]">下载失败，点击重试</span>;
+                }
+                if (installed || s?.status === 'completed') {
+                  return (
+                    <>
+                      <span className="group-hover:hidden">下载完成</span>
+                      <span className="hidden group-hover:inline">重新下载</span>
+                    </>
+                  );
+                }
+                return '立即下载';
+              })()}
+            </button>
+          )}
+          {(() => {
+            const s = downloadStates[settings.whisperModel];
+            if (s?.status === 'failed' && s?.error) {
+              return <span className="text-[10px] text-amber-600">{s.error}</span>;
+            }
+            return null;
+          })()}
+        </div>
       </div>
 
       <div>
@@ -144,7 +353,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             <button
               key={d}
               type="button"
-              onClick={() => onChange({ deviceType: d })}
+              onClick={() => handleDeviceChange(d)}
               className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
                 settings.deviceType === d
                   ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
@@ -172,13 +381,22 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           <select
             value={settings.computeType}
             onChange={(e) => onChange({ computeType: e.target.value })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            disabled={isWhisperCpp}
+            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
           >
-            {COMPUTE_TYPES.map((t) => (
+            {computeOptions.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
-          <p className="mt-1 text-[10px] text-[var(--text-muted)]">只影响 faster-whisper；whisper.cpp 忽略。</p>
+          {computeTypeInvalid ? (
+            <p className="mt-1 text-[10px] text-amber-600">
+              {settings.deviceType === 'cpu' ? 'CPU 不支持 float16/bfloat16 系列，会自动回退到 int8。' : '当前 compute_type 与设备不兼容，请重选。'}
+            </p>
+          ) : (
+            <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+              {isWhisperCpp ? 'whisper.cpp 忽略此项' : settings.deviceType === 'cuda' ? 'CUDA: float16 速度最快，int8_float16 显存最省' : 'CPU: int8 最快、float32 最准'}
+            </p>
+          )}
         </div>
       </div>
 
@@ -220,7 +438,15 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {!isWhisperCpp ? (
+        {isWhisperCpp ? (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] leading-4 text-blue-700">
+            GPU 转写模式：CPU 线程对 whisper.cpp 无效，由 whisper-cli.exe 自行决定。
+          </div>
+        ) : isCuda ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[10px] leading-4 text-emerald-700">
+            CUDA 模式：转写在 GPU 上跑，CPU 线程仅影响 ffmpeg 音频提取。
+          </div>
+        ) : (
           <div>
             <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">CPU 转写线程</label>
             <input
@@ -231,10 +457,6 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
               onChange={(e) => onChange({ cpuThreads: Number(e.target.value) })}
               className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
             />
-          </div>
-        ) : (
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] leading-4 text-blue-700">
-            GPU 转写模式：CPU 线程对 whisper.cpp 无效，由 whisper-cli.exe 自行决定。
           </div>
         )}
         <div>

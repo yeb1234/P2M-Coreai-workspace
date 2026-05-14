@@ -8,8 +8,15 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5002,
     strictPort: false,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:80',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
+    emptyOutDir: false,
     rolldownOptions: {
       output: {
         codeSplitting: true,

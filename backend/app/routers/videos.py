@@ -15,6 +15,7 @@ from app.schemas import (
     NoteOut,
     SegmentSearchResult,
     SubtitleSegmentOut,
+    SubtitleSegmentUpdate,
     VideoOut,
     VideoPage,
     VideoFavoriteIn,
@@ -22,8 +23,9 @@ from app.schemas import (
 )
 from app.services.ai_jobs import create_ai_job_from_payload, ensure_video_note
 from app.services.sprite import get_or_generate_sprite, get_sprite_meta_path, get_sprite_path, has_sprite
+from app.services.subtitle_writer import update_vtt_segment_text
 from app.services.video_serialization import serialize_video
-from app.utils.serialization import to_output_url
+from app.utils.serialization import dump_segments, load_segments, to_output_url
 
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
@@ -579,3 +581,45 @@ def get_sprite_sheet(video_id: int, db: Session = Depends(get_db)):
         "X-Sprite-Meta": json.dumps(meta) if meta else "{}",
         "Cache-Control": "public, max-age=86400",
     })
+
+
+@router.put("/{video_id}/segments/{segment_index}")
+def update_segment(
+    video_id: int,
+    segment_index: int,
+    payload: SubtitleSegmentUpdate,
+    db: Session = Depends(get_db),
+):
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    segment = (
+        db.query(SubtitleSegment)
+        .filter(SubtitleSegment.video_id == video_id, SubtitleSegment.segment_index == segment_index)
+        .first()
+    )
+    if not segment:
+        raise HTTPException(status_code=404, detail="Segment not found")
+
+    new_text = payload.text.strip()
+    segment.text = new_text
+
+    # Update transcript_segments JSON in Video model
+    segments = load_segments(video.transcript_segments) if video.transcript_segments else []
+    if 0 <= segment_index < len(segments):
+        segments[segment_index]["text"] = new_text
+        video.transcript_segments = dump_segments(segments)
+
+    # Rebuild transcription from segments
+    if segments:
+        video.transcription = "\n".join((s.get("text") or "").strip() for s in segments).strip()
+
+    # Update VTT file on disk
+    if video.subtitle_path:
+        subtitle_file = Path(video.subtitle_path)
+        if subtitle_file.exists():
+            update_vtt_segment_text(subtitle_file, segment_index, new_text)
+
+    db.commit()
+    return {"status": "ok"}

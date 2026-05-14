@@ -112,7 +112,7 @@ def get_or_create_category(db, file_path: Path) -> int | None:
         category = db.query(Category).filter(Category.path == current_path_str).first()
         if not category:
             category = Category(
-                name=part if index == 0 else " / ".join(category_parts[: index + 1]),
+                name=part,
                 path=current_path_str,
                 sort_order=db.query(Category).count(),
                 parent_id=parent_id,

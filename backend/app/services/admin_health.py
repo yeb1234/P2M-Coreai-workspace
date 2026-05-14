@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.database import SessionLocal, engine, settings
 from app.models import AiJob, Video
-from app.services.ai_queue import is_queue_paused
+from app.services.admin_ai_queue import _is_queue_paused
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 
 
@@ -102,12 +102,6 @@ def backend_health() -> dict:
     whisper_cpp_exe = Path(settings.whisper_cpp_exe) if settings.whisper_cpp_exe else None
     whisper_cpp_model = Path(settings.whisper_cpp_model) if settings.whisper_cpp_model else None
     checks.append(health_item(
-        "whisper.cpp 可执行文件",
-        bool(whisper_cpp_exe and whisper_cpp_exe.exists()),
-        "已配置" if whisper_cpp_exe and whisper_cpp_exe.exists() else "未配置或文件不存在",
-        {"path": str(whisper_cpp_exe or ""), "extra_args": settings.whisper_cpp_extra_args},
-    ))
-    checks.append(health_item(
         "whisper.cpp 模型",
         bool(whisper_cpp_model and whisper_cpp_model.exists()),
         "已配置" if whisper_cpp_model and whisper_cpp_model.exists() else "未配置或文件不存在",
@@ -145,12 +139,74 @@ def backend_health() -> dict:
                 "queued": queued,
                 "failed": failed,
                 "worker_concurrency": settings.ai_worker_concurrency,
-                "paused": is_queue_paused(),
+                "paused": _is_queue_paused(),
             },
         ))
         checks.append(health_item("视频库", True, f"{videos} 个视频", {"videos": videos}))
     finally:
         db.close()
+
+    try:
+        import ctranslate2
+        cuda_devices = ctranslate2.get_cuda_device_count()
+        cuda_available = cuda_devices > 0
+    except Exception:
+        cuda_devices = 0
+        cuda_available = False
+    from app.services.transcribe_whisper import _resolve_device
+    resolved_device = _resolve_device(settings.device_type)
+    checks.append(health_item(
+        "CUDA / GPU",
+        cuda_available,
+        f"检测到 {cuda_devices} 个 CUDA 设备，转写将使用 {resolved_device}" if cuda_available else f"未检测到 CUDA 设备，转写将使用 {resolved_device}",
+        {
+            "cuda_devices": cuda_devices,
+            "resolved_device": resolved_device,
+            "configured_device_type": settings.device_type,
+        },
+    ))
+
+    # When CUDA is actually selected, also probe cuBLAS / cuDNN runtime DLLs because
+    # faster-whisper fails opaquely if those are missing on Windows.
+    if resolved_device == "cuda":
+        try:
+            from app.services.transcribe_whisper import _ensure_cuda_libs, _probe_cuda_runtime_libs
+            _ensure_cuda_libs()
+            probe = _probe_cuda_runtime_libs()
+            missing = probe.get("missing") or []
+            present = probe.get("present") or []
+            checks.append(health_item(
+                "CUDA 运行库 (cuBLAS/cuDNN)",
+                not missing,
+                (
+                    "已加载: " + ", ".join(present)
+                    if not missing
+                    else "缺失: " + ", ".join(missing)
+                    + "。请在后端 venv 中执行: pip install nvidia-cublas-cu12 nvidia-cudnn-cu12"
+                ),
+                {"present": present, "missing": missing},
+            ))
+        except Exception as exc:
+            checks.append(health_item(
+                "CUDA 运行库 (cuBLAS/cuDNN)", False, f"探测失败: {exc}", {},
+            ))
+
+    whisper_cpp_ok = False
+    whisper_cpp_msg = "未配置"
+    if whisper_cpp_exe and whisper_cpp_exe.exists():
+        try:
+            from app.services.transcribe_whisper import _probe_whisper_cpp_exe
+            _probe_whisper_cpp_exe(whisper_cpp_exe)
+            whisper_cpp_ok = True
+            whisper_cpp_msg = "whisper-cli.exe 可正常启动"
+        except RuntimeError as exc:
+            whisper_cpp_msg = str(exc)
+    checks.append(health_item(
+        "whisper.cpp 可执行文件",
+        whisper_cpp_ok,
+        whisper_cpp_msg,
+        {"path": str(whisper_cpp_exe or ""), "extra_args": settings.whisper_cpp_extra_args},
+    ))
 
     checks.append(health_item(
         "转写默认配置",
@@ -159,7 +215,7 @@ def backend_health() -> dict:
             f"{settings.default_whisper_model} / whisper.cpp GPU/外部引擎"
         )
         if settings.whisper_engine == "whisper.cpp"
-        else f"{settings.default_whisper_model} / {settings.whisper_cpu_threads} 个 CPU 转写线程 / {settings.whisper_compute_type}",
+        else f"{settings.default_whisper_model} / {settings.whisper_cpu_threads} 个 CPU 转写线程 / {settings.whisper_compute_type} / 设备 {resolved_device}",
         {
             "model": settings.default_whisper_model,
             "language": settings.default_language,
@@ -172,6 +228,7 @@ def backend_health() -> dict:
             "whisper_engine": settings.whisper_engine,
             "whisper_cpp_exe": settings.whisper_cpp_exe,
             "whisper_cpp_model": settings.whisper_cpp_model,
+            "resolved_device": resolved_device,
         },
     ))
 
