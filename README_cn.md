@@ -84,7 +84,7 @@ cd backend && .venv311/Scripts/python -m compileall app
 ## 文档
 
 - [更新日志](docs/changelog.md)
-- [2.8 技术改进报告](docs/2026-05-13-2.8-technical-report.md)
+- [2.91 技术改进报告](docs/2026-05-13-2.91-technical-report.md)
 - [2.7 技术改进报告](docs/2026-05-12-2.7-technical-report.md)
 - [踩坑与维护记录](docs/today-fixes-and-pitfalls.md)
 - [待办、提醒时间和番茄快捷输入规则](docs/todo-reminder-input-rules.md)

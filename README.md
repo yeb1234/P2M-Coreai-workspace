@@ -1,6 +1,6 @@
 # SiteYeb / P2M CoreAI Workspace
 
-当前版本：2.8.0
+当前版本：2.91
 
 一个还在持续生长的个人工作台。
 
@@ -31,7 +31,7 @@ SiteYeb 最开始是为个人学习、看视频、做笔记、跑番茄钟、管
 
 未来会继续接大量 AI 功能，前端页面也会尽量统一接入左侧插件系统，而不是散落在不同入口里。
 
-## 2.8.0 做了什么
+## 2.91 做了什么
 
 这一版重点围绕字幕转录、AI 任务中心和侧边栏体验继续打磨：
 
@@ -192,7 +192,7 @@ npm run build
 ## 文档
 
 - [更新日志](docs/changelog.md)
-- [2.8 技术改进报告](docs/2026-05-13-2.8-technical-report.md)
+- [2.91 技术改进报告](docs/2026-05-13-2.91-technical-report.md)
 - [2.7 技术改进报告](docs/2026-05-12-2.7-technical-report.md)
 - [2.6 技术改进报告](docs/2026-05-11-2.6-technical-report.md)
 - [2.5 技术改进报告](docs/2026-05-11-2.5-technical-report.md)
