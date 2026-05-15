@@ -44,6 +44,8 @@ def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | No
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     try:
         stdout, stderr = process.communicate()

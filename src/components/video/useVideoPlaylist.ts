@@ -104,6 +104,15 @@ export function useVideoPlaylist({ currentVideo, selectVideo, currentCategoryId 
     return true;
   }, [currentVideo, playlist, playlistIdx, selectPlaylistItem]);
 
+  const playPreviousFromPlaylist = useCallback(() => {
+    if (!currentVideo || playlist.length === 0) return false;
+    const currentIdx = playlist.findIndex((item) => item.id === currentVideo.id);
+    const prevIdx = (currentIdx >= 0 ? currentIdx : playlistIdx) - 1;
+    if (prevIdx < 0) return false;
+    void selectPlaylistItem(playlist[prevIdx], true);
+    return true;
+  }, [currentVideo, playlist, playlistIdx, selectPlaylistItem]);
+
   return {
     playlist,
     playlistIdx,
@@ -111,6 +120,7 @@ export function useVideoPlaylist({ currentVideo, selectVideo, currentCategoryId 
     playAfterLoadRef,
     selectPlaylistItem,
     playNextFromPlaylist,
+    playPreviousFromPlaylist,
     togglePlaylistScope,
   };
 }

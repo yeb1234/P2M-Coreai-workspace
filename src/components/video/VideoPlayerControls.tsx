@@ -46,7 +46,8 @@ interface VideoPlayerControlsProps {
   onProgressMouseMove: (e: React.MouseEvent<HTMLDivElement>) => void;
   onProgressMouseLeave: () => void;
   onTogglePlay: () => void;
-  onSeekBy: (delta: number) => void;
+  onPlayPrevious: () => void;
+  onPlayNext: () => void;
   onToggleMute: () => void;
   onVolumeChange: (volume: number) => void;
   onToggleSubtitleMenu: () => void;
@@ -87,7 +88,8 @@ export function VideoPlayerControls({
   onProgressMouseMove,
   onProgressMouseLeave,
   onTogglePlay,
-  onSeekBy,
+  onPlayPrevious,
+  onPlayNext,
   onToggleMute,
   onVolumeChange,
   onToggleSubtitleMenu,
@@ -134,10 +136,10 @@ export function VideoPlayerControls({
           <button onClick={() => { onTogglePlay(); playInteractionSound(isPlaying ? 'tap' : 'start'); }} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title={isPlaying ? '暂停 (空格)' : '播放 (空格)'}>
             {isPlaying ? <Pause size={isMobile ? 18 : 20} /> : <Play size={isMobile ? 18 : 20} />}
           </button>
-          <button onClick={() => { onSeekBy(-10); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="后退10秒">
+          <button onClick={() => { onPlayPrevious(); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="上一集">
             <SkipBack size={isMobile ? 14 : 16} />
           </button>
-          <button onClick={() => { onSeekBy(10); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="前进10秒">
+          <button onClick={() => { onPlayNext(); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title="下一集">
             <SkipForward size={isMobile ? 14 : 16} />
           </button>
 

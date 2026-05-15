@@ -82,14 +82,14 @@ def main() -> None:
     # must restart it (same as restarting the backend today).
     while _running:
         try:
-            # burst=True processes all queued jobs then returns.
-            # If a job is killed mid-flight work() exits with an error,
-            # caught below, and the loop restarts.
-            worker.work(burst=True, with_scheduler=False)
+            # burst=False keeps the worker blocking on the queue.
+            # It only returns on exception (e.g. job killed), then the
+            # loop restarts after a brief pause.
+            worker.work(burst=False, with_scheduler=False)
         except Exception:
             logger.exception("Worker error")
         if _running:
-            # No jobs in queue or worker was killed; pause briefly
+            # Brief pause before restarting after an error
             time.sleep(2)
 
     logger.info("AI RQ worker stopped.")

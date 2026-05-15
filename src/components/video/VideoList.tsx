@@ -1,17 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckSquare, ChevronRight, Folder, RefreshCw, Search, Square, Scan } from 'lucide-react';
+import { AlertCircle, CheckSquare, ChevronRight, Folder, RefreshCw, Search, Square } from 'lucide-react';
 import { useVideoStore } from '../../stores/videoStore';
 import {
   fetchContinueVideo,
   fetchRecentHistory,
   fetchRecentVideos,
   generateThumbnails,
-  rescanVideos,
   type CategoryTree,
   type VideoItem,
 } from '../../lib/videoApi';
 import { VideoGridSection, VideoNavigationCards, type HistorySortMode, type VideoGridMode } from './VideoListSections';
-import { playInteractionSound } from '../../lib/sounds';
 
 const VIDEO_GRID_COLUMNS_KEY = 'p2m_video_grid_columns';
 const DEFAULT_VIDEO_GRID_COLUMNS = 5;
@@ -195,7 +193,6 @@ export function VideoList() {
   const [gridMode, setGridMode] = useState<VideoGridMode>('normal');
   const [historySort, setHistorySort] = useState<HistorySortMode>('newest');
   const [columnsPerRow, setColumnsPerRow] = useState(loadVideoGridColumns);
-  const [rescanLoading, setRescanLoading] = useState(false);
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [rescanMsg, setRescanMsg] = useState('');
   const selectedFolderIdSet = useMemo(() => new Set(selectedFolderIds), [selectedFolderIds]);
@@ -208,26 +205,6 @@ export function VideoList() {
       : [...selectedFolderIds, id];
     setSelectedFolderIds(next);
   }, [selectedFolderIdSet, selectedFolderIds, setSelectedFolderIds]);
-
-  const handleRescan = useCallback(async () => {
-    setRescanLoading(true);
-    setRescanMsg('');
-    try {
-      const result = await rescanVideos();
-      playInteractionSound('success');
-      setRescanMsg(`扫描完成：新增 ${result.added}，删除 ${result.removed}，共 ${result.total} 个视频`);
-      await loadCategoryTree();
-      const state = useVideoStore.getState();
-      const ids = state.selectedFolderIds.length > 0 ? state.selectedFolderIds : undefined;
-      await loadVideos(1, state.searchQuery || undefined, ids);
-    } catch {
-      playInteractionSound('error');
-      setRescanMsg('扫描失败');
-    } finally {
-      setRescanLoading(false);
-      setTimeout(() => setRescanMsg(''), 4000);
-    }
-  }, [loadCategoryTree, loadVideos]);
 
   const handleRefreshFolders = useCallback(async () => {
     setRefreshLoading(true);
@@ -454,9 +431,6 @@ export function VideoList() {
           <div className="flex items-center gap-1">
             <button onClick={handleRefreshFolders} disabled={refreshLoading} className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-50" title="刷新当前目录和视频列表">
               {refreshLoading ? <RefreshCw size={14} className="animate-spin" /> : <Folder size={14} />}
-            </button>
-            <button onClick={handleRescan} disabled={rescanLoading} className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-50" title="重新扫描视频文件">
-              {rescanLoading ? <RefreshCw size={14} className="animate-spin" /> : <Scan size={14} />}
             </button>
           </div>
         </div>

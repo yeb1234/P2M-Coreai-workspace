@@ -294,6 +294,8 @@ def _probe_whisper_cpp_exe(exe_path: Path) -> None:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
@@ -415,7 +417,7 @@ def transcribe_wav(
         beam_size=beam_size or settings.whisper_beam_size,
         best_of=best_of or settings.whisper_best_of,
         temperature=settings.whisper_temperature if temperature is None else temperature,
-        condition_on_previous_text=True,
+        condition_on_previous_text=False,
     )
 
     parts: list[str] = []

@@ -91,6 +91,7 @@ function VideoPlayerView() {
     playAfterLoadRef,
     selectPlaylistItem,
     playNextFromPlaylist,
+    playPreviousFromPlaylist,
     togglePlaylistScope,
   } = useVideoPlaylist({ currentVideo, selectVideo, currentCategoryId });
 
@@ -361,7 +362,8 @@ function VideoPlayerView() {
               onProgressMouseMove={updateHover}
               onProgressMouseLeave={clearHover}
               onTogglePlay={togglePlay}
-              onSeekBy={seekBy}
+              onPlayPrevious={playPreviousFromPlaylist}
+              onPlayNext={playNextFromPlaylist}
               onToggleMute={toggleMute}
               onVolumeChange={handleVolumeChange}
               onToggleSubtitleMenu={() => { setShowSubtitleMenu(!showSubtitleMenu); setShowSpeedMenu(false); }}

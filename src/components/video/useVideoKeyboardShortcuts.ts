@@ -39,11 +39,11 @@ export function useVideoKeyboardShortcuts({
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
-          onSeekBy(-5);
+          onSeekBy(-10);
           break;
         case 'ArrowRight':
           e.preventDefault();
-          onSeekBy(5);
+          onSeekBy(10);
           break;
         case 'ArrowUp':
           e.preventDefault();

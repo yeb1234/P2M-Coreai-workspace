@@ -1,8 +1,6 @@
-version: "3.8"
-
 services:
   redis:
-    image: redis:7-alpine
+    image: docker.m.daocloud.io/library/redis:7-alpine
     container_name: siteyeb-redis
     restart: unless-stopped
     ports:

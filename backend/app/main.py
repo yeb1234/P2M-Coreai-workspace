@@ -47,6 +47,17 @@ def _run_background_thumbnails() -> None:
             generate_missing_sprites(limit=thumbnail_limit)
 
 
+def _drain_worker_stdout(proc: subprocess.Popen) -> None:
+    """Consume worker subprocess stdout to prevent PIPE deadlock."""
+    try:
+        if proc.stdout is None:
+            return
+        for line in proc.stdout:
+            print(f"[worker] {line}", end="", file=sys.stderr, flush=True)
+    except Exception:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
@@ -60,7 +71,12 @@ async def lifespan(_app: FastAPI):
     worker_proc = subprocess.Popen(
         [sys.executable, "-m", "app.worker"],
         cwd=backend_dir,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
+    threading.Thread(target=_drain_worker_stdout, args=(worker_proc,), name="worker-stdout-drain", daemon=True).start()
     print(f"AI RQ worker subprocess started: pid={worker_proc.pid}", file=sys.stderr, flush=True)
     yield
     stop_file_watcher()

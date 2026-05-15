@@ -98,6 +98,8 @@ def get_video_duration(video_path: str) -> float | None:
 
 
 def get_or_create_category(db, file_path: Path) -> int | None:
+    from sqlalchemy.exc import IntegrityError
+
     category_parts = get_category_parts(file_path)
     if not category_parts:
         return None
@@ -111,6 +113,11 @@ def get_or_create_category(db, file_path: Path) -> int | None:
         current_path_str = str(current_path.resolve())
         category = db.query(Category).filter(Category.path == current_path_str).first()
         if not category:
+            category = db.query(Category).filter(
+                Category.name == part,
+                Category.parent_id == parent_id,
+            ).first()
+        if not category:
             category = Category(
                 name=part,
                 path=current_path_str,
@@ -118,8 +125,21 @@ def get_or_create_category(db, file_path: Path) -> int | None:
                 parent_id=parent_id,
             )
             db.add(category)
-            db.commit()
-            db.refresh(category)
+            try:
+                db.commit()
+                db.refresh(category)
+            except IntegrityError:
+                db.rollback()
+                category = db.query(Category).filter(Category.path == current_path_str).first()
+                if not category:
+                    category = db.query(Category).filter(
+                        Category.name == part,
+                        Category.parent_id == parent_id,
+                    ).first()
+                if category:
+                    db.refresh(category)
+        if not category:
+            return None
         parent_id = category.id
 
     return parent_id

@@ -218,6 +218,23 @@ def ensure_runtime_schema() -> None:
             # Some SQLite builds omit FTS5; substring fallback search remains available.
             pass
 
+        # Migration: categories.name was globally unique, now composite (name, parent_id)
+        try:
+            indexes = connection.exec_driver_sql("PRAGMA index_list(categories)").fetchall()
+            for idx in indexes:
+                idx_name = idx[1]
+                is_unique = idx[2]
+                if is_unique:
+                    info = connection.exec_driver_sql(f"PRAGMA index_info({idx_name})").fetchall()
+                    cols = [row[2] for row in info]
+                    if cols == ["name"]:
+                        connection.exec_driver_sql(f"DROP INDEX IF EXISTS {idx_name}")
+            connection.exec_driver_sql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uix_category_name_parent ON categories(name, parent_id)"
+            )
+        except Exception:
+            pass
+
         connection.exec_driver_sql(
             """
             CREATE TABLE IF NOT EXISTS users (
