@@ -1,6 +1,6 @@
 # SiteYeb / P2M CoreAI Workspace
 
-当前版本：2.91
+当前版本：2.92
 
 一个还在持续生长的个人工作台。
 
