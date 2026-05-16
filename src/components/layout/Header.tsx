@@ -1,6 +1,8 @@
-import React, { useCallback, useState } from 'react';
-import { Bell, Settings, Clock, LogOut, Bot } from 'lucide-react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Bell, Settings, Clock, LogOut, Bot, Palette } from 'lucide-react';
 import { usePomodoroStore, useScheduleStore, useUIStore, useNotificationStore, useAuthStore, useAIStore } from '../../stores';
+import { BUILT_IN_THEME_IDS, THEME_PRESETS, applyTheme } from '../../lib/themes';
 import { NotificationPanel } from './NotificationPanel';
 import { toLocalDateString } from '../../lib/date';
 import { useClockNow } from '../../hooks/useClockNow';
@@ -44,8 +46,30 @@ export const Header: React.FC = () => {
   const logout = useAuthStore((s) => s.logout);
   const chatOpen = useAIStore((s) => s.chatOpen);
   const toggleChat = useAIStore((s) => s.toggleChat);
+  const themeId = useUIStore((s) => s.themeId);
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const themePickerRef = useRef<HTMLDivElement>(null);
+  const themeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // 点击外部关闭主题选择器
+  useEffect(() => {
+    if (!showThemePicker) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        themePickerRef.current &&
+        !themePickerRef.current.contains(target) &&
+        themeButtonRef.current &&
+        !themeButtonRef.current.contains(target)
+      ) {
+        setShowThemePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showThemePicker]);
 
   // Today stats
   const today = toLocalDateString(new Date());
@@ -95,7 +119,68 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="relative flex items-center gap-1">
+            <button
+              ref={themeButtonRef}
+              onClick={() => setShowThemePicker((v) => !v)}
+              className={`rounded-lg p-2 transition-colors ${showThemePicker ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--text-primary)]'}`}
+              title="切换主题"
+            >
+              <Palette size={18} />
+            </button>
+
+            {showThemePicker &&
+              createPortal(
+                <div
+                  ref={themePickerRef}
+                  className="fixed z-[9999] mt-2 w-64 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] p-3 shadow-lg"
+                  style={{
+                    top: (themeButtonRef.current?.getBoundingClientRect().bottom ?? 0) + 8,
+                    right: window.innerWidth - (themeButtonRef.current?.getBoundingClientRect().right ?? 0),
+                  }}
+                >
+                  <p className="mb-2 text-[11px] font-medium text-[var(--text-secondary)]">主题风格</p>
+                  <div className="grid grid-cols-5 gap-2">
+                    {THEME_PRESETS.filter((t) => BUILT_IN_THEME_IDS.has(t.id)).map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          useUIStore.getState().setTheme(t.id);
+                          applyTheme(t.id, t.vars);
+                        }}
+                        title={t.name}
+                        className={`relative h-9 w-9 overflow-hidden rounded-lg shadow-sm transition-all hover:scale-110 ${
+                          themeId === t.id ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-card)]' : ''
+                        }`}
+                        style={{
+                          background: `linear-gradient(to right, ${t.vars['--bg-base']} 33.33%, ${t.vars['--accent']} 33.33%, ${t.vars['--accent']} 66.66%, ${t.vars['--text-primary']} 66.66%)`,
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <p className="mb-2 mt-3 text-[11px] font-medium text-[var(--text-secondary)]">自定义风格</p>
+                  <div className="grid grid-cols-5 gap-2">
+                    {THEME_PRESETS.filter((t) => !BUILT_IN_THEME_IDS.has(t.id)).map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          useUIStore.getState().setTheme(t.id);
+                          applyTheme(t.id, t.vars);
+                        }}
+                        title={t.name}
+                        className={`relative h-9 w-9 overflow-hidden rounded-lg shadow-sm transition-all hover:scale-110 ${
+                          themeId === t.id ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-card)]' : ''
+                        }`}
+                        style={{
+                          background: `linear-gradient(to right, ${t.vars['--bg-base']} 33.33%, ${t.vars['--accent']} 33.33%, ${t.vars['--accent']} 66.66%, ${t.vars['--text-primary']} 66.66%)`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>,
+                document.body
+              )}
             <button
               onClick={toggleChat}
               className={`p-2 rounded-lg transition-colors relative ${

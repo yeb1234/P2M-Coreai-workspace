@@ -19,7 +19,6 @@ export default defineConfig({
     emptyOutDir: false,
     rolldownOptions: {
       output: {
-        codeSplitting: true,
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined;
           if (id.includes('/react') || id.includes('\\react') || id.includes('react-router-dom')) return 'react';

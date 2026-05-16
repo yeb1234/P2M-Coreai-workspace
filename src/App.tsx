@@ -7,6 +7,7 @@ import { registerAllPlugins } from './plugins';
 import { useAuthStore, useNotificationStore, useScheduleStore, useCalendarStore } from './stores';
 import { useRehydrateStores } from './hooks/useRehydrateStores';
 import { useApplyStoredTheme } from './hooks/useApplyStoredTheme';
+import { useThemeScheduler } from './hooks/useThemeScheduler';
 registerAllPlugins();
 
 function WelcomeScreen({ username, onDone }: { username: string; onDone: () => void }) {
@@ -42,6 +43,7 @@ function App() {
   const storesReady = useRehydrateStores(currentUser);
   const appDataReady = initialized && Boolean(currentUser) && storesReady;
   useApplyStoredTheme(initialized);
+  useThemeScheduler(initialized && appDataReady);
 
   useEffect(() => {
     if (appDataReady) {

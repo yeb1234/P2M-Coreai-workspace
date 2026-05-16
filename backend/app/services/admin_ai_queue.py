@@ -15,6 +15,7 @@ from app.models import AiJob, Video
 import sys
 
 from app.services.admin_settings import load_transcription_settings
+from app.services.ai_jobs import _video_has_transcription_outputs
 from app.services.rq_client import (
     ai_jobs_queue,
     cancel_job,
@@ -98,6 +99,23 @@ def recover_stuck_ai_jobs(minutes: int = 60, correction_minutes: int = 15, force
         for job in jobs:
             was_correcting_subtitles = job.stage == "correcting-subtitles"
             video = db.query(Video).filter(Video.id == job.video_id).first()
+
+            # 如果视频已经有完整转录结果，直接标记完成而不是恢复为 queued
+            if video and _video_has_transcription_outputs(video):
+                job.status = "completed"
+                job.stage = "completed"
+                job.message = "Skipped — video already has transcription"
+                job.error = None
+                job.transcript = video.transcription
+                job.transcript_segments = video.transcript_segments
+                job.summary = video.summary
+                job.markdown_path = video.markdown_path
+                job.subtitle_path = video.subtitle_path
+                video.ai_status = "completed"
+                video.ai_stage = "completed"
+                video.ai_error = None
+                continue
+
             job.status = "queued"
             job.stage = "queued"
             job.message = (
@@ -181,6 +199,24 @@ def resume_ai_job(job_id: str) -> dict:
         video = db.query(Video).filter(Video.id == job.video_id).first()
         if not video:
             return {"resumed": False, "reason": "missing_video"}
+
+        # 如果视频已经有完整转录结果，直接标记完成而不是恢复为 queued
+        if _video_has_transcription_outputs(video):
+            job.status = "completed"
+            job.stage = "completed"
+            job.message = "Skipped — video already has transcription"
+            job.error = None
+            job.transcript = video.transcription
+            job.transcript_segments = video.transcript_segments
+            job.summary = video.summary
+            job.markdown_path = video.markdown_path
+            job.subtitle_path = video.subtitle_path
+            video.ai_status = "completed"
+            video.ai_stage = "completed"
+            video.ai_error = None
+            db.commit()
+            return {"resumed": True, "job_id": job.id}
+
         job.status = "queued"
         job.stage = "queued"
         job.message = "Resumed by user"
@@ -201,8 +237,13 @@ def resume_ai_job(job_id: str) -> dict:
         db.close()
 
 
-def enqueue_ai_jobs(job_ids: list[str]) -> None:
-    """Enqueue a list of job IDs into the RQ queue."""
+def enqueue_ai_jobs(job_ids: list[str], at_front: bool = False) -> None:
+    """Enqueue a list of job IDs into the RQ queue.
+
+    Args:
+        job_ids: List of job IDs to enqueue.
+        at_front: If True, push jobs to the front of the queue (for single-video priority).
+    """
     if not job_ids:
         return
     queue = ai_jobs_queue()
@@ -211,6 +252,7 @@ def enqueue_ai_jobs(job_ids: list[str]) -> None:
             "app.services.ai_job_tasks.run_ai_job_task",
             args=(job_id,),
             job_id=job_id,
+            at_front=at_front,
         )
 
 
@@ -360,8 +402,26 @@ def sync_db_queue_to_rq() -> int:
             return 0
         queue = ai_jobs_queue()
         enqueued = 0
+        skipped = 0
         for job in queued_jobs:
             try:
+                # 如果视频已经有完整转录结果，直接标记完成，不入队
+                video = db.query(Video).filter(Video.id == job.video_id).first()
+                if video and _video_has_transcription_outputs(video):
+                    job.status = "completed"
+                    job.stage = "completed"
+                    job.message = "Skipped — video already has transcription"
+                    job.transcript = video.transcription
+                    job.transcript_segments = video.transcript_segments
+                    job.summary = video.summary
+                    job.markdown_path = video.markdown_path
+                    job.subtitle_path = video.subtitle_path
+                    video.ai_status = "completed"
+                    video.ai_stage = "completed"
+                    video.ai_error = None
+                    skipped += 1
+                    continue
+
                 rq_job = queue.fetch_job(job.id)
                 if rq_job is None:
                     queue.enqueue(
@@ -372,7 +432,13 @@ def sync_db_queue_to_rq() -> int:
                     enqueued += 1
             except Exception:
                 logger.exception("Failed to enqueue job %s to RQ", job.id)
-        logger.info("sync_db_queue_to_rq: pushed %d/%d queued jobs to RQ", enqueued, len(queued_jobs))
+        db.commit()
+        logger.info(
+            "sync_db_queue_to_rq: pushed %d/%d queued jobs to RQ, skipped %d already-done",
+            enqueued,
+            len(queued_jobs),
+            skipped,
+        )
         return enqueued
     finally:
         db.close()

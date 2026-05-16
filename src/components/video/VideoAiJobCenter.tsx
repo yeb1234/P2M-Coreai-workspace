@@ -29,6 +29,7 @@ interface VideoAiJobCenterProps {
   batchCorrectionEnabled?: boolean;
   batchPreview?: AiJobBatchOut | null;
   queuePaused?: boolean;
+  queueStuck?: boolean;
   onStatusChange: (status: string | null) => void;
   onBatchModeChange?: (mode: AiJobBatchMode) => void;
   onBatchLimitChange?: (limit: number) => void;
@@ -264,6 +265,7 @@ export function VideoAiJobCenter({
   batchCorrectionEnabled = false,
   batchPreview,
   queuePaused = false,
+  queueStuck = false,
   onStatusChange,
   onBatchModeChange,
   onBatchLimitChange,
@@ -350,14 +352,24 @@ export function VideoAiJobCenter({
               onClick={canToggleQueue ? onToggleQueue : undefined}
               disabled={!canToggleQueue}
               className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-                queuePaused
+                queuePaused || queueStuck
                   ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
                   : 'border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
               }`}
-              title={queuePaused ? '开始任务（恢复新任务入队）' : hasQueuedOrRunningJobs ? '暂停任务（运行中任务不受影响）' : '没有可暂停的任务'}
+              title={
+                queuePaused
+                  ? '开始任务（恢复新任务入队）'
+                  : queueStuck
+                  ? '队列卡住，点击重新调度排队任务'
+                  : hasQueuedOrRunningJobs
+                  ? '暂停任务（运行中任务不受影响）'
+                  : '没有可暂停的任务'
+              }
             >
-              {queuePaused ? <Play size={13} /> : <Pause size={13} />}
-              <span>{queuePaused ? '开始任务' : hasQueuedOrRunningJobs ? '暂停任务' : '队列空闲'}</span>
+              {queuePaused || queueStuck ? <Play size={13} /> : <Pause size={13} />}
+              <span>
+                {queuePaused ? '开始任务' : queueStuck ? '开始任务' : hasQueuedOrRunningJobs ? '暂停任务' : '队列空闲'}
+              </span>
             </button>
             <IconButton title="刷新任务状态" onClick={onRefresh} disabled={loading}>
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />

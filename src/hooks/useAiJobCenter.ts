@@ -33,6 +33,7 @@ interface AiJobCenterProps {
   batchCorrectionEnabled: boolean;
   batchPreview: AiJobBatchOut | null;
   queuePaused: boolean;
+  queueStuck: boolean;
   onStatusChange: (status: string | null) => void;
   onBatchModeChange: (mode: AiJobBatchMode) => void;
   onBatchLimitChange: (limit: number) => void;
@@ -253,11 +254,17 @@ export function useAiJobCenter(
     setBatchPreview(null);
   }, []);
 
+  const queueStuck = useMemo(() => {
+    return !queuePaused && (aiJobs?.queued ?? 0) > 0 && (aiJobs?.running ?? 0) === 0;
+  }, [queuePaused, aiJobs?.queued, aiJobs?.running]);
+
   const toggleQueue = useCallback(async () => {
     const hasQueuedOrRunningJobs = (aiJobs?.queued ?? 0) + (aiJobs?.running ?? 0) > 0;
-    if (!queuePaused && !hasQueuedOrRunningJobs) return;
+    const isStuck = !queuePaused && (aiJobs?.queued ?? 0) > 0 && (aiJobs?.running ?? 0) === 0;
+    if (!queuePaused && !hasQueuedOrRunningJobs && !isStuck) return;
     await withLoading(async () => {
-      const result = queuePaused ? await resumeAiQueue() : await pauseAiQueue();
+      const shouldResume = queuePaused || isStuck;
+      const result = shouldResume ? await resumeAiQueue() : await pauseAiQueue();
       setQueuePaused(result.paused);
       await loadAiJobs();
       if (currentVideoId) {
@@ -421,6 +428,7 @@ export function useAiJobCenter(
     batchCorrectionEnabled,
     batchPreview,
     queuePaused,
+    queueStuck,
     onStatusChange: setAiJobStatusFilter,
     onBatchModeChange: changeBatchMode,
     onBatchLimitChange: changeBatchLimit,

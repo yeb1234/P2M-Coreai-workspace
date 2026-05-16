@@ -60,7 +60,7 @@ export function ToggleSwitch({ checked, onClick }: { checked: boolean; onClick: 
     <button
       type="button"
       onClick={onClick}
-      className={`relative h-5 w-10 rounded-full transition-colors ${checked ? 'bg-[var(--accent)]' : 'bg-[var(--border-strong)]'}`}
+      className={`relative h-5 w-10 rounded-full transition-colors ${checked ? 'bg-[var(--accent)]' : 'bg-[var(--border-medium)]'}`}
     >
       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? 'left-[22px]' : 'left-0.5'}`} />
     </button>

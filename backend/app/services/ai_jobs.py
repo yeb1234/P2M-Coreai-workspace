@@ -157,6 +157,20 @@ def _build_job_paths(video: Video, job: AiJob) -> AiJobPaths:
     )
 
 
+def _video_has_transcription_outputs(video: Video) -> bool:
+    """Check if a video already has completed transcription outputs on disk.
+
+    Uses the stored paths (video.markdown_path / video.subtitle_path)
+    rather than rebuilding from a specific job ID, so recovered old jobs
+    still correctly detect existing outputs.
+    """
+    if not video.transcription:
+        return False
+    md_path = video.markdown_path and Path(video.markdown_path)
+    sub_path = video.subtitle_path and Path(video.subtitle_path)
+    return bool(md_path and md_path.exists() and sub_path and sub_path.exists())
+
+
 def create_ai_job(
     *,
     db,
@@ -208,6 +222,10 @@ def create_ai_job(
     )
     if existing_job:
         _apply_job_options(existing_job, options)
+        # 单点重新生成时，把已有 queued 任务的 created_at 刷新到当前时间
+        # 使其在 DB 排序中排在最前面
+        if existing_job.status == "queued":
+            existing_job.created_at = datetime.now()
         db.commit()
         db.refresh(existing_job)
         return existing_job

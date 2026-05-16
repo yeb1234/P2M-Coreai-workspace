@@ -585,3 +585,78 @@ export function resetTheme() {
     root.style.removeProperty(key);
   });
 }
+
+/* ─── Theme Schedule ─── */
+export interface ThemeScheduleRule {
+  id: string;
+  name: string;
+  weekdays: number[]; // 0=Sun, 1=Mon...6=Sat
+  startTime: string; // "HH:MM"
+  endTime: string; // "HH:MM"
+  themeId: string;
+  enabled: boolean;
+}
+
+export const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+
+export const DEFAULT_THEME_SCHEDULE_RULES: ThemeScheduleRule[] = [
+  {
+    id: 'rule-workday',
+    name: '工作日办公',
+    weekdays: [1, 2, 3, 4, 5],
+    startTime: '09:00',
+    endTime: '17:30',
+    themeId: 'corporate',
+    enabled: true,
+  },
+  {
+    id: 'rule-weekend',
+    name: '周末休闲',
+    weekdays: [0, 6],
+    startTime: '00:00',
+    endTime: '23:59',
+    themeId: 'meadow',
+    enabled: true,
+  },
+];
+
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function matchThemeScheduleRule(rule: ThemeScheduleRule, date = new Date()): boolean {
+  if (!rule.enabled) return false;
+  if (!rule.weekdays.includes(date.getDay())) return false;
+  const now = timeToMinutes(`${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`);
+  const start = timeToMinutes(rule.startTime);
+  const end = timeToMinutes(rule.endTime);
+  return now >= start && now <= end;
+}
+
+export function findActiveScheduleRule(
+  rules: ThemeScheduleRule[],
+  date = new Date()
+): ThemeScheduleRule | null {
+  // 后面的规则优先级更高，类似于层叠顺序。
+  // 用户可通过拖拽/调整规则顺序控制哪条规则在冲突时胜出。
+  for (let i = rules.length - 1; i >= 0; i--) {
+    if (matchThemeScheduleRule(rules[i], date)) return rules[i];
+  }
+  return null;
+}
+
+export function formatScheduleRuleTime(rule: ThemeScheduleRule): string {
+  return `${rule.startTime} ~ ${rule.endTime}`;
+}
+
+export function formatScheduleRuleWeekdays(rule: ThemeScheduleRule): string {
+  if (rule.weekdays.length === 7) return '每天';
+  if (rule.weekdays.length === 2 && rule.weekdays.includes(0) && rule.weekdays.includes(6)) {
+    return '周末';
+  }
+  if (rule.weekdays.length === 5 && rule.weekdays.every((d) => d >= 1 && d <= 5)) {
+    return '工作日';
+  }
+  return rule.weekdays.map((d) => WEEKDAY_LABELS[d]).join('、');
+}

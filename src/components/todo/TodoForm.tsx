@@ -2,11 +2,17 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Calendar } from 'lucide-react';
 import type { ScheduleItem, TodoPriority } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
-import { useScheduleStore, useUIStore } from '../../stores';
+import { usePomodoroStore, useScheduleStore, useUIStore } from '../../stores';
 import { toISODateString } from '../../lib/date';
 import { playInteractionSound } from '../../lib/sounds';
 import { parseTodoQuickInput } from '../../lib/todoQuickInput';
 import { combineLocalDateTime, dateTimeParts, defaultDueAt, getNextWholeHour, toMinuteISOString } from '../../lib/scheduleTime';
+import {
+  ALLOWED_POMODORO_ROUNDS,
+  getPlannedMinutesForRounds,
+  inferAllowedRoundsFromDuration,
+  getScheduleDurationMinutes,
+} from '../../lib/pomodoroPlanning';
 
 const PRIORITY_SHORTCUTS: Record<string, TodoPriority> = {
   '/g': 'green',
@@ -38,6 +44,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   const addTodo = useScheduleStore((s) => s.addTodo);
   const updateItem = useScheduleStore((s) => s.updateItem);
   const noteEnterBehavior = useUIStore((s) => s.noteEnterBehavior);
+  const pomodoroConfig = usePomodoroStore((s) => s.config);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
   const startParts = todo?.startAt ? dateTimeParts(todo.startAt) : null;
   const dueParts = todo?.dueAt ? dateTimeParts(todo.dueAt) : null;
@@ -53,6 +60,32 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   const [reminderEnabled, setReminderEnabled] = useState(Boolean(todo?.reminderAt));
   const [reminderDate, setReminderDate] = useState(reminderParts?.date || startDate);
   const [reminderTime, setReminderTime] = useState(reminderParts?.time || startTime);
+
+  // 初始 pomodoroCount：优先用户设定，其次从时长反推，未排期默认 1 轮
+  const initialPomodoroCount = todo?.pomodoroRounds && todo.pomodoroRounds > 0
+    ? todo.pomodoroRounds
+    : (startDate && startTime && dueDate && endTime
+      ? inferAllowedRoundsFromDuration(
+        getScheduleDurationMinutes(
+          combineLocalDateTime(startDate, startTime),
+          combineLocalDateTime(dueDate, endTime)
+        ),
+        pomodoroConfig
+      )
+      : pomodoroConfig.longBreakInterval);
+  const [pomodoroCount, setPomodoroCount] = useState(initialPomodoroCount);
+
+  // 当排程时间变化时，自动反推番茄钟数量
+  React.useEffect(() => {
+    if (!startDate || !startTime || !dueDate || !endTime) return;
+    const duration = getScheduleDurationMinutes(
+      combineLocalDateTime(startDate, startTime),
+      combineLocalDateTime(dueDate, endTime)
+    );
+    if (duration <= 0) return;
+    const inferred = inferAllowedRoundsFromDuration(duration, pomodoroConfig);
+    setPomodoroCount(inferred);
+  }, [startDate, startTime, dueDate, endTime, pomodoroConfig]);
 
   const priorities: TodoPriority[] = ['high', 'medium', 'low', 'green'];
 
@@ -115,6 +148,18 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
     }
   }, [dueDate, startDate]);
 
+  const handlePomodoroCountChange = useCallback((count: number) => {
+    setPomodoroCount(count);
+    if (startDate && startTime) {
+      const plannedMinutes = getPlannedMinutesForRounds(count, pomodoroConfig);
+      const startAt = new Date(`${startDate}T${startTime}:00`);
+      const endAt = new Date(startAt.getTime() + plannedMinutes * 60000);
+      const { date, time } = dateTimeParts(toMinuteISOString(endAt));
+      setDueDate(date);
+      setEndTime(time);
+    }
+  }, [startDate, startTime, pomodoroConfig]);
+
   const handleReminderToggle = useCallback((checked: boolean) => {
     setReminderEnabled(checked);
     if (checked && !reminderEnabled && !todo?.reminderAt) {
@@ -151,7 +196,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       reminderAt: reminderEnabled
         ? parsed.reminderAt ?? combineLocalDateTime(reminderDate || normalizedStartDate || defaultDate || toISODateString(new Date()), reminderTime || startTime || '09:00')
         : null,
-      pomodoroRounds: parsed.pomodoroRounds ?? todo?.pomodoroRounds ?? (startAt && dueAt ? 0 : 1),
+      pomodoroRounds: pomodoroCount,
     };
 
     if (todo) {
@@ -282,6 +327,31 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
           />
         </div>
         <p className="mt-1 text-[10px] md:text-xs text-[var(--text-muted)]">开始和截止时间会按分钟写入数据库。</p>
+      </div>
+
+      <div>
+        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">
+          预计番茄钟数量
+        </label>
+        <div className="flex items-center gap-2">
+          <select
+            value={pomodoroCount}
+            onChange={(event) => handlePomodoroCountChange(Number(event.target.value))}
+            className="flex-1 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+          >
+            {ALLOWED_POMODORO_ROUNDS.map((n) => (
+              <option key={n} value={n}>
+                {n} 个
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">
+            预计 {getPlannedMinutesForRounds(pomodoroCount, pomodoroConfig)} 分钟
+          </span>
+        </div>
+        <p className="mt-1 text-[10px] md:text-xs text-[var(--text-muted)]">
+          修改数量会自动调整截止时间，修改截止时间也会反推数量。
+        </p>
       </div>
 
       <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2.5">

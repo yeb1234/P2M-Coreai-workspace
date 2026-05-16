@@ -5,7 +5,7 @@ import { usePomodoroStore, useScheduleStore } from '../../stores';
 import { POMODORO_VIRTUAL_TODO_ID } from '../../stores/pomodoroStore';
 import { formatDate, formatDuration } from '../../lib/date';
 import { dateTimeParts, hasScheduleTime } from '../../lib/scheduleTime';
-import { getSchedulePomodoroPlan } from '../../lib/pomodoroPlanning';
+import { getSchedulePomodoroPlan, getPlannedMinutesForRounds } from '../../lib/pomodoroPlanning';
 import { playInteractionSound, playNotificationSound } from '../../lib/sounds';
 import { resetAmbientSoundSelection } from '../../hooks/useAmbientSoundController';
 import { TodoBadge } from './TodoBadge';
@@ -69,19 +69,15 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
     setEditing(false);
   }, [editValue, todo.id, todo.title, updateItem]);
 
-  // 用户明确设定了 pomodoroRounds 就用它，否则 fallback 到时间区间推导值
-  const effectiveRounds = Math.max(1, todo.pomodoroRounds > 0 ? todo.pomodoroRounds : plannedRounds);
+  // 有排期时才显示预计信息；未排期 todo 不显示预计，但点运行时走 1 轮
+  const effectiveRounds = hasTimeRange
+    ? Math.max(1, todo.pomodoroRounds > 0 ? todo.pomodoroRounds : plannedRounds)
+    : 0;
   const totalPomodoros = effectiveRounds;
   const { plannedMinutes, completedMinutes } = useMemo(() => {
-    const { workDuration, shortBreakDuration, longBreakDuration, longBreakInterval } = config;
-    const plannedPomodoros = effectiveRounds;
-    const plannedShortBreaks = Math.max(0, plannedPomodoros - 1);
-    const plannedLongBreaks = Math.max(0, Math.floor((plannedPomodoros - 1) / longBreakInterval));
-    const planned = plannedPomodoros * workDuration + plannedShortBreaks * shortBreakDuration + plannedLongBreaks * longBreakDuration;
-    const completedPomodoros = Math.max(0, Math.min(todo.pomodoroCount, plannedPomodoros));
-    const completedShortBreaks = Math.max(0, completedPomodoros - 1);
-    const completedLongBreaks = Math.max(0, Math.floor((completedPomodoros - 1) / longBreakInterval));
-    const completed = completedPomodoros * workDuration + completedShortBreaks * shortBreakDuration + completedLongBreaks * longBreakDuration;
+    const planned = getPlannedMinutesForRounds(effectiveRounds, config);
+    const completedPomodoros = Math.max(0, Math.min(todo.pomodoroCount, effectiveRounds));
+    const completed = getPlannedMinutesForRounds(completedPomodoros, config);
     return { plannedMinutes: planned, completedMinutes: completed };
   }, [config, effectiveRounds, todo.pomodoroCount]);
 
@@ -224,12 +220,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
                   {startParts?.time} - {dueParts?.time}
                 </span>
               </>
-            ) : (
-              <span className="flex items-center gap-1">
-                <Clock size={12} />
-                未排期
-              </span>
-            )}
+            ) : null}
             {effectiveRounds > 0 && (
               <span className="flex items-center gap-1 text-[#16a34a]">
                 <Clock size={12} />
@@ -261,7 +252,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
         </div>
 
         <div className="flex items-center gap-1">
-          {todo.status !== 'completed' && effectiveRounds > 0 && (
+          {todo.status !== 'completed' && (
             <button onClick={handleStartPomodoro} className="p-1.5 rounded-lg bg-[#f0fdf4] text-[#16a34a] hover:bg-[#dcfce7] transition-colors" title="开始专注">
               <Play size={16} />
             </button>

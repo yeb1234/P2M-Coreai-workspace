@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { idbStorage } from '../lib/idbStorage';
-import { type ThemeVars, THEME_PRESETS, applyTheme } from '../lib/themes';
+import { type ThemeVars, type ThemeScheduleRule, THEME_PRESETS, applyTheme, DEFAULT_THEME_SCHEDULE_RULES } from '../lib/themes';
 import { VIEW_PATH } from '../config/pageRegistry';
 
 export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'pomodoro' | 'timecenter' | 'video' | 'transcriber' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
@@ -42,6 +42,8 @@ interface UIState {
   videoRightPanelWidth: number;
   videoRightPanelCollapsed: boolean;
   activeNoteId: string | null;
+  themeScheduleEnabled: boolean;
+  themeScheduleRules: ThemeScheduleRule[];
   setActiveView: (view: ActiveView) => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -64,6 +66,8 @@ interface UIState {
   toggleVideoRightPanel: () => void;
   setVideoRightPanelCollapsed: (collapsed: boolean) => void;
   setActiveNoteId: (id: string | null) => void;
+  setThemeScheduleEnabled: (enabled: boolean) => void;
+  setThemeScheduleRules: (rules: ThemeScheduleRule[]) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -85,6 +89,8 @@ export const useUIStore = create<UIState>()(
       videoRightPanelWidth: 340,
       videoRightPanelCollapsed: false,
       activeNoteId: null,
+      themeScheduleEnabled: false,
+      themeScheduleRules: DEFAULT_THEME_SCHEDULE_RULES,
       setActiveView: (view) => {
         set((state) => ({
           activeView: view,
@@ -141,6 +147,8 @@ export const useUIStore = create<UIState>()(
       toggleVideoRightPanel: () => set((state) => ({ videoRightPanelCollapsed: !state.videoRightPanelCollapsed })),
       setVideoRightPanelCollapsed: (collapsed) => set({ videoRightPanelCollapsed: collapsed }),
       setActiveNoteId: (activeNoteId) => set({ activeNoteId }),
+      setThemeScheduleEnabled: (themeScheduleEnabled) => set({ themeScheduleEnabled }),
+      setThemeScheduleRules: (themeScheduleRules) => set({ themeScheduleRules }),
       setTheme: (id) => {
         set({ themeId: id });
         if (id === 'custom') return;
@@ -183,6 +191,8 @@ export const useUIStore = create<UIState>()(
         noteEnterBehavior: state.noteEnterBehavior,
         videoRightPanelWidth: state.videoRightPanelWidth,
         videoRightPanelCollapsed: state.videoRightPanelCollapsed,
+        themeScheduleEnabled: state.themeScheduleEnabled,
+        themeScheduleRules: state.themeScheduleRules,
       }),
       merge: (persisted, current) => {
         if (!persisted || typeof persisted !== 'object') return current;
@@ -208,6 +218,8 @@ export const useUIStore = create<UIState>()(
         return {
           ...current,
           ...saved,
+          themeScheduleEnabled: saved.themeScheduleEnabled ?? current.themeScheduleEnabled,
+          themeScheduleRules: saved.themeScheduleRules ?? current.themeScheduleRules,
           sidebarWidth: clampSidebarWidth(saved.sidebarWidth),
           navOrder: merged,
           hiddenNavItems: validHidden,

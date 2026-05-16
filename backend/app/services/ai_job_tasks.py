@@ -21,6 +21,7 @@ from app.services.ai_jobs import (
     _step_summarize,
     _step_transcribe,
     _step_write_outputs,
+    _video_has_transcription_outputs,
 )
 from app.services.rq_client import clear_job_cancelled, is_job_cancelled
 
@@ -44,6 +45,22 @@ def run_ai_job_task(job_id: str) -> None:
         paths = _build_job_paths(video, job)
         if not paths.source.exists():
             _mark_failed(db, job, "Video file does not exist")
+            return
+
+        # 如果视频已经有完整的转录结果，直接标记完成，避免重复处理
+        if _video_has_transcription_outputs(video):
+            job.status = "completed"
+            job.stage = "completed"
+            job.message = "Skipped — video already has transcription"
+            job.transcript = video.transcription
+            job.transcript_segments = video.transcript_segments
+            job.summary = video.summary
+            job.markdown_path = video.markdown_path
+            job.subtitle_path = video.subtitle_path
+            video.ai_status = "completed"
+            video.ai_stage = "completed"
+            video.ai_error = None
+            db.commit()
             return
 
         # Claim the job

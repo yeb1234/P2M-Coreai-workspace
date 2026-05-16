@@ -21,6 +21,7 @@ from app.schemas import (
     VideoFavoriteIn,
     WatchHistoryIn,
 )
+from app.services.admin_ai_queue import _is_queue_paused, enqueue_ai_jobs
 from app.services.ai_jobs import create_ai_job_from_payload, ensure_video_note
 from app.services.sprite import get_or_generate_sprite, get_sprite_meta_path, get_sprite_path, has_sprite
 from app.services.subtitle_writer import update_vtt_segment_text
@@ -446,6 +447,8 @@ def start_ai_job(video_id: int, payload: AiJobCreate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Video not found")
 
     job = create_ai_job_from_payload(db, video_id, payload)
+    if job.status == "queued" and not _is_queue_paused():
+        enqueue_ai_jobs([job.id], at_front=True)
     return {"job_id": job.id, "status": job.status, "stage": job.stage}
 
 

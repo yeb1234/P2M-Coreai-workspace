@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { useScheduleStore, useTodoStore } from '../../stores';
+import { usePomodoroStore, useScheduleStore, useTodoStore } from '../../stores';
 import { toISODateString, formatDate } from '../../lib/date';
 import { playInteractionSound } from '../../lib/sounds';
 import { PRIORITY_COLORS, type ScheduleItem, type TodoPriority, type TodoStatus } from '../../types';
 import { combineLocalDateTime, datePart, hasScheduleTime } from '../../lib/scheduleTime';
+import { getMaxPomodoroPlanMinutes, getSchedulePomodoroPlan } from '../../lib/pomodoroPlanning';
 
 interface ScheduledWeekItem extends ScheduleItem {
   startAt: string;
@@ -214,6 +215,8 @@ export const Calendar2Page: React.FC = () => {
   const addEvent = useScheduleStore((s) => s.addEvent);
   const deleteItem = useScheduleStore((s) => s.deleteItem);
   const updateItem = useScheduleStore((s) => s.updateItem);
+  const pomodoroConfig = usePomodoroStore((s) => s.config);
+  const maxTodoMinutes = useMemo(() => getMaxPomodoroPlanMinutes(pomodoroConfig), [pomodoroConfig]);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [draft, setDraft] = useState<DraftSelection | null>(null);
   const [dragAnchor, setDragAnchor] = useState<DraftSelection | null>(null);
@@ -349,8 +352,9 @@ export const Calendar2Page: React.FC = () => {
     if (point.dayIndex !== dragAnchor.dayIndex) return;
     const startMinutes = Math.min(dragAnchor.startMinutes, point.minutes);
     const endMinutes = Math.max(dragAnchor.startMinutes + SNAP_MINUTES, point.minutes);
-    setDraft({ dayIndex: dragAnchor.dayIndex, startMinutes, endMinutes: clamp(endMinutes, startMinutes + SNAP_MINUTES, END_HOUR * 60) });
-  }, [dayWidth, dragAnchor, visibleDayCount, visibleDayOffset]);
+    const maxEnd = Math.min(startMinutes + maxTodoMinutes, END_HOUR * 60);
+    setDraft({ dayIndex: dragAnchor.dayIndex, startMinutes, endMinutes: clamp(endMinutes, startMinutes + SNAP_MINUTES, maxEnd) });
+  }, [dayWidth, dragAnchor, maxTodoMinutes, visibleDayCount, visibleDayOffset]);
 
   const finishSelection = useCallback(() => {
     if (draft && draft.endMinutes - draft.startMinutes >= SNAP_MINUTES) {
@@ -374,12 +378,15 @@ export const Calendar2Page: React.FC = () => {
     const title = draftTitle.trim() || '未命名事项';
     const date = weekDateStrings[editingDraft.dayIndex];
     const startAt = combineLocalDateTime(date, formatTimeInput(editingDraft.startMinutes));
-    const dueAt = combineLocalDateTime(date, formatTimeInput(editingDraft.endMinutes));
+    let dueAt = combineLocalDateTime(date, formatTimeInput(editingDraft.endMinutes));
 
     if (editingDraft.itemId) {
       const existingItem = items[editingDraft.itemId];
       updateItem(editingDraft.itemId, { title, startAt, dueAt, reminderAt: existingItem?.reminderAt ? startAt : existingItem?.reminderAt ?? null });
     } else if (createTodo) {
+      const plan = getSchedulePomodoroPlan({ startAt, dueAt, pomodoroRounds: 0 }, pomodoroConfig);
+      const correctedEndMinutes = editingDraft.startMinutes + plan.plannedMinutes;
+      dueAt = combineLocalDateTime(date, formatTimeInput(correctedEndMinutes));
       addTodo({
         title,
         priority: editingDraft.priority || 'medium',
@@ -398,7 +405,7 @@ export const Calendar2Page: React.FC = () => {
 
     playInteractionSound('success');
     closeDraftEditor();
-  }, [addEvent, addTodo, closeDraftEditor, createTodo, draftTitle, editingDraft, items, updateItem, weekDateStrings]);
+  }, [addEvent, addTodo, closeDraftEditor, createTodo, draftTitle, editingDraft, items, pomodoroConfig, updateItem, weekDateStrings]);
 
   const handleLaneDragStart = useCallback((event: React.DragEvent<HTMLElement>, lane: CalendarLane) => {
     event.dataTransfer.effectAllowed = 'copy';
@@ -430,8 +437,10 @@ export const Calendar2Page: React.FC = () => {
     event.dataTransfer.dropEffect = event.dataTransfer.types.includes('application/x-calendar2-lane') ? 'copy' : 'move';
     const point = getClientSelection(event.clientX, event.clientY, gridRef.current, dayWidth, visibleDayOffset, visibleDayCount);
     const startMinutes = clamp(point.minutes - dragOffsetRef.current, START_HOUR * 60, END_HOUR * 60 - SNAP_MINUTES);
-    setDraft({ dayIndex: point.dayIndex, startMinutes, endMinutes: clamp(startMinutes + 60, startMinutes + SNAP_MINUTES, END_HOUR * 60) });
-  }, [dayWidth, visibleDayCount, visibleDayOffset]);
+    const isLaneDrag = event.dataTransfer.types.includes('application/x-calendar2-lane');
+    const defaultDuration = isLaneDrag ? Math.min(60, maxTodoMinutes) : 60;
+    setDraft({ dayIndex: point.dayIndex, startMinutes, endMinutes: clamp(startMinutes + defaultDuration, startMinutes + SNAP_MINUTES, END_HOUR * 60) });
+  }, [dayWidth, maxTodoMinutes, visibleDayCount, visibleDayOffset]);
 
   const handleGridDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     if (!gridRef.current) return;
@@ -459,10 +468,11 @@ export const Calendar2Page: React.FC = () => {
 
     try {
       const lane = JSON.parse(laneRaw) as CalendarLane;
+      const endMinutes = clamp(startMinutes + Math.min(60, maxTodoMinutes), startMinutes + SNAP_MINUTES, END_HOUR * 60);
       const next = {
         dayIndex: point.dayIndex,
         startMinutes,
-        endMinutes: clamp(startMinutes + 60, startMinutes + SNAP_MINUTES, END_HOUR * 60),
+        endMinutes,
         title: lane.title,
         color: lane.color,
         priority: lane.id,
@@ -704,7 +714,10 @@ export const Calendar2Page: React.FC = () => {
                         const rect = gridRef.current.getBoundingClientRect();
                         const y = e.clientY - rect.top;
                         const rawMinutes = START_HOUR * 60 + (y / HOUR_HEIGHT) * 60;
-                        const newEndMinutes = clamp(snapMinutes(rawMinutes), event.startMinutes + SNAP_MINUTES, END_HOUR * 60);
+                        let newEndMinutes = clamp(snapMinutes(rawMinutes), event.startMinutes + SNAP_MINUTES, END_HOUR * 60);
+                        if (event.item.type === 'todo') {
+                          newEndMinutes = Math.min(newEndMinutes, event.startMinutes + maxTodoMinutes);
+                        }
                         setResizing({ id: event.id, startMinutes: event.startMinutes, dayIndex: event.dayIndex, newEndMinutes });
                       }}
                       onPointerUp={() => {
