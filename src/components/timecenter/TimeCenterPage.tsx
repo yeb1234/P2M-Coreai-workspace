@@ -4,7 +4,7 @@ import Countdown from 'react-countdown';
 import 'react-clock/dist/Clock.css';
 import { AlarmClock, Bell, Hourglass, Pause, Play, Plus, RotateCcw, TimerReset, Trash2, X } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { useNotificationStore, useTimeCenterStore, useTodoStore } from '../../stores';
+import { useNotificationStore, useScheduleStore, useTimeCenterStore } from '../../stores';
 import { playNotificationSound } from '../../lib/sounds';
 import { toLocalDateString } from '../../lib/date';
 import { useClockNow } from '../../hooks/useClockNow';
@@ -130,8 +130,14 @@ export const TimeCenterPage: React.FC = () => {
     updateWorldClock,
     removeWorldClock,
   } = useTimeCenterStore();
-  const todos = useTodoStore((s) => s.todos);
-  const addTodo = useTodoStore((s) => s.addTodo);
+  // 同上：待办数据源统一到 scheduleStore，否则时间中心显示的
+  // 是本地遗留数据，和待办页对不上。
+  const scheduleItems = useScheduleStore((s) => s.items);
+  const todos = useMemo(
+    () => Object.fromEntries(Object.entries(scheduleItems).filter(([, i]) => i.type === 'todo' && !i.deletedAt)),
+    [scheduleItems],
+  );
+  const addTodo = useScheduleStore((s) => s.addTodo);
   const addNotification = useNotificationStore((s) => s.addNotification);
 
   const stopwatchElapsed = stopwatchRunning && stopwatchStart != null
@@ -257,7 +263,7 @@ export const TimeCenterPage: React.FC = () => {
         title,
         description: '来自时间中心的提醒',
         priority: 'medium',
-        dueDate: toLocalDateString(reminderDate),
+        dueAt: toLocalDateString(reminderDate),
         reminderAt: reminderDate.toISOString(),
       });
     }

@@ -3,7 +3,7 @@ import Clock from 'react-clock';
 import 'react-clock/dist/Clock.css';
 import { AlarmClock, Eye, EyeOff, Hourglass, Maximize2, Minimize2, Pause, Play, Plus, RotateCcw, Settings2, TimerReset, X } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { useNotificationStore, useTimeCenterStore, useTodoStore } from '../../stores';
+import { useNotificationStore, useScheduleStore, useTimeCenterStore } from '../../stores';
 import { playNotificationSound } from '../../lib/sounds';
 import { toLocalDateString } from '../../lib/date';
 import { generateId } from '../../lib/id';
@@ -340,14 +340,17 @@ function TaskCreator() {
   const [taskAt, setTaskAt] = useState(() => toDateTimeInput(new Date(Date.now() + 30 * 60 * 1000)));
 
   const { addCountdownPreset } = useTimeCenterStore();
-  const addTodo = useTodoStore((s) => s.addTodo);
+  // 待办统一走 scheduleStore（后端 schedule_items 表）。
+  // 原来这里写的是 useTodoStore（本地 IndexedDB），
+  // 在时间中心建的待办不会出现在待办页 —— 两边数据不通。
+  const addTodo = useScheduleStore((s) => s.addTodo);
 
   const create = () => {
     const title = taskTitle.trim() || (taskType === 'countdown' ? '倒计时' : '待办提醒');
     if (taskType === 'countdown') addCountdownPreset({ label: title, seconds: Math.max(1, taskMinutes) * 60 });
     if (taskType === 'todo') {
       const d = new Date(taskAt);
-      addTodo({ title, description: '来自时间中心的提醒', priority: 'medium', dueDate: toLocalDateString(d), reminderAt: d.toISOString() });
+      addTodo({ title, description: '来自时间中心的提醒', priority: 'medium', dueAt: toLocalDateString(d), reminderAt: d.toISOString() });
     }
     setTaskTitle('新的时间任务');
     setTaskMinutes(5);
