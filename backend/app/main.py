@@ -4,6 +4,7 @@ import logging
 import subprocess
 import sys
 import threading
+import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,15 +12,18 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import func
 
+from app.core.errors import register_exception_handlers
+from app.core.observability import RequestContextMiddleware, configure_logging
 from app.database import Base, SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
-from app.routers import admin, ai_jobs, assistant, auth, calendar_events, categories, notes, schedule_items, user_data, videos
+from app.routers import admin, ai_jobs, assistant, auth, calendar_events, categories, notes, schedule_items, search, user_data, videos
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
 
 DIST_DIR = Path(__file__).resolve().parents[2] / "dist"
+APP_STARTED_AT = time.time()
 
-
+configure_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -89,18 +93,26 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="P2 Learning OS API",
-    version="0.1.0",
+    version="3.0.0",
     lifespan=lifespan,
+    docs_url="/api/docs" if settings.enable_docs else None,
+    openapi_url="/api/openapi.json" if settings.enable_docs else None,
 )
 
+# 显式来源：allow_origins=["*"] 与 allow_credentials=True 是无效组合，
+# 浏览器会直接拒绝，而且等于关闭了同源保护
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["X-Sprite-Meta"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Sprite-Meta", "X-Request-ID"],
 )
+# 放最外层，保证 CORS 预检也带上 request_id
+app.add_middleware(RequestContextMiddleware)
+
+register_exception_handlers(app)
 
 app.include_router(auth.router)
 app.include_router(user_data.router)
@@ -109,6 +121,7 @@ app.include_router(videos.router)
 app.include_router(categories.router)
 app.include_router(ai_jobs.router)
 app.include_router(assistant.router)
+app.include_router(search.router)
 app.include_router(notes.router)
 app.include_router(calendar_events.router)
 app.include_router(admin.router)
@@ -133,6 +146,55 @@ async def serve_sound_asset(full_path: str):
             "Cache-Control": "public, max-age=604800",
         },
     )
+
+
+@app.get("/health")
+def health():
+    """存活探针：只验证进程与数据库连接，必须快速返回。"""
+    from app.database import check_database
+
+    try:
+        db_info = check_database()
+        db_ok = True
+    except Exception as exc:
+        logger.error("健康检查数据库失败: %s", exc)
+        db_info = {"error": str(exc)[:200]}
+        db_ok = False
+
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "uptime_sec": round(time.time() - APP_STARTED_AT, 1),
+        "database": db_info,
+    }
+
+
+@app.get("/ready")
+def ready():
+    """就绪探针：检索链路可用才返回 200，用于发布前判断。"""
+    from fastapi.responses import JSONResponse
+    from app.database import check_database
+    from app.migrations import embedding_stats
+    from app.services.embeddings import get_embedding_client
+    from app.services.llm import llm_health
+
+    checks: dict = {}
+    try:
+        check_database()
+        checks["database"] = "ok"
+    except Exception as exc:
+        checks["database"] = f"fail: {str(exc)[:120]}"
+
+    try:
+        stats = embedding_stats(engine)
+        checks["vectors"] = stats
+    except Exception as exc:
+        checks["vectors"] = f"fail: {str(exc)[:120]}"
+
+    checks["embedding_model"] = get_embedding_client().health()
+    checks["llm"] = llm_health()
+
+    ok = checks.get("database") == "ok" and checks["embedding_model"].get("ok")
+    return JSONResponse(status_code=200 if ok else 503, content={"ready": ok, "checks": checks})
 
 
 @app.get("/api/stats", response_model=StatsOut)

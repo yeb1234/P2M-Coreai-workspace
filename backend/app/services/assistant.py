@@ -1,4 +1,5 @@
 import json
+import logging
 from collections import defaultdict
 
 from sqlalchemy import desc, or_, text
@@ -13,6 +14,8 @@ from app.services.prompts import (
     build_contextual_user_message,
 )
 from app.utils.files import unique_suffix
+
+logger = logging.getLogger(__name__)
 
 
 def llm_usage_policy() -> str:
@@ -50,70 +53,64 @@ def build_reference(segment: SubtitleSegment, video: Video, score_hint: float) -
 
 
 def search_references(query: str, video_id: int | None = None, limit: int = 6) -> list[dict]:
-    keywords = [item.strip().lower() for item in query.split() if item.strip()]
-    if not keywords:
-        keywords = [query.strip().lower()]
+    """检索参考片段。
 
+    3.0 起改走混合检索（pg_trgm 词法 + pgvector 语义 + RRF）。
+    原实现依赖 SQLite FTS5，而 FTS5 默认分词对中文完全失效，
+    在 PostgreSQL 上也没有对应表，因此整体替换。
+    """
+    from app.services.hybrid_search import hybrid_search
+
+    try:
+        result = hybrid_search(
+            query,
+            top_k=max(1, limit),
+            candidate_k=max(20, limit * 4),
+            video_ids=[video_id] if video_id else None,
+            use_rerank=False,  # 旧链路追求低延迟，重排留给 Agent 链路
+        )
+    except Exception as exc:
+        logger.warning("混合检索失败，回退到关键词包含匹配: %s", exc)
+        return _fallback_keyword_references(query, video_id, limit)
+
+    return [
+        {
+            "video_id": hit.video_id,
+            "video_title": hit.video_title,
+            "start_sec": hit.start_sec,
+            "end_sec": hit.end_sec,
+            "text": hit.text,
+            "score_hint": round(hit.vector_score or hit.lexical_score or hit.score, 4),
+        }
+        for hit in result["hits"]
+    ]
+
+
+def _fallback_keyword_references(query: str, video_id: int | None, limit: int) -> list[dict]:
+    """最后兜底：纯 LIKE 匹配。质量差但不会让接口挂掉。"""
+    keywords = [item.strip().lower() for item in query.split() if item.strip()] or [query.strip().lower()]
     db = SessionLocal()
     try:
-        try:
-            fts_sql = """
-                SELECT s.id, s.video_id, s.segment_index, s.start_sec, s.end_sec, s.text,
-                       v.id AS v_id, v.title AS v_title
-                FROM subtitle_segments_fts f
-                JOIN subtitle_segments s ON s.id = f.rowid
-                JOIN videos v ON v.id = s.video_id
-                WHERE subtitle_segments_fts MATCH :query_text
-            """
-            params = {"query_text": query.strip(), "limit": limit * 4}
-            if video_id:
-                fts_sql += " AND s.video_id = :video_id"
-                params["video_id"] = video_id
-            fts_sql += " ORDER BY bm25(subtitle_segments_fts) LIMIT :limit"
-            fts_rows = db.execute(text(fts_sql), params).fetchall()
-        except Exception:
-            fts_rows = []
-
-        if fts_rows:
-            results = []
-            grouped_best = defaultdict(float)
-            for row in fts_rows:
-                text_lower = (row.text or "").lower()
-                score_hint = sum(1 for keyword in keywords if keyword in text_lower) or 0.5
-                if score_hint <= grouped_best[(row.video_id, row.start_sec)]:
-                    continue
-                grouped_best[(row.video_id, row.start_sec)] = score_hint
-                results.append(
-                    {
-                        "video_id": row.video_id,
-                        "video_title": row.v_title,
-                        "start_sec": row.start_sec,
-                        "end_sec": row.end_sec,
-                        "text": row.text,
-                        "score_hint": float(score_hint),
-                    }
-                )
-            results.sort(key=lambda item: item["score_hint"], reverse=True)
-            return results[:limit]
-
         filters = [SubtitleSegment.text.contains(keyword) for keyword in keywords]
-        query_stmt = db.query(SubtitleSegment, Video).join(Video, Video.id == SubtitleSegment.video_id)
+        stmt = db.query(SubtitleSegment, Video).join(Video, Video.id == SubtitleSegment.video_id)
         if video_id:
-            query_stmt = query_stmt.filter(SubtitleSegment.video_id == video_id)
-        rows = query_stmt.filter(or_(*filters)).limit(limit * 4).all()
+            stmt = stmt.filter(SubtitleSegment.video_id == video_id)
+        rows = stmt.filter(or_(*filters)).limit(limit * 4).all()
 
         if not rows:
-            fallback = db.query(Video)
-            if video_id:
-                fallback = fallback.filter(Video.id == video_id)
-            videos = fallback.order_by(desc(Video.is_favorite), desc(Video.favorited_at), desc(Video.updated_at)).limit(limit).all()
+            videos = (
+                db.query(Video)
+                .order_by(desc(Video.is_favorite), desc(Video.updated_at))
+                .limit(limit)
+                .all()
+            )
             return [
                 {
                     "video_id": video.id,
                     "video_title": video.title,
                     "start_sec": 0,
                     "end_sec": min(video.duration or 0, 90),
-                    "text": (video.summary or video.transcription or "No transcript available yet.")[:220],
+                    "text": (video.summary or video.transcription or "暂无字幕")[:220],
                     "score_hint": 0.1,
                 }
                 for video in videos
@@ -128,7 +125,6 @@ def search_references(query: str, video_id: int | None = None, limit: int = 6) -
                 continue
             grouped_best[(video.id, segment.start_sec)] = score_hint
             results.append(build_reference(segment, video, float(score_hint or 0.1)))
-
         results.sort(key=lambda item: item["score_hint"], reverse=True)
         return results[:limit]
     finally:

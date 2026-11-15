@@ -485,3 +485,39 @@ class CalendarEventOut(CalendarEventBase):
 
 class CalendarEventListOut(BaseModel):
     items: list[CalendarEventOut]
+
+
+# ==================== 混合检索 ====================
+
+
+class HybridSearchHit(BaseModel):
+    segment_id: int
+    video_id: int
+    video_title: str
+    category_id: int | None = None
+    start_sec: float
+    end_sec: float
+    text: str
+    score: float
+    lexical_score: float | None = None
+    vector_score: float | None = None
+    rerank_score: float | None = None
+    sources: list[str] = []
+
+
+class HybridSearchOut(BaseModel):
+    query: str
+    hits: list[HybridSearchHit]
+    timings: dict[str, float] = {}
+    degraded: list[str] = []
+    rerank_used: bool = False
+
+
+class VectorStatsOut(BaseModel):
+    embedded: int
+    eligible: int
+    coverage: float
+    videos: int
+    models: list[dict] = []
+    first_at: str | None = None
+    last_at: str | None = None

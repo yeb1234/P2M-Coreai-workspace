@@ -45,9 +45,14 @@ def lexical_search(
     limit: int = 30,
     category_ids: list[int] | None = None,
     video_ids: list[int] | None = None,
-    similarity_threshold: float = 0.08,
+    similarity_threshold: float = 0.12,
+    min_text_len: int = 10,
 ) -> list[dict]:
-    """返回词法命中，按相似度降序。任何异常都降级为空列表，不阻塞语义检索。"""
+    """返回词法命中，按相似度降序。任何异常都降级为空列表，不阻塞语义检索。
+
+    min_text_len 过滤掉「有什么用」「Langgraph」这类 3-8 字碎片：
+    trgm 相似度对短文本天然偏高，不过滤会让无信息量的片段挤掉真内容。
+    """
     query = (query or "").strip()
     if not query:
         return []
@@ -57,6 +62,10 @@ def lexical_search(
         "q": query,
         "limit": limit,
         "threshold": similarity_threshold,
+        "min_len": min_text_len,
+        # 精确包含查询词的短片段要豁免长度限制，否则「依赖注入」这种
+        # 本身就是短词的技术术语会被 min_len 误杀
+        "q_like": f"%{query}%",
     }
     if category_ids:
         filters.append("v.category_id = ANY(:category_ids)")
@@ -90,6 +99,7 @@ def lexical_search(
         FROM subtitle_segments s
         JOIN videos v ON v.id = s.video_id
         WHERE (s.text % :q{token_conditions}){filter_sql}
+          AND (length(s.text) >= :min_len OR s.text ILIKE :q_like)
         ORDER BY sim DESC, length(s.text) ASC
         LIMIT :limit
     """
