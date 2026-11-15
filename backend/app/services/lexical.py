@@ -13,6 +13,7 @@ import re
 from sqlalchemy import text
 
 from app.database import engine, settings
+from app.tables import retrieval_table_name
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +90,11 @@ def lexical_search(
 
     # 语义块模式下换表。两块表的列名一致（id/text/video_id/start_sec/end_sec），
     # 所以 SQL 结构可以完全复用。
+    #
+    # 表名从 app.tables 取，不在这里拼字面量：
+    # 两张表的 id 空间重叠，拼错了不会报错，只会静默命中另一批文本。
     use_chunks = settings.retrieval_source == "chunks"
-    source_table = "content_chunks" if use_chunks else "subtitle_segments"
+    source_table = retrieval_table_name()
     if use_chunks:
         # 块至少 30 字，长度过滤没有意义；短句过滤是给碎片模式用的补丁
         min_text_len = 0

@@ -310,7 +310,11 @@ expect(await page.locator('.todo-item').count()).toBe(1);
 □ 6. 涉及异步/长任务 → 显式写超时、并发、重试上限
 □ 7. 涉及删数据 → 清单从外键元数据生成，或加 ON DELETE CASCADE
 □ 8. 加端点 → 默认加鉴权，除非能明确说出「为什么这个可以匿名」
+□ 9. 表名 / 列名不要写字符串字面量 → 从 app/tables.py 取
+      两张向量表的 id 空间重叠，拼错不报错，只会静默返回另一批数据
 ```
+
+> `app/tables.py` 是这两张表的唯一来源：查询用的列对象、建表和索引的 DDL 都在那儿，`migrations.py` 只负责调用。加列时只改它。
 
 第 8 条不是洁癖：这一轮发现 `GET /api/ai-jobs` **完全不登录就能列出所有转写任务**（含视频标题、失败原因、模型配置），`GET /api/ai-jobs/{id}` 匿名可查。都是单用户时代留下的。
 
@@ -327,7 +331,7 @@ expect(await page.locator('.todo-item').count()).toBe(1);
 | `p2m-todo-storage` 旧数据还留在用户浏览器里 | 无害，但排查时会误导（这次的坑） | 加一次性清理，或明确写进文档 |
 | 时间中心只显示 `reminderAt` 非空的待办 | 设计如此（它是「时间中心」），但没文档 | 补一句注释，别再当 bug 查 |
 | `sprite` 代码矛盾：`file_scanner` 有 `generate_missing_sprites()`，`models.py` 没有 `sprite` 字段 | 功能半途废弃或改名 | 查清后要么补字段要么删函数 |
-| 向量化未实现（pgvector 0.8.7 已装，无任何 `vector` 列） | 不是「重启会丢」，是「还没做」 | 按 `background-tasks.md` 三步接入 |
+| 向量覆盖率只有 38%（716,107 / 1,871,941 可嵌入片段） | 检索召回不全，一半内容搜不到 | 跑 `scripts/backfill_chunk_embeddings.py` 补齐；补齐过程走通用任务底座可续跑 |
 | `dist/sounds` 47MB（`cafe.ogg` 单个 20M，`wind.ogg` 529kbps） | 镜像体积，不影响首屏 | 重编码 64kbps 单声道，有音质取舍 |
 | worker 并发 = 1，任务失败不重试 | 队列堆 20 个视频要等很久；网络抖动导致的失败永久失败 | 要区分「可重试」和「不可重试」，别盲目加 |
 | `sync_db_queue_to_rq` 没测过 Redis 挂掉的场景 | 未知 | 断 Redis 试一次 |

@@ -263,6 +263,17 @@ def get_db():
         db.close()
 
 
+def _seg_emb_table() -> str:
+    """向量表名。
+
+    延迟导入：app.tables → app.models → app.database，模块级导入会成环。
+    表名不写字面量，避免和 app/tables.py 漂移。
+    """
+    from app.tables import SEGMENT_EMBEDDINGS
+
+    return SEGMENT_EMBEDDINGS.name
+
+
 def check_database(deep: bool = True) -> dict:
     """返回数据库连通性摘要。
 
@@ -289,7 +300,7 @@ def check_database(deep: bool = True) -> dict:
                 )
             if deep:
                 info["segment_embeddings"] = connection.execute(
-                    text("SELECT count(*) FROM segment_embeddings")
+                    text(f"SELECT count(*) FROM {_seg_emb_table()}")
                 ).scalar()
     return info
 

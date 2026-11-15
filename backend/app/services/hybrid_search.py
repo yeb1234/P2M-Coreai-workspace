@@ -16,9 +16,11 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 import numpy as np
-from sqlalchemy import text
+from sqlalchemy import select
 
 from app.database import engine, settings
+from app.models import Category, SubtitleSegment, Video
+from app.tables import retrieval_table
 from app.services.embeddings import EmbeddingError, get_embedding_client
 from app.services.lexical import lexical_search
 from app.services.llm import build_chat_model
@@ -80,22 +82,31 @@ def fetch_segments(segment_ids: list[int]) -> dict[int, dict]:
     """
     if not segment_ids:
         return {}
-    table = "content_chunks" if settings.retrieval_source == "chunks" else "subtitle_segments"
+
+    # 表对象而不是字符串：切表由 retrieval_table() 统一决定，
+    # 写错表名会直接 KeyError，不会再出现「查了另一张表却正常返回」。
+    seg = retrieval_table()
+    video = Video.__table__
+    category = Category.__table__
+
+    stmt = (
+        select(
+            seg.c.id,
+            seg.c.video_id,
+            seg.c.start_sec,
+            seg.c.end_sec,
+            seg.c.text,
+            video.c.title.label("video_title"),
+            video.c.category_id,
+            category.c.name.label("category_name"),
+        )
+        .select_from(seg)
+        .join(video, video.c.id == seg.c.video_id)
+        .outerjoin(category, category.c.id == video.c.category_id)
+        .where(seg.c.id.in_(segment_ids))
+    )
     with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                f"""
-                SELECT s.id, s.video_id, s.start_sec, s.end_sec, s.text,
-                       v.title AS video_title, v.category_id,
-                       c.name AS category_name
-                FROM {table} s
-                JOIN videos v ON v.id = s.video_id
-                LEFT JOIN categories c ON c.id = v.category_id
-                WHERE s.id = ANY(:ids)
-                """
-            ),
-            {"ids": list(segment_ids)},
-        ).fetchall()
+        rows = conn.execute(stmt).fetchall()
     return {
         row.id: {
             "video_id": row.video_id,
@@ -225,21 +236,22 @@ def expand_hit_context(
     max_end = max(h.end_sec for h in hits) + window_sec
     video_ids = list({h.video_id for h in hits})
 
+    # 这里**必须**是字幕表，不能跟 retrieval_source 走：
+    # 扩上下文要的是逐句时间轴（平均 9 字一条），
+    # 语义块太粗（565 字一坨），拿来拼段落会重复大段内容。
+    seg = SubtitleSegment.__table__
+    stmt = (
+        select(seg.c.video_id, seg.c.start_sec, seg.c.end_sec, seg.c.text)
+        .where(
+            seg.c.video_id.in_(video_ids),
+            seg.c.start_sec >= min_start,
+            seg.c.start_sec <= max_end,
+        )
+        .order_by(seg.c.video_id, seg.c.start_sec)
+    )
     try:
         with engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    """
-                    SELECT video_id, start_sec, end_sec, text
-                    FROM subtitle_segments
-                    WHERE video_id = ANY(:vids)
-                      AND start_sec >= :lo
-                      AND start_sec <= :hi
-                    ORDER BY video_id, start_sec
-                    """
-                ),
-                {"vids": video_ids, "lo": min_start, "hi": max_end},
-            ).fetchall()
+            rows = conn.execute(stmt).fetchall()
     except Exception as exc:
         logger.warning("上下文扩展失败，返回原始片段: %s", exc)
         return hits

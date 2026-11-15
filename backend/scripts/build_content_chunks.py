@@ -126,43 +126,18 @@ def split_into_chunks(segments: list[tuple[float, float, str]]) -> list[dict]:
 
 
 def ensure_table(conn) -> None:
+    """建表 + 索引。DDL 来自 app.tables，和 migrations 用同一份。
+
+    之前这里自己写了一份 DDL，而 migrations 里没有 ——
+    结果新部署（没跑过这个脚本）时默认检索源 chunks 查的是不存在的表。
+    """
+    from app.tables import content_chunks_ddl
+
     dim = int(settings.embedding_dim or 1024)
     conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    conn.execute(
-        text(
-            f"""
-            CREATE TABLE IF NOT EXISTS content_chunks (
-                id BIGSERIAL PRIMARY KEY,
-                video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
-                chunk_index INTEGER NOT NULL,
-                start_sec DOUBLE PRECISION NOT NULL,
-                end_sec DOUBLE PRECISION NOT NULL,
-                text TEXT NOT NULL,
-                char_count INTEGER NOT NULL,
-                segment_count INTEGER NOT NULL DEFAULT 1,
-                -- 向量列先留空，由回填脚本填。放同一张表省一次 JOIN
-                embedding halfvec({dim}),
-                created_at TIMESTAMP DEFAULT now()
-            )
-            """
-        )
-    )
-    conn.execute(
-        text("CREATE INDEX IF NOT EXISTS ix_content_chunks_video ON content_chunks (video_id, chunk_index)")
-    )
-    conn.execute(
-        text(
-            f"CREATE INDEX IF NOT EXISTS ix_content_chunks_embedding ON content_chunks "
-            f"USING hnsw (embedding halfvec_cosine_ops)"
-        )
-    )
-    # 词法检索要用 trigram，和现有 subtitle_segments 保持一致
-    conn.execute(
-        text(
-            "CREATE INDEX IF NOT EXISTS ix_content_chunks_text_trgm ON content_chunks "
-            "USING gin (text gin_trgm_ops)"
-        )
-    )
+    conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+    for statement in content_chunks_ddl(dim):
+        conn.execute(text(statement))
 
 
 def main() -> int:

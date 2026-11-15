@@ -17,6 +17,7 @@ from pgvector.psycopg import register_vector
 from sqlalchemy import text
 
 from app.database import engine, settings
+from app.tables import CONTENT_CHUNKS, SEGMENT_EMBEDDINGS
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +87,8 @@ def upsert_embeddings(
                     for segment_id, video_id, category_id, vector in chunk:
                         copy.write_row((segment_id, video_id, category_id, vector))
                 cur.execute(
-                    """
-                    INSERT INTO segment_embeddings
+                    f"""
+                    INSERT INTO {SEGMENT_EMBEDDINGS.name}
                         (segment_id, video_id, category_id, model, dim, embedding)
                     SELECT
                         segment_id, video_id, category_id, %s, %s, embedding
@@ -145,9 +146,12 @@ def _search_chunks(
     where_parts.append("c.embedding IS NOT NULL")
     where_sql = "WHERE " + " AND ".join(where_parts)
 
+    # 表名从 Core 定义取，不写字面量 —— 这张表和字幕表的 id 空间重叠，
+    # 拼错了只会静默命中另一批数据
+    chunk_table = CONTENT_CHUNKS.name
     sql = f"""
         SELECT c.id, c.video_id, 1 - (c.embedding <=> %(qvec)s) AS score
-        FROM content_chunks c
+        FROM {chunk_table} c
         JOIN videos v ON v.id = c.video_id
         {where_sql}
         ORDER BY c.embedding <=> %(qvec)s
@@ -211,9 +215,10 @@ def search(
         params["video_ids"] = list(video_ids)
     where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
 
+    emb_table = SEGMENT_EMBEDDINGS.name
     sql = f"""
         SELECT segment_id, video_id, 1 - (embedding <=> %(qvec)s) AS score
-        FROM segment_embeddings
+        FROM {emb_table}
         {where_sql}
         ORDER BY embedding <=> %(qvec)s
         LIMIT %(top_k)s
@@ -242,7 +247,7 @@ def delete_by_video(video_id: int) -> int:
     _require_postgres()
     with engine.begin() as conn:
         result = conn.execute(
-            text("DELETE FROM segment_embeddings WHERE video_id = :vid"), {"vid": video_id}
+            text(f"DELETE FROM {SEGMENT_EMBEDDINGS.name} WHERE video_id = :vid"), {"vid": video_id}
         )
         return result.rowcount or 0
 
@@ -258,16 +263,16 @@ def stats() -> dict:
                     count(DISTINCT video_id) AS videos,
                     min(created_at) AS first_at,
                     max(created_at) AS last_at
-                FROM segment_embeddings
-                """
+                FROM {emb}
+                """.format(emb=SEGMENT_EMBEDDINGS.name)
             )
         ).first()
         model_rows = conn.execute(
             text(
                 """
-                SELECT model, count(*) FROM segment_embeddings
+                SELECT model, count(*) FROM {emb}
                 GROUP BY model ORDER BY count(*) DESC LIMIT 5
-                """
+                """.format(emb=SEGMENT_EMBEDDINGS.name)
             )
         ).fetchall()
         eligible = conn.execute(

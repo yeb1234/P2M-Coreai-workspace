@@ -14,6 +14,7 @@ import logging
 from sqlalchemy import text
 
 from app.database import Base, settings
+from app.tables import SEGMENT_EMBEDDINGS, content_chunks_ddl, segment_embeddings_ddl
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ def upgrade_postgres(engine) -> None:
         # 修完手动 ANALYZE 只花 274ms，说明成本极低，没必要省。
         for table, analyze_scale in (
             ("subtitle_segments", 0.02),
-            ("segment_embeddings", 0.02),
+            (SEGMENT_EMBEDDINGS.name, 0.02),
             ("videos", 0.05),
         ):
             try:
@@ -141,43 +142,15 @@ def upgrade_postgres(engine) -> None:
 
     dim = _safe_dim()
     with engine.begin() as conn:
-        # 向量表用原生 DDL：halfvec(半精度) 相比 float4 省一半磁盘与内存，
-        # 对 1024 维句向量召回损失可忽略。
-        conn.execute(
-            text(
-                f"""
-                CREATE TABLE IF NOT EXISTS segment_embeddings (
-                    segment_id  BIGINT PRIMARY KEY,
-                    video_id    INTEGER NOT NULL,
-                    category_id INTEGER,
-                    model       TEXT NOT NULL,
-                    dim         SMALLINT NOT NULL,
-                    embedding   halfvec({dim}) NOT NULL,
-                    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-                )
-                """
-            )
-        )
-        conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_seg_emb_video ON segment_embeddings (video_id)")
-        )
-        conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_seg_emb_category ON segment_embeddings (category_id)")
-        )
-        conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_seg_emb_model ON segment_embeddings (model)")
-        )
-
-        # HNSW：m=16 平衡召回与内存，ef_construction=64 建索引质量
-        conn.execute(
-            text(
-                """
-                CREATE INDEX IF NOT EXISTS ix_seg_emb_hnsw
-                ON segment_embeddings USING hnsw (embedding halfvec_cosine_ops)
-                WITH (m = 16, ef_construction = 64)
-                """
-            )
-        )
+        # 向量检索表（segment_embeddings / content_chunks）的 DDL 统一在
+        # app/tables.py 定义 —— 建表脚本 scripts/build_content_chunks.py
+        # 也用同一份，避免两处漂移。
+        #
+        # 之前 content_chunks 只在那个脚本里建，而 retrieval_source 默认就是
+        # "chunks"：新部署（没跑过脚本）一上来就查不存在的表，
+        # 报错还会被 lexical 的 except 吞成「降级为纯语义检索」。
+        for statement in (*segment_embeddings_ddl(dim), *content_chunks_ddl(dim)):
+            conn.execute(text(statement))
 
         # 中文模糊检索：pg_trgm 的 GIN 索引支持 ILIKE '%词%' 走索引
         conn.execute(
@@ -322,32 +295,26 @@ def upgrade_sqlite_legacy(engine) -> None:
 
 
 def embedding_stats(engine) -> dict:
-    """向量覆盖率统计，供 /health 与后台任务使用。"""
+    """向量覆盖率统计，供 /health 与后台任务使用。
+
+    SQLite 直接返回 0：那张表是 pgvector 专有的，之前 if/else 两个分支
+    写的是同一段 SQL，等于「以为兼容了，其实没兼容」。
+    """
+    if not settings.is_postgres:
+        return {"embedded": 0, "eligible": 0, "coverage": 0.0}
+
     with engine.connect() as conn:
-        if settings.is_postgres:
-            row = conn.execute(
-                text(
-                    """
-                    SELECT
-                      (SELECT count(*) FROM segment_embeddings) AS embedded,
-                      (SELECT count(*) FROM subtitle_segments
-                        WHERE length(text) >= :min_len) AS eligible
-                    """
-                ),
-                {"min_len": settings.embedding_min_text_len},
-            ).first()
-        else:
-            row = conn.execute(
-                text(
-                    """
-                    SELECT
-                      (SELECT count(*) FROM segment_embeddings) AS embedded,
-                      (SELECT count(*) FROM subtitle_segments
-                        WHERE length(text) >= :min_len) AS eligible
-                    """
-                ),
-                {"min_len": settings.embedding_min_text_len},
-            ).first()
+        row = conn.execute(
+            text(
+                f"""
+                SELECT
+                  (SELECT count(*) FROM {SEGMENT_EMBEDDINGS.name}) AS embedded,
+                  (SELECT count(*) FROM subtitle_segments
+                    WHERE length(text) >= :min_len) AS eligible
+                """
+            ),
+            {"min_len": settings.embedding_min_text_len},
+        ).first()
     embedded = int(row[0] or 0) if row else 0
     eligible = int(row[1] or 0) if row else 0
     return {
