@@ -36,38 +36,31 @@ def run_startup_scan() -> None:
         logger.exception("Startup video scan failed")
 
 
-def _run_background_thumbnails() -> None:
-    """空闲时补缩略图/雪碧图。
+def _run_background_sprites() -> None:
+    """空闲时补雪碧图。
 
-    两个开关都关着时直接返回，不要每 2 秒空转一次 —— 一个什么都不做的
-    死循环线程除了费电，还会让人误以为后台任务在跑。
+    缩略图已经迁到 app.services.thumbnail_worker（线程池并发），
+    这里只留雪碧图 —— 雪碧图要抽多帧再拼图，比缩略图重得多，
+    保持慢节奏反而合适。
     """
     import time
 
-    if not settings.thumbnail_background_enabled and not settings.sprite_background_enabled:
+    if not settings.sprite_background_enabled:
         return
 
     idle_cycles = 0
     while True:
         time.sleep(max(1, settings.ai_worker_poll_interval or 2))
         idle_cycles += 1
-        thumbnail_cycles = max(1, int(settings.thumbnail_background_idle_cycles or 10))
-        thumbnail_limit = max(1, int(settings.thumbnail_background_limit or 1))
-        if idle_cycles % thumbnail_cycles != 0:
+        cycles = max(1, int(settings.thumbnail_background_idle_cycles or 10))
+        limit = max(1, int(settings.thumbnail_background_limit or 1))
+        if idle_cycles % cycles != 0:
             continue
-        # 单次失败不能让整条后台链路死掉：ffmpeg 偶尔会因文件被占用报错
-        if settings.thumbnail_background_enabled:
-            try:
-                from app.services.file_scanner import generate_missing_thumbnails
-
-                generate_missing_thumbnails(limit=thumbnail_limit)
-            except Exception:
-                logger.exception("后台生成缩略图失败，跳过本轮")
         if settings.sprite_background_enabled:
             try:
                 from app.services.file_scanner import generate_missing_sprites
 
-                generate_missing_sprites(limit=thumbnail_limit)
+                generate_missing_sprites(limit=limit)
             except Exception:
                 logger.exception("后台生成雪碧图失败，跳过本轮")
 
@@ -173,8 +166,19 @@ async def lifespan(_app: FastAPI):
     start_file_watcher()
     threading.Thread(target=run_startup_scan, name="startup-video-scan", daemon=True).start()
     threading.Thread(target=_warmup_retrieval, name="embedding-warmup", daemon=True).start()
-    # Start background thumbnail/sprite worker thread
-    threading.Thread(target=_run_background_thumbnails, name="thumbnail-worker", daemon=True).start()
+    # 缩略图补齐：进程内单例 worker（线程池 + 去重 + 自动扫描）。
+    #
+    # 替换掉原来的 _run_background_thumbnails：那个是一次生成 1 张、
+    # 每 20 秒一轮，一小时最多 180 张。库里两万多条视频，
+    # 全缺的话要跑 160 小时，体感就是「永远补不完」。
+    #
+    # 现在 4 个线程并发 + 每 5 分钟扫一次库，单批最多 200 个，
+    # 实际吞吐取决于 ffmpeg 速度（单张约 0.3-2 秒）。
+    from app.services.thumbnail_worker import get_thumbnail_worker
+
+    get_thumbnail_worker().start_auto_scan()
+    if settings.sprite_background_enabled:
+        threading.Thread(target=_run_background_sprites, name="sprite-worker", daemon=True).start()
     # AI 转写 worker：独立进程 + 监督线程，崩了自动重拉
     backend_dir = str(Path(__file__).resolve().parent.parent)
     supervisor = WorkerSupervisor(backend_dir)

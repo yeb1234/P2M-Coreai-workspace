@@ -83,6 +83,31 @@ def rescan_library():
     return RescanOut(**rescan_video_library())
 
 
+@router.get("/thumbnails/status")
+def thumbnail_status():
+    """缩略图补齐进度。
+
+    inflight = 排队中 + 正在生成的数量。
+    前端可以轮询这个接口显示「还剩 N 个」。
+    """
+    from app.services.thumbnail_worker import get_thumbnail_worker
+
+    return get_thumbnail_worker().status()
+
+
+@router.post("/thumbnails/rescan")
+def thumbnail_rescan(limit: int = 200):
+    """扫库并投递缺失的缩略图任务。
+
+    和 /rescan 的区别：/rescan 是全量重扫视频库（慢，会改 DB 记录），
+    这个只查「thumbnail 为空」的视频，投给后台线程池，立即返回。
+    """
+    from app.services.thumbnail_worker import get_thumbnail_worker
+
+    added = get_thumbnail_worker().submit_missing(limit=max(1, min(limit, 2000)))
+    return {"queued": added, **get_thumbnail_worker().status()}
+
+
 @router.post("/generate-thumbnails")
 def generate_thumbnails_for_ids(payload: dict):
     return generate_thumbnails_for_video_ids(payload.get("video_ids", []))
