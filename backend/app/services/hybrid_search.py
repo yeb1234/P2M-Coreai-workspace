@@ -169,6 +169,14 @@ def _llm_rerank(query: str, hits: list[Hit], keep: int) -> list[Hit]:
         if not isinstance(ids, list):
             return candidates[:keep]
 
+        if len(ids) == 0:
+            # 模型明确表示「候选都不相关」时，要尊重这个负判断。
+            # 原实现把空数组也当成「没给出有效结果」，跟着 fallback 返回原序 ——
+            # 等于把模型唯一能说「没有」的机会吞掉了。
+            # 这是「红烧肉怎么做」会返回三条无关内容的直接原因。
+            logger.info("重排判定全部不相关，返回空结果: %s", query[:40])
+            return []
+
         reranked: list[Hit] = []
         seen: set[int] = set()
         for raw_index in ids:
