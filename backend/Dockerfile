@@ -50,6 +50,18 @@ RUN --mount=type=cache,target=/root/.cache/pip \
          echo "跳过 CUDA，转写将使用 CPU（int8）"; \
        fi
 
+# nvidia-* 的 wheel 把 .so 放在 site-packages/nvidia/*/lib，不在系统库路径里。
+# 不注册的话，ctranslate2 推理时会报
+#   "Library libcublas.so.12 is not found or cannot be loaded"
+# 注意 app 里的 _ensure_cuda_libs() 只管 Windows（首行 os.name != "nt" 就 return），
+# Linux 容器完全指望不上它。
+RUN if [ "$INSTALL_CUDA" = "true" ]; then \
+      find /usr/local/lib/python3.11/site-packages/nvidia -maxdepth 2 -name lib -type d \
+        > /etc/ld.so.conf.d/nvidia-cuda.conf 2>/dev/null || true; \
+      cat /etc/ld.so.conf.d/nvidia-cuda.conf; \
+      ldconfig; \
+    fi
+
 COPY backend/ .
 COPY prompts/ ./prompts/
 

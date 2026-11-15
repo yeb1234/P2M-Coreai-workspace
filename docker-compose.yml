@@ -138,6 +138,16 @@ services:
       EXTERNAL_LLM_MODEL: ${EXTERNAL_LLM_MODEL:-deepseek-v4.1-flash-1017}
       EXTERNAL_LLM_THINKING: ${EXTERNAL_LLM_THINKING:-false}
       LLM_USAGE_POLICY: ${LLM_USAGE_POLICY:-external_first}
+      # ---- 转写 ----
+      # 这组变量之前完全没透传，容器一直在用代码默认值（faster-whisper + small + int8），
+      # .env 里配的 whisper.cpp / large-v3 从来没生效过 —— 而且 Linux 容器也跑不了 Windows exe。
+      WHISPER_ENGINE: ${WHISPER_ENGINE:-faster-whisper}
+      DEFAULT_WHISPER_MODEL: ${DEFAULT_WHISPER_MODEL:-small}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      DEVICE_TYPE: ${DEVICE_TYPE:-auto}
+      # 模型从国内镜像拉，否则 3GB 下载会卡死
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
+      HF_HOME: /data/hf
       # ---- 检索 ----
       # chunks = 语义块（565 字/块），segments = 逐句字幕（9 字/条）
       # 切到 chunks 前必须确认 content_chunks 的向量覆盖率 > 95%，
@@ -177,6 +187,8 @@ services:
       - ${VIDEO_HOST_PATH:-D:/ITJC}/work:/data/work
       # 需要从 SQLite 迁移时，把旧库放到这里（只读）
       - ${SQLITE_SOURCE_DIR:-./.migration}:/data/source:ro
+      # faster-whisper 模型缓存。不挂载的话每次重建容器都要重下 3GB
+      - ./data/hf:/data/hf
     extra_hosts:
       # Linux 下 host.docker.internal 不自动存在，显式声明
       - "host.docker.internal:host-gateway"
