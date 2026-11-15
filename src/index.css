@@ -32,6 +32,16 @@
   --success: #16a34a;
   --danger: #dc3545;
   --shadow-card: 1px 1px 0px rgba(232, 212, 160, 0.06);
+  /* 状态色：和 --success / --danger 配套，供浅底标签用。
+     分类色（紫/青/粉）留在组件里 —— 它们是功能区分，不随主题变。 */
+  --warn: #f59e0b;
+  --warn-bg: #fff7ed;
+  --warn-border: #f6d9a8;
+  --info: #2563eb;
+  --info-bg: #eff6ff;
+  --info-border: #c7d9f8;
+  --success-bg: #f0fdf4;
+  --danger-bg: #fef2f2;
   --shadow-wood: 4px 6px 0px rgba(0,0,0,0.08), 6px 10px 24px rgba(0,0,0,0.15);
 
   /* Legacy compat */

@@ -41,18 +41,18 @@ export const ImportantDates: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl overflow-x-auto">
-      <span className="text-[10px] text-[#b8b4ac] whitespace-nowrap font-medium">重要日子</span>
-      <div className="h-3 w-px bg-[#e5e2dd]" />
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl overflow-x-auto">
+      <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap font-medium">重要日子</span>
+      <div className="h-3 w-px bg-[var(--border-light)]" />
       {upcoming.map((item) => (
         <div
           key={item.label}
           className="flex items-center gap-1.5 whitespace-nowrap"
         >
           <span style={{ color: item.color }}>{item.icon}</span>
-          <span className="text-xs text-[#6b7280]">{item.label}</span>
+          <span className="text-xs text-[var(--text-secondary)]">{item.label}</span>
           <span className={`text-[10px] font-medium ${
-            item.daysLeft === 0 ? 'text-[#c87d2f]' : item.daysLeft <= 7 ? 'text-[#dc3545]' : 'text-[#b8b4ac]'
+            item.daysLeft === 0 ? 'text-[var(--accent)]' : item.daysLeft <= 7 ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]'
           }`}>
             {item.daysLeft === 0 ? '今天' : `${item.daysLeft}天`}
           </span>

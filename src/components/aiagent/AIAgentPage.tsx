@@ -5,11 +5,11 @@ import { useAIStore } from '../../stores';
 
 const MOCK_AGENTS = [
   { name: '代码助手', desc: '代码生成、审查、重构、调试', icon: <Code size={18} />, color: 'text-[#8b5cf6]' },
-  { name: '知识检索', desc: '联网搜索、文档总结、问答', icon: <Globe size={18} />, color: 'text-[#2563eb]' },
-  { name: '数据分析', desc: '数据清洗、可视化、洞察报告', icon: <Database size={18} />, color: 'text-[#16a34a]' },
+  { name: '知识检索', desc: '联网搜索、文档总结、问答', icon: <Globe size={18} />, color: 'text-[var(--info)]' },
+  { name: '数据分析', desc: '数据清洗、可视化、洞察报告', icon: <Database size={18} />, color: 'text-[var(--success)]' },
   { name: '创意写作', desc: '文案、邮件、文档、翻译', icon: <Sparkles size={18} />, color: 'text-[#ec4899]' },
-  { name: '逻辑推理', desc: '数学、逻辑、策略分析', icon: <Brain size={18} />, color: 'text-[#f59e0b]' },
-  { name: '自动化', desc: '工作流编排、定时任务、API 调用', icon: <Zap size={18} />, color: 'text-[#c87d2f]' },
+  { name: '逻辑推理', desc: '数学、逻辑、策略分析', icon: <Brain size={18} />, color: 'text-[var(--warn)]' },
+  { name: '自动化', desc: '工作流编排、定时任务、API 调用', icon: <Zap size={18} />, color: 'text-[var(--accent)]' },
 ];
 
 export const AIAgentPage: React.FC = () => {

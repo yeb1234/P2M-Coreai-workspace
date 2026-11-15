@@ -56,15 +56,15 @@ export function SubtitleEditDialog({ isOpen, onClose, onConfirm, initialText }: 
           onChange={(e) => { setText(e.target.value); setError(''); }}
           onKeyDown={handleKeyDown}
           rows={3}
-          className="w-full rounded-lg border border-[#e5e2dd] bg-white px-3 py-2 text-sm text-[#1a1a1a] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] resize-none"
+          className="w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] resize-none"
           placeholder="输入字幕内容..."
         />
-        {error && <p className="text-xs text-[#dc3545]">{error}</p>}
+        {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-[#6b7280] bg-[#f3f2ef] rounded-lg hover:bg-[#e5e2dd] transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-base)] rounded-lg hover:bg-[var(--border-light)] transition-colors disabled:opacity-50"
           >
             取消
           </button>

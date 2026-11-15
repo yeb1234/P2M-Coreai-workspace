@@ -32,12 +32,12 @@ export const BookmarksPage: React.FC = () => {
 
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
-          <input type="text" placeholder="搜索书签..." className="w-full pl-10 pr-4 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl text-sm outline-none" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+          <input type="text" placeholder="搜索书签..." className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl text-sm outline-none" />
         </div>
         <div className="flex flex-wrap gap-1">
           {FOLDERS.map((f) => (
-            <button key={f} className={`px-3 py-2 text-xs rounded-lg transition-colors ${f === '全部' ? 'bg-[#fef7ed] text-[#c87d2f]' : 'text-[#6b7280] hover:bg-[#f3f2ef]'}`}>
+            <button key={f} className={`px-3 py-2 text-xs rounded-lg transition-colors ${f === '全部' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-base)]'}`}>
               {f}
             </button>
           ))}
@@ -46,16 +46,16 @@ export const BookmarksPage: React.FC = () => {
 
       <div className="auto-grid-panels">
         {MOCK_BOOKMARKS.map((bm) => (
-          <div key={bm.title} className="flex items-center gap-3 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md transition-shadow cursor-pointer group">
+          <div key={bm.title} className="flex items-center gap-3 p-3 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl hover:shadow-md transition-shadow cursor-pointer group">
             <span className="text-xl">{bm.favicon}</span>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#06b6d4] transition-colors truncate">{bm.title}</h3>
+              <h3 className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[#06b6d4] transition-colors truncate">{bm.title}</h3>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-[#9ca3af]">{bm.url}</span>
-                <span className="text-[10px] px-1.5 py-0.5 bg-[#f3f2ef] text-[#6b7280] rounded">{bm.folder}</span>
+                <span className="text-[10px] text-[var(--text-muted)]">{bm.url}</span>
+                <span className="text-[10px] px-1.5 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded">{bm.folder}</span>
               </div>
             </div>
-            <ExternalLink size={12} className="text-[#d1cdc6] group-hover:text-[#6b7280] flex-shrink-0" />
+            <ExternalLink size={12} className="text-[var(--border-medium)] group-hover:text-[var(--text-secondary)] flex-shrink-0" />
           </div>
         ))}
       </div>

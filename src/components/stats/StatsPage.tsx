@@ -119,47 +119,47 @@ export const StatsPage: React.FC = () => {
 
       {/* Summary cards */}
       <div className="auto-grid-cards">
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#c87d2f] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--accent)] mb-2">
             <Target size={16} />
             <span className="text-xs font-medium">今日番茄</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">{todayStats.totalPomodoros}</p>
-          <p className="text-[10px] text-[#9ca3af] mt-1">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{todayStats.totalPomodoros}</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">
             {todayStats.totalMinutes >= 60
               ? `${(todayStats.totalMinutes / 60).toFixed(1)}h`
               : `${todayStats.totalMinutes}分钟`}
           </p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#2563eb] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--info)] mb-2">
             <Clock size={16} />
             <span className="text-xs font-medium">本周专注</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">
             {totalWeekMinutes >= 60
               ? `${(totalWeekMinutes / 60).toFixed(1)}h`
               : `${totalWeekMinutes}m`}
           </p>
-          <p className="text-[10px] text-[#9ca3af] mt-1">{totalWeekPomodoros} 个番茄</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">{totalWeekPomodoros} 个番茄</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#16a34a] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--success)] mb-2">
             <ListTodo size={16} />
             <span className="text-xs font-medium">待办统计</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">{completedTodos}</p>
-          <p className="text-[10px] text-[#9ca3af] mt-1">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{completedTodos}</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">
             {inProgressTodos} 进行中 / {pendingTodos} 待处理
           </p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#ec4899] mb-2">
             <Flame size={16} />
             <span className="text-xs font-medium">连续天数</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">{streak}天</p>
-          <p className="text-[10px] text-[#f59e0b] mt-1">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{streak}天</p>
+          <p className="text-[10px] text-[var(--warn)] mt-1">
             {streak >= 7 ? '保持势头!' : streak > 0 ? '继续加油' : '从今天开始'}
           </p>
         </div>
@@ -167,43 +167,43 @@ export const StatsPage: React.FC = () => {
 
       {/* Extra stats row */}
       <div className="auto-grid-cards">
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-3 flex items-center gap-3">
-          <StickyNote size={16} className="text-[#f59e0b]" />
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
+          <StickyNote size={16} className="text-[var(--warn)]" />
           <div>
-            <p className="text-lg font-bold text-[#1a1a1a]">{notes.length}</p>
-            <p className="text-[10px] text-[#9ca3af]">笔记</p>
+            <p className="text-lg font-bold text-[var(--text-primary)]">{notes.length}</p>
+            <p className="text-[10px] text-[var(--text-muted)]">笔记</p>
           </div>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-3 flex items-center gap-3">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
           <Calendar size={16} className="text-[#7c3aed]" />
           <div>
-            <p className="text-lg font-bold text-[#1a1a1a]">{eventCount}</p>
-            <p className="text-[10px] text-[#9ca3af]">日历事件</p>
+            <p className="text-lg font-bold text-[var(--text-primary)]">{eventCount}</p>
+            <p className="text-[10px] text-[var(--text-muted)]">日历事件</p>
           </div>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-3 flex items-center gap-3">
-          <Target size={16} className="text-[#16a34a]" />
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
+          <Target size={16} className="text-[var(--success)]" />
           <div>
-            <p className="text-lg font-bold text-[#1a1a1a]">{todoList.length}</p>
-            <p className="text-[10px] text-[#9ca3af]">全部待办</p>
+            <p className="text-lg font-bold text-[var(--text-primary)]">{todoList.length}</p>
+            <p className="text-[10px] text-[var(--text-muted)]">全部待办</p>
           </div>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-3 flex items-center gap-3">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
           <TrendingUp size={16} className="text-[#06b6d4]" />
           <div>
-            <p className="text-lg font-bold text-[#1a1a1a]">
+            <p className="text-lg font-bold text-[var(--text-primary)]">
               {todoList.length > 0 ? Math.round((completedTodos / todoList.length) * 100) : 0}%
             </p>
-            <p className="text-[10px] text-[#9ca3af]">完成率</p>
+            <p className="text-[10px] text-[var(--text-muted)]">完成率</p>
           </div>
         </div>
       </div>
 
       {/* Weekly focus chart */}
-      <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-5">
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
-          <TrendingUp size={16} className="text-[#6b7280]" />
-          <h3 className="text-sm font-medium text-[#1a1a1a]">本周专注趋势</h3>
+          <TrendingUp size={16} className="text-[var(--text-secondary)]" />
+          <h3 className="text-sm font-medium text-[var(--text-primary)]">本周专注趋势</h3>
         </div>
         {totalWeekMinutes > 0 ? (
           <div className="min-w-[300px] flex items-end gap-3 h-40">
@@ -216,23 +216,23 @@ export const StatsPage: React.FC = () => {
 
               return (
                 <div key={date} className="flex-1 flex flex-col items-center gap-2">
-                  <span className="text-[10px] text-[#9ca3af]">
+                  <span className="text-[10px] text-[var(--text-muted)]">
                     {minutes > 0 ? `${minutes}分钟` : '-'}
                   </span>
                   <div className="w-full flex items-end justify-center" style={{ height: '120px' }}>
                     <div
                       className={`w-full rounded-t-md transition-all ${
                         isToday
-                          ? 'bg-gradient-to-t from-[#c87d2f] to-[#e0973f]'
+                          ? 'bg-gradient-to-t from-[var(--accent)] to-[var(--accent)]'
                           : 'bg-gradient-to-t from-[#d4c4a8] to-[#e5dcc8]'
                       }`}
                       style={{ height: `${Math.max(minutes > 0 ? 8 : 0, (minutes / maxMinutes) * 100)}%` }}
                     />
                   </div>
-                  <span className={`text-xs font-medium ${isToday ? 'text-[#c87d2f]' : 'text-[#6b7280]'}`}>
+                  <span className={`text-xs font-medium ${isToday ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}>
                     {DAY_LABELS[dayOfWeek]}
                     {pomodoros > 0 && (
-                      <span className="block text-[10px] text-[#9ca3af]">{pomodoros}个</span>
+                      <span className="block text-[10px] text-[var(--text-muted)]">{pomodoros}个</span>
                     )}
                   </span>
                 </div>
@@ -240,7 +240,7 @@ export const StatsPage: React.FC = () => {
             })}
           </div>
         ) : (
-          <div className="h-40 flex items-center justify-center text-[#9ca3af] text-sm">
+          <div className="h-40 flex items-center justify-center text-[var(--text-muted)] text-sm">
             <TrendingUp size={20} className="mr-2 opacity-40" />
             还没有专注记录，开始你的第一个番茄钟吧
           </div>
@@ -248,8 +248,8 @@ export const StatsPage: React.FC = () => {
       </div>
 
       {/* Achievement badges */}
-      <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-5">
-        <h3 className="text-sm font-medium text-[#1a1a1a] mb-3">成就徽章</h3>
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-5">
+        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">成就徽章</h3>
         <div className="flex flex-wrap gap-4">
           {badges.map((badge) => (
             <div key={badge.label} className="flex flex-col items-center gap-1">
@@ -257,12 +257,12 @@ export const StatsPage: React.FC = () => {
                 className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   badge.unlocked
                     ? 'bg-gradient-to-br from-[#f59e0b] to-[#c87d2f] text-white'
-                    : 'bg-[#e5e2dd] text-[#b8b4ac]'
+                    : 'bg-[var(--border-light)] text-[var(--text-muted)]'
                 }`}
               >
                 {badge.icon}
               </div>
-              <span className={`text-[10px] ${badge.unlocked ? 'text-[#6b7280]' : 'text-[#b8b4ac]'}`}>
+              <span className={`text-[10px] ${badge.unlocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]'}`}>
                 {badge.label}
               </span>
             </div>

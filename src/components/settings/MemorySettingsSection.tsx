@@ -148,7 +148,7 @@ export const MemorySettingsSection: React.FC = () => {
 
   const pinnedCount = useMemo(() => items.filter((m) => m.pinned).length, [items]);
 
-  if (loading) return <div className="p-4 text-sm text-[#9ca3af]">加载中…</div>;
+  if (loading) return <div className="p-4 text-sm text-[var(--text-muted)]">加载中…</div>;
 
   return (
     <div className="space-y-6">
@@ -223,8 +223,8 @@ export const MemorySettingsSection: React.FC = () => {
                   onClick={() => setPersona({ ...persona, tone: t })}
                   className={`rounded-lg border px-2.5 py-1 text-xs ${
                     persona.tone === t
-                      ? 'border-[#2c2a27] bg-[#2c2a27] text-white'
-                      : 'border-[#e5e2dd] bg-white text-[#6b7280] hover:bg-[#f5f3f0]'
+                      ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-white'
+                      : 'border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
                   }`}
                 >
                   {t}
@@ -241,8 +241,8 @@ export const MemorySettingsSection: React.FC = () => {
                   onClick={() => setPersona({ ...persona, proactivity: p })}
                   className={`rounded-lg border px-2.5 py-1 text-xs ${
                     persona.proactivity === p
-                      ? 'border-[#2c2a27] bg-[#2c2a27] text-white'
-                      : 'border-[#e5e2dd] bg-white text-[#6b7280] hover:bg-[#f5f3f0]'
+                      ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-white'
+                      : 'border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
                   }`}
                 >
                   {p}
@@ -257,7 +257,7 @@ export const MemorySettingsSection: React.FC = () => {
               onChange={(e) => setPersona({ ...persona, freeform: e.target.value })}
               rows={3}
               placeholder="比如：不要用「加油」「你可以的」这类空泛鼓励；回答技术问题时给可运行的代码"
-              className="w-full rounded-lg border border-[#e5e2dd] bg-white px-3 py-2 text-sm text-[#2c2a27] outline-none focus:border-[#2c2a27]"
+              className="w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--text-primary)]"
             />
           </div>
         </div>
@@ -265,7 +265,7 @@ export const MemorySettingsSection: React.FC = () => {
           <button
             onClick={() => void saveAll()}
             disabled={busy}
-            className="flex items-center gap-1.5 rounded-lg bg-[#2c2a27] px-3 py-1.5 text-sm text-white hover:bg-[#3d3a36] disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--text-primary)] px-3 py-1.5 text-sm text-white hover:bg-[#3d3a36] disabled:opacity-50"
           >
             <Save size={14} /> {saved ? '已保存' : '保存档案与设定'}
           </button>
@@ -284,7 +284,7 @@ export const MemorySettingsSection: React.FC = () => {
           <select
             value={newKind}
             onChange={(e) => setNewKind(e.target.value)}
-            className="rounded-lg border border-[#e5e2dd] bg-white px-2 py-1.5 text-sm text-[#2c2a27]"
+            className="rounded-lg border border-[var(--border-light)] bg-white px-2 py-1.5 text-sm text-[var(--text-primary)]"
           >
             {Object.entries(KIND_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
@@ -298,7 +298,7 @@ export const MemorySettingsSection: React.FC = () => {
           <button
             onClick={() => void addItem()}
             disabled={busy || !newContent.trim()}
-            className="flex shrink-0 items-center gap-1 rounded-lg border border-[#e5e2dd] bg-white px-3 py-1.5 text-sm text-[#2c2a27] hover:bg-[#f5f3f0] disabled:opacity-50"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-light)] bg-white px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] disabled:opacity-50"
           >
             <Plus size={14} /> 添加
           </button>
@@ -306,7 +306,7 @@ export const MemorySettingsSection: React.FC = () => {
 
         <div className="mt-3 space-y-1.5">
           {items.length === 0 && (
-            <div className="rounded-lg border border-dashed border-[#e5e2dd] py-6 text-center text-sm text-[#9ca3af]">
+            <div className="rounded-lg border border-dashed border-[var(--border-light)] py-6 text-center text-sm text-[var(--text-muted)]">
               还没有记忆条目。聊几次之后会自动积累。
             </div>
           )}
@@ -314,14 +314,14 @@ export const MemorySettingsSection: React.FC = () => {
             <div
               key={m.id}
               className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${
-                m.pinned ? 'border-[#c8b88a] bg-[#fdf9ed]' : 'border-[#e5e2dd] bg-white'
+                m.pinned ? 'border-[#c8b88a] bg-[#fdf9ed]' : 'border-[var(--border-light)] bg-white'
               }`}
             >
-              <span className="mt-0.5 shrink-0 rounded bg-[#f2efe9] px-1.5 py-0.5 text-[10px] text-[#6b7280]">
+              <span className="mt-0.5 shrink-0 rounded bg-[#f2efe9] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">
                 {KIND_LABELS[m.kind] ?? m.kind}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-sm text-[#2c2a27]">{m.content}</div>
+                <div className="text-sm text-[var(--text-primary)]">{m.content}</div>
                 <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[#b8b4ad]">
                   <span>{m.source === 'manual' ? '手动' : m.source === 'inferred' ? '自动提取' : '对话'}</span>
                   <span>置信 {(m.confidence * 100).toFixed(0)}%</span>
@@ -331,14 +331,14 @@ export const MemorySettingsSection: React.FC = () => {
               <button
                 onClick={() => void patchItem(m.id, { pinned: !m.pinned })}
                 title={m.pinned ? '取消锁定' : '锁定，防止自动更新覆盖'}
-                className="mt-0.5 shrink-0 rounded p-1 text-[#9ca3af] hover:bg-[#f2efe9] hover:text-[#2c2a27]"
+                className="mt-0.5 shrink-0 rounded p-1 text-[var(--text-muted)] hover:bg-[#f2efe9] hover:text-[var(--text-primary)]"
               >
                 {m.pinned ? <Lock size={13} /> : <Pin size={13} />}
               </button>
               <button
                 onClick={() => void removeItem(m.id)}
                 title="删除"
-                className="mt-0.5 shrink-0 rounded p-1 text-[#9ca3af] hover:bg-[#fdf3f0] hover:text-[#a33a26]"
+                className="mt-0.5 shrink-0 rounded p-1 text-[var(--text-muted)] hover:bg-[#fdf3f0] hover:text-[#a33a26]"
               >
                 <Trash2 size={13} />
               </button>

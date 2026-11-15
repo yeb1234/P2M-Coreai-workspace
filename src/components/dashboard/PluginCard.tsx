@@ -53,7 +53,7 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
 
   return (
     <div
-      className={`plugin-card ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-[#c87d2f] ring-offset-2 rounded-2xl' : ''}`}
+      className={`plugin-card ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-[var(--accent)] ring-offset-2 rounded-2xl' : ''}`}
       data-size={currentSize}
       draggable
       onDragStart={(e) => {

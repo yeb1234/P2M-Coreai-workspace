@@ -1,12 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { Download, Upload, Plus, Trash2, Clock, CalendarDays } from 'lucide-react';
+import { useState } from 'react';
+import { Download, Plus, Trash2, Clock, CalendarDays } from 'lucide-react';
 import { useUIStore } from '../../stores';
 import {
   BUILT_IN_THEME_IDS,
   THEME_PRESETS,
   applyTheme,
   generateThemeCss,
-  parseThemeVarsText,
   themeGroupLabel,
   type ThemeScheduleRule,
   WEEKDAY_LABELS,
@@ -19,13 +18,10 @@ import { ToggleSwitch, SettingsHint } from './SettingsPrimitives';
 export function AppearanceSettings() {
   const themeId = useUIStore((s) => s.themeId);
   const setTheme = useUIStore((s) => s.setTheme);
-  const setCustomTheme = useUIStore((s) => s.setCustomTheme);
   const themeScheduleEnabled = useUIStore((s) => s.themeScheduleEnabled);
   const setThemeScheduleEnabled = useUIStore((s) => s.setThemeScheduleEnabled);
   const themeScheduleRules = useUIStore((s) => s.themeScheduleRules);
   const setThemeScheduleRules = useUIStore((s) => s.setThemeScheduleRules);
-  const importRef = useRef<HTMLInputElement>(null);
-  const [importStatus, setImportStatus] = useState('');
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
 
   const handleThemeClick = (id: string, vars: typeof THEME_PRESETS[number]['vars']) => {
@@ -71,33 +67,6 @@ export function AppearanceSettings() {
     a.click();
     URL.revokeObjectURL(url);
     playInteractionSound('success');
-  };
-
-  const handleImportTheme = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const text = String(reader.result ?? '');
-        // Keep parsing centralized in themes.ts so CSS and JSON formats evolve together.
-        const vars = parseThemeVarsText(text);
-        if (!vars) {
-          setImportStatus('未识别出有效主题变量');
-          playInteractionSound('error');
-          return;
-        }
-        setCustomTheme(vars);
-        applyTheme('custom', vars);
-        setImportStatus('主题已导入');
-        playInteractionSound('success');
-      } catch {
-        setImportStatus('导入失败');
-        playInteractionSound('error');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   };
 
   const renderThemeButton = (t: (typeof THEME_PRESETS)[number]) => (
@@ -188,12 +157,7 @@ export function AppearanceSettings() {
           <button onClick={handleExportThemeJson} className="flex items-center gap-1 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--accent)]">
             <Download size={12} /> 导出 JSON 包
           </button>
-          <button onClick={() => importRef.current?.click()} className="flex items-center gap-1 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--accent)]">
-            <Upload size={12} /> 导入主题
-          </button>
-          <input ref={importRef} type="file" accept=".css,.json" onChange={handleImportTheme} className="hidden" />
         </div>
-        {importStatus && <p className="mt-2 text-[11px] text-[var(--text-muted)]">{importStatus}</p>}
       </div>
 
       {/* 自动主题调度 */}

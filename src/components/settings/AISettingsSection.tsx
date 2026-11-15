@@ -185,46 +185,46 @@ export function AISettings() {
     const options = modelOptions[target];
 
     return (
-      <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-3">
+      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-3">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
-            <p className="text-sm font-semibold text-[#1a1a1a]">{title}</p>
-            <p className="mt-0.5 text-[11px] text-[#8a8178]">{isLocal ? 'LM Studio / 本地 OpenAI 兼容服务。' : '网络 OpenAI 兼容服务，用于兜底或优先处理。'}</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+            <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{isLocal ? 'LM Studio / 本地 OpenAI 兼容服务。' : '网络 OpenAI 兼容服务，用于兜底或优先处理。'}</p>
           </div>
           {!isLocal && (
-            <button type="button" onClick={clearExternal} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#dc3545] hover:bg-[#fef2f2]" title="清空外部 LLM 设置">
+            <button type="button" onClick={clearExternal} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--danger)] hover:bg-[var(--danger-bg)]" title="清空外部 LLM 设置">
               <Trash2 size={14} />
             </button>
           )}
         </div>
         <div className="grid gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-[#6b7280]">接口地址</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">接口地址</label>
             <input
               value={form[baseKey]}
               onChange={(e) => updateForm({ [baseKey]: e.target.value } as Partial<AssistantRuntimeSettingsDto>)}
-              className="w-full rounded-lg border border-[#e5e2dd] bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm"
               placeholder={isLocal ? 'http://127.0.0.1:1234/v1' : 'https://example.com/v1'}
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-[#6b7280]">API Key</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">API Key</label>
             <input
               type="password"
               value={form[apiKey]}
               onChange={(e) => updateForm({ [apiKey]: e.target.value } as Partial<AssistantRuntimeSettingsDto>)}
-              className="w-full rounded-lg border border-[#e5e2dd] bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm"
               placeholder={isLocal ? 'lm-studio' : '外部服务 API Key'}
             />
           </div>
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <label className="block text-xs font-medium text-[#6b7280]">模型名</label>
+              <label className="block text-xs font-medium text-[var(--text-secondary)]">模型名</label>
               <button
                 type="button"
                 onClick={() => void scanModels(target)}
                 disabled={modelLoading !== null || !form[baseKey].trim()}
-                className="inline-flex items-center gap-1 text-xs text-[#6b7280] hover:text-[#c87d2f] disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] disabled:opacity-50"
                 title={modelListUrl(form[baseKey])}
               >
                 <RefreshCw size={12} className={modelLoading === target ? 'animate-spin' : ''} />
@@ -234,14 +234,14 @@ export function AISettings() {
             <select
               value={form[modelKey]}
               onChange={(e) => updateForm({ [modelKey]: e.target.value } as Partial<AssistantRuntimeSettingsDto>)}
-              className="w-full rounded-lg border border-[#e5e2dd] bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm"
             >
               {form[modelKey] && !options.includes(form[modelKey]) && <option value={form[modelKey]}>{form[modelKey]}</option>}
               {!form[modelKey] && <option value="">请选择模型</option>}
               {options.map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
-            {modelListUrl(form[baseKey]) && <p className="mt-1 text-[10px] text-[#9ca3af]">模型列表：<code>{modelListUrl(form[baseKey])}</code></p>}
-            {modelError[target] && <p className="mt-1 text-[10px] text-[#dc3545]">{modelError[target]}</p>}
+            {modelListUrl(form[baseKey]) && <p className="mt-1 text-[10px] text-[var(--text-muted)]">模型列表：<code>{modelListUrl(form[baseKey])}</code></p>}
+            {modelError[target] && <p className="mt-1 text-[10px] text-[var(--danger)]">{modelError[target]}</p>}
           </div>
         </div>
       </div>
@@ -255,41 +255,41 @@ export function AISettings() {
         {renderEndpointGroup('external')}
       </div>
 
-      <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-3">
-        <label className="mb-1.5 block text-xs font-medium text-[#6b7280]">兜底方案</label>
+      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-3">
+        <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">兜底方案</label>
         <select
           value={form.llm_usage_policy}
           onChange={(e) => updateForm({ llm_usage_policy: e.target.value as LlmUsagePolicy })}
-          className="w-full rounded-lg border border-[#e5e2dd] bg-white px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm"
         >
           {POLICY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
-        <p className="mt-1 text-[10px] text-[#9ca3af]">影响灵境小助手对话、视频总结和字幕校对。保存后新请求生效。</p>
+        <p className="mt-1 text-[10px] text-[var(--text-muted)]">影响灵境小助手对话、视频总结和字幕校对。保存后新请求生效。</p>
       </div>
 
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-[#6b7280]">系统提示词</label>
-        <textarea value={draftSystemPrompt} onChange={(e) => setDraftSystemPrompt(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-2 text-sm" />
+        <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">系统提示词</label>
+        <textarea value={draftSystemPrompt} onChange={(e) => setDraftSystemPrompt(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-sm" />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button onClick={() => void handleSave()} disabled={loading} className="flex items-center gap-1.5 rounded-lg bg-[#c87d2f] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#b06d24] disabled:opacity-50">
+        <button onClick={() => void handleSave()} disabled={loading} className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#b06d24] disabled:opacity-50">
           <Save size={14} /> 保存小助手设置
         </button>
-        <button onClick={() => void loadSettings()} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-[#e5e2dd] px-4 py-2 text-sm font-medium text-[#5f5a52] transition-colors hover:border-[#c87d2f] hover:text-[#c87d2f] disabled:opacity-50">
+        <button onClick={() => void loadSettings()} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-light)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> 重新读取
         </button>
-        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
-        {status && <span className="text-xs text-[#c87d2f]">{status}</span>}
+        {saved && <span className="text-xs text-[var(--success)]">已保存</span>}
+        {status && <span className="text-xs text-[var(--accent)]">{status}</span>}
       </div>
 
-      <div className="border-t border-[#e5e2dd] pt-4">
+      <div className="border-t border-[var(--border-light)] pt-4">
         <div className="mb-3 flex items-center justify-between">
-          <h4 className="text-sm font-medium text-[#1a1a1a]">提示词模板</h4>
+          <h4 className="text-sm font-medium text-[var(--text-primary)]">提示词模板</h4>
           <button
             type="button"
             onClick={addTemplate}
-            className="inline-flex items-center gap-1 rounded-md bg-[#16a34a] px-2.5 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-[#15803d]"
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--success)] px-2.5 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-[#15803d]"
           >
             <Plus className="h-3.5 w-3.5" />
             新建模板
@@ -305,8 +305,8 @@ export function AISettings() {
                 key={template.id}
                 className={`rounded-lg border p-3 transition-colors ${
                   isActive
-                    ? 'border-[#16a34a] bg-[#f0fdf4]'
-                    : 'border-[#d1cdc6] bg-white'
+                    ? 'border-[#16a34a] bg-[var(--success-bg)]'
+                    : 'border-[var(--border-medium)] bg-white'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -315,17 +315,17 @@ export function AISettings() {
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="flex-1 rounded-md border border-[#d1cdc6] px-2 py-1 text-sm outline-none focus:border-[#16a34a]"
+                      className="flex-1 rounded-md border border-[var(--border-medium)] px-2 py-1 text-sm outline-none focus:border-[#16a34a]"
                     />
                   ) : (
                     <button
                       type="button"
                       onClick={() => setActiveTemplateId(template.id)}
-                      className="flex-1 text-left text-sm font-medium text-[#292524] hover:text-[#16a34a]"
+                      className="flex-1 text-left text-sm font-medium text-[#292524] hover:text-[var(--success)]"
                     >
                       {template.name}
                       {isActive && (
-                        <span className="ml-2 text-xs text-[#16a34a]">(当前)</span>
+                        <span className="ml-2 text-xs text-[var(--success)]">(当前)</span>
                       )}
                     </button>
                   )}
@@ -339,7 +339,7 @@ export function AISettings() {
                             updateTemplate(template.id, { name: editName, content: editContent });
                             setEditingId(null);
                           }}
-                          className="rounded-md p-1 text-[#16a34a] hover:bg-[#dcfce7]"
+                          className="rounded-md p-1 text-[var(--success)] hover:bg-[#dcfce7]"
                           title="保存"
                         >
                           <Save className="h-4 w-4" />
@@ -347,7 +347,7 @@ export function AISettings() {
                         <button
                           type="button"
                           onClick={() => setEditingId(null)}
-                          className="rounded-md p-1 text-[#6b7280] hover:bg-[#f5f5f4]"
+                          className="rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-base)]"
                           title="取消"
                         >
                           <X className="h-4 w-4" />
@@ -362,7 +362,7 @@ export function AISettings() {
                             setEditName(template.name);
                             setEditContent(template.content);
                           }}
-                          className="rounded-md p-1 text-[#6b7280] hover:bg-[#f5f5f4]"
+                          className="rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-base)]"
                           title="编辑"
                         >
                           <Pencil className="h-4 w-4" />
@@ -387,13 +387,13 @@ export function AISettings() {
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={6}
-                    className="mt-2 w-full rounded-md border border-[#d1cdc6] bg-white px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-[#16a34a]"
+                    className="mt-2 w-full rounded-md border border-[var(--border-medium)] bg-white px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-[#16a34a]"
                     placeholder="在这里写提示词模板内容..."
                   />
                 )}
 
                 {!isEditing && (
-                  <div className="mt-1 text-xs text-[#6b7280] line-clamp-2">
+                  <div className="mt-1 text-xs text-[var(--text-secondary)] line-clamp-2">
                     {template.content}
                   </div>
                 )}
@@ -418,20 +418,20 @@ export function AISettings() {
               setActiveTemplateId(DEFAULT_PROMPT_TEMPLATES[0].id);
             }
           }}
-          className="mt-3 flex items-center gap-1.5 rounded-lg bg-[#f5f5f4] px-3 py-2 text-sm text-[#6b7280] transition-colors hover:bg-[#e7e5e4]"
+          className="mt-3 flex items-center gap-1.5 rounded-lg bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[#e7e5e4]"
         >
           <RotateCcw className="h-4 w-4" />
           重置为默认模板
         </button>
       </div>
 
-      <div className="space-y-3 border-t border-[#e5e2dd] pt-4">
+      <div className="space-y-3 border-t border-[var(--border-light)] pt-4">
         <div>
-          <h4 className="mb-1 text-sm font-medium text-[#1a1a1a]">连接测试</h4>
-          <p className="text-xs text-[#9ca3af]">这里不会保存对话，只用来确认所选接口是否能正常回复。</p>
+          <h4 className="mb-1 text-sm font-medium text-[var(--text-primary)]">连接测试</h4>
+          <p className="text-xs text-[var(--text-muted)]">这里不会保存对话，只用来确认所选接口是否能正常回复。</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select value={testTarget} onChange={(e) => setTestTarget(e.target.value as Target)} className="rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-2 text-sm">
+          <select value={testTarget} onChange={(e) => setTestTarget(e.target.value as Target)} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-sm">
             <option value="local">测试本地 LLM</option>
             <option value="external">测试外部 LLM</option>
           </select>
@@ -439,21 +439,21 @@ export function AISettings() {
         <textarea
           value={testInput}
           onChange={(e) => setTestInput(e.target.value)}
-          className="min-h-20 w-full resize-y rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-2 text-sm"
+          className="min-h-20 w-full resize-y rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-sm"
           placeholder="输入一句测试消息"
         />
         <div className="flex items-center gap-3">
           <button
             onClick={() => void handleTestAI()}
             disabled={testing || !testInput.trim()}
-            className="rounded-lg bg-[#c87d2f] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#b06d24] disabled:opacity-50"
+            className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#b06d24] disabled:opacity-50"
           >
             {testing ? '测试中...' : '发送测试'}
           </button>
-          {testError && <span className="text-xs text-[#dc3545]">{testError}</span>}
+          {testError && <span className="text-xs text-[var(--danger)]">{testError}</span>}
         </div>
         {testReply && (
-          <div className="whitespace-pre-wrap rounded-lg border border-[#e5e2dd] bg-[#faf9f7] p-3 text-sm leading-6 text-[#1a1a1a]">
+          <div className="whitespace-pre-wrap rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] p-3 text-sm leading-6 text-[var(--text-primary)]">
             {testReply}
           </div>
         )}

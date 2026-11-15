@@ -322,7 +322,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
                   );
                 }
                 if (s?.status === 'failed') {
-                  return <span className="text-[#dc3545]">下载失败，点击重试</span>;
+                  return <span className="text-[var(--danger)]">下载失败，点击重试</span>;
                 }
                 if (installed || s?.status === 'completed') {
                   return (

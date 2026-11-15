@@ -45,18 +45,18 @@ export const PomodoroSummary: React.FC = () => {
     <div className="space-y-3">
       {/* Goal progress */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-medium text-[#6b7280]">
+        <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
           <span>🍅</span>
           <span>今日番茄</span>
-          <span className="font-semibold text-[#c87d2f]">
+          <span className="font-semibold text-[var(--accent)]">
             {todayStats.totalPomodoros}
           </span>
         </div>
       </div>
       {hasTodoGoal && (
-        <div className="w-full bg-[#e5e2dd] rounded-full h-1.5">
+        <div className="w-full bg-[var(--border-light)] rounded-full h-1.5">
           <div
-            className="bg-gradient-to-r from-[#c87d2f] to-[#e0973f] h-1.5 rounded-full transition-all duration-500"
+            className="bg-gradient-to-r from-[var(--accent)] to-[var(--accent)] h-1.5 rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -66,23 +66,23 @@ export const PomodoroSummary: React.FC = () => {
       <div className="grid grid-cols-2 gap-2">
         {mode === 'pomodoro' ? (
           <>
-            <div className="bg-[#fef7ed] rounded-lg p-2.5 text-center">
-              <p className="text-xl font-bold text-[#c87d2f]">{todayStats.totalPomodoros}</p>
+            <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
+              <p className="text-xl font-bold text-[var(--accent)]">{todayStats.totalPomodoros}</p>
               <p className="text-[10px] font-medium text-[#92400e]">番茄数</p>
             </div>
-            <div className="bg-[#fef7ed] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
               <p className="text-xl font-bold text-[#b06d20]">{formatDuration(todayStats.totalMinutes)}</p>
               <p className="text-[10px] font-medium text-[#92400e]">专注时长</p>
             </div>
           </>
         ) : (
           <>
-            <div className="bg-[#fef7ed] rounded-lg p-2.5 text-center">
-              <p className="text-xl font-bold text-[#16a34a]">{todoStats.completed}/{todoStats.total}</p>
+            <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
+              <p className="text-xl font-bold text-[var(--success)]">{todoStats.completed}/{todoStats.total}</p>
               <p className="text-[10px] font-medium text-[#166534]">已完成</p>
             </div>
-            <div className="bg-[#fef7ed] rounded-lg p-2.5 text-center">
-              <p className="text-xl font-bold text-[#c87d2f]">{todoStats.inProgress}</p>
+            <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
+              <p className="text-xl font-bold text-[var(--accent)]">{todoStats.inProgress}</p>
               <p className="text-[10px] font-medium text-[#92400e]">进行中</p>
             </div>
           </>
@@ -92,7 +92,7 @@ export const PomodoroSummary: React.FC = () => {
       {/* Mode toggle */}
       <button
         onClick={toggleMode}
-        className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] text-[#b8b4ac] hover:text-[#c87d2f] hover:bg-[#fef7ed] rounded-lg transition-colors"
+        className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-accent)] rounded-lg transition-colors"
       >
         {mode === 'pomodoro' ? (
           <><ListTodo size={10} /> 切换到待办视图</>
@@ -103,7 +103,7 @@ export const PomodoroSummary: React.FC = () => {
 
       {/* Running timer */}
       {timer.status === 'running' && (
-        <div className="flex items-center gap-2 text-xs font-medium text-[#c87d2f] bg-[#fef7ed] rounded-lg p-2 border border-[#e5e2dd]">
+        <div className="flex items-center gap-2 text-xs font-medium text-[var(--accent)] bg-[var(--bg-accent)] rounded-lg p-2 border border-[var(--border-light)]">
           <Timer size={14} className="animate-pulse" />
           <span>{PHASE_LABELS[timer.phase]}</span>
           <span className="ml-auto font-mono text-sm font-bold">
@@ -115,7 +115,7 @@ export const PomodoroSummary: React.FC = () => {
 
       {/* No sessions today */}
       {todayStats.totalPomodoros === 0 && timer.status !== 'running' && mode === 'pomodoro' && (
-        <p className="text-xs text-[#b8b4ac] text-center py-1">今天还没有专注记录</p>
+        <p className="text-xs text-[var(--text-muted)] text-center py-1">今天还没有专注记录</p>
       )}
     </div>
   );

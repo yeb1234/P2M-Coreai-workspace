@@ -21,29 +21,29 @@ export const OpenClawPage: React.FC = () => {
       />
 
       <div className="relative max-w-xl">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
-        <input type="text" placeholder="搜索 npm / pip / cargo 包..." className="w-full pl-10 pr-4 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl text-sm outline-none" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+        <input type="text" placeholder="搜索 npm / pip / cargo 包..." className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl text-sm outline-none" />
       </div>
 
       <div className="space-y-3">
         {MOCK_PACKAGES.map((pkg) => (
-          <div key={pkg.name} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
+          <div key={pkg.name} className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
-                <Package size={16} className="text-[#dc3545]" />
-                <h3 className="text-sm font-semibold text-[#1a1a1a] group-hover:text-[#dc3545] transition-colors">{pkg.name}</h3>
-                <span className="text-[10px] px-1.5 py-0.5 bg-[#f3f2ef] text-[#6b7280] rounded font-mono">v{pkg.version}</span>
+                <Package size={16} className="text-[var(--danger)]" />
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--danger)] transition-colors">{pkg.name}</h3>
+                <span className="text-[10px] px-1.5 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded font-mono">v{pkg.version}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-1.5 text-[#b8b4ac] hover:text-[#16a34a] hover:bg-[#f0fdf4] rounded-md"><Download size={14} /></button>
-                <ExternalLink size={14} className="text-[#d1cdc6] group-hover:text-[#6b7280]" />
+                <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--success)] hover:bg-[var(--success-bg)] rounded-md"><Download size={14} /></button>
+                <ExternalLink size={14} className="text-[var(--border-medium)] group-hover:text-[var(--text-secondary)]" />
               </div>
             </div>
-            <p className="text-xs text-[#6b7280] mt-1.5">{pkg.desc}</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1.5">{pkg.desc}</p>
             <div className="flex items-center gap-4 mt-2">
-              <span className="text-[10px] text-[#9ca3af] flex items-center gap-1"><Star size={10} className="text-[#f59e0b]" />{(pkg.stars / 1000).toFixed(0)}k</span>
-              <span className="text-[10px] text-[#9ca3af] flex items-center gap-1"><Download size={10} />{pkg.downloads}</span>
-              <span className="text-[10px] px-1.5 py-0.5 bg-[#fef7ed] text-[#c87d2f] rounded-full">{pkg.tag}</span>
+              <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1"><Star size={10} className="text-[var(--warn)]" />{(pkg.stars / 1000).toFixed(0)}k</span>
+              <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1"><Download size={10} />{pkg.downloads}</span>
+              <span className="text-[10px] px-1.5 py-0.5 bg-[var(--bg-accent)] text-[var(--accent)] rounded-full">{pkg.tag}</span>
             </div>
           </div>
         ))}

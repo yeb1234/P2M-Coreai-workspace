@@ -40,9 +40,9 @@ export function Slider({ value, min, max, step, onChange, className = '', dark =
       className={`relative h-[6px] rounded-full cursor-pointer group/slider ${dark ? 'bg-white/20' : 'bg-[#d1cdc6]'} ${className}`}
       onMouseDown={handleDown}
     >
-      <div className={`absolute inset-y-0 left-0 rounded-full ${dark ? 'bg-white/70' : 'bg-[#c87d2f]'}`} style={{ width: `${pct}%` }} />
+      <div className={`absolute inset-y-0 left-0 rounded-full ${dark ? 'bg-white/70' : 'bg-[var(--accent)]'}`} style={{ width: `${pct}%` }} />
       <div
-        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full shadow-sm border-2 pointer-events-none opacity-0 group-hover/slider:opacity-100 transition-opacity ${dark ? 'bg-white border-white/50' : 'bg-[#c87d2f] border-white'}`}
+        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full shadow-sm border-2 pointer-events-none opacity-0 group-hover/slider:opacity-100 transition-opacity ${dark ? 'bg-white border-white/50' : 'bg-[var(--accent)] border-white'}`}
         style={{ left: `calc(${pct}% - 6px)` }}
       />
     </div>

@@ -30,7 +30,7 @@ const VARS = {
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
   }, VARS);
   await p.waitForTimeout(1200);
-  await p.screenshot({ path: 'test-results/theme-scholar-home.png' });
+  await p.screenshot({ path: 'test-results/vars-scholar-home.png' });
 
   await p.goto('http://localhost/#/journey', { waitUntil: 'domcontentloaded' });
   await p.waitForTimeout(2500);
@@ -40,7 +40,7 @@ const VARS = {
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
   }, VARS);
   await p.waitForTimeout(900);
-  await p.screenshot({ path: 'test-results/theme-scholar-journey.png' });
+  await p.screenshot({ path: 'test-results/vars-scholar-journey.png' });
   console.log('主题截图完成');
   await b.close();
 })().catch((e) => { console.error(e.message); process.exit(1); });

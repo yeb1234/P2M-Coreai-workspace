@@ -287,18 +287,18 @@ function VideoPlayerView() {
     <div className="space-y-4 px-0">
       {/* Header - hidden on mobile */}
       <div className="hidden md:flex items-center gap-3">
-        <button onClick={clearSelection} className="p-2 rounded-lg hover:bg-[#f3f2ef] text-[#6b7280] transition-colors">
+        <button onClick={clearSelection} className="p-2 rounded-lg hover:bg-[var(--bg-base)] text-[var(--text-secondary)] transition-colors">
           <ArrowLeft size={18} />
         </button>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-semibold text-[#1a1a1a] truncate">{currentVideo.title}</h2>
-          <p className="text-xs text-[#9ca3af]">{currentVideo.filename}</p>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] truncate">{currentVideo.title}</h2>
+          <p className="text-xs text-[var(--text-muted)]">{currentVideo.filename}</p>
         </div>
       </div>
 
       {/* Mobile: back button */}
       {isMobile && (
-        <button onClick={clearSelection} className="p-1.5 text-[#6b7280] hover:text-[#1a1a1a] transition-colors" title="返回列表">
+        <button onClick={clearSelection} className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" title="返回列表">
           <ArrowLeft size={18} />
         </button>
       )}

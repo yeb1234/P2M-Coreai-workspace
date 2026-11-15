@@ -26,50 +26,50 @@ export const InterviewPage: React.FC = () => {
 
       {/* Stats */}
       <div className="auto-grid-compact">
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
-          <BookOpen size={20} className="text-[#2563eb] mx-auto mb-2" />
-          <p className="text-xl font-bold text-[#1a1a1a]">156</p>
-          <p className="text-[10px] text-[#9ca3af]">总题数</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
+          <BookOpen size={20} className="text-[var(--info)] mx-auto mb-2" />
+          <p className="text-xl font-bold text-[var(--text-primary)]">156</p>
+          <p className="text-[10px] text-[var(--text-muted)]">总题数</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
-          <CheckCircle size={20} className="text-[#16a34a] mx-auto mb-2" />
-          <p className="text-xl font-bold text-[#1a1a1a]">89</p>
-          <p className="text-[10px] text-[#9ca3af]">已掌握</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
+          <CheckCircle size={20} className="text-[var(--success)] mx-auto mb-2" />
+          <p className="text-xl font-bold text-[var(--text-primary)]">89</p>
+          <p className="text-[10px] text-[var(--text-muted)]">已掌握</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
-          <Star size={20} className="text-[#f59e0b] mx-auto mb-2" />
-          <p className="text-xl font-bold text-[#1a1a1a]">23</p>
-          <p className="text-[10px] text-[#9ca3af]">收藏</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
+          <Star size={20} className="text-[var(--warn)] mx-auto mb-2" />
+          <p className="text-xl font-bold text-[var(--text-primary)]">23</p>
+          <p className="text-[10px] text-[var(--text-muted)]">收藏</p>
         </div>
       </div>
 
       {/* Category tabs */}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {CATEGORIES.map((c) => (
-          <button key={c} className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-colors ${c === '全部' ? 'bg-[#fef7ed] text-[#c87d2f]' : 'text-[#6b7280] hover:bg-[#f3f2ef]'}`}>
+          <button key={c} className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-colors ${c === '全部' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-base)]'}`}>
             {c}
           </button>
         ))}
       </div>
 
       {/* Questions */}
-      <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl overflow-hidden">
-        <div className="divide-y divide-[#e5e2dd]">
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl overflow-hidden">
+        <div className="divide-y divide-[var(--border-light)]">
           {MOCK_QUESTIONS.map((item, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-3.5 hover:bg-[#fef7ed] transition-colors cursor-pointer group">
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center ${item.starred ? 'bg-[#f59e0b]' : 'bg-[#e5e2dd]'}`}>
+            <div key={i} className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--bg-accent)] transition-colors cursor-pointer group">
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center ${item.starred ? 'bg-[var(--warn)]' : 'bg-[var(--border-light)]'}`}>
                 {item.starred && <Star size={10} className="text-white" />}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-[#1a1a1a] group-hover:text-[#c87d2f] transition-colors">{item.q}</p>
+                <p className="text-sm text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{item.q}</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] px-1.5 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded">{item.category}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${item.difficulty === '高频' ? 'bg-[#fef2f2] text-[#dc3545]' : item.difficulty === '中频' ? 'bg-[#fef7ed] text-[#c87d2f]' : 'bg-[#f3f2ef] text-[#9ca3af]'}`}>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-[var(--info-bg)] text-[var(--info)] rounded">{item.category}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${item.difficulty === '高频' ? 'bg-[var(--danger-bg)] text-[var(--danger)]' : item.difficulty === '中频' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' : 'bg-[var(--bg-base)] text-[var(--text-muted)]'}`}>
                     {item.difficulty}
                   </span>
                 </div>
               </div>
-              <ChevronRight size={14} className="text-[#d1cdc6] group-hover:text-[#6b7280]" />
+              <ChevronRight size={14} className="text-[var(--border-medium)] group-hover:text-[var(--text-secondary)]" />
             </div>
           ))}
         </div>

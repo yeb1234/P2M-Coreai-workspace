@@ -32,29 +32,29 @@ export const TodoSummary: React.FC = () => {
   return (
     <div className="space-y-3">
       <div className="auto-grid-compact text-center">
-        <div className="bg-[#fef7ed] rounded-lg p-2">
-          <p className="text-xl font-bold text-[#c87d2f]">{pending}</p>
+        <div className="bg-[var(--bg-accent)] rounded-lg p-2">
+          <p className="text-xl font-bold text-[var(--accent)]">{pending}</p>
           <p className="text-[10px] font-medium text-[#92400e]">待处理</p>
         </div>
-        <div className="bg-[#eff6ff] rounded-lg p-2">
-          <p className="text-xl font-bold text-[#2563eb]">{inProgress}</p>
+        <div className="bg-[var(--info-bg)] rounded-lg p-2">
+          <p className="text-xl font-bold text-[var(--info)]">{inProgress}</p>
           <p className="text-[10px] font-medium text-[#1e40af]">进行中</p>
         </div>
-        <div className="bg-[#f0fdf4] rounded-lg p-2">
-          <p className="text-xl font-bold text-[#16a34a]">{completed}</p>
+        <div className="bg-[var(--success-bg)] rounded-lg p-2">
+          <p className="text-xl font-bold text-[var(--success)]">{completed}</p>
           <p className="text-[10px] font-medium text-[#166534]">已完成</p>
         </div>
       </div>
 
       {total > 0 && (
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-[#6b7280]">
+          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
             <span>完成度</span>
-            <span className="font-semibold text-[#1a1a1a]">{completionRate}%</span>
+            <span className="font-semibold text-[var(--text-primary)]">{completionRate}%</span>
           </div>
-          <div className="w-full bg-[#e5e2dd] rounded-full h-1.5">
+          <div className="w-full bg-[var(--border-light)] rounded-full h-1.5">
             <div
-              className="bg-gradient-to-r from-[#c87d2f] to-[#e0973f] h-1.5 rounded-full transition-all duration-500"
+              className="bg-gradient-to-r from-[var(--accent)] to-[var(--accent)] h-1.5 rounded-full transition-all duration-500"
               style={{ width: `${completionRate}%` }}
             />
           </div>
@@ -62,7 +62,7 @@ export const TodoSummary: React.FC = () => {
       )}
 
       <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-[#6b7280]">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
           <ListTodo size={12} />
           <span>待办优先</span>
         </div>
@@ -73,7 +73,7 @@ export const TodoSummary: React.FC = () => {
             <div
               key={todo.id}
               className={`flex items-center gap-2 text-xs p-2 rounded-lg cursor-pointer hover:shadow-sm transition-all ${
-                isLast ? 'hover:bg-[#fef7ed]' : ''
+                isLast ? 'hover:bg-[var(--bg-accent)]' : ''
               }`}
               style={{
                 background: `linear-gradient(135deg, ${color}20 0%, ${color}08 100%)`,
@@ -83,19 +83,19 @@ export const TodoSummary: React.FC = () => {
                 if (isLast) setActiveView('todo');
               }}
             >
-              <span className={`truncate ${isLast ? 'text-[#b8b4ac]' : 'text-[#1a1a1a]'} font-medium`}>
+              <span className={`truncate ${isLast ? 'text-[var(--text-muted)]' : 'text-[var(--text-primary)]'} font-medium`}>
                 {isLast ? `...还有 ${urgentTodos.length - 2} 项` : todo.title}
               </span>
             </div>
           );
         })}
         {urgentTodos.length === 0 && (
-          <p className="text-xs text-[#b8b4ac] text-center py-2">暂无待办</p>
+          <p className="text-xs text-[var(--text-muted)] text-center py-2">暂无待办</p>
         )}
       </div>
 
       {overdue > 0 && (
-        <div className="flex items-center gap-2 text-[#dc3545] text-xs bg-[#fef2f2] rounded-lg p-2 font-medium">
+        <div className="flex items-center gap-2 text-[var(--danger)] text-xs bg-[var(--danger-bg)] rounded-lg p-2 font-medium">
           <AlertCircle size={14} />
           <span>{overdue} 项已过期</span>
         </div>

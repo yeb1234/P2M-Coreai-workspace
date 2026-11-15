@@ -21,8 +21,8 @@ export function SettingsNav<TSectionId extends string>({ sections, activeSection
           onClick={() => onSelect(section.id)}
           className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-all md:shrink ${
             activeSection === section.id
-              ? 'bg-[#fef7ed] text-[#c87d2f] font-medium'
-              : 'text-[#6b7280] hover:bg-[#f3f2ef] hover:text-[#1a1a1a]'
+              ? 'bg-[var(--bg-accent)] text-[var(--accent)] font-medium'
+              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-base)] hover:text-[var(--text-primary)]'
           }`}
         >
           {section.icon}

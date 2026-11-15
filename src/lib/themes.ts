@@ -191,7 +191,7 @@ export function generateThemeCss(themeId: string, vars: ThemeVars): string {
     '',
     '/*',
     '  排查提示：',
-    '  - 看到亮白块，优先搜索 bg-white、bg-[#faf9f7]、bg-[#f3f2ef]。',
+    '  - 看到亮白块，优先搜索 bg-white、bg-[var(--bg-elevated)]、bg-[var(--bg-base)]。',
     '  - 文字看不清，优先调整 --text-primary 和 --text-secondary。',
     '  - 分割线太硬，降低 --border-medium 或改用 --border-light。',
     '  - 选中态太刺眼，调低 --accent 或加深 --accent-bg。',

@@ -26,56 +26,56 @@ export const ShopPage: React.FC = () => {
 
       {/* Stats */}
       <div className="auto-grid-cards">
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#16a34a] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--success)] mb-2">
             <DollarSign size={16} />
             <span className="text-xs font-medium">今日收入</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">¥12,580</p>
-          <p className="text-[10px] text-[#16a34a] mt-1 flex items-center gap-1">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">¥12,580</p>
+          <p className="text-[10px] text-[var(--success)] mt-1 flex items-center gap-1">
             <ArrowUpRight size={10} /> +15% vs 昨日
           </p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#dc3545] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--danger)] mb-2">
             <TrendingDown size={16} />
             <span className="text-xs font-medium">今日支出</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">¥3,200</p>
-          <p className="text-[10px] text-[#dc3545] mt-1 flex items-center gap-1">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">¥3,200</p>
+          <p className="text-[10px] text-[var(--danger)] mt-1 flex items-center gap-1">
             <ArrowDownRight size={10} /> -5% vs 昨日
           </p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#2563eb] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--info)] mb-2">
             <Package size={16} />
             <span className="text-xs font-medium">待发货</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">8 单</p>
-          <p className="text-[10px] text-[#9ca3af] mt-1">需尽快处理</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">8 单</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">需尽快处理</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#f59e0b] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--warn)] mb-2">
             <AlertTriangle size={16} />
             <span className="text-xs font-medium">售后处理</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">3 件</p>
-          <p className="text-[10px] text-[#dc3545] mt-1">1 件退款待审</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">3 件</p>
+          <p className="text-[10px] text-[var(--danger)] mt-1">1 件退款待审</p>
         </div>
       </div>
 
       {/* Alerts */}
-      <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-        <h3 className="text-sm font-medium text-[#1a1a1a] mb-3 flex items-center gap-2">
-          <AlertTriangle size={14} className="text-[#f59e0b]" />
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3 flex items-center gap-2">
+          <AlertTriangle size={14} className="text-[var(--warn)]" />
           预警通知
         </h3>
         <div className="space-y-2">
           {MOCK_ALERTS.map((alert, i) => (
             <div key={i} className={`flex items-center gap-3 p-3 rounded-lg text-xs ${
-              alert.type === 'error' ? 'bg-[#fef2f2] text-[#dc3545]' :
-              alert.type === 'warning' ? 'bg-[#fef7ed] text-[#c87d2f]' :
-              'bg-[#eff6ff] text-[#2563eb]'
+              alert.type === 'error' ? 'bg-[var(--danger-bg)] text-[var(--danger)]' :
+              alert.type === 'warning' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' :
+              'bg-[var(--info-bg)] text-[var(--info)]'
             }`}>
               <span className="flex-1">{alert.msg}</span>
               <span className="text-[10px] opacity-60">{alert.time}</span>
@@ -85,43 +85,43 @@ export const ShopPage: React.FC = () => {
       </div>
 
       {/* Orders table */}
-      <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-[#e5e2dd]">
-          <h3 className="text-sm font-medium text-[#1a1a1a] flex items-center gap-2">
-            <Truck size={14} className="text-[#6b7280]" />
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-[var(--border-light)]">
+          <h3 className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
+            <Truck size={14} className="text-[var(--text-secondary)]" />
             最近订单
           </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[#f3f2ef]">
-                <th className="text-left px-4 py-2 font-medium text-[#6b7280]">订单号</th>
-                <th className="text-left px-4 py-2 font-medium text-[#6b7280]">客户</th>
-                <th className="text-left px-4 py-2 font-medium text-[#6b7280]">商品</th>
-                <th className="text-right px-4 py-2 font-medium text-[#6b7280]">金额</th>
-                <th className="text-left px-4 py-2 font-medium text-[#6b7280]">状态</th>
-                <th className="text-left px-4 py-2 font-medium text-[#6b7280]">物流</th>
+              <tr className="bg-[var(--bg-base)]">
+                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">订单号</th>
+                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">客户</th>
+                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">商品</th>
+                <th className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">金额</th>
+                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">状态</th>
+                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">物流</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e5e2dd]">
+            <tbody className="divide-y divide-[var(--border-light)]">
               {MOCK_ORDERS.map((order) => (
-                <tr key={order.id} className="hover:bg-[#fef7ed]">
-                  <td className="px-4 py-2.5 font-mono text-[#6b7280]">{order.id}</td>
-                  <td className="px-4 py-2.5 text-[#1a1a1a]">{order.customer}</td>
-                  <td className="px-4 py-2.5 text-[#1a1a1a]">{order.product}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-[#1a1a1a]">¥{order.amount}</td>
+                <tr key={order.id} className="hover:bg-[var(--bg-accent)]">
+                  <td className="px-4 py-2.5 font-mono text-[var(--text-secondary)]">{order.id}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-primary)]">{order.customer}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-primary)]">{order.product}</td>
+                  <td className="px-4 py-2.5 text-right font-medium text-[var(--text-primary)]">¥{order.amount}</td>
                   <td className="px-4 py-2.5">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                      order.status === '已发货' ? 'bg-[#eff6ff] text-[#2563eb]' :
-                      order.status === '待发货' ? 'bg-[#fef7ed] text-[#c87d2f]' :
-                      order.status === '已签收' ? 'bg-[#f0fdf4] text-[#16a34a]' :
-                      'bg-[#fef2f2] text-[#dc3545]'
+                      order.status === '已发货' ? 'bg-[var(--info-bg)] text-[var(--info)]' :
+                      order.status === '待发货' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' :
+                      order.status === '已签收' ? 'bg-[var(--success-bg)] text-[var(--success)]' :
+                      'bg-[var(--danger-bg)] text-[var(--danger)]'
                     }`}>
                       {order.status}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-[#9ca3af] font-mono">{order.logistics}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-muted)] font-mono">{order.logistics}</td>
                 </tr>
               ))}
             </tbody>

@@ -226,15 +226,15 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       className="space-y-3 md:space-y-4"
     >
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">
-          标题 <span className="text-[#dc3545]">*</span>
+        <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">
+          标题 <span className="text-[var(--danger)]">*</span>
         </label>
         <input
           type="text"
           value={title}
           onChange={(event) => handleTitleChange(event.target.value)}
           onKeyDown={handleTitleKeyDown}
-          className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+          className="w-full px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           placeholder="输入标题，快捷：/g 绿 /p 粉 /y 黄 /b 蓝"
           autoFocus
           required
@@ -242,20 +242,20 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       </div>
 
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">描述</label>
+        <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">描述</label>
         <textarea
           ref={descriptionInputRef}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           onKeyDown={handleDescriptionKeyDown}
-          className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all resize-none bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+          className="w-full px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all resize-none bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           placeholder={noteEnterBehavior === 'enter_save' ? '添加描述（可选）... Enter 保存，Alt+Enter 换行' : '添加描述（可选）... Enter 换行，Alt+Enter 保存'}
           rows={2}
         />
       </div>
 
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1.5">便签颜色</label>
+        <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1.5">便签颜色</label>
         <div className="flex gap-1.5 md:gap-2">
           {priorities.map((item) => (
             <button
@@ -278,7 +278,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       </div>
 
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">开始时间</label>
+        <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">开始时间</label>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <input
@@ -289,7 +289,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
                 if (!dueDate) setDueDate(event.target.value);
               }}
               onFocus={handleStartDateFocus}
-              className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+              className="w-full px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
             />
             <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
           </div>
@@ -299,13 +299,13 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
             onChange={(event) => setStartTime(event.target.value)}
             onFocus={handleStartTimeFocus}
             step="60"
-            className="w-28 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+            className="w-28 px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">截止时间</label>
+        <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">截止时间</label>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <input
@@ -313,7 +313,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
               onFocus={handleDueDateFocus}
-              className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+              className="w-full px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
             />
             <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
           </div>
@@ -323,21 +323,21 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
             onChange={(event) => setEndTime(event.target.value)}
             onFocus={handleEndTimeFocus}
             step="60"
-            className="w-28 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+            className="w-28 px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           />
         </div>
         <p className="mt-1 text-[10px] md:text-xs text-[var(--text-muted)]">开始和截止时间会按分钟写入数据库。</p>
       </div>
 
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[#6b7280] mb-1">
+        <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">
           预计番茄钟数量
         </label>
         <div className="flex items-center gap-2">
           <select
             value={pomodoroCount}
             onChange={(event) => handlePomodoroCountChange(Number(event.target.value))}
-            className="flex-1 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+            className="flex-1 px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           >
             {ALLOWED_POMODORO_ROUNDS.map((n) => (
               <option key={n} value={n}>
@@ -371,7 +371,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
                 type="date"
                 value={reminderDate}
                 onChange={(event) => setReminderDate(event.target.value)}
-                className="w-full px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+                className="w-full px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
               />
               <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
             </div>
@@ -380,7 +380,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
               value={reminderTime}
               onChange={(event) => setReminderTime(event.target.value)}
               step="60"
-              className="w-28 px-3 py-1.5 md:py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
+              className="w-28 px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
             />
           </div>
         )}

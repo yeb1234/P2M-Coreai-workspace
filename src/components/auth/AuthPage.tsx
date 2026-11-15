@@ -64,20 +64,20 @@ export const AuthPage: React.FC = () => {
         </div>
 
         {/* Card */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-[#e5e2dd] p-6">
-          <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4 flex items-center gap-2">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-[var(--border-light)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
             {isRegister ? <UserPlus size={18} /> : <LogIn size={18} />}
             {isRegister ? '注册账号' : '登录'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-[#6b7280] mb-1">用户名</label>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">用户名</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10 transition-colors"
+                className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
                 placeholder="输入用户名"
                 autoFocus
                 autoComplete="username"
@@ -85,12 +85,12 @@ export const AuthPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#6b7280] mb-1">密码</label>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">密码</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10 transition-colors"
+                className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
                 placeholder={isRegister ? '至少 8 位，含字母和数字' : '输入密码'}
                 autoComplete={isRegister ? 'new-password' : 'current-password'}
               />
@@ -98,12 +98,12 @@ export const AuthPage: React.FC = () => {
 
             {isRegister && (
               <div>
-                <label className="block text-xs font-medium text-[#6b7280] mb-1">确认密码</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">确认密码</label>
                 <input
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10 transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
                   placeholder="再次输入密码"
                   autoComplete="new-password"
                 />
@@ -116,20 +116,20 @@ export const AuthPage: React.FC = () => {
                   type="checkbox"
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-[#d1cdc6] text-[#c87d2f] focus:ring-[#c87d2f]/20"
+                  className="w-3.5 h-3.5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]/20"
                 />
-                <span className="text-xs text-[#6b7280]">记住密码</span>
+                <span className="text-xs text-[var(--text-secondary)]">记住密码</span>
               </label>
             )}
 
             {error && (
-              <p className="text-xs text-[#dc3545] bg-[#dc3545]/5 px-3 py-2 rounded-lg">{error}</p>
+              <p className="text-xs text-[var(--danger)] bg-[var(--danger)]/5 px-3 py-2 rounded-lg">{error}</p>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] disabled:opacity-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : isRegister ? <UserPlus size={16} /> : <LogIn size={16} />}
               {isRegister ? '注册' : '登录'}
@@ -139,7 +139,7 @@ export const AuthPage: React.FC = () => {
           <div className="mt-4 text-center">
             <button
               onClick={toggleMode}
-              className="text-xs text-[#8b7355] hover:text-[#c87d2f] transition-colors"
+              className="text-xs text-[#8b7355] hover:text-[var(--accent)] transition-colors"
             >
               {isRegister ? '已有账号？去登录' : '没有账号？去注册'}
             </button>

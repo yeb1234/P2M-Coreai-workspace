@@ -39,7 +39,7 @@ export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children })
               key={item.value}
               onClick={() => setFilter({ status: item.value })}
               className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${
-                filter.status === item.value ? 'bg-[#c87d2f] text-white' : 'bg-[#f3f2ef] text-[#6b7280]'
+                filter.status === item.value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'
               }`}
             >
               {item.label}
@@ -52,7 +52,7 @@ export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children })
               key={item.value || 'all'}
               onClick={() => setFilter({ priority: item.value })}
               className={`px-2 py-0.5 text-[10px] rounded-full transition-colors flex items-center gap-1 ${
-                filter.priority === item.value ? 'text-white' : 'bg-[#f3f2ef] text-[#6b7280]'
+                filter.priority === item.value ? 'text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'
               }`}
               style={{ backgroundColor: filter.priority === item.value ? (item.value ? PRIORITY_COLORS[item.value] : '#c87d2f') : undefined }}
             >
@@ -70,27 +70,27 @@ export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children })
     return (
       <div className="hidden md:block space-y-2">
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
             value={filter.searchQuery}
             onChange={(event) => setFilter({ searchQuery: event.target.value })}
-            className="w-full pl-9 pr-3 py-2 border border-[#e5e2dd] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all text-sm bg-[#faf9f7]"
+            className="w-full pl-9 pr-3 py-2 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all text-sm bg-[var(--bg-elevated)]"
             placeholder="搜索待办事项..."
           />
         </div>
 
         <div className="flex flex-wrap gap-2">
           <div className="flex items-center gap-1.5">
-            <Filter size={14} className="text-[#9ca3af]" />
-            <span className="text-xs text-[#6b7280]">状态</span>
+            <Filter size={14} className="text-[var(--text-muted)]" />
+            <span className="text-xs text-[var(--text-secondary)]">状态</span>
           </div>
           {statuses.map((item) => (
             <button
               key={item.value}
               onClick={() => setFilter({ status: item.value })}
               className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
-                filter.status === item.value ? 'bg-[#c87d2f] text-white' : 'bg-[#f3f2ef] text-[#6b7280] hover:bg-[#e5e2dd]'
+                filter.status === item.value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)] hover:bg-[var(--border-light)]'
               }`}
             >
               {item.label}
@@ -100,15 +100,15 @@ export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children })
 
         <div className="flex flex-wrap gap-2">
           <div className="flex items-center gap-1.5">
-            <Filter size={14} className="text-[#9ca3af]" />
-            <span className="text-xs text-[#6b7280]">便签</span>
+            <Filter size={14} className="text-[var(--text-muted)]" />
+            <span className="text-xs text-[var(--text-secondary)]">便签</span>
           </div>
           {priorities.map((item) => (
             <button
               key={item.value || 'all'}
               onClick={() => setFilter({ priority: item.value })}
               className={`px-2.5 py-1 text-xs rounded-full transition-colors flex items-center gap-1.5 ${
-                filter.priority === item.value ? 'text-white' : 'bg-[#f3f2ef] text-[#6b7280] hover:bg-[#e5e2dd]'
+                filter.priority === item.value ? 'text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)] hover:bg-[var(--border-light)]'
               }`}
               style={{ backgroundColor: filter.priority === item.value ? (item.value ? PRIORITY_COLORS[item.value] : '#c87d2f') : undefined }}
             >

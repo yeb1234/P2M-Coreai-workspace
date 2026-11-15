@@ -46,7 +46,7 @@ function PlaylistRow({ item, currentVideo, isPlaying, onSelectItem }: PlaylistRo
         {item.thumbnail ? (
           <img src={getThumbnailUrl(item.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
         ) : (
-          <PlayCircle size={16} className="absolute inset-0 m-auto text-[#b8b4ac]" />
+          <PlayCircle size={16} className="absolute inset-0 m-auto text-[var(--text-muted)]" />
         )}
         {isCurrent && isPlaying && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
@@ -62,7 +62,7 @@ function PlaylistRow({ item, currentVideo, isPlaying, onSelectItem }: PlaylistRo
         <p className={`truncate text-xs ${isCurrent ? 'font-medium text-[var(--accent)]' : 'theme-text-primary'}`}>
           {item.title}
         </p>
-        {item.completed && <span className="text-[9px] text-[#16a34a]">已看完</span>}
+        {item.completed && <span className="text-[9px] text-[var(--success)]">已看完</span>}
         {progressPercent !== null && !item.completed && (
           <div className="theme-progress-track mt-1 h-0.5 overflow-hidden rounded-full">
             <div className="theme-progress-fill h-full rounded-full" style={{ width: `${progressPercent}%` }} />

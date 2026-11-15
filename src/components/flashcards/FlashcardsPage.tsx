@@ -18,7 +18,7 @@ export const FlashcardsPage: React.FC = () => {
         subtitle="间隔重复，高效记忆"
         icon={<Layers size={22} />}
         action={
-          <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#f59e0b] rounded-lg hover:bg-[#d97706] transition-colors">
+          <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[var(--warn)] rounded-lg hover:bg-[#d97706] transition-colors">
             <Plus size={16} />
             新建卡组
           </button>
@@ -27,16 +27,16 @@ export const FlashcardsPage: React.FC = () => {
 
       <div className="auto-grid-panels">
         {MOCK_DECKS.map((deck) => (
-          <div key={deck.name} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-5 hover:shadow-md transition-shadow cursor-pointer">
+          <div key={deck.name} className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-5 hover:shadow-md transition-shadow cursor-pointer">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: deck.color }} />
-              <h3 className="text-sm font-semibold text-[#1a1a1a]">{deck.name}</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">{deck.name}</h3>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6b7280] mb-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)] mb-4">
               <span>{deck.cards} 张卡片</span>
-              <span className="text-[#16a34a]">{deck.mastered} 已掌握</span>
+              <span className="text-[var(--success)]">{deck.mastered} 已掌握</span>
             </div>
-            <div className="w-full bg-[#e5e2dd] rounded-full h-1.5 mb-4">
+            <div className="w-full bg-[var(--border-light)] rounded-full h-1.5 mb-4">
               <div
                 className="h-1.5 rounded-full transition-all"
                 style={{ width: `${(deck.mastered / deck.cards) * 100}%`, backgroundColor: deck.color }}
@@ -46,14 +46,14 @@ export const FlashcardsPage: React.FC = () => {
               <button
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs rounded-lg transition-colors ${
                   deck.due > 0
-                    ? 'bg-[#fef7ed] text-[#c87d2f] hover:bg-[#fde8d0]'
-                    : 'bg-[#f3f2ef] text-[#b8b4ac] cursor-default'
+                    ? 'bg-[var(--bg-accent)] text-[var(--accent)] hover:bg-[#fde8d0]'
+                    : 'bg-[var(--bg-base)] text-[var(--text-muted)] cursor-default'
                 }`}
               >
                 <Play size={12} />
                 {deck.due > 0 ? `复习 ${deck.due} 张` : '已完成'}
               </button>
-              <button className="p-2 text-[#b8b4ac] hover:text-[#6b7280] bg-[#f3f2ef] rounded-lg">
+              <button className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-[var(--bg-base)] rounded-lg">
                 <RotateCcw size={14} />
               </button>
             </div>

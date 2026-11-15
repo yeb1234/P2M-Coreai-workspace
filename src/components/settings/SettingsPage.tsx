@@ -109,8 +109,8 @@ function PomodoroSettings() {
               onClick={() => setForm((f) => ({ ...f, ambientPlaybackMode: item.value }))}
               className={`rounded-lg border px-3 py-2 text-left transition-colors ${
                 (form.ambientPlaybackMode ?? 'manual') === item.value
-                  ? 'border-[#c87d2f] bg-[#fff7ed] text-[#9a5a1e]'
-                  : 'border-[#e5e2dd] bg-[#faf9f7] text-[#5f5a52] hover:border-[#c87d2f]/50'
+                  ? 'border-[var(--accent)] bg-[var(--warn-bg)] text-[var(--accent-hover)]'
+                  : 'border-[var(--border-light)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-[var(--accent)]/50'
               }`}
             >
               <p className="text-sm font-medium">{item.label}</p>
@@ -124,7 +124,7 @@ function PomodoroSettings() {
         <select
           value={form.ambientSound ?? 'none'}
           onChange={(e) => setForm((f) => ({ ...f, ambientSound: e.target.value as PomodoroConfig['ambientSound'] }))}
-          className="w-full rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[#c87d2f]"
+          className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)]"
         >
           <option value="none">不播放</option>
           {Object.entries(AMBIENT_SOUNDS).map(([value, item]) => (
@@ -137,9 +137,9 @@ function PomodoroSettings() {
         <SettingsButton onClick={handleSave}>
           <Save size={14} /> 保存设置
         </SettingsButton>
-        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
+        {saved && <span className="text-xs text-[var(--success)]">已保存</span>}
       </div>
-      <div className="border-t border-[#e5e2dd] pt-4">
+      <div className="border-t border-[var(--border-light)] pt-4">
         <SettingsSectionTitle>历史数据</SettingsSectionTitle>
         <SettingsHint className="mb-3 mt-2">共 {sessionCount} 个已完成的番茄记录</SettingsHint>
         <SettingsButton variant="danger" onClick={() => { if (window.confirm('确定清除所有番茄历史记录？此操作不可撤销。')) { clearHistory(); playInteractionSound('delete'); } }} className="px-3 py-1.5 text-xs">
@@ -210,22 +210,22 @@ function ProfileSettings() {
       </div>
       <div>
         <SettingsFieldLabel>语言</SettingsFieldLabel>
-        <div className="px-3 py-2 bg-[#f3f2ef] border border-[#e5e2dd] rounded-lg text-sm text-[#6b7280]">简体中文（内置）</div>
+        <div className="px-3 py-2 bg-[var(--bg-base)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-secondary)]">简体中文（内置）</div>
       </div>
       <div>
         <SettingsFieldLabel>一周起始日</SettingsFieldLabel>
-        <div className="px-3 py-2 bg-[#f3f2ef] border border-[#e5e2dd] rounded-lg text-sm text-[#6b7280]">星期一（内置）</div>
+        <div className="px-3 py-2 bg-[var(--bg-base)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-secondary)]">星期一（内置）</div>
       </div>
       <div className="flex items-center gap-3">
         <SettingsButton onClick={handleSave}>
           <Save size={14} /> 保存设置
         </SettingsButton>
-        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
+        {saved && <span className="text-xs text-[var(--success)]">已保存</span>}
       </div>
 
-      <div className="pt-4 border-t border-[#e5e2dd]">
+      <div className="pt-4 border-t border-[var(--border-light)]">
         <SettingsSectionTitle>编辑偏好</SettingsSectionTitle>
-        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-3">
+        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-3">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">编辑回车行为</p>
             <SettingsHint>
@@ -245,7 +245,7 @@ function ProfileSettings() {
       </div>
 
       {/* Change password */}
-      <div className="pt-4 border-t border-[#e5e2dd]">
+      <div className="pt-4 border-t border-[var(--border-light)]">
         <SettingsSectionTitle>修改密码</SettingsSectionTitle>
         <div className="space-y-2">
           <SettingsTextInput type="password" value={pwOld} onChange={(e) => setPwOld(e.target.value)} placeholder="原密码" />
@@ -255,7 +255,7 @@ function ProfileSettings() {
         <SettingsButton variant="secondary" onClick={handleChangePassword} className="mt-3">
           修改密码
         </SettingsButton>
-        {pwMsg && <p className={`mt-2 text-xs ${pwError ? 'text-[#dc3545]' : 'text-[#16a34a]'}`}>{pwMsg}</p>}
+        {pwMsg && <p className={`mt-2 text-xs ${pwError ? 'text-[var(--danger)]' : 'text-[var(--success)]'}`}>{pwMsg}</p>}
       </div>
     </div>
   );
@@ -290,7 +290,7 @@ function NotificationSettings() {
     <div className="space-y-4">
       <p className="text-sm text-[var(--text-secondary)]">管理各类通知的开关和提示音设置。</p>
       {toggles.map(({ key, label, desc }) => (
-        <div key={key} className="flex items-center justify-between py-3 border-b border-[#e5e2dd] last:border-0">
+        <div key={key} className="flex items-center justify-between py-3 border-b border-[var(--border-light)] last:border-0">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
             <SettingsHint>{desc}</SettingsHint>
@@ -302,7 +302,7 @@ function NotificationSettings() {
         <SettingsButton onClick={handleSave}>
           <Save size={14} /> 保存设置
         </SettingsButton>
-        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
+        {saved && <span className="text-xs text-[var(--success)]">已保存</span>}
       </div>
     </div>
   );

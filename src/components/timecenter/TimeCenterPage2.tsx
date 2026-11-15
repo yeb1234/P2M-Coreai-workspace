@@ -105,7 +105,7 @@ const WidgetCard: React.FC<WidgetCardProps> = React.memo(({
 
   return (
     <div
-      className={`tc-widget ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-[#c87d2f] ring-offset-2 rounded-2xl' : ''}`}
+      className={`tc-widget ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-[var(--accent)] ring-offset-2 rounded-2xl' : ''}`}
       data-size={size}
       draggable
       onDragStart={(e) => {

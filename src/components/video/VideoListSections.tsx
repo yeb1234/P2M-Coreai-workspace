@@ -250,7 +250,7 @@ export const VideoNavigationCards = React.memo(function VideoNavigationCards({
               {continueVideo?.thumbnail ? (
                 <img src={getThumbnailUrl(continueVideo.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
               ) : (
-                <PlayCircle size={22} className="absolute inset-0 m-auto text-[#b8b4ac]" />
+                <PlayCircle size={22} className="absolute inset-0 m-auto text-[var(--text-muted)]" />
               )}
               {continueVideo && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
@@ -292,15 +292,15 @@ export const VideoNavigationCards = React.memo(function VideoNavigationCards({
           meta={latestMeta}
         />
 
-        <div className="min-w-0 rounded-xl border border-dashed border-[#e5e2dd] bg-[#faf9f7] p-3">
+        <div className="min-w-0 rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] p-3">
           <div className="mb-2 flex items-center gap-2">
-            <Sparkles size={14} className="text-[#c87d2f]" />
-            <span className="text-xs font-semibold text-[#1a1a1a]">小助手推荐</span>
-            <span className="rounded-full bg-[#f3f2ef] px-1.5 py-0.5 text-[9px] text-[#9ca3af]">占位</span>
+            <Sparkles size={14} className="text-[var(--accent)]" />
+            <span className="text-xs font-semibold text-[var(--text-primary)]">小助手推荐</span>
+            <span className="rounded-full bg-[var(--bg-base)] px-1.5 py-0.5 text-[9px] text-[var(--text-muted)]">占位</span>
           </div>
-          <div className="rounded-lg bg-[#f3f2ef] px-3 py-4">
-            <p className="text-xs font-medium text-[#1a1a1a]">稍后根据观看历史推荐</p>
-            <p className="mt-1 text-[10px] leading-4 text-[#9ca3af]">
+          <div className="rounded-lg bg-[var(--bg-base)] px-3 py-4">
+            <p className="text-xs font-medium text-[var(--text-primary)]">稍后根据观看历史推荐</p>
+            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">
               这里预留给灵境小助手：可按最近观看、字幕关键词、文件夹上下文推荐下一个视频。
             </p>
           </div>

@@ -28,14 +28,14 @@ export const CalendarPage: React.FC = () => {
         subtitle="点击日期查看事件"
         icon={<CalendarDays size={22} />}
         action={
-          <button onClick={() => setShowEventForm(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] transition-colors">
+          <button onClick={() => setShowEventForm(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors">
             <Plus size={16} />
             新建事件
           </button>
         }
       />
 
-      <div className="calendar-paper rounded-xl border border-[#e5e2dd] p-4 mx-auto shadow-sm">
+      <div className="calendar-paper rounded-xl border border-[var(--border-light)] p-4 mx-auto shadow-sm">
         <CalendarToolbar />
         <div className="mt-4">
           <CalendarGrid onDayDoubleClick={(date) => setTodoPlanDate(date)} />
@@ -75,8 +75,8 @@ const SelectedDateEvents: React.FC = () => {
   };
 
   return (
-    <div className="mt-4 bg-[#fef7ed] rounded-xl border border-[#e5e2dd] p-4">
-      <h3 className="font-medium text-[#1a1a1a] mb-3">
+    <div className="mt-4 bg-[var(--bg-accent)] rounded-xl border border-[var(--border-light)] p-4">
+      <h3 className="font-medium text-[var(--text-primary)] mb-3">
         {new Date(selectedDate).toLocaleDateString('zh-CN', {
           month: 'long',
           day: 'numeric',
@@ -94,10 +94,10 @@ const SelectedDateEvents: React.FC = () => {
               <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg" style={{ backgroundColor: '#8b5cf610' }}>
                 <div className="w-2 h-2 rounded-full bg-[#8b5cf6]" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-[#1a1a1a]">{event.title}</p>
-                  <p className="text-xs text-[#6b7280]">{start.time} - {due.time}</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{event.title}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">{start.time} - {due.time}</p>
                 </div>
-                <button type="button" onClick={() => handleDelete(event.id)} className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]" title="删除">
+                <button type="button" onClick={() => handleDelete(event.id)} className="p-1.5 text-[var(--text-muted)] transition-colors hover:text-[var(--danger)]" title="删除">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -108,16 +108,16 @@ const SelectedDateEvents: React.FC = () => {
 
       {pendingTodos.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-xs font-medium text-[#c87d2f]">待办</p>
+          <p className="mb-2 text-xs font-medium text-[var(--accent)]">待办</p>
           <div className="space-y-2">
             {pendingTodos.map((todo) => (
-              <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-[#e5e2dd] bg-white px-3 py-2">
+              <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white px-3 py-2">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: todo.priority === 'high' ? '#e8a0a0' : todo.priority === 'medium' ? '#e8d4a0' : todo.priority === 'low' ? '#a0c4e8' : '#a0d4a0' }} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[#1a1a1a]">{todo.title}</p>
-                  {todo.pomodoroRounds > 0 && <p className="text-[10px] text-[#9ca3af]">{todo.pomodoroRounds} 个番茄</p>}
+                  <p className="truncate text-sm font-medium text-[var(--text-primary)]">{todo.title}</p>
+                  {todo.pomodoroRounds > 0 && <p className="text-[10px] text-[var(--text-muted)]">{todo.pomodoroRounds} 个番茄</p>}
                 </div>
-                <button type="button" onClick={() => handleDelete(todo.id)} className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]" title="移入垃圾箱">
+                <button type="button" onClick={() => handleDelete(todo.id)} className="p-1.5 text-[var(--text-muted)] transition-colors hover:text-[var(--danger)]" title="移入垃圾箱">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -128,15 +128,15 @@ const SelectedDateEvents: React.FC = () => {
 
       {completedTodos.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-xs font-medium text-[#16a34a]">已完成</p>
+          <p className="mb-2 text-xs font-medium text-[var(--success)]">已完成</p>
           <div className="space-y-2">
             {completedTodos.map((todo) => (
-              <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-[#e5e2dd] bg-white px-3 py-2">
-                <div className="w-2 h-2 rounded-full shrink-0 bg-[#16a34a]" />
+              <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white px-3 py-2">
+                <div className="w-2 h-2 rounded-full shrink-0 bg-[var(--success)]" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-[#9ca3af] line-through">{todo.title}</p>
+                  <p className="truncate text-sm text-[var(--text-muted)] line-through">{todo.title}</p>
                 </div>
-                <button type="button" onClick={() => handleDelete(todo.id)} className="p-1.5 text-[#9ca3af] transition-colors hover:text-[#dc3545]" title="移入垃圾箱">
+                <button type="button" onClick={() => handleDelete(todo.id)} className="p-1.5 text-[var(--text-muted)] transition-colors hover:text-[var(--danger)]" title="移入垃圾箱">
                   <Trash2 size={14} />
                 </button>
               </div>

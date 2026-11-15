@@ -128,18 +128,18 @@ export const JourneyPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-8 text-sm text-[#9ca3af]">正在汇总五个数据源…</div>
+      <div className="p-8 text-sm text-[var(--text-muted)]">正在汇总五个数据源…</div>
     );
   }
 
   if (error || !data) {
     return (
       <div className="p-8">
-        <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-8 text-center">
-          <div className="text-sm text-[#6b7280]">{error || '没有数据'}</div>
+        <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-8 text-center">
+          <div className="text-sm text-[var(--text-secondary)]">{error || '没有数据'}</div>
           <button
             onClick={() => void load()}
-            className="mt-3 rounded-lg border border-[#e5e2dd] bg-white px-3 py-1.5 text-sm hover:bg-[#f5f3f0]"
+            className="mt-3 rounded-lg border border-[var(--border-light)] bg-white px-3 py-1.5 text-sm hover:bg-[var(--bg-elevated)]"
           >
             重试
           </button>
@@ -155,45 +155,45 @@ export const JourneyPage: React.FC = () => {
     <div className="p-4 sm:p-6">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[#2c2a27]">学习轨迹</h1>
-          <p className="mt-1 text-sm text-[#9ca3af]">
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">学习轨迹</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
             把观看、专注、笔记、日历里的记录合在一起，看你走到了哪
           </p>
         </div>
         <button
           onClick={() => void load()}
-          className="shrink-0 whitespace-nowrap rounded-lg border border-[#e5e2dd] bg-white px-3 py-1.5 text-xs text-[#6b7280] hover:bg-[#f5f3f0]"
+          className="shrink-0 whitespace-nowrap rounded-lg border border-[var(--border-light)] bg-white px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
         >
           刷新
         </button>
       </div>
 
       {/* 等级 */}
-      <div className="mb-4 rounded-xl border border-[#e5e2dd] bg-gradient-to-br from-[#faf9f7] to-[#f2efe9] p-5">
+      <div className="mb-4 rounded-xl border border-[var(--border-light)] bg-gradient-to-br from-[#faf9f7] to-[#f2efe9] p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="rounded-lg bg-[#2c2a27] px-2.5 py-1 text-xs font-medium text-white">
+              <span className="rounded-lg bg-[var(--text-primary)] px-2.5 py-1 text-xs font-medium text-white">
                 Lv.{level.index}
               </span>
-              <span className="text-lg font-semibold text-[#2c2a27]">{level.title}</span>
+              <span className="text-lg font-semibold text-[var(--text-primary)]">{level.title}</span>
             </div>
-            <p className="mt-1.5 text-sm text-[#6b7280]">{level.desc}</p>
+            <p className="mt-1.5 text-sm text-[var(--text-secondary)]">{level.desc}</p>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-2xl font-semibold tabular-nums text-[#2c2a27]">{level.exp}</div>
-            <div className="text-xs text-[#9ca3af]">经验</div>
+            <div className="text-2xl font-semibold tabular-nums text-[var(--text-primary)]">{level.exp}</div>
+            <div className="text-xs text-[var(--text-muted)]">经验</div>
           </div>
         </div>
 
         <div className="mt-4">
-          <div className="h-2 overflow-hidden rounded-full bg-[#e5e2dd]">
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--border-light)]">
             <div
-              className="h-full rounded-full bg-[#2c2a27] transition-all"
+              className="h-full rounded-full bg-[var(--text-primary)] transition-all"
               style={{ width: `${Math.max(level.progress * 100, 2)}%` }}
             />
           </div>
-          <div className="mt-1.5 flex justify-between text-xs text-[#9ca3af]">
+          <div className="mt-1.5 flex justify-between text-xs text-[var(--text-muted)]">
             <span>
               {level.next_title
                 ? `距「${level.next_title}」还差 ${level.to_next} 点`
@@ -206,11 +206,11 @@ export const JourneyPage: React.FC = () => {
 
       {/* 本周 + 连续 + 成就 */}
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-        <div className="rounded-xl border border-[#e5e2dd] bg-white p-4">
-          <div className="flex items-center gap-1.5 text-xs text-[#9ca3af]">
+        <div className="rounded-xl border border-[var(--border-light)] bg-white p-4">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <Clock size={14} /> 本周学习
           </div>
-          <div className="mt-1.5 text-lg font-semibold text-[#2c2a27] sm:text-xl">
+          <div className="mt-1.5 text-lg font-semibold text-[var(--text-primary)] sm:text-xl">
             {fmtMinutes(this_week.minutes)}
           </div>
           <div className={`mt-1 flex items-center gap-1 text-xs ${weekUp ? 'text-[#3f8f3a]' : 'text-[#c0392b]'}`}>
@@ -220,34 +220,34 @@ export const JourneyPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#e5e2dd] bg-white p-4">
-          <div className="flex items-center gap-1.5 text-xs text-[#9ca3af]">
+        <div className="rounded-xl border border-[var(--border-light)] bg-white p-4">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <Flame size={14} /> 连续学习
           </div>
-          <div className="mt-1.5 text-lg font-semibold text-[#2c2a27] sm:text-xl">
-            {sources.streak_days} <span className="text-sm font-normal text-[#9ca3af]">天</span>
+          <div className="mt-1.5 text-lg font-semibold text-[var(--text-primary)] sm:text-xl">
+            {sources.streak_days} <span className="text-sm font-normal text-[var(--text-muted)]">天</span>
           </div>
-          <div className="mt-1 text-xs text-[#9ca3af]">
+          <div className="mt-1 text-xs text-[var(--text-muted)]">
             近 30 天活跃 {sources.active_days_30d} 天
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#e5e2dd] bg-white p-4">
-          <div className="flex items-center gap-1.5 text-xs text-[#9ca3af]">
+        <div className="rounded-xl border border-[var(--border-light)] bg-white p-4">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <Trophy size={14} /> 成就
           </div>
-          <div className="mt-1.5 text-lg font-semibold text-[#2c2a27] sm:text-xl">
-            {unlocked} <span className="text-sm font-normal text-[#9ca3af]">/ {total_milestones}</span>
+          <div className="mt-1.5 text-lg font-semibold text-[var(--text-primary)] sm:text-xl">
+            {unlocked} <span className="text-sm font-normal text-[var(--text-muted)]">/ {total_milestones}</span>
           </div>
-          <div className="mt-1 text-xs text-[#9ca3af]">
+          <div className="mt-1 text-xs text-[var(--text-muted)]">
             {unlocked === total_milestones ? '全部解锁' : `还差 ${total_milestones - unlocked} 个`}
           </div>
         </div>
       </div>
 
       {/* 五源明细 */}
-      <div className="mb-4 rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-4">
-        <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[#6b7280]">
+      <div className="mb-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
+        <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
           <Sparkles size={13} /> 这份轨迹串了五个数据源
         </div>
         <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-5">
@@ -259,13 +259,13 @@ export const JourneyPage: React.FC = () => {
             { label: '涉猎领域', value: `${sources.categories} 个` },
           ].map((s) => (
             <div key={s.label}>
-              <div className="text-sm font-medium text-[#2c2a27]">{s.value}</div>
-              <div className="mt-0.5 text-[11px] text-[#9ca3af]">{s.label}</div>
+              <div className="text-sm font-medium text-[var(--text-primary)]">{s.value}</div>
+              <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">{s.label}</div>
             </div>
           ))}
         </div>
         {sources.pomodoro_total > 0 && (
-          <div className="mt-2 text-[11px] text-[#9ca3af]">
+          <div className="mt-2 text-[11px] text-[var(--text-muted)]">
             番茄钟记录 {sources.pomodoro_total} 次，完成 {sources.pomodoro_done} 次
           </div>
         )}
@@ -273,7 +273,7 @@ export const JourneyPage: React.FC = () => {
 
       {/* 成就墙 */}
       <div className="mb-4">
-        <h2 className="mb-2 text-sm font-medium text-[#6b7280]">成就墙</h2>
+        <h2 className="mb-2 text-sm font-medium text-[var(--text-secondary)]">成就墙</h2>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           {milestones.map((m) => (
             <div
@@ -282,17 +282,17 @@ export const JourneyPage: React.FC = () => {
               className={`rounded-xl border p-3 text-center transition-colors ${
                 m.unlocked
                   ? 'border-[#c8b88a] bg-[#fdf9ed]'
-                  : 'border-[#e5e2dd] bg-white'
+                  : 'border-[var(--border-light)] bg-white'
               }`}
             >
               <div
                 className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full ${
-                  m.unlocked ? 'bg-[#2c2a27] text-[#fdf9ed]' : 'bg-[#f2efe9] text-[#c4c0b9]'
+                  m.unlocked ? 'bg-[var(--text-primary)] text-[#fdf9ed]' : 'bg-[#f2efe9] text-[#c4c0b9]'
                 }`}
               >
                 {m.unlocked ? ICONS[m.icon] ?? <Trophy size={18} /> : <Lock size={16} />}
               </div>
-              <div className={`mt-1.5 text-[11px] font-medium ${m.unlocked ? 'text-[#2c2a27]' : 'text-[#9ca3af]'}`}>
+              <div className={`mt-1.5 text-[11px] font-medium ${m.unlocked ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
                 {m.title}
               </div>
               {!m.unlocked && (
@@ -311,10 +311,10 @@ export const JourneyPage: React.FC = () => {
       </div>
 
       {/* 热力图 */}
-      <div className="rounded-xl border border-[#e5e2dd] bg-white p-4">
+      <div className="rounded-xl border border-[var(--border-light)] bg-white p-4">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-[#6b7280]">近 90 天</h2>
-          <div className="flex items-center gap-1 text-[10px] text-[#9ca3af]">
+          <h2 className="text-sm font-medium text-[var(--text-secondary)]">近 90 天</h2>
+          <div className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
             少
             {['bg-[#efece8]', 'bg-[#d9e8d4]', 'bg-[#a8d3a0]', 'bg-[#6fb865]', 'bg-[#3f8f3a]'].map((c) => (
               <span key={c} className={`h-3 w-3 rounded-sm ${c}`} />

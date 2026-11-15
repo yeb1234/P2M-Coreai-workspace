@@ -9,7 +9,7 @@ export const recentNotesPlugin: Plugin = {
     icon: <StickyNote size={20} />,
     description: '最近编辑的笔记',
     defaultPosition: 4,
-    color: 'text-[#f59e0b]',
+    color: 'text-[var(--warn)]',
     defaultSize: 'small',
     summaryComponent: RecentNotesSummary,
   },

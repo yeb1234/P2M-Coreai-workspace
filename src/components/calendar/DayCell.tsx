@@ -47,7 +47,7 @@ export const DayCell: React.FC<DayCellProps> = React.memo(({
       onClick={() => onSelect(dateStr)}
       onDoubleClick={() => onDoubleClick?.(dateStr)}
       className={`relative h-[52px] md:h-[76px] p-1 rounded-lg border transition-all hover:shadow-md overflow-hidden ${
-        isSelected ? 'ring-2 ring-[#c87d2f] border-[#c87d2f]' : ''
+        isSelected ? 'ring-2 ring-[var(--accent)] border-[var(--accent)]' : ''
       } ${!isInMonth ? 'opacity-40' : ''}`}
       style={{
         background: isSelected
@@ -62,8 +62,8 @@ export const DayCell: React.FC<DayCellProps> = React.memo(({
       <div
         className={`text-[10px] md:text-xs font-medium mb-0.5 ${
           isToday
-            ? 'w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-[#c87d2f] text-white rounded-full mx-auto text-[8px] md:text-[10px]'
-            : 'text-[#1a1a1a]'
+            ? 'w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-[var(--accent)] text-white rounded-full mx-auto text-[8px] md:text-[10px]'
+            : 'text-[var(--text-primary)]'
         }`}
       >
         {dayNumber}

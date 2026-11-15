@@ -11,14 +11,14 @@ const MOCK_WORKFLOWS = [
 ];
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  active: { label: '运行中', color: 'bg-[#f0fdf4] text-[#16a34a]' },
-  paused: { label: '已暂停', color: 'bg-[#f3f2ef] text-[#9ca3af]' },
+  active: { label: '运行中', color: 'bg-[var(--success-bg)] text-[var(--success)]' },
+  paused: { label: '已暂停', color: 'bg-[var(--bg-base)] text-[var(--text-muted)]' },
 };
 
 const RESULT_MAP: Record<string, { icon: React.ReactNode; color: string }> = {
-  success: { icon: <CheckCircle size={12} />, color: 'text-[#16a34a]' },
-  warning: { icon: <Clock size={12} />, color: 'text-[#f59e0b]' },
-  error: { icon: <Zap size={12} />, color: 'text-[#dc3545]' },
+  success: { icon: <CheckCircle size={12} />, color: 'text-[var(--success)]' },
+  warning: { icon: <Clock size={12} />, color: 'text-[var(--warn)]' },
+  error: { icon: <Zap size={12} />, color: 'text-[var(--danger)]' },
 };
 
 export const HermesPage: React.FC = () => {
@@ -31,20 +31,20 @@ export const HermesPage: React.FC = () => {
       />
 
       <div className="auto-grid-compact">
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
-          <Workflow size={20} className="text-[#c87d2f] mx-auto mb-2" />
-          <p className="text-xl font-bold text-[#1a1a1a]">5</p>
-          <p className="text-[10px] text-[#9ca3af]">工作流</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
+          <Workflow size={20} className="text-[var(--accent)] mx-auto mb-2" />
+          <p className="text-xl font-bold text-[var(--text-primary)]">5</p>
+          <p className="text-[10px] text-[var(--text-muted)]">工作流</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
-          <CheckCircle size={20} className="text-[#16a34a] mx-auto mb-2" />
-          <p className="text-xl font-bold text-[#1a1a1a]">127</p>
-          <p className="text-[10px] text-[#9ca3af]">成功执行</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
+          <CheckCircle size={20} className="text-[var(--success)] mx-auto mb-2" />
+          <p className="text-xl font-bold text-[var(--text-primary)]">127</p>
+          <p className="text-[10px] text-[var(--text-muted)]">成功执行</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 text-center">
-          <Zap size={20} className="text-[#f59e0b] mx-auto mb-2" />
-          <p className="text-xl font-bold text-[#1a1a1a]">3</p>
-          <p className="text-[10px] text-[#9ca3af]">本周触发</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
+          <Zap size={20} className="text-[var(--warn)] mx-auto mb-2" />
+          <p className="text-xl font-bold text-[var(--text-primary)]">3</p>
+          <p className="text-[10px] text-[var(--text-muted)]">本周触发</p>
         </div>
       </div>
 
@@ -53,20 +53,20 @@ export const HermesPage: React.FC = () => {
           const status = STATUS_MAP[wf.status];
           const result = RESULT_MAP[wf.result];
           return (
-            <div key={wf.name} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
+            <div key={wf.name} className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 mb-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <GitBranch size={14} className="text-[#6b7280]" />
-                  <h3 className="min-w-0 truncate text-sm font-semibold text-[#1a1a1a] group-hover:text-[#c87d2f] transition-colors">{wf.name}</h3>
+                  <GitBranch size={14} className="text-[var(--text-secondary)]" />
+                  <h3 className="min-w-0 truncate text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{wf.name}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
-                  <button className="p-1 text-[#b8b4ac] hover:text-[#16a34a]">
+                  <button className="p-1 text-[var(--text-muted)] hover:text-[var(--success)]">
                     {wf.status === 'active' ? <Pause size={14} /> : <Play size={14} />}
                   </button>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#6b7280]">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]">
                 <span className="flex items-center gap-1"><Clock size={10} />{wf.trigger}</span>
                 <span>{wf.steps} 步骤</span>
                 <span className="flex items-center gap-1">
@@ -79,11 +79,11 @@ export const HermesPage: React.FC = () => {
                 {Array.from({ length: wf.steps }).map((_, i) => (
                   <React.Fragment key={i}>
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold ${
-                      i < wf.steps - 1 ? 'bg-[#16a34a] text-white' : 'bg-[#e5e2dd] text-[#6b7280]'
+                      i < wf.steps - 1 ? 'bg-[var(--success)] text-white' : 'bg-[var(--border-light)] text-[var(--text-secondary)]'
                     }`}>
                       {i + 1}
                     </div>
-                    {i < wf.steps - 1 && <ArrowRight size={10} className="text-[#d1cdc6]" />}
+                    {i < wf.steps - 1 && <ArrowRight size={10} className="text-[var(--border-medium)]" />}
                   </React.Fragment>
                 ))}
               </div>

@@ -95,22 +95,22 @@ const FolderTile = React.memo(function FolderTile({
   const displayName = folderDisplayName(category);
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all group">
+    <div className="flex items-center gap-2 p-3 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl hover:shadow-md hover:border-[var(--accent)] transition-all group">
       <button
         onClick={(e) => { e.stopPropagation(); onSelect(category.id); }}
         className="shrink-0"
         title={checked ? '取消筛选' : '筛选此文件夹'}
       >
         {checked
-          ? <CheckSquare size={16} className="text-[#c87d2f]" />
-          : <Square size={16} className="text-[#b8b4ac] group-hover:text-[#6b7280]" />
+          ? <CheckSquare size={16} className="text-[var(--accent)]" />
+          : <Square size={16} className="text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]" />
         }
       </button>
       <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
-        <Folder size={20} className="text-[#c87d2f] shrink-0" />
+        <Folder size={20} className="text-[var(--accent)] shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
-          <p className="text-[10px] text-[#9ca3af]">{category.video_count} 个视频</p>
+          <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">{displayName}</p>
+          <p className="text-[10px] text-[var(--text-muted)]">{category.video_count} 个视频</p>
         </div>
       </button>
     </div>
@@ -128,12 +128,12 @@ const SearchFolderTile = React.memo(function SearchFolderTile({
   const parentPath = folderParentPath(category);
 
   return (
-    <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-3 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all text-left group">
-      <Folder size={20} className="text-[#c87d2f] shrink-0" />
+    <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-3 p-3 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl hover:shadow-md hover:border-[var(--accent)] transition-all text-left group">
+      <Folder size={20} className="text-[var(--accent)] shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
-        {parentPath && <p className="text-[10px] text-[#b8b4ac] truncate">{parentPath}</p>}
-        <p className="text-[10px] text-[#9ca3af]">{category.video_count} 个视频</p>
+        <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">{displayName}</p>
+        {parentPath && <p className="text-[10px] text-[var(--text-muted)] truncate">{parentPath}</p>}
+        <p className="text-[10px] text-[var(--text-muted)]">{category.video_count} 个视频</p>
       </div>
     </button>
   );
@@ -149,22 +149,22 @@ const FolderSearchGroupCard = React.memo(function FolderSearchGroupCard({
   onEnterFolder: (id: number, name: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7]/60 p-2.5">
+    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)]/60 p-2.5">
       <div className="mb-2 flex items-center gap-2">
-        <Folder size={15} className="shrink-0 text-[#c87d2f]" />
+        <Folder size={15} className="shrink-0 text-[var(--accent)]" />
         {group.parent ? (
           <button
             type="button"
             onClick={() => onEnterParent(group.parent!.id, group.parentLabel)}
             className="min-w-0 text-left"
           >
-            <span className="block truncate text-xs font-semibold text-[#1a1a1a] hover:text-[#c87d2f]">{group.parentLabel}</span>
-            {group.parentPath && <span className="block truncate text-[10px] text-[#9ca3af]">{group.parentPath}</span>}
+            <span className="block truncate text-xs font-semibold text-[var(--text-primary)] hover:text-[var(--accent)]">{group.parentLabel}</span>
+            {group.parentPath && <span className="block truncate text-[10px] text-[var(--text-muted)]">{group.parentPath}</span>}
           </button>
         ) : (
           <div className="min-w-0">
-            <span className="block truncate text-xs font-semibold text-[#1a1a1a]">{group.parentLabel}</span>
-            <span className="block truncate text-[10px] text-[#9ca3af]">视频目录根层级</span>
+            <span className="block truncate text-xs font-semibold text-[var(--text-primary)]">{group.parentLabel}</span>
+            <span className="block truncate text-[10px] text-[var(--text-muted)]">视频目录根层级</span>
           </div>
         )}
       </div>
@@ -458,7 +458,7 @@ export function VideoList() {
 
       {isSearching && matchedFolders.length > 0 && (
         <div>
-          <p className="text-xs text-[#9ca3af] mb-2">匹配的文件夹 ({matchedFolders.length})</p>
+          <p className="text-xs text-[var(--text-muted)] mb-2">匹配的文件夹 ({matchedFolders.length})</p>
           <div className="space-y-3">
             {groupedMatchedFolders.map((group) => (
               <FolderSearchGroupCard
@@ -487,7 +487,7 @@ export function VideoList() {
       )}
 
       {error && (
-        <div className="flex items-center gap-2 p-3 bg-[#fef2f2] border border-[#fecaca] rounded-lg text-sm text-[#dc3545]">
+        <div className="flex items-center gap-2 p-3 bg-[var(--danger-bg)] border border-[#fecaca] rounded-lg text-sm text-[var(--danger)]">
           <AlertCircle size={16} />
           {error}
         </div>

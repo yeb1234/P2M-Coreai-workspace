@@ -39,29 +39,29 @@ export const ComparePage: React.FC = () => {
       <div className="space-y-8">
         {MOCK_COMPARE.map((group) => (
           <div key={group.name}>
-            <h3 className="text-sm font-semibold text-[#1a1a1a] mb-3">{group.name}</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">{group.name}</h3>
             <div className="auto-grid-panels">
               {group.items.map((item, idx) => (
                 <div
                   key={item.name}
-                  className={`bg-[#faf9f7] border rounded-xl p-5 hover:shadow-md transition-shadow ${
-                    idx === 0 ? 'border-[#c87d2f] ring-1 ring-[#c87d2f]/20' : 'border-[#e5e2dd]'
+                  className={`bg-[var(--bg-elevated)] border rounded-xl p-5 hover:shadow-md transition-shadow ${
+                    idx === 0 ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]/20' : 'border-[var(--border-light)]'
                   }`}
                 >
                   {idx === 0 && (
-                    <span className="text-[10px] px-2 py-0.5 bg-[#fef7ed] text-[#c87d2f] rounded-full font-medium">推荐</span>
+                    <span className="text-[10px] px-2 py-0.5 bg-[var(--bg-accent)] text-[var(--accent)] rounded-full font-medium">推荐</span>
                   )}
                   <div className="flex items-center justify-between mt-2 mb-3">
-                    <h4 className="text-base font-semibold text-[#1a1a1a]">{item.name}</h4>
-                    <span className="text-xs text-[#9ca3af] flex items-center gap-1">
-                      <Star size={10} className="text-[#f59e0b]" />
+                    <h4 className="text-base font-semibold text-[var(--text-primary)]">{item.name}</h4>
+                    <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+                      <Star size={10} className="text-[var(--warn)]" />
                       {item.stars}
                     </span>
                   </div>
                   <div className="space-y-2">
                     <div>
                       {item.pros.map((p) => (
-                        <div key={p} className="flex items-center gap-2 text-xs text-[#16a34a] py-0.5">
+                        <div key={p} className="flex items-center gap-2 text-xs text-[var(--success)] py-0.5">
                           <Check size={12} />
                           {p}
                         </div>
@@ -69,7 +69,7 @@ export const ComparePage: React.FC = () => {
                     </div>
                     <div>
                       {item.cons.map((c) => (
-                        <div key={c} className="flex items-center gap-2 text-xs text-[#dc3545] py-0.5">
+                        <div key={c} className="flex items-center gap-2 text-xs text-[var(--danger)] py-0.5">
                           <X size={12} />
                           {c}
                         </div>

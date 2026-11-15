@@ -20,10 +20,10 @@ import {
 const PENDING_VIDEO_KEY = 'p2m_pending_recommended_video_id';
 
 const STATUS_META: Record<StepStatus, { label: string; className: string }> = {
-  pending: { label: '未开始', className: 'text-[#9ca3af] bg-[#f3f1ec] border-[#e5e2dd]' },
-  in_progress: { label: '进行中', className: 'text-[#c87d2f] bg-[#fdf6ec] border-[#f0dcc0]' },
-  done: { label: '已完成', className: 'text-[#16a34a] bg-[#f0f9f1] border-[#c8e6cc]' },
-  skipped: { label: '已跳过', className: 'text-[#6b7280] bg-[#f5f5f4] border-[#e5e2dd]' },
+  pending: { label: '未开始', className: 'text-[var(--text-muted)] bg-[#f3f1ec] border-[var(--border-light)]' },
+  in_progress: { label: '进行中', className: 'text-[var(--accent)] bg-[var(--bg-accent)] border-[#f0dcc0]' },
+  done: { label: '已完成', className: 'text-[var(--success)] bg-[#f0f9f1] border-[#c8e6cc]' },
+  skipped: { label: '已跳过', className: 'text-[var(--text-secondary)] bg-[var(--bg-base)] border-[var(--border-light)]' },
 };
 
 function formatMinutes(minutes: number | null | undefined): string {
@@ -55,13 +55,13 @@ function openVideo(videoId: number) {
 const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string; hint: string; tone: string }> = ({
   icon, label, value, hint, tone,
 }) => (
-  <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-4">
+  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
     <div className={`mb-2 flex items-center gap-2 ${tone}`}>
       {icon}
       <span className="text-xs font-medium">{label}</span>
     </div>
-    <p className="text-2xl font-bold text-[#1a1a1a]">{value}</p>
-    <p className="mt-1 text-[10px] text-[#9ca3af]">{hint}</p>
+    <p className="text-2xl font-bold text-[var(--text-primary)]">{value}</p>
+    <p className="mt-1 text-[10px] text-[var(--text-muted)]">{hint}</p>
   </div>
 );
 
@@ -81,20 +81,20 @@ const StepRow: React.FC<{
     <li className="relative pl-8">
       {/* 时间线主轴 */}
       <span
-        className={`absolute left-[11px] top-6 h-full w-px ${isDone ? 'bg-[#c8e6cc]' : 'bg-[#e5e2dd]'}`}
+        className={`absolute left-[11px] top-6 h-full w-px ${isDone ? 'bg-[#c8e6cc]' : 'bg-[var(--border-light)]'}`}
         aria-hidden
       />
-      <span className="absolute left-0 top-1 flex h-[22px] w-[22px] items-center justify-center rounded-full border border-[#e5e2dd] bg-white">
+      <span className="absolute left-0 top-1 flex h-[22px] w-[22px] items-center justify-center rounded-full border border-[var(--border-light)] bg-white">
         {isDone ? (
-          <CheckCircle2 size={15} className="text-[#16a34a]" />
+          <CheckCircle2 size={15} className="text-[var(--success)]" />
         ) : step.status === 'in_progress' ? (
-          <CircleDot size={15} className="text-[#c87d2f]" />
+          <CircleDot size={15} className="text-[var(--accent)]" />
         ) : (
           <Circle size={13} className="text-[#c7c2b8]" />
         )}
       </span>
 
-      <div className="mb-3 rounded-xl border border-[#e5e2dd] bg-white">
+      <div className="mb-3 rounded-xl border border-[var(--border-light)] bg-white">
         <button
           type="button"
           onClick={() => onToggle(step.id)}
@@ -102,22 +102,22 @@ const StepRow: React.FC<{
         >
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-mono text-[#9ca3af]">STEP {index + 1}</span>
+              <span className="text-[11px] font-mono text-[var(--text-muted)]">STEP {index + 1}</span>
               <span className={`rounded border px-1.5 py-0.5 text-[10px] ${meta.className}`}>{meta.label}</span>
-              <span className="flex items-center gap-1 text-[10px] text-[#9ca3af]">
+              <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
                 <Clock size={11} /> {formatMinutes(step.est_minutes)}
               </span>
             </span>
             <span
-              className={`mt-1 block text-sm font-medium ${isDone ? 'text-[#9ca3af] line-through' : 'text-[#1a1a1a]'}`}
+              className={`mt-1 block text-sm font-medium ${isDone ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}
             >
               {step.title}
             </span>
           </span>
           {expanded ? (
-            <ChevronDown size={16} className="mt-1 shrink-0 text-[#9ca3af]" />
+            <ChevronDown size={16} className="mt-1 shrink-0 text-[var(--text-muted)]" />
           ) : (
-            <ChevronRight size={16} className="mt-1 shrink-0 text-[#9ca3af]" />
+            <ChevronRight size={16} className="mt-1 shrink-0 text-[var(--text-muted)]" />
           )}
         </button>
 
@@ -129,26 +129,26 @@ const StepRow: React.FC<{
 
             {step.videos.length > 0 ? (
               <div className="space-y-1">
-                <p className="text-[10px] font-medium text-[#9ca3af]">配套视频（都来自你的视频库）</p>
+                <p className="text-[10px] font-medium text-[var(--text-muted)]">配套视频（都来自你的视频库）</p>
                 {step.videos.map((video) => (
                   <button
                     key={video.id}
                     type="button"
                     onClick={() => openVideo(video.id)}
-                    className="flex w-full items-center gap-2 rounded-lg border border-[#f0ede8] bg-[#faf9f7] px-2 py-1.5 text-left transition hover:border-[#c87d2f] hover:bg-[#fdf6ec]"
+                    className="flex w-full items-center gap-2 rounded-lg border border-[#f0ede8] bg-[var(--bg-elevated)] px-2 py-1.5 text-left transition hover:border-[var(--accent)] hover:bg-[var(--bg-accent)]"
                   >
                     <PlayCircle size={14} className="shrink-0 text-[#ec4899]" />
-                    <span className="min-w-0 flex-1 truncate text-xs text-[#1a1a1a]">
+                    <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-primary)]">
                       {video.title || `视频 ${video.id}`}
                     </span>
                     {video.duration ? (
-                      <span className="shrink-0 text-[10px] text-[#9ca3af]">{formatClock(video.duration)}</span>
+                      <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{formatClock(video.duration)}</span>
                     ) : null}
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="rounded-lg bg-[#fdf6ec] px-2 py-1.5 text-[11px] text-[#c87d2f]">
+              <p className="rounded-lg bg-[var(--bg-accent)] px-2 py-1.5 text-[11px] text-[var(--accent)]">
                 这一步在你的视频库里暂时没有匹配素材，需要自己找资料补充。
               </p>
             )}
@@ -160,7 +160,7 @@ const StepRow: React.FC<{
                     type="button"
                     disabled={busy}
                     onClick={() => onAdvance(step)}
-                    className="rounded-lg bg-[#16a34a] px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-[#15803d] disabled:opacity-50"
+                    className="rounded-lg bg-[var(--success)] px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-[#15803d] disabled:opacity-50"
                   >
                     {step.status === 'pending' ? '开始这一步' : '标记完成'}
                   </button>
@@ -168,7 +168,7 @@ const StepRow: React.FC<{
                     type="button"
                     disabled={busy}
                     onClick={() => onReopen(step)}
-                    className="rounded-lg border border-[#e5e2dd] px-2.5 py-1 text-[11px] text-[#6b7280] transition hover:bg-[#f5f5f4] disabled:opacity-50"
+                    className="rounded-lg border border-[var(--border-light)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] disabled:opacity-50"
                   >
                     重置
                   </button>
@@ -178,7 +178,7 @@ const StepRow: React.FC<{
                   type="button"
                   disabled={busy}
                   onClick={() => onReopen(step)}
-                  className="rounded-lg border border-[#e5e2dd] px-2.5 py-1 text-[11px] text-[#6b7280] transition hover:bg-[#f5f5f4] disabled:opacity-50"
+                  className="rounded-lg border border-[var(--border-light)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] disabled:opacity-50"
                 >
                   撤销完成
                 </button>
@@ -314,7 +314,7 @@ export const LearningPathPage: React.FC = () => {
     return (
       <div className="w-full pt-2">
         <PageTitle title="学习路径" subtitle="把模糊的目标拆成能照着做的步骤" icon={<Route size={22} />} />
-        <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-8 text-center text-sm text-[#9ca3af]">
+        <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-8 text-center text-sm text-[var(--text-muted)]">
           正在载入你的学习数据…
         </div>
       </div>
@@ -331,7 +331,7 @@ export const LearningPathPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-1.5 rounded-lg border border-[#e5e2dd] bg-white px-3 py-1.5 text-xs text-[#4b5563] transition hover:border-[#c87d2f] hover:text-[#c87d2f]"
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-light)] bg-white px-3 py-1.5 text-xs text-[#4b5563] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             <Sparkles size={14} />
             {showForm ? '收起' : '规划新路径'}
@@ -340,7 +340,7 @@ export const LearningPathPage: React.FC = () => {
       />
 
       {loadError && (
-        <div className="flex items-start gap-2 rounded-xl border border-[#f0dcc0] bg-[#fdf6ec] px-3 py-2 text-xs text-[#c87d2f]">
+        <div className="flex items-start gap-2 rounded-xl border border-[#f0dcc0] bg-[var(--bg-accent)] px-3 py-2 text-xs text-[var(--accent)]">
           <AlertCircle size={14} className="mt-0.5 shrink-0" />
           <span className="flex-1">{loadError}</span>
           <button type="button" onClick={() => void load()} className="underline">重试</button>
@@ -354,21 +354,21 @@ export const LearningPathPage: React.FC = () => {
           label="累计观看"
           value={formatMinutes(profile?.total_watch_minutes ?? 0)}
           hint={`接触 ${profile?.videos_started ?? 0} 个视频`}
-          tone="text-[#c87d2f]"
+          tone="text-[var(--accent)]"
         />
         <StatCard
           icon={<CheckCircle2 size={16} />}
           label="完成率"
           value={`${Math.round((profile?.completion_rate ?? 0) * 100)}%`}
           hint={`完成 ${profile?.videos_completed ?? 0} 个`}
-          tone="text-[#16a34a]"
+          tone="text-[var(--success)]"
         />
         <StatCard
           icon={<TrendingUp size={16} />}
           label="连续学习"
           value={`${profile?.streak_days ?? 0} 天`}
           hint={`近 30 天活跃 ${profile?.active_days_30d ?? 0} 天`}
-          tone="text-[#2563eb]"
+          tone="text-[var(--info)]"
         />
         <StatCard
           icon={<Target size={16} />}
@@ -381,57 +381,57 @@ export const LearningPathPage: React.FC = () => {
 
       {/* 生成表单 */}
       {showForm && (
-        <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7] p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#1a1a1a]">
-            <Sparkles size={15} className="text-[#c87d2f]" />
+        <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+            <Sparkles size={15} className="text-[var(--accent)]" />
             规划一条新路径
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-[11px] text-[#6b7280]">目标</span>
+              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">目标</span>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={120}
-                className="w-full rounded-lg border border-[#e5e2dd] bg-white px-2.5 py-1.5 text-xs text-[#1a1a1a] outline-none focus:border-[#c87d2f]"
+                className="w-full rounded-lg border border-[var(--border-light)] bg-white px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                 placeholder="例如：3 个月补齐 RAG 工程能力"
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[11px] text-[#6b7280]">目标岗位</span>
+              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">目标岗位</span>
               <input
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
-                className="w-full rounded-lg border border-[#e5e2dd] bg-white px-2.5 py-1.5 text-xs text-[#1a1a1a] outline-none focus:border-[#c87d2f]"
+                className="w-full rounded-lg border border-[var(--border-light)] bg-white px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                 placeholder="AI Agent 工程师"
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[11px] text-[#6b7280]">期限（可空）</span>
+              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">期限（可空）</span>
               <input
                 type="date"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                className="w-full rounded-lg border border-[#e5e2dd] bg-white px-2.5 py-1.5 text-xs text-[#1a1a1a] outline-none focus:border-[#c87d2f]"
+                className="w-full rounded-lg border border-[var(--border-light)] bg-white px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[11px] text-[#6b7280]">每周可投入（小时）</span>
+              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">每周可投入（小时）</span>
               <input
                 type="number"
                 min={1}
                 max={80}
                 value={weeklyHours}
                 onChange={(e) => setWeeklyHours(Number(e.target.value) || 10)}
-                className="w-full rounded-lg border border-[#e5e2dd] bg-white px-2.5 py-1.5 text-xs text-[#1a1a1a] outline-none focus:border-[#c87d2f]"
+                className="w-full rounded-lg border border-[var(--border-light)] bg-white px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
               />
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-[11px] text-[#6b7280]">要覆盖的技能（逗号分隔）</span>
+              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">要覆盖的技能（逗号分隔）</span>
               <input
                 value={skills}
                 onChange={(e) => setSkills(e.target.value)}
-                className="w-full rounded-lg border border-[#e5e2dd] bg-white px-2.5 py-1.5 text-xs text-[#1a1a1a] outline-none focus:border-[#c87d2f]"
+                className="w-full rounded-lg border border-[var(--border-light)] bg-white px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                 placeholder="Python, FastAPI, LangGraph, RAG"
               />
             </label>
@@ -449,12 +449,12 @@ export const LearningPathPage: React.FC = () => {
               type="button"
               disabled={generating}
               onClick={() => void handleGenerate()}
-              className="flex items-center gap-1.5 rounded-lg bg-[#c87d2f] px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-[#b06d26] disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-[#b06d26] disabled:opacity-60"
             >
               {generating ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
               {generating ? `正在规划… ${elapsed}s` : '生成路径'}
             </button>
-            <span className="text-[10px] text-[#9ca3af]">
+            <span className="text-[10px] text-[var(--text-muted)]">
               规划要 20–40 秒，会依次检索你库里的素材。
             </span>
           </div>
@@ -471,8 +471,8 @@ export const LearningPathPage: React.FC = () => {
               onClick={() => setActivePathId(path.id)}
               className={`rounded-lg border px-2.5 py-1 text-[11px] transition ${
                 path.id === activePathId
-                  ? 'border-[#c87d2f] bg-[#fdf6ec] text-[#c87d2f]'
-                  : 'border-[#e5e2dd] bg-white text-[#6b7280] hover:border-[#c87d2f]'
+                  ? 'border-[var(--accent)] bg-[var(--bg-accent)] text-[var(--accent)]'
+                  : 'border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:border-[var(--accent)]'
               }`}
             >
               {path.title.replace(' · 学习路径', '')}
@@ -484,20 +484,20 @@ export const LearningPathPage: React.FC = () => {
 
       {/* 当前路径 */}
       {!activePath ? (
-        <div className="rounded-xl border border-dashed border-[#e5e2dd] bg-[#faf9f7] p-10 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] p-10 text-center">
           <Route size={28} className="mx-auto mb-3 text-[#c7c2b8]" />
-          <p className="text-sm font-medium text-[#1a1a1a]">还没有学习路径</p>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-[#9ca3af]">
+          <p className="text-sm font-medium text-[var(--text-primary)]">还没有学习路径</p>
+          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-[var(--text-muted)]">
             填一下上面的目标，系统会按你的视频库和真实学习数据排一条步骤清晰的路径。
             之后在对话里问「下一步学什么」，助手会直接按这条路径回答。
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-xl border border-[#e5e2dd] bg-white p-4">
+          <div className="rounded-xl border border-[var(--border-light)] bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="truncate text-sm font-semibold text-[#1a1a1a]">{activePath.title}</h3>
+                <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">{activePath.title}</h3>
                 {activePath.summary && (
                   <p className="mt-1 text-xs leading-relaxed text-[#4b5563]">{activePath.summary}</p>
                 )}
@@ -506,7 +506,7 @@ export const LearningPathPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void handleActivate(activePath)}
-                  className="shrink-0 rounded-lg border border-[#c87d2f] px-2.5 py-1 text-[11px] text-[#c87d2f] transition hover:bg-[#fdf6ec]"
+                  className="shrink-0 rounded-lg border border-[var(--accent)] px-2.5 py-1 text-[11px] text-[var(--accent)] transition hover:bg-[var(--bg-accent)]"
                 >
                   设为进行中
                 </button>
@@ -514,7 +514,7 @@ export const LearningPathPage: React.FC = () => {
             </div>
 
             <div className="mt-3">
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#6b7280]">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
                 <span>
                   {activePath.progress.done}/{activePath.progress.total} 步完成
                 </span>
@@ -525,7 +525,7 @@ export const LearningPathPage: React.FC = () => {
               </div>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#f0ede8]">
                 <div
-                  className="h-full rounded-full bg-[#16a34a] transition-all"
+                  className="h-full rounded-full bg-[var(--success)] transition-all"
                   style={{ width: `${activePath.progress.percent}%` }}
                 />
               </div>

@@ -42,7 +42,7 @@ export const CalendarToolbar: React.FC = () => {
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <button
           onClick={handleToday}
-          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium text-[#6b7280] bg-[#faf9f7] border border-[#e5e2dd] rounded-lg hover:bg-[#f3f2ef] transition-colors"
+          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-base)] transition-colors"
         >
           <Calendar size={14} />
           今天
@@ -51,30 +51,30 @@ export const CalendarToolbar: React.FC = () => {
         <div className="flex shrink-0 items-center">
           <button
             onClick={handlePrev}
-            className="p-1.5 hover:bg-[#f3f2ef] rounded-lg transition-colors"
+            className="p-1.5 hover:bg-[var(--bg-base)] rounded-lg transition-colors"
           >
-            <ChevronLeft size={20} className="text-[#6b7280]" />
+            <ChevronLeft size={20} className="text-[var(--text-secondary)]" />
           </button>
           <button
             onClick={handleNext}
-            className="p-1.5 hover:bg-[#f3f2ef] rounded-lg transition-colors"
+            className="p-1.5 hover:bg-[var(--bg-base)] rounded-lg transition-colors"
           >
-            <ChevronRight size={20} className="text-[#6b7280]" />
+            <ChevronRight size={20} className="text-[var(--text-secondary)]" />
           </button>
         </div>
 
-        <h2 className="min-w-0 flex-1 text-base font-semibold text-[#1a1a1a] md:text-lg">
+        <h2 className="min-w-0 flex-1 text-base font-semibold text-[var(--text-primary)] md:text-lg">
           {titleText}
         </h2>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-1 bg-[#f3f2ef] rounded-lg p-0.5">
+      <div className="ml-auto flex shrink-0 items-center gap-1 bg-[var(--bg-base)] rounded-lg p-0.5">
         <button
           onClick={() => setView('month')}
           className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
             currentView === 'month'
-              ? 'bg-[#faf9f7] text-[#1a1a1a] shadow-sm'
-              : 'text-[#6b7280] hover:text-[#1a1a1a]'
+              ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           月
@@ -83,8 +83,8 @@ export const CalendarToolbar: React.FC = () => {
           onClick={() => setView('week')}
           className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
             currentView === 'week'
-              ? 'bg-[#faf9f7] text-[#1a1a1a] shadow-sm'
-              : 'text-[#6b7280] hover:text-[#1a1a1a]'
+              ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           周

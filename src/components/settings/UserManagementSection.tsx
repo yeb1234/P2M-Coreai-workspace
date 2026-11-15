@@ -159,12 +159,12 @@ export const UserManagementSection: React.FC = () => {
       </div>
 
       {error && (
-        <p className="flex items-start gap-1.5 text-xs text-[#dc3545]">
+        <p className="flex items-start gap-1.5 text-xs text-[var(--danger)]">
           <AlertCircle size={13} className="mt-0.5 shrink-0" />
           {error}
         </p>
       )}
-      {notice && <p className="text-xs text-[#16a34a]">{notice}</p>}
+      {notice && <p className="text-xs text-[var(--success)]">{notice}</p>}
 
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -175,11 +175,11 @@ export const UserManagementSection: React.FC = () => {
         </div>
 
         {loading ? (
-          <p className="py-6 text-center text-xs text-[#9ca3af]">加载中…</p>
+          <p className="py-6 text-center text-xs text-[var(--text-muted)]">加载中…</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-[#e5e2dd]">
+          <div className="overflow-x-auto rounded-lg border border-[var(--border-light)]">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#faf9f7] text-[#6b7280]">
+              <thead className="bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
                 <tr>
                   <th className="px-3 py-2 font-medium">账号</th>
                   <th className="px-3 py-2 font-medium">角色</th>
@@ -196,27 +196,27 @@ export const UserManagementSection: React.FC = () => {
                   return (
                     <tr key={user.id} className="border-t border-[#f0ede8]">
                       <td className="px-3 py-2">
-                        <span className="font-medium text-[#1a1a1a]">{user.username}</span>
-                        {isSelf && <span className="ml-1.5 text-[10px] text-[#9ca3af]">(你)</span>}
+                        <span className="font-medium text-[var(--text-primary)]">{user.username}</span>
+                        {isSelf && <span className="ml-1.5 text-[10px] text-[var(--text-muted)]">(你)</span>}
                       </td>
                       <td className="px-3 py-2">
                         <span
                           className={`rounded border px-1.5 py-0.5 text-[10px] ${
                             user.role === 'admin'
-                              ? 'border-[#f0dcc0] bg-[#fdf6ec] text-[#c87d2f]'
-                              : 'border-[#e5e2dd] bg-[#f5f5f4] text-[#6b7280]'
+                              ? 'border-[#f0dcc0] bg-[var(--bg-accent)] text-[var(--accent)]'
+                              : 'border-[var(--border-light)] bg-[var(--bg-base)] text-[var(--text-secondary)]'
                           }`}
                         >
                           {user.role === 'admin' ? '管理员' : '成员'}
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        <span className={user.is_active ? 'text-[#16a34a]' : 'text-[#dc3545]'}>
+                        <span className={user.is_active ? 'text-[var(--success)]' : 'text-[var(--danger)]'}>
                           {user.is_active ? '启用' : '已停用'}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-[#6b7280]">{formatDate(user.last_login_at)}</td>
-                      <td className="px-3 py-2 text-[#9ca3af]">
+                      <td className="px-3 py-2 text-[var(--text-secondary)]">{formatDate(user.last_login_at)}</td>
+                      <td className="px-3 py-2 text-[var(--text-muted)]">
                         {user.watch_events} 条观看 / {user.learning_paths} 条路径
                       </td>
                       <td className="px-3 py-2">
@@ -226,7 +226,7 @@ export const UserManagementSection: React.FC = () => {
                             disabled={busy || isSelf}
                             onClick={() => void handleToggleRole(user)}
                             title={user.role === 'admin' ? '降为成员' : '设为管理员'}
-                            className="rounded p-1 text-[#6b7280] transition hover:bg-[#f5f5f4] hover:text-[#c87d2f] disabled:opacity-30"
+                            className="rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] hover:text-[var(--accent)] disabled:opacity-30"
                           >
                             <Shield size={13} />
                           </button>
@@ -235,7 +235,7 @@ export const UserManagementSection: React.FC = () => {
                             disabled={busy || isSelf}
                             onClick={() => void handleToggleActive(user)}
                             title={user.is_active ? '停用' : '启用'}
-                            className="rounded p-1 text-[#6b7280] transition hover:bg-[#f5f5f4] hover:text-[#c87d2f] disabled:opacity-30"
+                            className="rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] hover:text-[var(--accent)] disabled:opacity-30"
                           >
                             {user.is_active ? <UserX size={13} /> : <UserCheck size={13} />}
                           </button>
@@ -244,7 +244,7 @@ export const UserManagementSection: React.FC = () => {
                             disabled={busy}
                             onClick={() => void handleResetPassword(user)}
                             title="重置密码"
-                            className="rounded p-1 text-[#6b7280] transition hover:bg-[#f5f5f4] hover:text-[#2563eb] disabled:opacity-30"
+                            className="rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] hover:text-[var(--info)] disabled:opacity-30"
                           >
                             <KeyRound size={13} />
                           </button>
@@ -253,7 +253,7 @@ export const UserManagementSection: React.FC = () => {
                             disabled={busy || isSelf}
                             onClick={() => void handleDelete(user)}
                             title="删除账号"
-                            className="rounded p-1 text-[#6b7280] transition hover:bg-[#fdf2f2] hover:text-[#dc3545] disabled:opacity-30"
+                            className="rounded p-1 text-[var(--text-secondary)] transition hover:bg-[#fdf2f2] hover:text-[var(--danger)] disabled:opacity-30"
                           >
                             <Trash2 size={13} />
                           </button>

@@ -18,10 +18,10 @@ export const RecentNotesSummary: React.FC = () => {
       {recent.map((note) => (
         <div key={note.id} className={`${note.color} rounded-lg p-2.5`}>
           <div className="flex items-center gap-2 mb-1">
-            <StickyNote size={12} className="text-[#6b7280] flex-shrink-0" />
-            <span className="text-xs font-medium text-[#1a1a1a] truncate">{note.title}</span>
+            <StickyNote size={12} className="text-[var(--text-secondary)] flex-shrink-0" />
+            <span className="text-xs font-medium text-[var(--text-primary)] truncate">{note.title}</span>
           </div>
-          <p className="text-[10px] text-[#6b7280] line-clamp-2 leading-relaxed">{note.content || '空笔记'}</p>
+          <p className="text-[10px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed">{note.content || '空笔记'}</p>
         </div>
       ))}
     </div>

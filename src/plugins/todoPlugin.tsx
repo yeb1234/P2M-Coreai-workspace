@@ -10,7 +10,7 @@ export const todoPlugin: Plugin = {
     icon: <ListTodo size={20} />,
     description: '管理您的待办事项',
     defaultPosition: 0,
-    color: 'text-[#c87d2f]',
+    color: 'text-[var(--accent)]',
     defaultSize: 'small',
     summaryComponent: TodoSummary,
   },
