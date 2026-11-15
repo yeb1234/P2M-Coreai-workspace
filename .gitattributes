@@ -19,3 +19,6 @@ Dockerfile  text eol=lf
 *.woff      binary
 *.woff2     binary
 *.db        binary
+
+# Caddy 配置挂载进容器，保持 LF
+Caddyfile   text eol=lf
