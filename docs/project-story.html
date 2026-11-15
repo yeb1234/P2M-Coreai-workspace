@@ -577,7 +577,8 @@
     <li><a href="#interview"><span class="n">07</span>面试怎么答</a></li>
     <li><a href="#tell"><span class="n">08</span>怎么讲这个项目</a></li>
     <li><a href="#hardening"><span class="n">09</span>从能跑到能上线</a></li>
-    <li><a href="#appendix"><span class="n">10</span>附录</a></li>
+    <li><a href="#research"><span class="n">10</span>开工前的三页纸</a></li>
+    <li><a href="#appendix"><span class="n">11</span>附录</a></li>
   </ul>
 </aside>
 
@@ -2287,8 +2288,146 @@ fcd1e58  chore           换行符规则固化</code></pre>
   </p>
 </section>
 
+<section id="research">
+  <div class="sec-head"><span class="sec-num">10</span><h2>开工前的三页纸</h2></div>
+  <p class="sec-desc">
+    每个项目动手之前，先做一次「全面研究」，落成三页纸：<b>架构拆解、竞品对照、评测口径</b>，各一页。
+    这三页不是为了交差，是<b>决策工具</b>——它决定的是「要不要返工三轮」。
+  </p>
+
+  <p class="sec-desc">
+    写之前先想清楚，每一页各自回答一个不同的问题：
+  </p>
+
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi"><div class="kpi-v">钱花在哪</div><div class="kpi-l">架构拆解 → 决定分层与取舍</div></div>
+    <div class="kpi"><div class="kpi-v">别人踩过啥</div><div class="kpi-l">竞品对照 → 决定什么不做</div></div>
+    <div class="kpi"><div class="kpi-v">什么算成功</div><div class="kpi-l">评测口径 → 决定什么时候停</div></div>
+  </div>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">①</span>
+      <h3>架构拆解：画出一条请求的完整链路</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">写什么</div><div class="pit-text">
+        一张链路图，从用户点击到数据落地，每一层标两个东西：<b>它负责什么</b>、<b>它挂了会发生什么</b>。
+        然后列出三个「我认为的瓶颈」，每个都配一个可以验证它的方法。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">别写什么</div><div class="pit-text">
+        不要写「分了控制器/服务/仓储三层」——那是结果，不是决策。
+        要写的是<b>为什么这么分</b>：哪一层必须能独立替换，哪一层值得为它多写一个抽象。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">本项目实例</div><div class="pit-text">
+        画出「浏览器 → Caddy → nginx → FastAPI → 数据层」之后，发现一个当时没意识到的事：
+        <b>nginx 只看得到 IP，看不到「谁」</b>。所以在云上它一个人扛不住多用户限流，
+        按用户的速率和配额必须放到应用层。
+        <br>这条结论是画图时得到的，不是写代码时撞出来的。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">价值</div><div class="pit-text">
+        链路图上每个「它挂了会怎样」，都是一次免费的故障演练。
+        这个问题答不上来的层，就是你还不够了解的层。
+      </div></div>
+    </div>
+  </div>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">②</span>
+      <h3>竞品对照：不比功能，比三个维度</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">比什么</div><div class="pit-text">
+        <b>数据模型</b>：它把什么东西当成一个检索单元？一条还是成段？<br>
+        <b>策略分工</b>：召回、融合、重排各自解决什么问题，边界在哪？<br>
+        <b>失败处理</b>：断网、超时、依赖挂了，它是报错还是降级？
+      </div></div>
+      <div class="pit-row"><div class="pit-label">关键方法</div><div class="pit-text">
+        <b>找共同点</b>。三个竞品都做的选择，往往是被现实教育过的结论，不值得重新发明。<br>
+        <b>找差异点</b>，那才是你的机会所在。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">本项目实例</div><div class="pit-text">
+        看 RAGFlow、Dify、AnythingLLM，发现它们都做「分块 + 混合检索 + rerank」。
+        当时觉得是行业套路，等自己踩完碎片检索的坑才明白：
+        <b>它们不是选择这么做，是被教训过。</b>
+      </div></div>
+      <div class="pit-row"><div class="pit-label">价值</div><div class="pit-text">
+        竞品对照最大的用处是<b>砍需求</b>。看完三家都没做的功能，大概率不是它们没想到，
+        而是做了也不划算。
+      </div></div>
+    </div>
+  </div>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">③</span>
+      <h3>评测口径：在写代码前定死「什么算好」</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">四件事</div><div class="pit-text">
+        1. 用什么数据测 —— 固定查询集，20 条左右，<b>必须含负例</b><br>
+        2. 什么叫好 —— 命中率下限、相关性标准、延迟上限<br>
+        3. 谁来判定 —— 人工判断 + 一个可量化的代理指标<br>
+        4. <b>失败长什么样</b> —— 这条最重要，先写清楚错误的样子
+      </div></div>
+      <div class="pit-row"><div class="pit-label">为什么最重要的</div><div class="pit-text">
+        是第四条。没有「失败长什么样」的时候，人会不自觉地把
+        <b>「接口返回 200」当成成功标准</b>。
+        这个项目里中文检索零命中跑了很久没被发现，就是因为 200 也是一种「成功」。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">本项目实例</div><div class="pit-text">
+        8 条查询，覆盖概念（闭包）、英文术语（useEffect）、跨表述（函数返回另一个函数）、
+        意图（RAG 召回 vs 重排）、以及<b>应无结果</b>（红烧肉怎么做）。<br>
+        判定标准：top 3 里有几条真的能回答问题。负例标准：必须返回空。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">代价</div><div class="pit-text">
+        检索调了三轮才回正轨：第一轮调 RRF 权重，第二轮换 reranker，
+        第三轮才发现根因是<b>检索单元只有 9 个字</b>。
+        <br><br>
+        如果第一页就写了「8 条查询 + 人工判定」，第一天就会发现这个问题——
+        随便一条查询的返回都是「我现在啊」「对吧」这种句子，肉眼可见。
+      </div></div>
+    </div>
+  </div>
+
+  <h3>最小形态：三页纸加起来不超过 1500 字</h3>
+  <p class="sec-desc">
+    写多了就是浪费时间。每页三到五条，够用即可。
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>页</th><th>最少要写</th><th>可以省</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>架构拆解</b></td>
+        <td>一张链路图 + 每层的故障影响 + 三个待验证的瓶颈假设</td>
+        <td>详细时序图、完整部署拓扑</td>
+      </tr>
+      <tr>
+        <td><b>竞品对照</b></td>
+        <td>三个产品 × 同一个维度（数据模型 / 策略分工 / 失败处理）</td>
+        <td>功能清单、价格、截图</td>
+      </tr>
+      <tr>
+        <td><b>评测口径</b></td>
+        <td>20 条查询 + 判定标准 + 至少 3 条负例</td>
+        <td>完整测试报告、覆盖率数字</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="sec-desc" style="margin-top:12px">
+    一句话总结：<b>这三页纸加起来不超过 1500 字，但它决定的是「要不要返工三轮」。</b>
+    而且它有一个额外好处——面试时被问「你怎么启动一个项目」，这三页就是现成的答案，
+    比「先看需求、再选技术栈」这种空话具体得多。
+  </p>
+</section>
+
 <section id="appendix">
-  <div class="sec-head"><span class="sec-num">10</span><h2>附录</h2></div>
+  <div class="sec-head"><span class="sec-num">11</span><h2>附录</h2></div>
   <p class="sec-desc">查代码、跑命令、对术语时用。</p>
 
   <h3>关键文件地图</h3>
