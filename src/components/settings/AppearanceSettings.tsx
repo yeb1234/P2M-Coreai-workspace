@@ -79,7 +79,7 @@ export function AppearanceSettings() {
           : 'hover:border-[var(--border-medium)]'
       }`}
     >
-      <div className="mb-2 flex h-7 overflow-hidden rounded-md border border-[var(--border-light)]">
+      <div className="mb-2 flex h-7 overflow-hidden rounded-lg border border-[var(--border-light)]">
         <span className="flex-1" style={{ background: t.vars['--bg-base'] }} />
         <span className="flex-1" style={{ background: t.vars['--bg-card'] }} />
         <span className="flex-1" style={{ background: t.vars['--accent'] }} />
@@ -132,7 +132,7 @@ export function AppearanceSettings() {
         <div className="mb-3 flex items-center justify-between">
           <label className="block text-xs font-medium text-[var(--text-secondary)]">主题风格</label>
           {themeScheduleEnabled && (
-            <span className="rounded-md bg-[var(--accent-bg)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+            <span className="rounded-lg bg-[var(--accent-bg)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
               自动调度中
             </span>
           )}
@@ -192,13 +192,13 @@ export function AppearanceSettings() {
                         <input
                           value={rule.name}
                           onChange={(e) => handleUpdateRule(rule.id, { name: e.target.value })}
-                          className="flex-1 rounded-md border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]"
+                          className="flex-1 rounded-lg border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]"
                           placeholder="规则名称"
                         />
                         <select
                           value={rule.themeId}
                           onChange={(e) => handleUpdateRule(rule.id, { themeId: e.target.value })}
-                          className="rounded-md border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]"
+                          className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]"
                         >
                           {THEME_PRESETS.map((t) => (
                             <option key={t.id} value={t.id}>{t.name}</option>
@@ -211,14 +211,14 @@ export function AppearanceSettings() {
                           type="time"
                           value={rule.startTime}
                           onChange={(e) => handleUpdateRule(rule.id, { startTime: e.target.value })}
-                          className="rounded-md border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none"
+                          className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none"
                         />
                         <span className="text-[var(--text-muted)]">~</span>
                         <input
                           type="time"
                           value={rule.endTime}
                           onChange={(e) => handleUpdateRule(rule.id, { endTime: e.target.value })}
-                          className="rounded-md border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none"
+                          className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none"
                         />
                       </div>
                       <div className="flex items-center gap-1">
@@ -226,7 +226,7 @@ export function AppearanceSettings() {
                           <button
                             key={day}
                             onClick={() => toggleRuleWeekday(rule.id, day)}
-                            className={`h-6 w-6 rounded-md text-xs font-medium transition-colors ${
+                            className={`h-6 w-6 rounded-lg text-xs font-medium transition-colors ${
                               rule.weekdays.includes(day)
                                 ? 'bg-[var(--accent)] text-white'
                                 : 'border border-[var(--border-light)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'

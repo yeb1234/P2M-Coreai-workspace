@@ -33,7 +33,7 @@ const VideoCard = React.memo(function VideoCard({
               event.stopPropagation();
               onToggleFavorite(video.id, !video.is_favorite);
             }}
-            className={`absolute right-1 top-1 z-20 grid h-6 w-6 place-items-center rounded-md border border-white/20 bg-black/45 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/65 ${
+            className={`absolute right-1 top-1 z-20 grid h-6 w-6 place-items-center rounded-lg border border-white/20 bg-black/45 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/65 ${
               video.is_favorite ? 'text-[#fbbf24]' : 'text-white/80'
             }`}
             title={video.is_favorite ? '取消收藏' : '收藏视频'}
@@ -487,7 +487,7 @@ export function VideoGridSection({
             <select
               value={columnsPerRow}
               onChange={(event) => onColumnsPerRowChange(Number(event.target.value))}
-              className="h-6 rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-1.5 py-0 text-xs"
+              className="h-6 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-1.5 py-0 text-xs"
               title="设置当前视频列表每行显示的视频数量"
             >
               {[2, 3, 4, 5, 6, 7, 8].map((count) => (

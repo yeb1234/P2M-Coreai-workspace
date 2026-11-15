@@ -33,7 +33,7 @@ export function SubtitleOverlay({ visible, text, opacity, size, onDoubleClick }:
           e.stopPropagation();
           onDoubleClick?.();
         }}
-        className="max-w-[86%] rounded-md bg-black/65 px-3 py-1.5 text-center text-white leading-snug shadow-lg pointer-events-auto cursor-text select-text"
+        className="max-w-[86%] rounded-lg bg-black/65 px-3 py-1.5 text-center text-white leading-snug shadow-lg pointer-events-auto cursor-text select-text"
         style={{ fontSize: `${Math.max(12, Math.round(18 * size / 100))}px` }}
       >
         {text}

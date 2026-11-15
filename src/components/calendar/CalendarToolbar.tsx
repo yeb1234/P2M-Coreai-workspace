@@ -71,7 +71,7 @@ export const CalendarToolbar: React.FC = () => {
       <div className="ml-auto flex shrink-0 items-center gap-1 bg-[var(--bg-base)] rounded-lg p-0.5">
         <button
           onClick={() => setView('month')}
-          className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+          className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
             currentView === 'month'
               ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -81,7 +81,7 @@ export const CalendarToolbar: React.FC = () => {
         </button>
         <button
           onClick={() => setView('week')}
-          className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+          className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
             currentView === 'week'
               ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

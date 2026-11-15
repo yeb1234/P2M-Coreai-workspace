@@ -86,14 +86,14 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
           <div className="flex items-center gap-0.5">
             <button
               onClick={handleZoom}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-md transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-lg transition-colors"
               title={currentSize === 'large' ? '缩小' : '放大'}
             >
               {currentSize === 'large' ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
             <button
               onClick={() => togglePlugin(plugin.metadata.id)}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] rounded-md transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] rounded-lg transition-colors"
               title="隐藏此组件"
             >
               <X size={13} />

@@ -433,26 +433,26 @@ export const TimeCenterPage: React.FC = () => {
                     <div className="flex justify-end gap-1">
                       {row.type === 'stopwatch' && (
                         <>
-                          <button onClick={stopwatchRunning ? pauseStopwatch : startStopwatch} className="rounded-md bg-[var(--accent)] px-2 py-1 text-white">{stopwatchRunning ? <Pause size={13} /> : <Play size={13} />}</button>
-                          <button onClick={resetStopwatch} className="rounded-md bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)]"><RotateCcw size={13} /></button>
+                          <button onClick={stopwatchRunning ? pauseStopwatch : startStopwatch} className="rounded-lg bg-[var(--accent)] px-2 py-1 text-white">{stopwatchRunning ? <Pause size={13} /> : <Play size={13} />}</button>
+                          <button onClick={resetStopwatch} className="rounded-lg bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)]"><RotateCcw size={13} /></button>
                         </>
                       )}
                       {row.type === 'countdown' && (
                         <>
-                          <button onClick={() => countdownEndById[row.id] ? pauseCountdown(row.id) : startCountdown(row.id, countdownPresets.find((item) => item.id === row.id)?.seconds || 60)} className="rounded-md bg-[var(--accent)] px-2 py-1 text-white">{countdownEndById[row.id] ? <Pause size={13} /> : <Play size={13} />}</button>
-                          <button onClick={() => removeCountdownPreset(row.id)} className="rounded-md bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 size={13} /></button>
+                          <button onClick={() => countdownEndById[row.id] ? pauseCountdown(row.id) : startCountdown(row.id, countdownPresets.find((item) => item.id === row.id)?.seconds || 60)} className="rounded-lg bg-[var(--accent)] px-2 py-1 text-white">{countdownEndById[row.id] ? <Pause size={13} /> : <Play size={13} />}</button>
+                          <button onClick={() => removeCountdownPreset(row.id)} className="rounded-lg bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 size={13} /></button>
                         </>
                       )}
                       {row.type === 'alarm' && (
                         <>
-                          <button onClick={() => toggleAlarm(row.id)} className="rounded-md bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)]">{row.enabled ? '停用' : '启用'}</button>
-                          <button onClick={() => removeAlarm(row.id)} className="rounded-md bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 size={13} /></button>
+                          <button onClick={() => toggleAlarm(row.id)} className="rounded-lg bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)]">{row.enabled ? '停用' : '启用'}</button>
+                          <button onClick={() => removeAlarm(row.id)} className="rounded-lg bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 size={13} /></button>
                         </>
                       )}
                       {(row.type === 'reminder' || row.type === 'todo') && row.type !== 'todo' && (
                         <>
-                          <button onClick={() => toggleReminder(row.id)} className="rounded-md bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)]">{row.enabled ? '停用' : '启用'}</button>
-                          <button onClick={() => removeReminder(row.id)} className="rounded-md bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 size={13} /></button>
+                          <button onClick={() => toggleReminder(row.id)} className="rounded-lg bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)]">{row.enabled ? '停用' : '启用'}</button>
+                          <button onClick={() => removeReminder(row.id)} className="rounded-lg bg-[var(--bg-card)] px-2 py-1 text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 size={13} /></button>
                         </>
                       )}
                     </div>

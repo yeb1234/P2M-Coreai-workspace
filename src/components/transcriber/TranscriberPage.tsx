@@ -379,7 +379,7 @@ export function TranscriberPage() {
               type="button"
               onClick={loadTree}
               disabled={treeLoading}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-45"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-45"
               title="刷新目录"
             >
               <RefreshCw size={14} className={treeLoading ? 'animate-spin' : ''} />
@@ -426,7 +426,7 @@ export function TranscriberPage() {
                 selectedVideos.map((video) => (
                   <div
                     key={video.id}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-[var(--bg-elevated)]"
+                    className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-[var(--bg-elevated)]"
                     title={video.title}
                   >
                     <PlayCircle size={13} className="shrink-0 text-[var(--accent)]" />

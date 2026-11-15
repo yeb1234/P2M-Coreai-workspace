@@ -35,7 +35,7 @@ export const OpenClawPage: React.FC = () => {
                 <span className="text-xs px-1.5 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded font-mono">v{pkg.version}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--success)] hover:bg-[var(--success-bg)] rounded-md"><Download size={14} /></button>
+                <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--success)] hover:bg-[var(--success-bg)] rounded-lg"><Download size={14} /></button>
                 <ExternalLink size={14} className="text-[var(--border-medium)] group-hover:text-[var(--text-secondary)]" />
               </div>
             </div>

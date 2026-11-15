@@ -128,14 +128,14 @@ const WidgetCard: React.FC<WidgetCardProps> = React.memo(({
           <div className="flex items-center gap-0.5">
             <button
               onClick={() => onToggleSize(id)}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-md transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-lg transition-colors"
               title={size === 'full' || size === 'large' ? '缩小' : '放大'}
             >
               {size === 'full' || size === 'large' ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
             <button
               onClick={() => onToggleEnabled(id)}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] rounded-md transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] rounded-lg transition-colors"
               title="隐藏此组件"
             >
               <X size={13} />
@@ -272,8 +272,8 @@ function ActiveCountdownWidget({
               <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                 <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
               </div>
-              <button onClick={() => onPause(id)} className="shrink-0 px-2 py-0.5 rounded-md bg-blue-500 text-white text-xs">暂停</button>
-              <button onClick={() => onComplete(id)} className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--bg-card)] text-[var(--text-muted)] text-xs hover:text-[var(--danger)]">取消</button>
+              <button onClick={() => onPause(id)} className="shrink-0 px-2 py-0.5 rounded-lg bg-blue-500 text-white text-xs">暂停</button>
+              <button onClick={() => onComplete(id)} className="shrink-0 px-2 py-0.5 rounded-lg bg-[var(--bg-card)] text-[var(--text-muted)] text-xs hover:text-[var(--danger)]">取消</button>
             </div>
           </div>
         );

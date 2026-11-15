@@ -44,7 +44,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
   return (
     <div>
       <div
-        className="flex min-w-0 items-center gap-1.5 rounded-md py-1 pr-2 hover:bg-[var(--bg-accent)]"
+        className="flex min-w-0 items-center gap-1.5 rounded-lg py-1 pr-2 hover:bg-[var(--bg-accent)]"
         style={{ paddingLeft: `${level * 16 + 4}px` }}
       >
         {/* 没有子节点时不留按钮 —— 之前是 disabled + opacity-0，

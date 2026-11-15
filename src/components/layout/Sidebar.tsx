@@ -141,7 +141,7 @@ export const Sidebar: React.FC = () => {
               <span className="truncate text-sm font-bold tracking-wider text-[var(--accent)]">灵境</span>
               <button
                 onClick={toggleSidebar}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
                 title="收起左侧栏"
               >
                 <ChevronLeft size={14} />
@@ -150,7 +150,7 @@ export const Sidebar: React.FC = () => {
           ) : (
             <button
               onClick={toggleSidebar}
-              className="grid h-8 w-full place-items-center rounded-md text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
+              className="grid h-8 w-full place-items-center rounded-lg text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
               title="展开左侧栏"
             >
               <ChevronRight size={16} />
@@ -160,14 +160,14 @@ export const Sidebar: React.FC = () => {
             <div className="ml-2 flex shrink-0 items-center gap-0.5">
               <button
                 onClick={resetNavOrder}
-                className="grid h-7 w-7 place-items-center rounded-md text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
+                className="grid h-7 w-7 place-items-center rounded-lg text-[var(--text-muted)] transition-all hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]"
                 title="重置顺序"
               >
                 <RotateCcw size={14} />
               </button>
               <button
                 onClick={() => setShowRestorePanel((v) => !v)}
-                className={`grid h-7 w-7 place-items-center rounded-md transition-all ${
+                className={`grid h-7 w-7 place-items-center rounded-lg transition-all ${
                   showRestorePanel
                     ? 'text-[var(--accent)] bg-[var(--accent-bg)]'
                     : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)]'
@@ -268,7 +268,7 @@ export const Sidebar: React.FC = () => {
                 const meta = PAGE_MAP[id];
                 if (!meta) return null;
                 return (
-                  <div key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--bg-elevated)] transition-colors">
+                  <div key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors">
                     <span className="text-[var(--text-muted)]">{meta.icon}</span>
                     <span className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-[var(--text-secondary)]">
                       <span className="truncate">{meta.label}</span>

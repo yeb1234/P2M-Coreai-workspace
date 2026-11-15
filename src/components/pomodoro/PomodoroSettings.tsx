@@ -16,7 +16,7 @@ export const PomodoroSettingsButton = forwardRef<HTMLButtonElement, PomodoroSett
     <button
       ref={ref}
       onClick={onClick}
-      className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-[var(--accent-bg)] px-2.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_16%,var(--bg-card))]"
+      className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent-bg)] px-2.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_16%,var(--bg-card))]"
     >
       <Settings2 size={14} />
       参数
@@ -56,7 +56,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
         </h3>
         <button
           onClick={closeSettings}
-          className="grid h-6 w-6 place-items-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)]"
+          className="grid h-6 w-6 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)]"
           title="关闭参数面板"
         >
           <X size={13} />
@@ -74,7 +74,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
             <button
               key={min}
               onClick={() => { updateConfig({ workDuration: min }); playInteractionSound('save'); }}
-              className={`h-7 text-xs rounded-md border transition-all ${
+              className={`h-7 text-xs rounded-lg border transition-all ${
                 config.workDuration === min
                   ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                   : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--accent)]'
@@ -97,7 +97,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
             <button
               key={min}
               onClick={() => { updateConfig({ shortBreakDuration: min }); playInteractionSound('save'); }}
-              className={`h-7 text-xs rounded-md border transition-all ${
+              className={`h-7 text-xs rounded-lg border transition-all ${
                 config.shortBreakDuration === min
                   ? 'bg-[var(--success)] text-white border-[var(--success)] shadow-sm'
                   : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--success)]'
@@ -120,7 +120,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
             <button
               key={min}
               onClick={() => { updateConfig({ longBreakDuration: min }); playInteractionSound('save'); }}
-              className={`h-7 text-xs rounded-md border transition-all ${
+              className={`h-7 text-xs rounded-lg border transition-all ${
                 config.longBreakDuration === min
                   ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                   : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--accent)]'
@@ -143,7 +143,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
             <button
               key={n}
               onClick={() => { updateConfig({ longBreakInterval: n }); playInteractionSound('save'); }}
-              className={`h-7 text-xs rounded-md border transition-all ${
+              className={`h-7 text-xs rounded-lg border transition-all ${
                 config.longBreakInterval === n
                   ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                   : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--accent)]'
@@ -169,7 +169,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
               key={item.value}
               type="button"
               onClick={() => { updateConfig({ ambientPlaybackMode: item.value }); playInteractionSound('save'); }}
-              className={`rounded-md border px-2.5 py-1.5 text-left transition-all ${
+              className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
                 ambientMode === item.value
                   ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                   : 'border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-[var(--accent)]'

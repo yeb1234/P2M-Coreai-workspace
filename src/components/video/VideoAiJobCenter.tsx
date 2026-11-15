@@ -241,7 +241,7 @@ function IconButton({
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
         danger
           ? 'text-[var(--danger)] hover:border-[color-mix(in_srgb,var(--danger)_38%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]'
           : 'text-[var(--text-secondary)] hover:border-[var(--border-light)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]'
@@ -320,7 +320,7 @@ export function VideoAiJobCenter({
           type="button"
           onClick={() => setCollapsed((value) => !value)}
           aria-expanded={!collapsed}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]"
           title={collapsed ? '展开 AI 任务中心' : '收起 AI 任务中心'}
           aria-label={collapsed ? '展开 AI 任务中心' : '收起 AI 任务中心'}
         >
@@ -352,7 +352,7 @@ export function VideoAiJobCenter({
               type="button"
               onClick={canToggleQueue ? onToggleQueue : undefined}
               disabled={!canToggleQueue}
-              className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+              className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                 queuePaused || queueStuck
                   ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
                   : 'border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
@@ -390,7 +390,7 @@ export function VideoAiJobCenter({
 
       {!collapsed && (
         <div className="mt-4 min-w-0 space-y-4">
-          <div className="min-w-0 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
             <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-[var(--text-primary)]">批处理{batchScopeLabel}</p>
@@ -403,7 +403,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onPreviewBatchFolder}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
                 >
                   <SearchCheck size={13} />
                   预览
@@ -412,7 +412,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onApplySettings}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
                   title="将左侧当前转写设置保存到后端并同步给排队中的任务"
                 >
                   <RefreshCw size={13} />
@@ -422,7 +422,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onBatchFolder}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-xs text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-lg bg-[var(--accent)] px-2 text-xs text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
                 >
                   {batchLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                   入队
@@ -436,7 +436,7 @@ export function VideoAiJobCenter({
                   key={mode.value}
                   type="button"
                   onClick={() => onBatchModeChange?.(mode.value)}
-                  className={`min-w-0 truncate rounded-md border px-2 py-1.5 text-left text-xs transition-colors ${
+                  className={`min-w-0 truncate rounded-lg border px-2 py-1.5 text-left text-xs transition-colors ${
                     batchMode === mode.value
                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                       : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
@@ -452,7 +452,7 @@ export function VideoAiJobCenter({
             </p>
 
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-xs text-[var(--text-secondary)]">
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--border-light)] px-2 py-1.5 text-xs text-[var(--text-secondary)]">
                 <span className="shrink-0">最多新增入队</span>
                 <input
                   value={limitDraft}
@@ -465,7 +465,7 @@ export function VideoAiJobCenter({
                   className="min-w-0 flex-1 border-0 bg-transparent px-1 py-0 text-right text-xs text-[var(--text-primary)] outline-none"
                 />
               </label>
-              <label className="flex min-w-[145px] shrink-0 items-center justify-between gap-3 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-xs text-[var(--text-secondary)]">
+              <label className="flex min-w-[145px] shrink-0 items-center justify-between gap-3 rounded-lg border border-[var(--border-light)] px-2 py-1.5 text-xs text-[var(--text-secondary)]">
                 <span>同时校对字幕</span>
                 <input
                   type="checkbox"
@@ -477,7 +477,7 @@ export function VideoAiJobCenter({
             </div>
 
             {batchPreview && (
-              <div className="mt-2 min-w-0 rounded-md border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-xs leading-5 text-[var(--text-muted)]">
+              <div className="mt-2 min-w-0 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-xs leading-5 text-[var(--text-muted)]">
                 <p>
                   共 {batchPreview.requested}，可处理 {batchPreview.eligible}，本次入队 {batchPreview.enqueued || previewEnqueueCount}，跳过 {batchPreview.skipped}
                   {batchPreview.active ? `，活动中 ${batchPreview.active}` : ''}
@@ -507,7 +507,7 @@ export function VideoAiJobCenter({
                   key={filter.value ?? 'all'}
                   type="button"
                   onClick={() => onStatusChange(filter.value)}
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
+                  className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs transition-colors ${
                     selectedStatus === filter.value
                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                       : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'

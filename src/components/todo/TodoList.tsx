@@ -238,7 +238,7 @@ export const TodoList: React.FC = () => {
               <div className="max-h-60 overflow-y-auto divide-y divide-[var(--border-light)]">
                 {trashedTodos.map(({ item, deletedAt }) => (
                   <div key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-accent)] transition-colors">
-                    <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: PRIORITY_COLORS[item.priority] }} />
+                    <div className="w-3 h-3 rounded-lg flex-shrink-0" style={{ backgroundColor: PRIORITY_COLORS[item.priority] }} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-[var(--text-primary)] truncate block">{item.title}</span>
                       <span className="text-xs text-[var(--text-muted)]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>

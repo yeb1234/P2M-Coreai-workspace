@@ -327,7 +327,7 @@ export function TranscriptionSettings() {
               key={d}
               type="button"
               onClick={() => updateForm({ deviceType: d })}
-              className={`flex-1 rounded-md border px-2 py-1.5 text-xs transition-colors ${
+              className={`flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
                 form.deviceType === d
                   ? 'border-[var(--accent)] bg-[var(--warn-bg)] text-[var(--accent-hover)]'
                   : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)]/50'

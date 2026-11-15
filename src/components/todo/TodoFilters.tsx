@@ -56,7 +56,7 @@ export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children })
               }`}
               style={{ backgroundColor: filter.priority === item.value ? (item.value ? PRIORITY_COLORS[item.value] : '#c87d2f') : undefined }}
             >
-              {item.color && <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} />}
+              {item.color && <span className="w-2 h-2 rounded-lg flex-shrink-0" style={{ backgroundColor: item.color }} />}
               {item.label}
             </button>
           ))}
@@ -112,7 +112,7 @@ export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children })
               }`}
               style={{ backgroundColor: filter.priority === item.value ? (item.value ? PRIORITY_COLORS[item.value] : '#c87d2f') : undefined }}
             >
-              {item.color && <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} />}
+              {item.color && <span className="w-2.5 h-2.5 rounded-lg flex-shrink-0" style={{ backgroundColor: item.color }} />}
               {item.label}
             </button>
           ))}

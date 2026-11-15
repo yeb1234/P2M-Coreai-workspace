@@ -192,7 +192,7 @@ export function AISettings() {
             <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{isLocal ? 'LM Studio / 本地 OpenAI 兼容服务。' : '网络 OpenAI 兼容服务，用于兜底或优先处理。'}</p>
           </div>
           {!isLocal && (
-            <button type="button" onClick={clearExternal} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--danger)] hover:bg-[var(--danger-bg)]" title="清空外部 LLM 设置">
+            <button type="button" onClick={clearExternal} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--danger)] hover:bg-[var(--danger-bg)]" title="清空外部 LLM 设置">
               <Trash2 size={14} />
             </button>
           )}
@@ -289,7 +289,7 @@ export function AISettings() {
           <button
             type="button"
             onClick={addTemplate}
-            className="inline-flex items-center gap-1 rounded-md bg-[var(--success)] px-2.5 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-[#15803d]"
+            className="inline-flex items-center gap-1 rounded-lg bg-[var(--success)] px-2.5 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-[#15803d]"
           >
             <Plus className="h-3.5 w-3.5" />
             新建模板
@@ -315,7 +315,7 @@ export function AISettings() {
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="flex-1 rounded-md border border-[var(--border-medium)] px-2 py-1 text-sm outline-none focus:border-[#16a34a]"
+                      className="flex-1 rounded-lg border border-[var(--border-medium)] px-2 py-1 text-sm outline-none focus:border-[#16a34a]"
                     />
                   ) : (
                     <button
@@ -339,7 +339,7 @@ export function AISettings() {
                             updateTemplate(template.id, { name: editName, content: editContent });
                             setEditingId(null);
                           }}
-                          className="rounded-md p-1 text-[var(--success)] hover:bg-[#dcfce7]"
+                          className="rounded-lg p-1 text-[var(--success)] hover:bg-[#dcfce7]"
                           title="保存"
                         >
                           <Save className="h-4 w-4" />
@@ -347,7 +347,7 @@ export function AISettings() {
                         <button
                           type="button"
                           onClick={() => setEditingId(null)}
-                          className="rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-base)]"
+                          className="rounded-lg p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-base)]"
                           title="取消"
                         >
                           <X className="h-4 w-4" />
@@ -362,7 +362,7 @@ export function AISettings() {
                             setEditName(template.name);
                             setEditContent(template.content);
                           }}
-                          className="rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-base)]"
+                          className="rounded-lg p-1 text-[var(--text-secondary)] hover:bg-[var(--bg-base)]"
                           title="编辑"
                         >
                           <Pencil className="h-4 w-4" />
@@ -371,7 +371,7 @@ export function AISettings() {
                           <button
                             type="button"
                             onClick={() => removeTemplate(template.id)}
-                            className="rounded-md p-1 text-[#dc2626] hover:bg-red-50"
+                            className="rounded-lg p-1 text-[#dc2626] hover:bg-red-50"
                             title="删除"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -387,7 +387,7 @@ export function AISettings() {
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={6}
-                    className="mt-2 w-full rounded-md border border-[var(--border-medium)] bg-white px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-[#16a34a]"
+                    className="mt-2 w-full rounded-lg border border-[var(--border-medium)] bg-white px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-[#16a34a]"
                     placeholder="在这里写提示词模板内容..."
                   />
                 )}

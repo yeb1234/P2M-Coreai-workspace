@@ -70,11 +70,11 @@ export const PomodoroStats: React.FC = () => {
             <span className="text-xs font-medium">本周趋势</span>
             <div className="ml-auto flex items-center gap-3 pr-1 text-xs">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'var(--accent)' }} />
+                <span className="w-2 h-2 rounded-lg" style={{ backgroundColor: 'var(--accent)' }} />
                 专注
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'var(--warning)' }} />
+                <span className="w-2 h-2 rounded-lg" style={{ backgroundColor: 'var(--warning)' }} />
                 休息
               </span>
             </div>
@@ -106,7 +106,7 @@ export const PomodoroStats: React.FC = () => {
                     <div className="text-xs leading-tight">{dayName}</div>
                     <div className="text-xs leading-tight">{dayNum}</div>
                   </div>
-                  <div className="flex-1 h-5 rounded-md relative overflow-hidden bg-[var(--bg-elevated)]">
+                  <div className="flex-1 h-5 rounded-lg relative overflow-hidden bg-[var(--bg-elevated)]">
                     {sessions.map((session) => {
                       const left = timeToPercent(session.startTime);
                       const endPct = session.endTime ? timeToPercent(session.endTime) : left + 2;
@@ -114,7 +114,7 @@ export const PomodoroStats: React.FC = () => {
                       return (
                         <div
                           key={session.id}
-                          className="absolute top-0.5 bottom-0.5 rounded-sm"
+                          className="absolute top-0.5 bottom-0.5 rounded-lg"
                           style={{
                             left: `${left}%`,
                             width: `${width}%`,

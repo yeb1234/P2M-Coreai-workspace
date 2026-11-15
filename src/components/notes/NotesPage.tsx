@@ -252,7 +252,7 @@ export const NotesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => { setActiveNoteId(note.id); setEdit((prev) => ({ ...prev, id: null })); }}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-white/65 hover:text-[var(--danger)]"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-white/65 hover:text-[var(--danger)]"
                 title="取消"
                 aria-label="取消编辑"
               >
@@ -261,7 +261,7 @@ export const NotesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={saveEdit}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--success)] text-white shadow-sm transition-colors hover:bg-[#15803d]"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--success)] text-white shadow-sm transition-colors hover:bg-[#15803d]"
                 title="保存"
                 aria-label="保存笔记"
               >
@@ -290,7 +290,7 @@ export const NotesPage: React.FC = () => {
         onClick={() => startEdit(note)}
       >
         <div
-          className="absolute left-2 top-3 cursor-grab rounded-md px-0.5 py-1 text-[var(--text-secondary)]/45 opacity-0 transition-all hover:bg-white/45 hover:text-[#374151] active:cursor-grabbing group-hover:opacity-100"
+          className="absolute left-2 top-3 cursor-grab rounded-lg px-0.5 py-1 text-[var(--text-secondary)]/45 opacity-0 transition-all hover:bg-white/45 hover:text-[#374151] active:cursor-grabbing group-hover:opacity-100"
           draggable
           onClick={(event) => event.stopPropagation()}
           onDragStart={(event) => {
@@ -587,7 +587,7 @@ export const NotesPage: React.FC = () => {
               <div className="max-h-64 overflow-y-auto divide-y divide-[var(--border-light)]">
                 {trashedNotes.map(({ note, deletedAt }) => (
                   <div key={note.id} className="flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-accent)] transition-colors">
-                    <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: COLOR_DOT[note.color] }} />
+                    <div className="w-3 h-3 rounded-lg flex-shrink-0" style={{ backgroundColor: COLOR_DOT[note.color] }} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-[var(--text-primary)] truncate block">{note.title}</span>
                       <span className="text-xs text-[var(--text-muted)]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>

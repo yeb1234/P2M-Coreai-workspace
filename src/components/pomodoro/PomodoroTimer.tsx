@@ -261,7 +261,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
               onPointerMove={handleVolumePointerMove}
               onKeyDown={handleVolumeKeyDown}
               style={ambientVolumeStyle}
-              className="relative h-8 min-w-0 flex-1 cursor-pointer touch-none rounded-md px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]"
+              className="relative h-8 min-w-0 flex-1 cursor-pointer touch-none rounded-lg px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]"
             >
               <div className="absolute left-1.5 right-1.5 top-1/2 h-2 -translate-y-1/2 rounded-full bg-[var(--bg-elevated)]" />
               <div
@@ -280,7 +280,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
               <button
                 key={sound}
                 onClick={() => void toggleAmbient(sound)}
-                className={`flex h-7 min-w-0 items-center justify-center rounded-md transition-colors ${
+                className={`flex h-7 min-w-0 items-center justify-center rounded-lg transition-colors ${
                   ambientSound === sound
                     ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'

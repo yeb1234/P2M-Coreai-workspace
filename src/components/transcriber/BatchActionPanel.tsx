@@ -42,7 +42,7 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
             type="button"
             onClick={onPreview}
             disabled={batchLoading || selectedVideoCount === 0}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
           >
             <SearchCheck size={13} />
             预览
@@ -51,7 +51,7 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
             type="button"
             onClick={onApplySettings}
             disabled={batchLoading}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
             title="将左侧当前转写设置保存到后端并同步给排队中的任务"
           >
             <RefreshCw size={13} />
@@ -61,7 +61,7 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
             type="button"
             onClick={onEnqueue}
             disabled={batchLoading || selectedVideoCount === 0}
-            className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-xs text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
+            className="inline-flex h-7 items-center gap-1 rounded-lg bg-[var(--accent)] px-2 text-xs text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
           >
             {batchLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             入队

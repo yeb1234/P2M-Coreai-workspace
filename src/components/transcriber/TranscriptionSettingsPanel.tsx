@@ -190,7 +190,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           <button
             type="button"
             onClick={applyCudaTurbo}
-            className={`rounded-md border px-2 py-1.5 text-left transition-colors ${
+            className={`rounded-lg border px-2 py-1.5 text-left transition-colors ${
               isCuda && settings.whisperModel === 'large-v3-turbo'
                 ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                 : 'border-[var(--border-light)] bg-[var(--theme-surface,white)] text-[var(--text-primary)] hover:border-[var(--accent)]'
@@ -203,7 +203,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           <button
             type="button"
             onClick={applyLowUsage}
-            className={`rounded-md border px-2 py-1.5 text-left transition-colors ${
+            className={`rounded-lg border px-2 py-1.5 text-left transition-colors ${
               settings.whisperEngine === 'faster-whisper' && settings.deviceType !== 'cuda'
                 ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                 : 'border-[var(--border-light)] bg-[var(--theme-surface,white)] text-[var(--text-primary)] hover:border-[var(--accent)]'
@@ -216,7 +216,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           <button
             type="button"
             onClick={applyHighPerf}
-            className={`rounded-md border px-2 py-1.5 text-left transition-colors ${
+            className={`rounded-lg border px-2 py-1.5 text-left transition-colors ${
               settings.whisperEngine === 'whisper.cpp'
                 ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                 : 'border-[var(--border-light)] bg-[var(--theme-surface,white)] text-[var(--text-primary)] hover:border-[var(--accent)]'
@@ -229,7 +229,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           <button
             type="button"
             onClick={applyDefault}
-            className="rounded-md border border-[var(--border-light)] bg-[var(--theme-surface,white)] px-2 py-1.5 text-left transition-colors hover:border-[var(--accent)]"
+            className="rounded-lg border border-[var(--border-light)] bg-[var(--theme-surface,white)] px-2 py-1.5 text-left transition-colors hover:border-[var(--accent)]"
             title="恢复系统默认参数"
           >
             <p className="text-xs font-medium text-[var(--text-primary)]">恢复默认</p>
@@ -244,7 +244,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
         <select id="f-1a10c7"
           value={settings.whisperEngine}
           onChange={(e) => handleEngineChange(e.target.value)}
-          className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+          className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
         >
           <option value="faster-whisper">faster-whisper CPU（稳定默认）</option>
           <option value="whisper.cpp">whisper.cpp 外部引擎（可接 Vulkan/HIP）</option>
@@ -256,7 +256,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
         <select id="f-9b3022"
           value={settings.whisperModel}
           onChange={(e) => onChange({ whisperModel: e.target.value })}
-          className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+          className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
         >
           {modelOptions.map((m) => {
             const installed = !whisperModels || installedModels.has(m.id);
@@ -354,7 +354,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
               key={d}
               type="button"
               onClick={() => handleDeviceChange(d)}
-              className={`flex-1 rounded-md border px-2 py-1.5 text-xs transition-colors ${
+              className={`flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
                 settings.deviceType === d
                   ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                   : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)]'
@@ -373,7 +373,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           <input id="f-295bb7"
             value={settings.language}
             onChange={(e) => onChange({ language: e.target.value })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
         <div>
@@ -382,7 +382,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             value={settings.computeType}
             onChange={(e) => onChange({ computeType: e.target.value })}
             disabled={isWhisperCpp}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
+            className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
           >
             {computeOptions.map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -409,7 +409,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             max={10}
             value={settings.beamSize}
             onChange={(e) => onChange({ beamSize: Number(e.target.value) })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
         <div>
@@ -420,7 +420,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             max={10}
             value={settings.bestOf}
             onChange={(e) => onChange({ bestOf: Number(e.target.value) })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
         <div>
@@ -432,18 +432,18 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             step={0.1}
             value={settings.temperature}
             onChange={(e) => onChange({ temperature: Number(e.target.value) })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         {isWhisperCpp ? (
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs leading-4 text-blue-700">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs leading-4 text-blue-700">
             GPU 转写模式：CPU 线程对 whisper.cpp 无效，由 whisper-cli.exe 自行决定。
           </div>
         ) : isCuda ? (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs leading-4 text-emerald-700">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs leading-4 text-emerald-700">
             CUDA 模式：转写在 GPU 上跑，CPU 线程仅影响 ffmpeg 音频提取。
           </div>
         ) : (
@@ -455,7 +455,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
               max={128}
               value={settings.cpuThreads}
               onChange={(e) => onChange({ cpuThreads: Number(e.target.value) })}
-              className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+              className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
             />
           </div>
         )}
@@ -467,7 +467,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             max={2000}
             value={settings.wordLimit}
             onChange={(e) => onChange({ wordLimit: Number(e.target.value) })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
       </div>

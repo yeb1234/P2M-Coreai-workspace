@@ -317,7 +317,7 @@ export const JourneyPage: React.FC = () => {
           <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
             少
             {['bg-[#efece8]', 'bg-[#d9e8d4]', 'bg-[#a8d3a0]', 'bg-[#6fb865]', 'bg-[#3f8f3a]'].map((c) => (
-              <span key={c} className={`h-3 w-3 rounded-sm ${c}`} />
+              <span key={c} className={`h-3 w-3 rounded-lg ${c}`} />
             ))}
             多
           </div>
@@ -330,10 +330,10 @@ export const JourneyPage: React.FC = () => {
                   <div
                     key={day.date}
                     title={`${day.date}：${day.minutes} 分钟`}
-                    className={`h-3 w-3 rounded-sm ${heatClass(day.minutes)}`}
+                    className={`h-3 w-3 rounded-lg ${heatClass(day.minutes)}`}
                   />
                 ) : (
-                  <div key={`e-${wi}-${di}`} className="h-3 w-3 rounded-sm bg-transparent" />
+                  <div key={`e-${wi}-${di}`} className="h-3 w-3 rounded-lg bg-transparent" />
                 )
               )}
             </div>
