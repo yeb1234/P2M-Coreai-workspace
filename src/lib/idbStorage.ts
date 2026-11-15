@@ -251,12 +251,19 @@ if (typeof window !== 'undefined') {
 
 export const idbStorage: StateStorage = {
   getItem: async (name: string) => {
+    // 读取优先级：云端 > 本地兜底 > null（用 store 默认值）
+    //
+    // 之前是「登录态只读云端，拿不到就返回 null」，缺了回读本地这一步。
+    // 后果：后端还没有这份数据时（首次登录、或者用户从没改过这个 store），
+    // store 会以为「没有数据」而用默认值初始化。用户看到番茄钟配置变回默认、
+    // 待办清空，然后一改就把默认值推上云端，把真数据覆盖掉。
+    // 番茄钟「换设备折腾好久」就是这条路径。
     if (hasAuthToken()) {
       try {
         const result = await getUserData(name);
-        return result ?? null;
+        if (result !== null && result !== undefined) return result;
       } catch {
-        // Fall through to local storage
+        // 云端读失败，继续走本地兜底
       }
     }
     if (!db) return memoryKv.get(idbKey(name)) ?? null;
@@ -327,4 +334,88 @@ export const localOnlyStorage: StateStorage = {
 export async function clearIDBKvData(): Promise<void> {
   if (!db) { memoryKv.clear(); return; }
   await db.kv.clear();
+}
+
+/**
+ * 首次登录时的存量同步。
+ *
+ * 场景：用户之前是本地模式（或从旧版本升级上来），IndexedDB 里有一批数据，
+ * 但云端 user_data 还是空的。此时如果什么都不做，用户一改就会用新值覆盖，
+ * 老数据白丢。
+ *
+ * 做法：把当前用户在本地存的每个 key，逐个检查云端；云端没有的推上去。
+ * 云端已有的**不动** —— 云端优先，避免多设备场景下用旧设备覆盖新设备。
+ */
+export async function bootstrapLocalToRemote(): Promise<{ pushed: number; skipped: number }> {
+  if (!hasAuthToken() || !db) return { pushed: 0, skipped: 0 };
+
+  const uid = localStorage.getItem('p2m-auth-user-id');
+  const prefix = uid ? `u${uid}:` : '';
+  if (!prefix) return { pushed: 0, skipped: 0 };
+
+  const rows = await db.kv.where('key').startsWith(prefix).toArray();
+  let pushed = 0;
+  let skipped = 0;
+
+  for (const row of rows) {
+    const name = row.key.slice(prefix.length);
+    if (!name.startsWith('p2m-')) continue;
+    try {
+      const remote = await getUserData(name);
+      if (remote !== null && remote !== undefined) {
+        skipped += 1;
+        continue;
+      }
+      await setUserData(name, row.value);
+      pushed += 1;
+    } catch {
+      // 单个 key 失败不影响其它
+    }
+  }
+  return { pushed, skipped };
+}
+
+/**
+ * 登录后重新加载所有持久化 store。
+ *
+ * 为什么必须做
+ * -----------
+ * SPA 的加载顺序是：页面渲染 → store 初始化（此时还没登录，getItem 只能读到本地，
+ * 新设备上是空的）→ 用户登录。登录完成后 store **不会**自动重读云端，
+ * 于是页面继续显示默认值 —— 用户看到的是「我的待办没了」「番茄钟配置回到默认」。
+ *
+ * 番茄钟「换设备折腾好久」就是这条路径：数据其实在云端，只是没人去拿。
+ *
+ * 实现上要求每个 store 都用了 persist 中间件（有 .persist.rehydrate）。
+ * 没用的会在 filter 里被跳过。
+ */
+export async function rehydrateAllStores(): Promise<number> {
+  const mod = await import('../stores');
+  const candidates: unknown[] = [
+    mod.useUIStore, mod.useTodoStore, mod.useCalendarStore, mod.useScheduleStore,
+    mod.usePomodoroStore, mod.usePluginStore, mod.useNotesStore, mod.useNotificationStore,
+    mod.useVideoStore, mod.useTimeCenterStore, mod.useAIStore, mod.useTranscriptionStore,
+  ];
+
+  let count = 0;
+  await Promise.allSettled(
+    candidates.map(async (store) => {
+      const persist = (store as { persist?: { rehydrate?: () => Promise<void> | void } })?.persist;
+      if (typeof persist?.rehydrate === 'function') {
+        await persist.rehydrate();
+        count += 1;
+      }
+    }),
+  );
+  return count;
+}
+
+
+
+// 临时诊断入口（跨设备加载排查用，定位完删）
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).__p2mDebug = {
+    getItem: idbStorage.getItem,
+    hasAuthToken,
+  };
 }
