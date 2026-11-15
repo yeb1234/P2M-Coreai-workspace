@@ -204,6 +204,35 @@ export function generateThemeCss(themeId: string, vars: ThemeVars): string {
 
 export const THEME_PRESETS: ThemePreset[] = [
   {
+    id: 'scholar-paper',
+    name: '学术纸感',
+    description: '米白纸面 + 细点纹理 + 衬线标题，不发光的极简阅读感。',
+    vars: {
+      '--bg-body': '#eceae5',
+      '--bg-base': '#f7f6f3',
+      '--bg-card': '#fdfcfa',
+      '--bg-elevated': '#f2f0eb',
+      '--bg-accent': '#f0ede6',
+      '--text-primary': '#1c1c1a',
+      '--text-secondary': '#6b6862',
+      '--text-muted': '#a19d96',
+      '--border-light': '#e6e3dc',
+      '--border-medium': '#d5d1c9',
+      // 强调色用深墨而不是彩色 —— 这个风格的克制感来自「不用颜色区分层级」
+      '--accent': '#3a3733',
+      '--accent-hover': '#26241f',
+      '--accent-bg': '#ece9e2',
+      '--paper-bg': '#fbfaf7',
+      '--scrollbar-thumb': '#d5d1c9',
+      '--scrollbar-hover': '#bdb8af',
+      '--header-bg': 'rgba(247, 246, 243, 0.82)',
+      '--sidebar-bg': 'rgba(247, 246, 243, 0.92)',
+      '--success': '#4a7c59',
+      '--danger': '#a4442f',
+      '--shadow-card': '0 1px 2px rgba(28, 28, 26, 0.04)',
+    },
+  },
+  {
     id: 'warm-wood',
     name: '暖木经典',
     description: '温暖木质纹理，经典风格。',

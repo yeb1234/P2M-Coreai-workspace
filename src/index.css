@@ -1756,3 +1756,35 @@ video::cue(backdrop) {
     gap: 0.875rem;
   }
 }
+
+/* ───────────────────────────────────────────────────────────
+   学术纸感主题的额外样式
+   颜色靠 CSS 变量就够了，但这个风格有两个特征是变量表达不了的：
+   1. 背景的细点阵纹理（印刷纸的手感）
+   2. 标题的衬线体（非衬线会和「学术」的气质割裂）
+   所以用 [data-theme] 单独挂，不影响其他主题。
+   ─────────────────────────────────────────────────────────── */
+
+[data-theme='scholar-paper'] body {
+  background-image: radial-gradient(circle, rgba(28, 28, 26, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-attachment: fixed;
+}
+
+/* 标题用衬线，正文保持无衬线 —— 全衬线在小字号下可读性会掉 */
+[data-theme='scholar-paper'] h1,
+[data-theme='scholar-paper'] h2 {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+  letter-spacing: 0.015em;
+  font-weight: 600;
+}
+
+/* 卡片去掉阴影和描边感，靠留白和极淡的底色分层 —— 这是截图里最明显的手法 */
+[data-theme='scholar-paper'] .rounded-xl.border {
+  box-shadow: none;
+}
+
+/* 主按钮用深墨底，是这个主题里唯一的高对比块 */
+[data-theme='scholar-paper'] button.bg-\[\#2c2a27\] {
+  background-color: var(--accent);
+}

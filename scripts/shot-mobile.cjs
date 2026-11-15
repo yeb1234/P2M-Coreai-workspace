@@ -14,7 +14,8 @@ const { chromium, devices } = require('playwright');
   await p.screenshot({ path: 'test-results/mobile-home.png' });
 
   const pages = [
-    ['todo', '待办'], ['journey', '学习轨迹'], ['notes', '笔记'], ['settings', '设置'],
+    ['video', '视频站'], ['pomodoro', '番茄钟'], ['calendar', '日历看板'],
+    ['learning', '学习路径'], ['stats', '数据中心'],
   ];
   for (const [id, name] of pages) {
     await p.goto('http://localhost/#/' + id, { waitUntil: 'domcontentloaded' });
