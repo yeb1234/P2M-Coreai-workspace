@@ -190,6 +190,16 @@ npm run build
 - AI 接口额度、日志和审计。
 - 视频文件目录的权限隔离。
 
+## 排障
+
+站点异常时第一条命令（只读，不改任何状态）：
+
+```bash
+bash scripts/diagnose.sh
+```
+
+打出容器状态、健康探针最后输出、PG 长事务/锁等待、worker 注册与队列积压。
+
 ## 文档
 
 - [开发工作法（怎么在这个项目上安全改动）](docs/maintainability.md) ← 动手前先看

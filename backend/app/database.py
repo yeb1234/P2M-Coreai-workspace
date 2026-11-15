@@ -301,6 +301,82 @@ def check_database(deep: bool = True) -> dict:
     return info
 
 
+# 长事务判定阈值。
+#
+# 60 秒：正常业务事务都是毫秒级；60 秒还没结束，基本就是
+# 「把网络请求 / 子进程 / 文件 IO 夹在 SELECT 和 commit 之间」。
+# 30 秒：有查询在等锁超过 30 秒，说明已经有人堵住了别人。
+LONG_TX_WARN_SECONDS = 60
+BLOCKED_WARN_SECONDS = 30
+
+
+def check_transactions() -> dict:
+    """事务健康度：长事务和锁等待。
+
+    为什么要专门监控这个
+    ------------------
+    2026-11-16 实际故障：缩略图 worker 把 ffmpeg 夹在
+    `db.query(Video)` 和 `db.commit()` 之间，4 个线程各占一个
+    videos 表的 ACCESS SHARE 锁。结果迁移里的
+    `ALTER TABLE videos ADD COLUMN` 等了 12 分 30 秒，
+    后端卡在「初始化 schema」，healthcheck 一直失败，整站 502。
+
+    这个故障的特点：**应用日志里一个字都没有**。
+    不报错、不超时、不打日志，只是让别的东西无声地排队。
+    唯一的线索就在 pg_stat_activity 里。
+
+    所以把它放进 /health：docker 会把探针输出存下来，
+    出问题时 `docker inspect` 就能看到，不用再去连数据库。
+
+    查询本身很便宜（读一个系统视图），可以每 30 秒跑一次。
+    """
+    if not settings.is_postgres:
+        return {"level": "ok", "reason": "sqlite"}
+
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT
+                  count(*) FILTER (WHERE state = 'idle in transaction'),
+                  COALESCE(max(EXTRACT(EPOCH FROM now() - state_change))
+                           FILTER (WHERE state = 'idle in transaction'), 0),
+                  count(*) FILTER (WHERE wait_event_type = 'Lock'),
+                  COALESCE(max(EXTRACT(EPOCH FROM now() - query_start))
+                           FILTER (WHERE wait_event_type = 'Lock'), 0)
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND pid <> pg_backend_pid()
+                """
+            )
+        ).first()
+
+    idle_tx = int(row[0] or 0) if row else 0
+    longest_idle = float(row[1] or 0) if row else 0.0
+    blocked = int(row[2] or 0) if row else 0
+    longest_blocked = float(row[3] or 0) if row else 0.0
+
+    warnings: list[str] = []
+    if idle_tx and longest_idle >= LONG_TX_WARN_SECONDS:
+        warnings.append(
+            f"{idle_tx} 个会话 idle in transaction，最长 {longest_idle:.0f}s"
+            f"（会阻塞 ALTER TABLE / CREATE INDEX，进而卡死迁移）"
+        )
+    if blocked and longest_blocked >= BLOCKED_WARN_SECONDS:
+        warnings.append(
+            f"{blocked} 个查询在等锁，最长 {longest_blocked:.0f}s"
+        )
+
+    return {
+        "level": "warn" if warnings else "ok",
+        "idle_in_transaction": idle_tx,
+        "longest_idle_tx_sec": round(longest_idle, 1),
+        "blocked_queries": blocked,
+        "longest_blocked_sec": round(longest_blocked, 1),
+        "warnings": warnings,
+    }
+
+
 def ensure_runtime_schema() -> None:
     """建表与索引（幂等）。PostgreSQL 走 pgvector + pg_trgm，SQLite 仅保留最小结构。"""
     if settings.is_postgres:

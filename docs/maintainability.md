@@ -334,6 +334,39 @@ expect(await page.locator('.todo-item').count()).toBe(1);
 | 有 worker 但任务一直排队 | **双 worker 抢队列** | `redis-cli SMEMBERS rq:workers:ai_jobs`，应为 1 个 |
 | 同一功能两个页面行为不一致 | **双实现** | 找两个组件各自的实现，选一个删掉 |
 
+### 表比人快的时候：直接跑诊断脚本
+
+```bash
+bash scripts/diagnose.sh
+```
+
+只读，一次打出四样东西：容器状态 + 探针最后输出 + PG 锁等待 + worker 注册。
+
+**为什么需要脚本而不是看 `/health`**：站点 502 的时候 `/health` 自己也是 502。
+应用层探针在最需要它的时候是死的，所以必须有一条不依赖应用进程的路径。
+
+**`/health` 现在带事务指标**：
+
+```json
+"transactions": {
+  "level": "warn",
+  "idle_in_transaction": 1,
+  "longest_idle_tx_sec": 76.0,
+  "blocked_queries": 0,
+  "warnings": ["1 个会话 idle in transaction，最长 76s（会阻塞 ALTER TABLE / CREATE INDEX，进而卡死迁移）"]
+}
+```
+
+而且它**故意在 warn 时仍返回 200**：探针挂掉会触发编排重启，
+但重启解决不了锁等待（持锁的是别的连接），只会让问题看起来像「进程不稳定」。
+这里要的是「看得见」，不是「自动重启」。
+
+docker 会把探针输出存下来，所以即使不 curl 也能看：
+
+```bash
+docker inspect -f '{{json .State.Health.Log}}' siteyeb-backend | tail -c 500
+```
+
 ---
 
 ## 7. 加新功能的标准动作

@@ -260,13 +260,35 @@ async def serve_sound_asset(full_path: str):
     )
 
 
+_tx_warn_state: bool = False
+
+
 @app.get("/health")
 def health():
-    """存活探针：只验证进程与数据库连通，必须快速返回。
+    """存活探针：验证进程与数据库连通，外加事务健康度。必须快速返回。
 
     详细指标（向量覆盖率、LLM 可达性）在 /ready 和 /api/admin/health。
+
+    ## 为什么探针里要查事务
+
+    2026-11-16 实际故障：长事务压住 videos 表，迁移的 ALTER TABLE
+    等了 12 分半，后端卡在启动阶段，整站 502。整个过程**应用日志里零线索**。
+
+    docker 会把健康探针的输出存进 `.State.Health.Log`，所以把这个指标
+    放进 /health 之后，出问题可以一条命令看到：
+
+        docker inspect -f '{{json .State.Health.Log}}' siteyeb-backend
+
+    ## 注意：warn 不回 503
+
+    长事务会让探针变 degraded，但**故意仍然返回 200**。
+    探针挂掉会触发编排重启，而重启恰恰解决不了锁等待
+    （持锁的是别的连接），只会让问题看起来更像「进程不稳定」。
+    这里要的是「看得见」，不是「自动重启」。
     """
-    from app.database import check_database
+    global _tx_warn_state
+
+    from app.database import check_database, check_transactions
 
     try:
         db_info = check_database(deep=False)
@@ -276,10 +298,26 @@ def health():
         db_info = {"error": str(exc)[:200]}
         db_ok = False
 
+    try:
+        tx_info = check_transactions()
+    except Exception as exc:  # noqa: BLE001
+        tx_info = {"level": "ok", "error": str(exc)[:120]}
+
+    # 只在状态翻转时记日志：探针每 30 秒跑一次，每次都打就是刷屏
+    if tx_info.get("level") == "warn":
+        if not _tx_warn_state:
+            _tx_warn_state = True
+            logger.warning("事务健康度异常：%s", "; ".join(tx_info.get("warnings") or []))
+    elif _tx_warn_state:
+        _tx_warn_state = False
+        logger.info("事务健康度已恢复")
+
+    degraded = not db_ok or tx_info.get("level") == "warn"
     return {
-        "status": "ok" if db_ok else "degraded",
+        "status": "degraded" if degraded else "ok",
         "uptime_sec": round(time.time() - APP_STARTED_AT, 1),
         "database": db_info,
+        "transactions": tx_info,
     }
 
 
@@ -287,7 +325,7 @@ def health():
 def ready():
     """就绪探针：检索链路可用才返回 200，用于发布前判断。"""
     from fastapi.responses import JSONResponse
-    from app.database import check_database
+    from app.database import check_database, check_transactions
     from app.migrations import embedding_stats
     from app.services.embeddings import get_embedding_client
     from app.services.llm import llm_health
@@ -304,6 +342,13 @@ def ready():
         checks["vectors"] = stats
     except Exception as exc:
         checks["vectors"] = f"fail: {str(exc)[:120]}"
+
+    # 长事务不参与 ready 判定（它不是「不能服务」，而是「会拖住 schema 变更」），
+    # 但必须在这里可见，否则排查时又要连数据库
+    try:
+        checks["transactions"] = check_transactions()
+    except Exception as exc:  # noqa: BLE001
+        checks["transactions"] = f"fail: {str(exc)[:120]}"
 
     checks["embedding_model"] = get_embedding_client().health()
     checks["llm"] = llm_health()
