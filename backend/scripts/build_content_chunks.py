@@ -1,0 +1,271 @@
+"""把逐句字幕重建成语义块（content_chunks）。
+
+为什么必须做
+------------
+现有检索单元是 `subtitle_segments`——一条一条字幕。实测：
+
+    片段时间  3,592,399 条
+    平均长度  9 字
+    中位数    8 字
+    65.3% 少于 10 字
+
+拿 8 个字的文本做检索单元，三个环节同时失效：
+
+1. **向量是噪声**：bge-m3 对 8 字输入的编码几乎由字面重叠决定，不是语义。
+   「那我们就来看一下」这类过渡句会以随机相似度混进结果。
+2. **RRF 放大噪声**：词法和向量两条通路都在噪声上排序，融合后噪声叠加。
+3. **Rerank 无从判断**：候选是一行 180 字截断的碎片，模型看不出相关性。
+
+合理区间是 200–500 中文字（约 300–700 tokens）。这个脚本按句子边界合并，
+目标 400 字、硬上限 600 字、块间重叠 60 字。
+
+顺带的收益：359 万条 → 约 10 万块，向量回填从 6 小时降到 20 分钟。
+
+用法
+----
+    # 先看分块效果，不写库
+    python scripts/build_content_chunks.py --dry-run --limit 20
+
+    # 正式建块
+    python scripts/build_content_chunks.py --rebuild
+
+    # 只处理指定视频
+    python scripts/build_content_chunks.py --videos 123,456
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sqlalchemy import text  # noqa: E402
+
+from app.database import engine, settings  # noqa: E402
+
+# 目标与边界
+TARGET_CHARS = 400
+MAX_CHARS = 600
+MIN_CHARS = 150
+OVERLAP_CHARS = 60
+
+# 句子结束标记。中文标点优先，顿号不算（它连的是并列词不是句）
+SENTENCE_END = set("。？！?!；;")
+
+
+def split_into_chunks(segments: list[tuple[float, float, str]]) -> list[dict]:
+    """把按时间排序的字幕片段合并成语义块。
+
+    合并规则：
+    - 累加到 TARGET_CHARS 且当前句已结束 → 切
+    - 超过 MAX_CHARS → 强制切（防止一段没标点的口播变成巨型块）
+    - 新块从上一块最后 OVERLAP_CHARS 的内容开始，保证跨块语义连贯
+    """
+    chunks: list[dict] = []
+    if not segments:
+        return chunks
+
+    buf: list[str] = []
+    buf_chars = 0
+    start_sec = segments[0][0]
+    end_sec = segments[0][1]
+    seg_count = 0
+
+    for seg_start, seg_end, raw in segments:
+        piece = (raw or "").strip()
+        if not piece:
+            continue
+
+        buf.append(piece)
+        buf_chars += len(piece)
+        end_sec = seg_end
+        seg_count += 1
+
+        ends_sentence = piece[-1] in SENTENCE_END
+        reached_target = buf_chars >= TARGET_CHARS
+        over_max = buf_chars >= MAX_CHARS
+
+        if (reached_target and ends_sentence) or over_max:
+            text_out = "".join(buf)
+            if len(text_out) >= MIN_CHARS or over_max:
+                chunks.append(
+                    {
+                        "start_sec": start_sec,
+                        "end_sec": end_sec,
+                        "text": text_out,
+                        "char_count": len(text_out),
+                        "segment_count": seg_count,
+                    }
+                )
+                # 用尾部做下一块的开头，保证跨块连续
+                tail = text_out[-OVERLAP_CHARS:]
+                buf = [tail] if tail else []
+                buf_chars = len(tail)
+                start_sec = seg_end
+                seg_count = 0
+            else:
+                # 没到最小长度就继续累积，不切
+                continue
+
+    # 收尾
+    if buf:
+        text_out = "".join(buf)
+        if len(text_out.strip()) >= 30:
+            chunks.append(
+                {
+                    "start_sec": start_sec,
+                    "end_sec": end_sec,
+                    "text": text_out,
+                    "char_count": len(text_out),
+                    "segment_count": seg_count,
+                }
+            )
+    return chunks
+
+
+def ensure_table(conn) -> None:
+    dim = int(settings.embedding_dim or 1024)
+    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    conn.execute(
+        text(
+            f"""
+            CREATE TABLE IF NOT EXISTS content_chunks (
+                id BIGSERIAL PRIMARY KEY,
+                video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+                chunk_index INTEGER NOT NULL,
+                start_sec DOUBLE PRECISION NOT NULL,
+                end_sec DOUBLE PRECISION NOT NULL,
+                text TEXT NOT NULL,
+                char_count INTEGER NOT NULL,
+                segment_count INTEGER NOT NULL DEFAULT 1,
+                -- 向量列先留空，由回填脚本填。放同一张表省一次 JOIN
+                embedding halfvec({dim}),
+                created_at TIMESTAMP DEFAULT now()
+            )
+            """
+        )
+    )
+    conn.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_content_chunks_video ON content_chunks (video_id, chunk_index)")
+    )
+    conn.execute(
+        text(
+            f"CREATE INDEX IF NOT EXISTS ix_content_chunks_embedding ON content_chunks "
+            f"USING hnsw (embedding halfvec_cosine_ops)"
+        )
+    )
+    # 词法检索要用 trigram，和现有 subtitle_segments 保持一致
+    conn.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_content_chunks_text_trgm ON content_chunks "
+            "USING gin (text gin_trgm_ops)"
+        )
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="重建语义块")
+    parser.add_argument("--dry-run", action="store_true", help="只统计，不写库")
+    parser.add_argument("--limit", type=int, default=0, help="只处理前 N 个视频")
+    parser.add_argument("--videos", default="", help="指定视频 id，逗号分隔")
+    parser.add_argument("--rebuild", action="store_true", help="先清空 content_chunks")
+    args = parser.parse_args()
+
+    ids = [int(x) for x in args.videos.split(",") if x.strip().isdigit()] if args.videos else None
+
+    if not args.dry_run:
+        with engine.begin() as conn:
+            ensure_table(conn)
+            if args.rebuild:
+                conn.execute(text("TRUNCATE content_chunks"))
+        if args.rebuild:
+            print("已清空 content_chunks")
+
+    with engine.connect() as conn:
+        video_query = "SELECT id, title FROM videos WHERE id IN (SELECT DISTINCT video_id FROM subtitle_segments)"
+        params: dict = {}
+        if ids:
+            video_query += " AND id = ANY(:ids)"
+            params["ids"] = ids
+        video_query += " ORDER BY id"
+        if args.limit:
+            video_query += f" LIMIT {int(args.limit)}"
+        videos = conn.execute(text(video_query), params).fetchall()
+
+        if not videos:
+            print("没有带字幕的视频")
+            return 1
+
+        print(f"待处理视频 {len(videos)} 个" + ("（dry-run）" if args.dry_run else ""))
+
+        total_segments = 0
+        total_chunks = 0
+        total_chars = 0
+        samples: list[dict] = []
+
+        for video in videos:
+            rows = conn.execute(
+                text(
+                    "SELECT start_sec, end_sec, text FROM subtitle_segments "
+                    "WHERE video_id = :vid ORDER BY start_sec"
+                ),
+                {"vid": video.id},
+            ).fetchall()
+            segments = [(r.start_sec, r.end_sec, r.text) for r in rows]
+            chunks = split_into_chunks(segments)
+
+            total_segments += len(segments)
+            total_chunks += len(chunks)
+            total_chars += sum(c["char_count"] for c in chunks)
+
+            if len(samples) < 2 and chunks:
+                samples.append({"title": video.title, "chunks": chunks[:2]})
+
+            if not args.dry_run:
+                conn.execute(text("DELETE FROM content_chunks WHERE video_id = :vid"), {"vid": video.id})
+                for index, chunk in enumerate(chunks):
+                    conn.execute(
+                        text(
+                            "INSERT INTO content_chunks "
+                            "(video_id, chunk_index, start_sec, end_sec, text, char_count, segment_count) "
+                            "VALUES (:vid, :idx, :s, :e, :t, :c, :n)"
+                        ),
+                        {
+                            "vid": video.id,
+                            "idx": index,
+                            "s": chunk["start_sec"],
+                            "e": chunk["end_sec"],
+                            "t": chunk["text"],
+                            "c": chunk["char_count"],
+                            "n": chunk["segment_count"],
+                        },
+                    )
+                conn.commit()
+
+    avg_seg = total_chars / total_segments if total_segments else 0
+    avg_chunk = total_chars / total_chunks if total_chunks else 0
+    print()
+    print(f"  字幕片段 {total_segments:,} 条，平均 {avg_seg:.0f} 字")
+    print(f"  语义块   {total_chunks:,} 个，平均 {avg_chunk:.0f} 字")
+    print(f"  压缩比   {total_segments / total_chunks:.1f} : 1" if total_chunks else "")
+    print()
+
+    for sample in samples:
+        print(f"  ── 《{(sample['title'] or '')[:40]}》──")
+        for chunk in sample["chunks"]:
+            print(f"  [{chunk['start_sec']:.0f}s-{chunk['end_sec']:.0f}s] {chunk['char_count']}字")
+            print(f"    {chunk['text'][:150]}…")
+        print()
+
+    if args.dry_run:
+        print("（dry-run：没有写入）")
+        return 0
+
+    print("完成。下一步：对 content_chunks 回填向量（见 docs/retrieval-tuning.md）")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

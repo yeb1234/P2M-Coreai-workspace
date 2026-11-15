@@ -45,6 +45,9 @@ class Hit:
     vector_rank: int | None = None
     rerank_score: float | None = None
     sources: list[str] = field(default_factory=list)
+    # 扩展上下文后：text 是合并出的段落，raw_text 保留命中的原始字幕
+    raw_text: str | None = None
+    segment_count: int = 1
 
     def to_dict(self) -> dict:
         return {
@@ -62,6 +65,8 @@ class Hit:
             "vector_rank": self.vector_rank,
             "rerank_score": self.rerank_score,
             "sources": self.sources,
+            "raw_text": self.raw_text,
+            "segment_count": self.segment_count,
         }
 
 
@@ -174,6 +179,139 @@ def _llm_rerank(query: str, hits: list[Hit], keep: int) -> list[Hit]:
     except Exception as exc:
         logger.warning("LLM 重排失败，保留 RRF 原序: %s", exc)
         return candidates[:keep]
+
+
+def expand_hit_context(
+    hits: list["Hit"],
+    *,
+    window_sec: float = 45.0,
+    max_chars: int = 700,
+) -> list["Hit"]:
+    """把命中的碎片字幕扩展成连续段落。
+
+    为什么必须做
+    ------------
+    字幕是逐句存的，实测 359 万条、平均 9 个字、中位数 8 个字。
+    一条命中的原文可能是「那我们就来看一下」，单独拿出来没有任何信息量，
+    模型既判断不了相关性，也没法据此回答。
+
+    这里按时间窗把前后片段拼起来：命中点前后各 window_sec 秒，
+    拼成一段完整的讲解再返回。时间戳同步扩展，前端跳转仍然准确。
+
+    为什么不改索引：扩上下文只影响「返回什么」，不影响「怎么找」。
+    能在不重建向量的前提下立刻改善输出质量。
+    真正的根治是语义分块（见 scripts/build_content_chunks.py），
+    但那要重跑一遍向量回填，适合放到独立批次做。
+    """
+    if not hits:
+        return hits
+
+    min_start = min(h.start_sec for h in hits) - window_sec
+    max_end = max(h.end_sec for h in hits) + window_sec
+    video_ids = list({h.video_id for h in hits})
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT video_id, start_sec, end_sec, text
+                    FROM subtitle_segments
+                    WHERE video_id = ANY(:vids)
+                      AND start_sec >= :lo
+                      AND start_sec <= :hi
+                    ORDER BY video_id, start_sec
+                    """
+                ),
+                {"vids": video_ids, "lo": min_start, "hi": max_end},
+            ).fetchall()
+    except Exception as exc:
+        logger.warning("上下文扩展失败，返回原始片段: %s", exc)
+        return hits
+
+    by_video: dict[int, list] = defaultdict(list)
+    for row in rows:
+        by_video[row.video_id].append(row)
+
+    for hit in hits:
+        timeline = by_video.get(hit.video_id) or []
+        if not timeline:
+            continue
+        lo = hit.start_sec - window_sec
+        hi = hit.end_sec + window_sec
+        window = [r for r in timeline if lo <= r.start_sec <= hi]
+        if not window:
+            continue
+
+        merged: list[str] = []
+        total = 0
+        for row in window:
+            piece = (row.text or "").strip()
+            if not piece:
+                continue
+            if total + len(piece) > max_chars:
+                break
+            merged.append(piece)
+            total += len(piece)
+
+        if not merged:
+            continue
+
+        hit.raw_text = hit.text
+        hit.text = "".join(merged)
+        hit.start_sec = window[0].start_sec
+        hit.end_sec = window[-1].end_sec
+        hit.segment_count = len(window)
+
+    return hits
+
+
+def dedupe_overlapping(
+    hits: list["Hit"],
+    *,
+    max_per_video: int = 2,
+    overlap_ratio: float = 0.5,
+) -> list["Hit"]:
+    """去掉同一视频里时间重叠的命中。
+
+    为什么必须做
+    ------------
+    碎片检索的典型病症：top_k 里 3 条来自同一个视频的相邻 90 秒，
+    时间戳几乎重合、内容互相复述。用户看到的是「三条一样的答案」，
+    而真正有用的其它视频被挤掉了。
+
+    实测「FastAPI 依赖注入」的前三条全部落在同一个视频的
+    2218s–2318s 区间，就是这个问题。
+
+    规则：同一视频内，与已保留项时间重叠超过 overlap_ratio 的丢弃；
+    同一视频最多保留 max_per_video 条，保证结果多样性。
+    """
+    kept: list[Hit] = []
+    per_video: dict[int, int] = defaultdict(int)
+
+    for hit in hits:
+        if per_video[hit.video_id] >= max_per_video:
+            continue
+
+        span = max(1e-6, hit.end_sec - hit.start_sec)
+        duplicated = False
+        for other in kept:
+            if other.video_id != hit.video_id:
+                continue
+            lo = max(other.start_sec, hit.start_sec)
+            hi = min(other.end_sec, hit.end_sec)
+            if hi <= lo:
+                continue
+            shorter = min(span, max(1e-6, other.end_sec - other.start_sec))
+            if (hi - lo) / shorter >= overlap_ratio:
+                duplicated = True
+                break
+
+        if not duplicated:
+            kept.append(hit)
+            per_video[hit.video_id] += 1
+
+    return kept
 
 
 def hybrid_search(
@@ -291,6 +429,12 @@ def hybrid_search(
         hit.score = score
         candidates.append(hit)
 
+    # 去重放在 rerank 之前：候选更干净，重排更准也更快。
+    # 保留 top_k 的 4 倍余量，避免去重后不够数
+    candidates = dedupe_overlapping(candidates, max_per_video=2)
+    if len(candidates) > top_k * 4:
+        candidates = candidates[: top_k * 4]
+
     should_rerank = settings.rerank_enabled if use_rerank is None else use_rerank
     if should_rerank and candidates:
         started = time.perf_counter()
@@ -298,5 +442,15 @@ def hybrid_search(
         timings["rerank_ms"] = round((time.perf_counter() - started) * 1000, 1)
     else:
         final = candidates[:top_k]
+
+    # 命中的是 9 个字的碎片，直接给模型没有意义。
+    # 按时间窗拼成段落再返回，时间戳同步扩展（前端跳转仍准）。
+    final = expand_hit_context(final)
+
+    # 扩展之后必须再去一次重。
+    # 去重放在扩展前是不够的：单条字幕只有 2 秒，时间上不重叠，
+    # 但扩展成 90 秒的段落后，相邻命中会大面积重合 ——
+    # 用户看到的就是「三条一样的答案」。
+    final = dedupe_overlapping(final, max_per_video=2)
 
     return {"hits": final, "timings": timings, "degraded": degraded}
