@@ -3,6 +3,9 @@
 *.bash      text eol=lf
 Dockerfile  text eol=lf
 
+# nginx 配置会被 COPY 进容器，保持 LF 避免解析异常
+*.conf      text eol=lf
+
 # Windows 批处理必须是 CRLF
 *.bat       text eol=crlf
 *.cmd       text eol=crlf
