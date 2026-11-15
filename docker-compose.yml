@@ -208,6 +208,127 @@ services:
       start_period: 60s
       retries: 3
 
+  # ─────────────────────────────────────────────────────────────
+  # AI 转写任务队列消费者
+  #
+  # 这个服务之前不在 compose 里 —— worker 靠手工在宿主机启动，
+  # 机器一重启就没了，队列里的任务没人消费，前端一直转圈。
+  # 现在交给 Docker 管，restart: unless-stopped 保证重启后自动拉起。
+  #
+  # 复用 backend 镜像（不重新构建），只换启动命令。
+  # 环境和挂载必须和 backend 完全一致：worker 要连同一个库、
+  # 读 /videos 里的源文件、往 /data/output 写结果。
+  # ─────────────────────────────────────────────────────────────
+  worker:
+    image: siteyeb-backend:3.0
+    container_name: siteyeb-worker
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        # 等 backend 先建好表结构，worker 启动时会 create_all
+        condition: service_healthy
+    environment:
+      # ---- 数据库 ----
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-p2user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-p2learning}
+      DB_POOL_SIZE: "10"
+      DB_MAX_OVERFLOW: "20"
+      # ---- 路径 ----
+      VIDEO_FOLDER: /videos
+      WORK_DIR: /data/work
+      OUTPUT_DIR: /data/output
+      THUMBNAIL_DIR: /data/thumbnails
+      SPRITE_DIR: /data/sprites
+      # 数据库里的 filepath 是容器化之前写入的 Windows 绝对路径，
+      # 这里声明宿主机前缀 -> 容器内路径的映射（最长前缀优先）
+      PATH_MAP: "${PATH_MAP:-${VIDEO_HOST_PATH:-D:/ITJC}/thumbnails=/data/thumbnails;${VIDEO_HOST_PATH:-D:/ITJC}/sprites=/data/sprites;${VIDEO_HOST_PATH:-D:/ITJC}/output=/data/output;${VIDEO_HOST_PATH:-D:/ITJC}/work=/data/work;${VIDEO_HOST_PATH:-D:/ITJC}=/videos}"
+      # ---- 本地模型（跑在宿主机）----
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL_DOCKER:-http://host.docker.internal:1234/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-lm-studio}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-bge-m3@q8_0}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-256}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL_DOCKER:-http://host.docker.internal:1234/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-lm-studio}
+      OPENAI_MODEL: ${OPENAI_MODEL:-qwen3-4b}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434}
+      # ---- 外部 LLM ----
+      EXTERNAL_LLM_BASE_URL: ${EXTERNAL_LLM_BASE_URL}
+      EXTERNAL_LLM_API_KEY: ${EXTERNAL_LLM_API_KEY}
+      EXTERNAL_LLM_MODEL: ${EXTERNAL_LLM_MODEL:-deepseek-v4.1-flash-1017}
+      EXTERNAL_LLM_THINKING: ${EXTERNAL_LLM_THINKING:-false}
+      LLM_USAGE_POLICY: ${LLM_USAGE_POLICY:-external_first}
+      # ---- 转写 ----
+      # 这组变量之前完全没透传，容器一直在用代码默认值（faster-whisper + small + int8），
+      # .env 里配的 whisper.cpp / large-v3 从来没生效过 —— 而且 Linux 容器也跑不了 Windows exe。
+      WHISPER_ENGINE: ${WHISPER_ENGINE:-faster-whisper}
+      DEFAULT_WHISPER_MODEL: ${DEFAULT_WHISPER_MODEL:-small}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      DEVICE_TYPE: ${DEVICE_TYPE:-auto}
+      # 模型从国内镜像拉，否则 3GB 下载会卡死
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
+      HF_HOME: /data/hf
+      # ---- 重排 ----
+      # 注意：compose 的 environment 是白名单，.env 里多写的键不会自动传进来。
+      # 这个坑在 whisper、embedding、rerank 上各踩过一次。
+      RERANK_API_URL: ${RERANK_API_URL:-}
+      RERANK_API_KEY: ${RERANK_API_KEY:-}
+      RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
+      RERANK_MIN_SCORE: ${RERANK_MIN_SCORE:-0.02}
+      # ---- 检索 ----
+      # chunks = 语义块（565 字/块），segments = 逐句字幕（9 字/条）
+      # 切到 chunks 前必须确认 content_chunks 的向量覆盖率 > 95%，
+      # 否则部分块没有向量，会漏召回
+      RETRIEVAL_SOURCE: ${RETRIEVAL_SOURCE:-segments}
+      # ---- 队列 ----
+      REDIS_URL: redis://redis:6379/0
+      # ---- 安全 ----
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 必须设置且长度 >= 32}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-12}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5002}
+      # 注册默认关闭：公网被扫到就会有人灌号。首个账号建好后设 false，
+      # 后续账号由管理员通过 /api/auth/create-user 开通
+      # 默认 true 是为了本机演示方便，会覆盖代码里的 False。
+      # 公网部署务必在 .env 里显式设成 false，改由管理员手工开通账号。
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      # 逗号分隔的管理员用户名白名单
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      # 接口文档默认不对外。要调试时临时设 true
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
+      # 会话 Cookie：令牌放 httpOnly Cookie，JS 读不到
+      # 生产（HTTPS）必须设 COOKIE_SECURE=true，否则 Cookie 会明文过网
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-p2m_session}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      # ---- 启动开关 ----
+      MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
+      SQLITE_SOURCE_PATH: /data/source/learning_os.db
+      BACKFILL_EMBEDDINGS: ${BACKFILL_EMBEDDINGS:-false}
+      TZ: Asia/Shanghai
+    volumes:
+      # 视频库只读挂载；改成你的实际路径
+      - ${VIDEO_HOST_PATH:-D:/ITJC}:/videos:ro
+      # 产物目录直接绑宿主机，复用已有的缩略图/雪碧图/字幕，
+      # 否则 1.4 万个视频的缩略图要在容器里从头再生成一遍
+      - ${VIDEO_HOST_PATH:-D:/ITJC}/thumbnails:/data/thumbnails
+      - ${VIDEO_HOST_PATH:-D:/ITJC}/sprites:/data/sprites
+      - ${VIDEO_HOST_PATH:-D:/ITJC}/output:/data/output
+      - ${VIDEO_HOST_PATH:-D:/ITJC}/work:/data/work
+      # 需要从 SQLite 迁移时，把旧库放到这里（只读）
+      - ${SQLITE_SOURCE_DIR:-./.migration}:/data/source:ro
+      # faster-whisper 模型缓存。不挂载的话每次重建容器都要重下 3GB
+      - ./data/hf:/data/hf
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # 镜像自带的 HEALTHCHECK 探的是 8000 端口（uvicorn）——
+    # worker 不提供 HTTP，继承下来会一直 unhealthy，必须关掉。
+    healthcheck:
+      disable: true
+
   frontend:
     # 本机开发：直接挂宿主机 dist，省掉「改完前端要重建镜像」这一环。
     # 生产部署时删掉这两行，靠镜像内的 COPY --from=build 提供静态文件。
