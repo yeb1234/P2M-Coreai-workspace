@@ -12,6 +12,20 @@ from rq.command import send_kill_horse_command
 
 from app.database import settings
 
+# 转写任务的超时上限。
+#
+# RQ 默认 job_timeout 是 180 秒 —— 一个小时的课程视频根本转不完，
+# 到点就被 RQ 强杀，任务标记失败。三处 enqueue 之前都没传这个参数，
+# 等于所有超过 3 分钟的转写都在超时边缘。
+#
+# 给 4 小时：足够转完 4 小时以上的长课程，又不至于让真卡死的任务
+# 永远占着 worker。
+AI_JOB_TIMEOUT_SECONDS = 4 * 60 * 60
+
+# 任务结果在 Redis 里保留一天。默认 500 秒，
+# 用户过一会回来查进度就查不到结果了。
+AI_JOB_RESULT_TTL_SECONDS = 24 * 60 * 60
+
 _redis_conn: redis.Redis | None = None
 _ai_jobs_queue: Queue | None = None
 

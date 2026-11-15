@@ -17,6 +17,8 @@ import sys
 from app.services.admin_settings import load_transcription_settings
 from app.services.ai_jobs import _video_has_transcription_outputs
 from app.services.rq_client import (
+    AI_JOB_RESULT_TTL_SECONDS,
+    AI_JOB_TIMEOUT_SECONDS,
     ai_jobs_queue,
     cancel_job,
     clear_job_cancelled,
@@ -231,6 +233,8 @@ def resume_ai_job(job_id: str) -> dict:
                 "app.services.ai_job_tasks.run_ai_job_task",
                 args=(job_id,),
                 job_id=job_id,
+                job_timeout=AI_JOB_TIMEOUT_SECONDS,
+                result_ttl=AI_JOB_RESULT_TTL_SECONDS,
             )
         return {"resumed": True, "job_id": job.id}
     finally:
@@ -253,6 +257,8 @@ def enqueue_ai_jobs(job_ids: list[str], at_front: bool = False) -> None:
             args=(job_id,),
             job_id=job_id,
             at_front=at_front,
+            job_timeout=AI_JOB_TIMEOUT_SECONDS,
+            result_ttl=AI_JOB_RESULT_TTL_SECONDS,
         )
 
 
@@ -428,6 +434,8 @@ def sync_db_queue_to_rq() -> int:
                         "app.services.ai_job_tasks.run_ai_job_task",
                         args=(job.id,),
                         job_id=job.id,
+                        job_timeout=AI_JOB_TIMEOUT_SECONDS,
+                        result_ttl=AI_JOB_RESULT_TTL_SECONDS,
                     )
                     enqueued += 1
             except Exception:
