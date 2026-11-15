@@ -122,6 +122,11 @@ def enqueue_task(
 
     dedupe=True 时，如果同一个 (kind, target_id) 已经有 queued/running
     的记录，直接跳过 —— 避免用户连点几次按钮堆出一堆重复任务。
+
+    契约：**只有去重才返回 None，出错一律抛异常**。
+    原来异常也被吞成 None，于是「投递失败」和「已经在队列里」在调用方
+    看来一模一样 —— 扫描以为「没什么要做的」，实际一个任务都没建。
+    这种静默失效比报错贵得多，所以宁可让调用方自己处理。
     """
     db = SessionLocal()
     try:
@@ -152,7 +157,7 @@ def enqueue_task(
     except Exception:  # noqa: BLE001
         db.rollback()
         logger.exception("创建任务失败 kind=%s target=%s", kind, target_id)
-        return None
+        raise
     finally:
         db.close()
 
@@ -178,6 +183,26 @@ def _push_to_rq(task_id: str) -> None:
 # ── 任务执行 ────────────────────────────────────────────────────
 
 
+def _set_task_state(task_id: str, **fields: Any) -> None:
+    """改任务状态。用 Core UPDATE，不走 ORM flush。
+
+    两个原因：
+    1. handler 可能跑几分钟（向量化、雪碧图），期间一直握着 session
+       等于开着一个长事务，pg 那边是 idle in transaction，会拖 vacuum。
+    2. ORM flush 会断言 rowcount，异常路径下会抛
+       StaleDataError("expected to update 1 row(s); -1 were matched")，
+       把本来正常执行完的任务打成异常。Core UPDATE 没有这个副作用。
+    """
+    db = SessionLocal()
+    try:
+        db.query(BackgroundTask).filter(BackgroundTask.id == task_id).update(
+            fields, synchronize_session=False
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
 def run_background_task(task_id: str) -> None:
     """RQ 调用的入口。按 kind 分派到具体处理函数。"""
     db = SessionLocal()
@@ -191,41 +216,56 @@ def run_background_task(task_id: str) -> None:
         if task.status == "done":
             return
 
-        handler = TaskHandler.get(task.kind)
+        kind = task.kind
+        attempts = (task.attempts or 0) + 1
+        handler = TaskHandler.get(kind)
         if handler is None:
-            task.status = "failed"
-            task.error = f"没有注册 kind={task.kind} 的处理函数"
-            db.commit()
-            logger.error("未知任务类型 kind=%s task=%s", task.kind, task_id)
+            _set_task_state(
+                task_id,
+                status="failed",
+                error=f"没有注册 kind={kind} 的处理函数",
+                finished_at=datetime.now(),
+            )
+            logger.error("未知任务类型 kind=%s task=%s", kind, task_id)
             return
 
-        task.status = "running"
-        task.attempts = (task.attempts or 0) + 1
-        task.started_at = datetime.now()
-        db.commit()
-
-        try:
-            handler(task)
-            task.status = "done"
-            task.error = None
-            task.finished_at = datetime.now()
-            db.commit()
-        except Exception as exc:  # noqa: BLE001
-            db.rollback()
-            task = db.query(BackgroundTask).filter(BackgroundTask.id == task_id).first()
-            if task is None:
-                return
-            task.error = str(exc)[:2000]
-            task.finished_at = datetime.now()
-            if (task.attempts or 0) >= MAX_ATTEMPTS:
-                task.status = "failed"
-                logger.error("任务失败已达上限 kind=%s task=%s err=%s", task.kind, task_id, exc)
-            else:
-                task.status = "queued"
-                logger.warning("任务失败，将重试 kind=%s task=%s 第 %s 次", task.kind, task_id, task.attempts)
-            db.commit()
+        # 摘出来再关连接：handler 只读 target_id / payload 这些已加载的标量，
+        # 带着 session 跑几分钟没有收益，只有长事务的代价。
+        db.expunge(task)
     finally:
         db.close()
+
+    _set_task_state(
+        task_id, status="running", attempts=attempts, started_at=datetime.now()
+    )
+
+    try:
+        handler(task)
+    except Exception as exc:  # noqa: BLE001
+        retry = attempts < MAX_ATTEMPTS
+        _set_task_state(
+            task_id,
+            status="queued" if retry else "failed",
+            error=str(exc)[:2000],
+            finished_at=datetime.now(),
+        )
+        if retry:
+            logger.warning(
+                "任务失败，重试第 %s/%s 次 kind=%s task=%s err=%s",
+                attempts, MAX_ATTEMPTS, kind, task_id, exc,
+            )
+            # 必须真的重新投递。原来只把状态改回 queued 就结束了，
+            # 队列里根本没有这个 job —— 只有等进程重启时的
+            # requeue_stale_tasks 才会被捡起来。日志写着「将重试」，
+            # 实际几小时内都不会重试。
+            _push_to_rq(task_id)
+        else:
+            logger.error(
+                "任务失败已达上限 kind=%s task=%s err=%s", kind, task_id, exc
+            )
+        return
+
+    _set_task_state(task_id, status="done", error=None, finished_at=datetime.now())
 
 
 # ── 重启恢复 ────────────────────────────────────────────────────

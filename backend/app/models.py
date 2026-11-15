@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from sqlalchemy import (
@@ -53,6 +54,14 @@ class Video(Base):
     file_size = Column(BigInteger().with_variant(Integer, "sqlite"), default=0)
     duration = Column(Float, nullable=True)
     thumbnail = Column(String, nullable=True)
+    # 最后一次「建块 + 向量化」完成的时间。
+    #
+    # 为什么需要这个标记：语义块和向量都是派生数据，但它们**无法自证新鲜**。
+    # 视频重转过、字幕变了，旧块还在、旧向量也在，光看 content_chunks
+    # 扫不出「过期」。用这个时间戳和字幕的 max(created_at) 比，才知道要不要重建。
+    #
+    # 缩略图不需要这个 —— thumbnail IS NULL 本身就是「还没做」的完整信号。
+    chunk_indexed_at = Column(DateTime, nullable=True)
     tags = Column(String, nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     transcription = Column(Text, nullable=True)
@@ -526,7 +535,11 @@ class BackgroundTask(Base):
         Index("ix_background_tasks_target", "kind", "target_id"),
     )
 
-    id = Column(String, primary_key=True)
+    # 主键必须自己生成。
+    # 之前只写了 primary_key=True，没有任何默认值 —— 建表时 PG 不给 String
+    # 主键加序列，插入直接 NotNullViolation。而 enqueue_task 里的
+    # except 把这个异常吞成了日志，于是「投递永远成功、任务永远不来」。
+    id = Column(String, primary_key=True, default=lambda: uuid.uuid4().hex)
     kind = Column(String, nullable=False, index=True)
     target_id = Column(String, nullable=False)
     payload = Column(JSON, default=dict)

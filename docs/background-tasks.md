@@ -10,7 +10,8 @@
 |---|---|---|
 | 缩略图批量补齐 | 定时扫描「缺缩略图的」 | **自动续跑**（扫描即恢复） |
 | AI 转写 | `ai_jobs` 表 + RQ + `requeue_interrupted_ai_jobs` | **自动续跑** |
-| 一次性任务（向量化等） | `background_tasks` 表 + RQ + `requeue_stale_tasks` | **自动续跑** |
+| 语义块索引（建块 + 向量化） | `background_tasks` 表 + RQ + 扫描 + `requeue_stale_tasks` | **自动续跑** |
+| 其他一次性任务（批量重算等） | `background_tasks` 表 + RQ + `requeue_stale_tasks` | **自动续跑** |
 
 ---
 
@@ -164,3 +165,61 @@ GET  /api/ai-jobs                         转写任务列表（admin）
 如果以后要开多 worker，需要加行级锁（`SELECT ... FOR UPDATE`）或 Redis 分布式锁。现在不需要。
 
 **不做任务优先级**。缩略图和转写分两个队列，互不阻塞，但队列内部是 FIFO。如果以后有「用户等着看结果」的任务需要插队，再加优先级字段。
+
+---
+
+## 四、语义块索引：两层判断 + 三层续跑
+
+这是目前唯一真正跑起来的 `background_tasks` 用法，也是判断最复杂的一个。
+
+### 为什么不能只靠扫描
+
+缩略图只要 `thumbnail IS NULL` 就知道要做什么。语义块不行：
+
+**块和向量都是派生数据，无法自证新鲜。** 视频重转过、字幕变了，
+旧块还在、旧向量也在 —— 扫 `content_chunks` 只能看出「有没有」，看不出「是不是旧的」。
+
+所以两层判断：
+
+| 层 | 判据 | 回答什么 |
+|---|---|---|
+| 1 | `videos.chunk_indexed_at` | 做没做过（扫描的快速筛选条件） |
+| 2 | `min(content_chunks.created_at) >= max(subtitle_segments.created_at)` | 块是不是基于当前这版字幕 |
+
+第 2 条不是冗余。重建块之后、向量算完之前进程被杀 —— 块是新的、向量是空的。
+只靠第 1 条会认为「没做过」→ 再重建一次 → **把已经算好的向量全冲掉，永远算不完**。
+
+### 三层续跑
+
+```
+整条没做过              → 建块 + 向量化
+块建好了、向量没齐      → 只补向量（不重建，已算的不浪费）
+块和向量齐了但字幕变了  → 重建
+```
+
+### 接线
+
+```
+转写完成（ai_job_tasks._finalize_job）
+  → _enqueue_chunk_index(video_id)          ← 主动投递
+worker 启动 / 每 10s-5min
+  → embedding_pipeline.scan_missing()       ← 兜底：投递失败、历史遗留、字幕变更
+      → background_tasks(kind='chunk_index')
+          → index_video()                   ← 幂等，中断可续
+```
+
+管理端点：
+
+```bash
+GET  /api/admin/embeddings/status           # 多少视频有字幕 / 索引了多少 / 还差多少
+POST /api/admin/embeddings/scan?limit=200   # 手动催一轮（正常不用）
+POST /api/admin/embeddings/reindex/29905    # 重建单个视频（换模型后用）
+```
+
+### 实测
+
+- 中断态续跑：把某个视频 422 个块的向量清空、标记清空 →
+  `reindex?force=false` → `rebuilt=0, embedded=422`，块文本 md5 **完全不变**
+- 硬杀恢复：`docker kill` worker（SIGKILL）→ 重启 → 卡在 `running` 的任务被
+  `requeue_stale_tasks` 捡回、全部跑完
+- 全量结果：8,819 个有字幕的视频全部索引，待处理 0

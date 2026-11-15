@@ -28,6 +28,27 @@ from app.services.rq_client import clear_job_cancelled, is_job_cancelled
 logger = logging.getLogger(__name__)
 
 
+def _enqueue_chunk_index(video_id: int) -> None:
+    """转写完成后把「建块 + 向量化」投递出去。
+
+    为什么必须在这里挂钩：建块和向量化原来是两个人工脚本，
+    转写流程结束后什么都不做。后果是「新转写的视频在检索里搜不到」，
+    而且没有任何异常信号 —— 用户只会觉得搜不准。
+
+    投递失败不能影响转写结果：转写本身已经写盘完成了，
+    索引还有定时扫描兜底（embedding_pipeline.scan_missing），
+    所以这里只记日志。
+    """
+    try:
+        from app.services.background_tasks import enqueue_task
+
+        task_id = enqueue_task("chunk_index", target_id=str(video_id))
+        if task_id:
+            logger.info("已投递索引任务 video=%s task=%s", video_id, task_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("投递索引任务失败 video=%s（扫描会补上）", video_id, exc_info=True)
+
+
 def run_ai_job_task(job_id: str) -> None:
     """RQ task entry point: execute a single AI job end-to-end."""
     db = SessionLocal()
@@ -61,6 +82,8 @@ def run_ai_job_task(job_id: str) -> None:
             video.ai_stage = "completed"
             video.ai_error = None
             db.commit()
+            # 已有转写说明早就有字幕了，但可能从没建过块（历史遗留）
+            _enqueue_chunk_index(video.id)
             return
 
         # Claim the job
@@ -101,6 +124,8 @@ def run_ai_job_task(job_id: str) -> None:
             raise RuntimeError("Job cancelled")
 
         _finalize_job(db, job, video, paths, transcript, segments, summary, summary_error)
+        # 转写产物已落库，接着把检索用的块和向量补上
+        _enqueue_chunk_index(video.id)
 
     except Exception as exc:
         _handle_job_failure(db, job_id, exc)

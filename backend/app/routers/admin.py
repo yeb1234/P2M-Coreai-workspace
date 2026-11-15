@@ -83,6 +83,34 @@ def rescan_library():
     return RescanOut(**rescan_video_library())
 
 
+@router.get("/embeddings/status")
+def embeddings_status():
+    """语义块索引进度：多少视频有字幕、索引了多少、还差多少、向量覆盖率。"""
+    from app.services.embedding_pipeline import status
+
+    return status()
+
+
+@router.post("/embeddings/scan")
+def embeddings_scan(limit: int = 50):
+    """手动触发一次扫描（正常不需要 —— worker 每 5 分钟自己扫）。"""
+    from app.services.embedding_pipeline import scan_missing
+
+    return scan_missing(limit=max(1, min(limit, 500)))
+
+
+@router.post("/embeddings/reindex/{video_id}")
+def embeddings_reindex(video_id: int, force: bool = True):
+    """重建单个视频的索引。
+
+    force=True（默认）会无视「已是最新」直接重建 —— 换嵌入模型、
+    调分块参数之后要这么做。同步执行，一个视频只有几块，秒级完成。
+    """
+    from app.services.embedding_pipeline import index_video
+
+    return index_video(video_id, force=force)
+
+
 @router.get("/background-tasks/stats")
 def background_task_stats():
     """通用后台任务的状态统计。

@@ -64,6 +64,21 @@ def main() -> None:
     # 通用任务：先注册 handler，再把 running/queued 的重新投递
     _register_bg_handlers()
     requeue_stale_tasks()
+
+    # 语义块索引扫描：把「有字幕但没索引 / 索引已过期」的视频投递过来。
+    #
+    # 为什么扫描放在 worker 而不是 backend：
+    #   建块和向量化是重活，不该和 HTTP 请求抢线程；
+    #   worker 是 restart: unless-stopped 的常驻进程，重启后线程自己回来。
+    #
+    # 为什么需要扫描而不是只靠转写后投递：
+    #   1) 转写后投递失败（Redis 抖动）时需要兜底
+    #   2) 历史遗留：这次接入之前转写的视频一个都没索引过
+    #   3) 视频重转、字幕变了，需要发现「旧索引」
+    from app.services.embedding_pipeline import start_auto_scan
+
+    start_auto_scan()
+
     logger.info("AI worker initialized, waiting for jobs...")
 
     # Import rq here to avoid issues if Redis is not available at import time

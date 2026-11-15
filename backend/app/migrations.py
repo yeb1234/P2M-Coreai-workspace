@@ -170,6 +170,11 @@ def upgrade_postgres(engine) -> None:
             )
         )
 
+        # 语义块索引标记（见 models.Video.chunk_indexed_at 的注释）
+        conn.execute(
+            text("ALTER TABLE videos ADD COLUMN IF NOT EXISTS chunk_indexed_at TIMESTAMP")
+        )
+
         # 业务查询索引
         for statement in (
             "CREATE INDEX IF NOT EXISTS ix_videos_category_sort ON videos (category_id, sort_key)",

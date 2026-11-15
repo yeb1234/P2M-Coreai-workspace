@@ -331,7 +331,7 @@ expect(await page.locator('.todo-item').count()).toBe(1);
 | `p2m-todo-storage` 旧数据还留在用户浏览器里 | 无害，但排查时会误导（这次的坑） | 加一次性清理，或明确写进文档 |
 | 时间中心只显示 `reminderAt` 非空的待办 | 设计如此（它是「时间中心」），但没文档 | 补一句注释，别再当 bug 查 |
 | `sprite` 代码矛盾：`file_scanner` 有 `generate_missing_sprites()`，`models.py` 没有 `sprite` 字段 | 功能半途废弃或改名 | 查清后要么补字段要么删函数 |
-| 向量覆盖率只有 38%（716,107 / 1,871,941 可嵌入片段） | 检索召回不全，一半内容搜不到 | 跑 `scripts/backfill_chunk_embeddings.py` 补齐；补齐过程走通用任务底座可续跑 |
+| 旧检索表 `segment_embeddings` 只覆盖 38%（716,107 / 1,871,941） | **不影响当前检索** —— `retrieval_source=chunks`，走的是 `content_chunks`（已 100% 索引）。38% 是遗留路径的数字 | 要么删掉旧路径，要么给它也接上扫描。别再拿这个数字判断「搜索坏了」 |
 | `dist/sounds` 47MB（`cafe.ogg` 单个 20M，`wind.ogg` 529kbps） | 镜像体积，不影响首屏 | 重编码 64kbps 单声道，有音质取舍 |
 | worker 并发 = 1，任务失败不重试 | 队列堆 20 个视频要等很久；网络抖动导致的失败永久失败 | 要区分「可重试」和「不可重试」，别盲目加 |
 | `sync_db_queue_to_rq` 没测过 Redis 挂掉的场景 | 未知 | 断 Redis 试一次 |
