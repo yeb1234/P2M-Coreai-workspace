@@ -1,3 +1,15 @@
+"""Database configuration and schema bootstrap.
+
+3.0 起主库为 PostgreSQL + pgvector：
+- 业务数据（视频/字幕/笔记/计划）落 PostgreSQL，解决 SQLite 单写锁与 15GB 体积问题
+- 向量检索走 pgvector 的 HNSW 索引，不再做全表暴力扫描
+
+SQLite 仅作为迁移来源（settings.sqlite_source_url）与只读回滚点保留。
+"""
+
+from __future__ import annotations
+
+import logging
 import os
 from pathlib import Path
 
@@ -7,28 +19,77 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+logger = logging.getLogger(__name__)
+
+DEFAULT_CORS_ORIGINS = "http://localhost:5002,http://localhost:5173,http://localhost"
 
 
 class Settings(BaseSettings):
-    database_url: str = f"sqlite:///{ROOT_DIR / 'learning_os.db'}"
+    # ---------------- 数据库 ----------------
+    database_url: str = "postgresql+psycopg://p2user:p2user@localhost:5432/p2learning"
+    sqlite_source_url: str = ""
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_recycle_s: int = 1800
+    db_echo: bool = False
+
+    # ---------------- 路径 ----------------
     video_folder: str = str(ROOT_DIR / "videos")
     work_dir: str = ""
     output_dir: str = ""
     thumbnail_dir: str = ""
     sprite_dir: str = ""
+
+    # ---------------- 本地 LLM ----------------
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b-instruct"
+    openai_base_url: str = "http://localhost:1234/v1"
+    openai_api_key: str = "lm-studio"
+    openai_model: str = "qwen3-4b"
+    assistant_llm_provider: str = "openai"
+
+    # ---------------- 外部 LLM ----------------
+    external_llm_base_url: str = "https://discovery-api.intern-ai.org.cn/v1"
+    external_llm_api_key: str = ""
+    external_llm_model: str = "deepseek-v4.1-flash-1017"
+    external_llm_thinking: bool = False
+    external_llm_timeout_s: int = 120
+    llm_usage_policy: str = "external_first"
+    llm_context_token_limit: int = 32000
+
+    # ---------------- 向量与重排 ----------------
+    embedding_base_url: str = "http://localhost:1234/v1"
+    embedding_api_key: str = "lm-studio"
+    embedding_model: str = "text-embedding-bge-m3@q8_0"
+    embedding_dim: int = 1024
+    embedding_batch_size: int = 16
+    embedding_timeout_s: int = 120
+    embedding_min_text_len: int = 8
+    rerank_enabled: bool = True
+    rerank_top_n: int = 20
+    rerank_keep: int = 6
+
+    # ---------------- Whisper ----------------
     default_whisper_model: str = "small"
     default_language: str = "zh"
-    external_llm_base_url: str = "https://token.sensenova.cn/v1"
-    external_llm_api_key: str = ""
-    external_llm_model: str = "deepseek-v4-flash"
-    llm_usage_policy: str = "local_first"
-    llm_context_token_limit: int = 8000
-    assistant_llm_provider: str = "local"
-    openai_base_url: str = "http://192.168.3.161:1234/v1"
-    openai_api_key: str = "lm-studio"
-    openai_model: str = "qwen3-vl-8b"
+    whisper_engine: str = "faster-whisper"
+    whisper_cpp_exe: str = ""
+    whisper_cpp_model: str = ""
+    whisper_cpp_extra_args: str = ""
+    whisper_cpu_threads: int = min(6, max(1, (os.cpu_count() or 4) - 2))
+    whisper_compute_type: str = "int8"
+    whisper_beam_size: int = 5
+    whisper_best_of: int = 5
+    whisper_temperature: float = 0.0
+    whisper_vad_filter: bool = True
+    subtitle_correction_enabled: bool = False
+    subtitle_correction_scope: str = "full"
+    subtitle_correction_batch_size: int = 60
+    subtitle_correction_timeout_s: int = 180
+    device_type: str = "auto"
+
+    # ---------------- 队列 ----------------
+    redis_url: str = "redis://localhost:6379/0"
     ai_worker_concurrency: int = 1
     ai_worker_poll_interval: float = 2.0
     ai_worker_requeue_running_on_start: bool = True
@@ -40,31 +101,50 @@ class Settings(BaseSettings):
     sprite_frame_interval: int = 5
     sprite_columns: int = 10
     sprite_jpeg_quality: int = 2
-    whisper_cpu_threads: int = min(6, max(1, (os.cpu_count() or 4) - 2))
-    whisper_compute_type: str = "int8"
-    whisper_beam_size: int = 5
-    whisper_best_of: int = 5
-    whisper_temperature: float = 0.0
-    whisper_vad_filter: bool = True
-    subtitle_correction_enabled: bool = False
-    subtitle_correction_scope: str = "full"
-    subtitle_correction_batch_size: int = 60
-    subtitle_correction_timeout_s: int = 180
-    whisper_engine: str = "faster-whisper"
-    device_type: str = "auto"
-    whisper_cpp_exe: str = ""
-    whisper_cpp_model: str = ""
-    whisper_cpp_extra_args: str = ""
-    jwt_secret: str = "p2m-local-dev-secret-change-in-prod"
-    jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 2160
-    redis_url: str = "redis://localhost:6379/0"
 
-    model_config = SettingsConfigDict(env_file=str(ROOT_DIR / ".env"), env_file_encoding="utf-8", extra="ignore")
+    # ---------------- 安全 ----------------
+    jwt_secret: str = "dev-only-change-me-please-set-JWT_SECRET-in-env"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 24
+    cors_origins: str = DEFAULT_CORS_ORIGINS
+    enable_docs: bool = True
+
+    model_config = SettingsConfigDict(
+        env_file=str(ROOT_DIR / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    @property
+    def is_postgres(self) -> bool:
+        return self.database_url.startswith("postgresql")
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        items = [part.strip() for part in (self.cors_origins or "").split(",") if part.strip()]
+        return items or ["http://localhost:5002"]
+
+    @property
+    def resolved_work_dir(self) -> str:
+        return self.work_dir or str(Path(self.video_folder) / "work")
+
+    @property
+    def resolved_output_dir(self) -> str:
+        return self.output_dir or str(Path(self.video_folder) / "output")
+
+    @property
+    def resolved_thumbnail_dir(self) -> str:
+        return self.thumbnail_dir or str(Path(self.video_folder) / "thumbnails")
+
+    @property
+    def resolved_sprite_dir(self) -> str:
+        return self.sprite_dir or str(Path(self.video_folder) / "sprites")
 
 
 settings = Settings()
 
+# 兼容既有代码里 settings.work_dir / output_dir / thumbnail_dir / sprite_dir 的读取
 if not settings.work_dir:
     settings.work_dir = str(Path(settings.video_folder) / "work")
 if not settings.output_dir:
@@ -74,20 +154,45 @@ if not settings.thumbnail_dir:
 if not settings.sprite_dir:
     settings.sprite_dir = str(Path(settings.video_folder) / "sprites")
 
-for folder in (settings.video_folder, settings.work_dir, settings.output_dir, settings.thumbnail_dir, settings.sprite_dir):
-    Path(folder).mkdir(parents=True, exist_ok=True)
+for folder in (
+    settings.video_folder,
+    settings.work_dir,
+    settings.output_dir,
+    settings.thumbnail_dir,
+    settings.sprite_dir,
+):
+    try:
+        Path(folder).mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # 视频盘未挂载时不应阻塞 API 启动
+        logger.warning("无法创建目录 %s，跳过", folder)
 
-engine = create_engine(
-    settings.database_url,
-    connect_args={
-        "check_same_thread": False,
-        "timeout": 30,
-    } if settings.database_url.startswith("sqlite") else {},
-)
+
+def _build_engine():
+    url = settings.database_url
+    if url.startswith("sqlite"):
+        return create_engine(
+            url,
+            connect_args={"check_same_thread": False, "timeout": 30},
+            echo=settings.db_echo,
+        )
+    return create_engine(
+        url,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_pre_ping=True,
+        pool_recycle=settings.db_pool_recycle_s,
+        echo=settings.db_echo,
+        future=True,
+    )
+
+
+engine = _build_engine()
 
 
 @event.listens_for(engine, "connect")
-def configure_sqlite_connection(dbapi_connection, _connection_record):
+def _configure_connection(dbapi_connection, _connection_record):
+    """SQLite 仅用于迁移读取，保留 WAL 以提升并发读性能；PG 无需额外设置。"""
     if not settings.database_url.startswith("sqlite"):
         return
     cursor = dbapi_connection.cursor()
@@ -97,7 +202,12 @@ def configure_sqlite_connection(dbapi_connection, _connection_record):
     cursor.close()
 
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine)
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+    bind=engine,
+)
 Base = declarative_base()
 
 
@@ -109,254 +219,39 @@ def get_db():
         db.close()
 
 
+def check_database() -> dict:
+    """返回数据库连通性摘要，供 /health 与 /ready 使用。"""
+    info: dict = {"backend": "postgresql" if settings.is_postgres else "sqlite"}
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+        if settings.is_postgres:
+            row = connection.execute(
+                text(
+                    "SELECT current_setting('server_version'), "
+                    "(SELECT extversion FROM pg_extension WHERE extname='vector'), "
+                    "(SELECT extversion FROM pg_extension WHERE extname='pg_trgm')"
+                )
+            ).first()
+            if row:
+                info.update(
+                    server_version=row[0],
+                    pgvector_version=row[1],
+                    pg_trgm_version=row[2],
+                )
+            info["segment_embeddings"] = connection.execute(
+                text("SELECT count(*) FROM segment_embeddings")
+            ).scalar()
+    return info
+
+
 def ensure_runtime_schema() -> None:
-    """Small SQLite migrations for the local MVP without introducing Alembic yet."""
-    if not settings.database_url.startswith("sqlite"):
+    """建表与索引（幂等）。PostgreSQL 走 pgvector + pg_trgm，SQLite 仅保留最小结构。"""
+    if settings.is_postgres:
+        from app.migrations import upgrade_postgres
+
+        upgrade_postgres(engine)
         return
 
-    with engine.begin() as connection:
-        video_columns = {
-            row[1]
-            for row in connection.exec_driver_sql("PRAGMA table_info(videos)").fetchall()
-        }
-        if "sort_key" not in video_columns:
-            connection.exec_driver_sql("ALTER TABLE videos ADD COLUMN sort_key TEXT")
-        if "is_favorite" not in video_columns:
-            connection.exec_driver_sql("ALTER TABLE videos ADD COLUMN is_favorite BOOLEAN DEFAULT 0")
-        if "favorited_at" not in video_columns:
-            connection.exec_driver_sql("ALTER TABLE videos ADD COLUMN favorited_at DATETIME")
+    from app.migrations import upgrade_sqlite_legacy
 
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_videos_category_sort ON videos(category_id, sort_key)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_videos_sort_key ON videos(sort_key)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_videos_favorite ON videos(is_favorite, favorited_at)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_watch_history_video_watched ON watch_history(video_id, watched_at)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_watch_history_watched ON watch_history(watched_at)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_subtitle_segments_video_index ON subtitle_segments(video_id, segment_index)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_ai_jobs_status_created ON ai_jobs(status, created_at)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_ai_jobs_video_status ON ai_jobs(video_id, status)"
-        )
-        connection.exec_driver_sql(
-            """
-            CREATE TABLE IF NOT EXISTS app_settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at DATETIME
-            )
-            """
-        )
-        ai_job_columns = {
-            row[1]
-            for row in connection.exec_driver_sql("PRAGMA table_info(ai_jobs)").fetchall()
-        }
-        for column_name, column_sql in (
-            ("cpu_threads", "INTEGER"),
-            ("compute_type", "TEXT"),
-            ("beam_size", "INTEGER"),
-            ("best_of", "INTEGER"),
-            ("temperature", "FLOAT"),
-            ("vad_filter", "BOOLEAN"),
-            ("device_type", "TEXT"),
-            ("subtitle_correction_enabled", "BOOLEAN"),
-            ("subtitle_correction_scope", "TEXT"),
-            ("subtitle_correction_prompt", "TEXT"),
-            ("whisper_engine", "TEXT"),
-        ):
-            if column_name not in ai_job_columns:
-                connection.exec_driver_sql(f"ALTER TABLE ai_jobs ADD COLUMN {column_name} {column_sql}")
-
-        try:
-            connection.exec_driver_sql(
-                """
-                CREATE VIRTUAL TABLE IF NOT EXISTS subtitle_segments_fts
-                USING fts5(text, content='subtitle_segments', content_rowid='id')
-                """
-            )
-            connection.exec_driver_sql(
-                """
-                CREATE TRIGGER IF NOT EXISTS subtitle_segments_ai AFTER INSERT ON subtitle_segments BEGIN
-                    INSERT INTO subtitle_segments_fts(rowid, text) VALUES (new.id, new.text);
-                END
-                """
-            )
-            connection.exec_driver_sql(
-                """
-                CREATE TRIGGER IF NOT EXISTS subtitle_segments_ad AFTER DELETE ON subtitle_segments BEGIN
-                    INSERT INTO subtitle_segments_fts(subtitle_segments_fts, rowid, text)
-                    VALUES ('delete', old.id, old.text);
-                END
-                """
-            )
-            connection.exec_driver_sql(
-                """
-                CREATE TRIGGER IF NOT EXISTS subtitle_segments_au AFTER UPDATE ON subtitle_segments BEGIN
-                    INSERT INTO subtitle_segments_fts(subtitle_segments_fts, rowid, text)
-                    VALUES ('delete', old.id, old.text);
-                    INSERT INTO subtitle_segments_fts(rowid, text) VALUES (new.id, new.text);
-                END
-                """
-            )
-            fts_count = connection.exec_driver_sql("SELECT count(*) FROM subtitle_segments_fts").scalar() or 0
-            segment_count = connection.exec_driver_sql("SELECT count(*) FROM subtitle_segments").scalar() or 0
-            if segment_count and not fts_count:
-                connection.execute(text("INSERT INTO subtitle_segments_fts(subtitle_segments_fts) VALUES ('rebuild')"))
-        except Exception:
-            # Some SQLite builds omit FTS5; substring fallback search remains available.
-            pass
-
-        # Migration: categories.name was globally unique, now composite (name, parent_id)
-        try:
-            indexes = connection.exec_driver_sql("PRAGMA index_list(categories)").fetchall()
-            for idx in indexes:
-                idx_name = idx[1]
-                is_unique = idx[2]
-                if is_unique:
-                    info = connection.exec_driver_sql(f"PRAGMA index_info({idx_name})").fetchall()
-                    cols = [row[2] for row in info]
-                    if cols == ["name"]:
-                        connection.exec_driver_sql(f"DROP INDEX IF EXISTS {idx_name}")
-            connection.exec_driver_sql(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uix_category_name_parent ON categories(name, parent_id)"
-            )
-        except Exception:
-            pass
-
-        connection.exec_driver_sql(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                display_name TEXT,
-                created_at DATETIME,
-                updated_at DATETIME
-            )
-            """
-        )
-        connection.exec_driver_sql(
-            "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users(username)"
-        )
-        connection.exec_driver_sql(
-            """
-            CREATE TABLE IF NOT EXISTS user_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL REFERENCES users(id),
-                store_key TEXT NOT NULL,
-                value TEXT NOT NULL,
-                updated_at DATETIME
-            )
-            """
-        )
-        connection.exec_driver_sql(
-            "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_data_user_store ON user_data(user_id, store_key)"
-        )
-        connection.exec_driver_sql(
-            """
-            CREATE TABLE IF NOT EXISTS schedule_items (
-                id TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id),
-                type TEXT NOT NULL,
-                title TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                priority TEXT NOT NULL DEFAULT 'green',
-                start_at DATETIME,
-                due_at DATETIME,
-                reminder_at DATETIME,
-                pomodoro_count INTEGER NOT NULL DEFAULT 0,
-                pomodoro_rounds INTEGER NOT NULL DEFAULT 0,
-                total_focus_minutes INTEGER NOT NULL DEFAULT 0,
-                completed_at DATETIME,
-                deleted_at DATETIME,
-                sort_order INTEGER NOT NULL DEFAULT 0,
-                created_at DATETIME,
-                updated_at DATETIME
-            )
-            """
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_type ON schedule_items(user_id, type)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_start ON schedule_items(user_id, start_at)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_due ON schedule_items(user_id, due_at)"
-        )
-        connection.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_status ON schedule_items(user_id, status)"
-        )
-        schedule_columns = {
-            row[1]: row
-            for row in connection.exec_driver_sql("PRAGMA table_info(schedule_items)").fetchall()
-        }
-        if schedule_columns.get("start_at", (None, None, None, 0))[3] or schedule_columns.get("due_at", (None, None, None, 0))[3]:
-            connection.exec_driver_sql("DROP TABLE IF EXISTS schedule_items_nullable_time")
-            connection.exec_driver_sql(
-                """
-                CREATE TABLE schedule_items_nullable_time (
-                    id TEXT PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES users(id),
-                    type TEXT NOT NULL,
-                    title TEXT NOT NULL,
-                    description TEXT DEFAULT '',
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    priority TEXT NOT NULL DEFAULT 'green',
-                    start_at DATETIME,
-                    due_at DATETIME,
-                    reminder_at DATETIME,
-                    pomodoro_count INTEGER NOT NULL DEFAULT 0,
-                    pomodoro_rounds INTEGER NOT NULL DEFAULT 0,
-                    total_focus_minutes INTEGER NOT NULL DEFAULT 0,
-                    completed_at DATETIME,
-                    deleted_at DATETIME,
-                    sort_order INTEGER NOT NULL DEFAULT 0,
-                    created_at DATETIME,
-                    updated_at DATETIME
-                )
-                """
-            )
-            connection.exec_driver_sql(
-                """
-                INSERT INTO schedule_items_nullable_time (
-                    id, user_id, type, title, description, status, priority,
-                    start_at, due_at, reminder_at, pomodoro_count, pomodoro_rounds,
-                    total_focus_minutes, completed_at, deleted_at, sort_order,
-                    created_at, updated_at
-                )
-                SELECT
-                    id, user_id, type, title, description, status, priority,
-                    start_at, due_at, reminder_at, pomodoro_count, pomodoro_rounds,
-                    total_focus_minutes, completed_at, deleted_at, sort_order,
-                    created_at, updated_at
-                FROM schedule_items
-                """
-            )
-            connection.exec_driver_sql("DROP TABLE schedule_items")
-            connection.exec_driver_sql("ALTER TABLE schedule_items_nullable_time RENAME TO schedule_items")
-            connection.exec_driver_sql(
-                "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_type ON schedule_items(user_id, type)"
-            )
-            connection.exec_driver_sql(
-                "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_start ON schedule_items(user_id, start_at)"
-            )
-            connection.exec_driver_sql(
-                "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_due ON schedule_items(user_id, due_at)"
-            )
-            connection.exec_driver_sql(
-                "CREATE INDEX IF NOT EXISTS ix_schedule_items_user_status ON schedule_items(user_id, status)"
-            )
+    upgrade_sqlite_legacy(engine)

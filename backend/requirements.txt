@@ -1,16 +1,35 @@
+# ---- Web 框架 ----
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+python-multipart==0.0.12
+aiofiles==24.1.0
+
+# ---- 数据层：PostgreSQL + pgvector ----
 sqlalchemy==2.0.36
+psycopg[binary]>=3.2
+pgvector>=0.3
 pydantic==2.9.2
 pydantic-settings==2.6.1
-python-multipart==0.0.12
-watchdog==5.0.3
-requests==2.32.3
+
+# ---- Agent / LLM ----
+langchain-core>=1.0
+langchain-openai>=1.0
+langgraph>=1.0
+
+# ---- 向量与数值 ----
+numpy>=2.0
+
+# ---- 队列与缓存 ----
+rq==1.16.2
+redis==5.0.8
+
+# ---- 语音转写 ----
 faster-whisper==1.0.3
 nvidia-cublas-cu12
 nvidia-cudnn-cu12
 nvidia-cuda-runtime-cu12
-aiofiles==24.1.0
+
+# ---- 其他 ----
+watchdog==5.0.3
+requests==2.32.3
 PyJWT==2.9.0
-rq==1.16.2
-redis==5.0.8

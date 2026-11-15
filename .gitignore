@@ -18,6 +18,7 @@ dist-ssr
 *.db.bak-*
 *.db-shm
 *.db-wal
+dump.rdb
 output/
 thumbnails/
 sprites/
