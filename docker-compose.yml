@@ -23,6 +23,11 @@ services:
     image: docker.m.daocloud.io/pgvector/pgvector:pg17
     container_name: siteyeb-pg
     restart: unless-stopped
+    # Docker 默认 /dev/shm 只有 64MB，而 PostgreSQL 的 posix 共享内存
+    # 就走这里。并行查询（work_mem 64MB × 2 worker）会直接把它撑爆，
+    # 报 "could not resize shared memory segment ... No space left on device"，
+    # 看着像磁盘满，其实是共享内存不够。
+    shm_size: 1gb
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-p2learning}
       POSTGRES_USER: ${POSTGRES_USER:-p2user}

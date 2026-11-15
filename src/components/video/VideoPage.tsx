@@ -23,12 +23,15 @@ import { useVideoElementEvents } from './useVideoElementEvents';
 import { useVideoProgressScrubber } from './useVideoProgressScrubber';
 import { useVideoSubtitles } from './useVideoSubtitles';
 import { useVideoSelection } from './useVideoSelection';
+import { useWatchTelemetry } from './useWatchTelemetry';
 import { useIsMobile, useWindowWidth } from '../../hooks/useMediaQuery';
 
 function VideoPlayerView() {
   const { currentVideo, currentSegments, jobStatus, jobStage, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  // 播放行为埋点：心跳每 15 秒上报一次，用于算真实观看时长与学习画像
+  useWatchTelemetry(currentVideo?.id, videoRef);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const isPlayingRef = useRef(false);
   const currentTimeRef = useRef(0);

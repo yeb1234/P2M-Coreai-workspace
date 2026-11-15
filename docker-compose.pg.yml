@@ -11,6 +11,8 @@ services:
     image: docker.m.daocloud.io/pgvector/pgvector:pg17
     container_name: siteyeb-pg
     restart: unless-stopped
+    # 见 docker-compose.yml 同名服务的注释：默认 64MB 的 /dev/shm 不够 PG 并行查询用
+    shm_size: 1gb
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-p2learning}
       POSTGRES_USER: ${POSTGRES_USER:-p2user}

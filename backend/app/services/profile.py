@@ -108,17 +108,41 @@ def _top_categories(db: Session, user_id: int | None, since: datetime, limit: in
 
 
 def _streak_days(db: Session, user_id: int | None) -> int:
+    """连续学习天数。
+
+    从「最近有学习记录的那天」往前数，而不是从今天。
+    但如果最近一次学习已经是前天或更早，说明链条断了，直接归零 ——
+    否则会出现「三周没学习，却显示连续 5 天」的荒谬结果。
+    """
     query = db.query(func.date(WatchEvent.occurred_at)).filter(WatchEvent.delta_sec > 0)
     if user_id is not None:
         query = query.filter(WatchEvent.user_id == user_id)
-    days = sorted({row[0] for row in query.distinct().all() if row[0]})
+    raw_days = [row[0] for row in query.distinct().all() if row[0]]
+    if not raw_days:
+        return 0
+
+    def to_date(value):
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, str):
+            try:
+                return datetime.strptime(value[:10], "%Y-%m-%d").date()
+            except ValueError:
+                return None
+        return value
+
+    days = sorted({d for d in (to_date(v) for v in raw_days) if d}, reverse=True)
     if not days:
         return 0
 
+    today = datetime.now().date()
+    if (today - days[0]).days > 1:
+        return 0  # 断档超过一天，连续记录清零
+
+    day_set = set(days)
     streak = 0
-    cursor = datetime.now().date()
-    day_set = {d if isinstance(d, str) else d.isoformat() for d in days}
-    while cursor.isoformat() in day_set:
+    cursor = days[0]
+    while cursor in day_set:
         streak += 1
         cursor -= timedelta(days=1)
     return streak

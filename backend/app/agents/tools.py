@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timedelta
 
 from langchain_core.tools import tool
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, text
 
 from app.database import SessionLocal
 from app.models import LearningGoal, LearningPath, Note, Video, WatchEvent, WatchHistory
@@ -25,6 +25,19 @@ logger = logging.getLogger(__name__)
 def _fmt_ts(seconds: float) -> str:
     total = int(seconds or 0)
     return f"{total // 60}:{total % 60:02d}"
+
+
+# 「下一步该看什么」不该出现这些：它们是刚接触时的第一个小时内容。
+# 实测未过滤时，一个已经学过 RAG 的人会被推「Python 注释」「print 输出」。
+ENTRY_LEVEL_PATTERNS = (
+    "第一个", "入门", "简介", "介绍", "注释", "变量", "print", "input",
+    "安装", "环境搭建", "hello", "认识", "初识", "概述", "预览", "扯淡",
+)
+
+
+def _is_entry_level(title: str) -> bool:
+    lowered = (title or "").lower()
+    return any(pattern in lowered for pattern in ENTRY_LEVEL_PATTERNS)
 
 
 @tool
@@ -98,15 +111,18 @@ def get_recent_activity(days: int = 7) -> str:
     since = datetime.now() - timedelta(days=days)
     db = SessionLocal()
     try:
-        events = (
-            db.query(WatchEvent, Video.title)
-            .join(Video, Video.id == WatchEvent.video_id)
+        # 统计与明细必须分开查。
+        # 原来的写法是「取最近 200 条事件 → 求和」，结果是：
+        # 200 条只覆盖了不到一天，报出来的「最近 7 天」比实际少了 8 倍。
+        # 聚合走 SQL，明细才用 LIMIT。
+        total_sec = (
+            db.query(func.coalesce(func.sum(WatchEvent.delta_sec), 0.0))
             .filter(WatchEvent.occurred_at >= since)
-            .order_by(desc(WatchEvent.occurred_at))
-            .limit(200)
-            .all()
+            .scalar()
+            or 0.0
         )
-        if not events:
+
+        if not total_sec:
             # 退化到 watch_history，老数据只有进度快照
             history = (
                 db.query(WatchHistory, Video.title)
@@ -124,14 +140,22 @@ def get_recent_activity(days: int = 7) -> str:
                 lines.append(f"- 《{title}》 进度 {pct:.0f}% {'已完成' if record.completed else ''}")
             return "\n".join(lines)
 
-        total_min = sum(float(e.delta_sec or 0) for e, _ in events) / 60
-        by_video: dict[str, float] = {}
-        for event, title in events:
-            by_video[title] = by_video.get(title, 0.0) + float(event.delta_sec or 0)
+        by_video = (
+            db.query(Video.title, func.sum(WatchEvent.delta_sec).label("secs"))
+            .join(Video, Video.id == WatchEvent.video_id)
+            .filter(WatchEvent.occurred_at >= since)
+            .group_by(Video.title)
+            .order_by(func.sum(WatchEvent.delta_sec).desc())
+            .limit(10)
+            .all()
+        )
 
-        lines = [f"最近 {days} 天共学习 {total_min:.0f} 分钟，涉及 {len(by_video)} 个视频："]
-        for title, secs in sorted(by_video.items(), key=lambda kv: kv[1], reverse=True)[:10]:
-            lines.append(f"- 《{title}》 {secs/60:.0f} 分钟")
+        lines = [
+            f"最近 {days} 天共学习 {float(total_sec)/60:.0f} 分钟，"
+            f"涉及 {len(by_video)} 个视频（按时长排序，前 10）："
+        ]
+        for title, secs in by_video:
+            lines.append(f"- 《{title}》 {float(secs or 0)/60:.0f} 分钟")
         return "\n".join(lines)
     finally:
         db.close()
@@ -183,7 +207,7 @@ def get_learning_goal() -> str:
 def recommend_next_videos(limit: int = 5, category_id: int = 0) -> str:
     """基于学习画像推荐「接下来该看什么」。
 
-    规则：优先未看过的、与投入最多领域相关、且有字幕的视频。
+    规则：优先未看过、与投入方向一致、且**不是入门级**的视频。
     回答「我下一步学什么」「推荐点视频」时调用。
     """
     limit = max(1, min(int(limit or 5), 10))
@@ -193,24 +217,115 @@ def recommend_next_videos(limit: int = 5, category_id: int = 0) -> str:
             row[0] for row in db.query(WatchHistory.video_id).distinct().all() if row[0]
         }
 
-        query = (
-            db.query(Video)
-            .filter(Video.title.isnot(None))
-            .filter(Video.transcription.isnot(None))
-        )
-        if category_id:
-            query = query.filter(Video.category_id == int(category_id))
-        candidates = query.order_by(desc(Video.is_favorite), desc(Video.updated_at)).limit(300).all()
+        # 关键判断：「投入最多的分类」是 Python 基础课（入门视频多、容易刷），
+        # 但那不是「下一步」。下一歩应该朝目标技能走，所以优先按目标技能的
+        # skills 去检索，再过滤掉已看过的。分类推荐只作为兜底。
+        goal_skills: list[str] = []
+        try:
+            goals = (
+                db.query(LearningGoal)
+                .filter(LearningGoal.status == "active")
+                .order_by(desc(LearningGoal.updated_at))
+                .limit(2)
+                .all()
+            )
+            for goal in goals:
+                for item in goal.skills or []:
+                    skill = item.get("skill") if isinstance(item, dict) else str(item)
+                    if skill and skill not in goal_skills:
+                        goal_skills.append(str(skill))
+        except Exception as exc:
+            logger.warning("读取目标失败: %s", exc)
 
-        fresh = [v for v in candidates if v.id not in watched_ids] or candidates
-        if not fresh:
-            return "视频库里没有可推荐的视频。"
+        picked: list[Video] = []
+        seen: set[int] = set()
 
-        lines = [f"推荐 {min(limit, len(fresh))} 个接下来可以看的视频（优先未看过的）："]
-        for video in fresh[:limit]:
+        if goal_skills and not category_id:
+            from app.services.hybrid_search import hybrid_search
+
+            for skill in goal_skills[:4]:
+                if len(picked) >= limit:
+                    break
+                try:
+                    result = hybrid_search(f"{skill} 实战 项目", top_k=6, use_rerank=False)
+                except Exception as exc:
+                    logger.warning("推荐检索 %s 失败: %s", skill, exc)
+                    continue
+                for hit in result["hits"]:
+                    if len(picked) >= limit:
+                        break
+                    if hit.video_id in watched_ids or hit.video_id in seen:
+                        continue
+                    if _is_entry_level(hit.video_title or ""):
+                        continue
+                    video = db.query(Video).filter(Video.id == hit.video_id).first()
+                    if video:
+                        seen.add(video.id)
+                        picked.append(video)
+
+            if not picked:
+                return (
+                    f"目标方向（{'/'.join(goal_skills[:4])}）的视频基本都看过了，"
+                    "剩下的不是「再看一个视频」能解决的。"
+                    "建议转向工程化闭环：评测集怎么建、接口怎么测、服务怎么部署。"
+                )
+
+        if not picked:
+            base = (
+                db.query(Video)
+                .filter(Video.title.isnot(None))
+                .filter(Video.transcription.isnot(None))
+            )
+            preferred_ids: list[int] = []
+            try:
+                profile = recompute_profile(db, None)
+                preferred_ids = [
+                    int(c["category_id"])
+                    for c in (profile.top_categories or [])
+                    if c.get("category_id")
+                ][:3]
+            except Exception as exc:
+                logger.warning("推荐时读取画像失败: %s", exc)
+
+            query = base
+            if category_id:
+                query = query.filter(Video.category_id == int(category_id))
+            elif preferred_ids:
+                query = query.filter(Video.category_id.in_(preferred_ids))
+
+            for video in query.order_by(desc(Video.is_favorite), desc(Video.updated_at)).limit(limit * 8).all():
+                if video.id in seen or video.id in watched_ids:
+                    continue
+                if _is_entry_level(video.title or ""):
+                    continue
+                seen.add(video.id)
+                picked.append(video)
+                if len(picked) >= limit:
+                    break
+
+        if not picked:
+            return "视频库里没有找到合适的候选。建议用 search_videos 按具体主题检索。"
+
+        # 分类名一起给出来，让模型能判断「这个推荐是否对得上用户目标」
+        name_map: dict[int, str] = {}
+        for cid in {v.category_id for v in picked if v.category_id}:
+            label = db.execute(
+                text("SELECT name FROM categories WHERE id = :cid"), {"cid": cid}
+            ).scalar()
+            if label:
+                name_map[int(cid)] = str(label)[:28]
+
+        basis = f"目标技能（{'/'.join(goal_skills[:4])}）" if goal_skills else "你的投入方向"
+        lines = [
+            f"候选 {min(limit, len(picked))} 个（按{basis}检索，已排除看过的和入门内容；"
+            "请结合用户目标判断是否合适，不合适就直说）："
+        ]
+        for video in picked[:limit]:
+            cid = int(video.category_id) if video.category_id else 0
+            label = name_map.get(cid, "")
             lines.append(
                 f"- id={video.id} 《{video.title}》 {_fmt_ts(video.duration or 0)}"
-                + ("（已收藏）" if video.is_favorite else "")
+                + (f"　[{label}]" if label else "")
             )
         return "\n".join(lines)
     finally:
