@@ -101,7 +101,43 @@ grep -rn "pomodoroCount" src/ | grep -E "update|set\(|=" | grep -v "__tests__"
 
 ---
 
-### 1.3 默认值假设了错误的使用场景
+### 1.3 长事务：把 DDL 堵死，站点起不来
+
+**这次的实例**
+
+```python
+thumbnail_worker._run_one:
+    db.query(Video)          # ← 拿到 videos 的 ACCESS SHARE
+    generate_thumbnail(...)  # ← 跑 ffmpeg，0.3-2 秒（长视频更久）
+    db.commit()              # ← 这会儿才放手
+```
+
+4 个线程 = 4 个 `idle in transaction` 一直压着 `videos` 表。
+
+**现象**：重建 backend 后整站 502。容器 `Up` 但 `unhealthy`，
+日志停在「初始化 schema」，迁移里的 `ALTER TABLE videos` 等了 **12 分 30 秒**。
+
+**为什么难查**：从应用日志看不出任何异常——没有报错，就是不动。
+必须去 `pg_stat_activity` 看 `state='idle in transaction'` 才找得到。
+
+**排查命令**
+
+```sql
+SELECT pid, state, now()-query_start, left(query,60)
+FROM pg_stat_activity
+WHERE datname='p2u...' AND state <> 'idle';
+```
+
+**怎么防**
+
+1. **DB 事务绝不跨越耗时操作**（网络请求、子进程、文件 IO）。
+   固定三段式：短事务读 → 无事务做活 → 短事务写。
+2. 迁移里的 DDL 加 `SET LOCAL lock_timeout = '20s'` ——
+   宁可 20 秒报错，也不要无声卡 12 分钟。
+
+这条和 1.2「只读不写回」是一对：那条是忘了写，这条是**写之前攥太久**。
+
+### 1.4 默认值假设了错误的使用场景
 
 框架的默认值是为 demo 设计的，不是为你的生产设计的。
 
@@ -294,6 +330,8 @@ expect(await page.locator('.todo-item').count()).toBe(1);
 | 首屏慢 | **静态资源** | `performance.getEntriesByType('resource')` 按 `initiatorType` 分组求和 |
 | 镜像体积异常 | **构建产物累积** | `emptyOutDir`；`ls dist/assets/*.js \| wc -l` |
 | 删数据 500 | **外键漏清** | 对比 `models.py` 里带 `user_id` 的表 vs 清理清单 |
+| 容器 Up 但 unhealthy，日志停在迁移 | **长事务堵住 DDL** | `pg_stat_activity` 里找 `idle in transaction` |
+| 有 worker 但任务一直排队 | **双 worker 抢队列** | `redis-cli SMEMBERS rq:workers:ai_jobs`，应为 1 个 |
 | 同一功能两个页面行为不一致 | **双实现** | 找两个组件各自的实现，选一个删掉 |
 
 ---
