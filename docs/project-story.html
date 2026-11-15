@@ -572,7 +572,7 @@
     <li><a href="#arch"><span class="n">02</span>架构长什么样</a></li>
     <li><a href="#story"><span class="n">03</span>从 0 到现在的两轮</a></li>
     <li><a href="#decisions"><span class="n">04</span>六个关键取舍</a></li>
-    <li><a href="#pits"><span class="n">05</span>八个坑</a></li>
+    <li><a href="#pits"><span class="n">05</span>十个坑</a></li>
     <li><a href="#results"><span class="n">06</span>成绩单</a></li>
     <li><a href="#interview"><span class="n">07</span>面试怎么答</a></li>
     <li><a href="#tell"><span class="n">08</span>怎么讲这个项目</a></li>
@@ -1212,7 +1212,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
 
 <!-- ============ 05 ============ -->
 <section id="pits">
-  <div class="sec-head"><span class="sec-num">05</span><h2>八个坑</h2></div>
+  <div class="sec-head"><span class="sec-num">05</span><h2>十个坑</h2></div>
   <p class="sec-desc">
     按「现象 → 排查 → 根因 → 修复 → 教训」写。这些是面试里「你遇到过什么难题」的标准答料，
     重点不是坑本身，而是<strong>你是怎么定位到它的</strong>。
@@ -1506,6 +1506,78 @@ fcd1e58  chore           换行符规则固化</code></pre>
           任何在读取路径上顺手写库的逻辑，都要问一句：如果失败原因是环境问题而不是数据问题，
           这次写入会不会造成不可逆的损失？容器化会把所有路径假设暴露一遍，
           这类兜底逻辑就是第一批被冲垮的。
+        </div>
+      </div></div>
+    </div>
+  </div>
+  <!-- 坑 9 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">09</span>
+      <h3>「最近 7 天学了 44 分钟」，实际是 338 分钟</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        学习助手说「最近 7 天共学习 44 分钟，涉及 5 个视频」。但直接查数据库，
+        同样 7 天加起来是 338 分钟 —— 差了 8 倍。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        看工具实现，发现一行 <code>.limit(200)</code>：先按时间倒序取 200 条事件，
+        再在内存里 <code>sum(delta_sec)</code> 当总量。
+        200 条心跳只覆盖了不到一天，所以「近 7 天」实际统计的是「最近几小时」。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        把「取明细」和「做统计」混在同一个查询里。
+        明细需要 LIMIT（结果给人看，太多没意义），统计绝不能 LIMIT（求和必须覆盖全集）。
+        这两个需求写在一个查询里，就会互相污染。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        拆成两个查询：统计用 <code>SUM</code> 交给数据库算（<code>338 分钟</code>），
+        明细单独查 <code>GROUP BY</code> + <code>LIMIT 10</code>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>聚合金句：有 LIMIT 的地方不能求和。</strong>
+          这个 bug 特别阴 —— 数字看起来完全合理（44 分钟不多不少），
+          没有报错、没有空值，只有和数据库对账才会发现。
+          凡是 Agent 引用的统计数字，都要能追溯到一条可复现的 SQL。
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 10 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">10</span>
+      <h3>报「磁盘满」，但磁盘还有 334G</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        全量向量回填一启动就失败：
+        <code>DiskFull: could not resize shared memory segment ... No space left on device</code>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        <code>docker system df</code> 显示 Docker 总共才占 11GB，宿主机 C 盘剩 334G。
+        既然不是磁盘，就看报错里的关键词「shared memory segment」，
+        转而查容器内的 <code>/dev/shm</code> —— 只有 <strong>64MB</strong>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        Docker 默认把 <code>/dev/shm</code> 限制在 64MB。
+        PostgreSQL 的 <code>dynamic_shared_memory_type=posix</code> 正好用这块空间，
+        而 <code>work_mem=64MB</code> × 2 个并行 worker 一次就要 128MB，直接撑爆。
+        报错文案里的「No space left on device」把人往磁盘方向带，实际是内存段。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        compose 里给 postgres 加 <code>shm_size: 1gb</code>，重建容器（数据在命名卷里，不丢）。
+        回填恢复正常，约 72 条/秒。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>别被错误文案的关键词牵着走。</strong>
+          「DiskFull」是个异常类型名，不是诊断结论。
+          先量一遍（Docker 占用 11GB / 磁盘剩 334G），再顺着报错里的具体名词
+          （shared memory segment）去找，比顺着结论去猜快得多。
         </div>
       </div></div>
     </div>

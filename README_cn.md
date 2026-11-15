@@ -9,7 +9,7 @@
 > 主库已从 SQLite 迁移到 **PostgreSQL 17 + pgvector 0.8.7**，检索从「失效的中文 FTS5 + 319 万条废向量」换成 **pg_trgm 词法 + HNSW 语义 + 加权 RRF + LLM 重排**；
 > 灵境小助手升级为 **LangChain ReAct Agent**（8 个工具、SSE 流式、会话记忆），并新增 **LangGraph 学习路径规划**。
 > 完整设计取舍与实测数据见 [docs/2026-11-15-3.0-architecture.md](docs/2026-11-15-3.0-architecture.md)。
-> 项目复盘（架构 / 演进 / 八个坑 / 面试问答）单页版：[docs/project-story.html](docs/project-story.html)，浏览器直接打开即可。
+> 项目复盘（架构 / 演进 / 十个坑 / 面试问答）单页版：[docs/project-story.html](docs/project-story.html)，浏览器直接打开即可。
 >
 > 启动数据库：`docker compose -f docker-compose.pg.yml --env-file .env up -d`
 
