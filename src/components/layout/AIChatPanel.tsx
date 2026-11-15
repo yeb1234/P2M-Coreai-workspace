@@ -59,7 +59,13 @@ function getRuntimeModelLabel(settings: AssistantRuntimeSettingsDto) {
 
 function formatTimestamp(seconds: number) {
   const total = Math.max(0, Math.floor(seconds || 0));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  // 超过一小时的视频按 h:mm:ss 显示，否则 mm:ss
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`;
 }
 
 /** 跳转到视频指定时间点：先把 seek 位置落到 localStorage，播放器加载后自会读取 */

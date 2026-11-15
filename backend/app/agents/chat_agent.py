@@ -306,7 +306,10 @@ async def stream_chat(ctx: AgentContext, message: str):
         try:
             from app.services.hybrid_search import hybrid_search
 
-            ref_result = hybrid_search(message, top_k=5, candidate_k=15, use_rerank=False)
+            ref_result = hybrid_search(message, top_k=6, candidate_k=15, use_rerank=False)
+            # 只保留真正相关的片段：低于 0.5 的多是「词面沾边」，点了也是浪费时间
+            strong = [h for h in ref_result["hits"] if (h.vector_score or 0) >= 0.5]
+            picked = strong[:5] if strong else ref_result["hits"][:3]
             references = [
                 {
                     "video_id": hit.video_id,
@@ -315,7 +318,7 @@ async def stream_chat(ctx: AgentContext, message: str):
                     "text": hit.text[:200],
                     "score": round(hit.vector_score or hit.lexical_score or 0, 3),
                 }
-                for hit in ref_result["hits"]
+                for hit in picked
             ]
         except Exception as exc:
             logger.warning("补充引用片段失败: %s", exc)

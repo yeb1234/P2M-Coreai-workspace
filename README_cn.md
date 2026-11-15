@@ -4,6 +4,14 @@
 
 它适合个人日常使用，也适合在局域网里给小团队、工作室或家庭设备改造使用。当前不是开箱即用的公网 SaaS，更像一个可以认真折腾、继续加固、继续接 AI 能力的开源底座。
 
+> **3.0 架构重构（2026-11-15）**
+>
+> 主库已从 SQLite 迁移到 **PostgreSQL 17 + pgvector 0.8.7**，检索从「失效的中文 FTS5 + 319 万条废向量」换成 **pg_trgm 词法 + HNSW 语义 + 加权 RRF + LLM 重排**；
+> 灵境小助手升级为 **LangChain ReAct Agent**（8 个工具、SSE 流式、会话记忆），并新增 **LangGraph 学习路径规划**。
+> 完整设计取舍与实测数据见 [docs/2026-11-15-3.0-architecture.md](docs/2026-11-15-3.0-architecture.md)。
+>
+> 启动数据库：`docker compose -f docker-compose.pg.yml --env-file .env up -d`
+
 ## 当前功能
 
 - 待办、日历1、日历2、番茄钟、笔记、时间中心。
