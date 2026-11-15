@@ -502,3 +502,37 @@ class AgentRun(Base):
     latency_ms = Column(Integer, nullable=True)
     error = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
+
+class BackgroundTask(Base):
+    """通用后台任务。任何「跑到一半断了要能接着跑」的活都挂这里。
+
+    和 AiJob 的分工：AiJob 专用于转写（字段和转写流程强绑定），
+    这张表是通用的 —— 缩略图、向量化、索引重建都能用。
+
+    状态机：
+        queued → running → done
+                   ↓ 失败且未达重试上限
+                 queued（重试）
+                   ↓ 达上限
+                 failed
+
+    worker 启动时会把 running / queued 的全部重新投递，
+    所以进程崩溃、机器重启都不会丢任务。
+    """
+
+    __tablename__ = "background_tasks"
+    __table_args__ = (
+        Index("ix_background_tasks_kind_status", "kind", "status"),
+        Index("ix_background_tasks_target", "kind", "target_id"),
+    )
+
+    id = Column(String, primary_key=True)
+    kind = Column(String, nullable=False, index=True)
+    target_id = Column(String, nullable=False)
+    payload = Column(JSON, default=dict)
+    status = Column(String, nullable=False, default="queued", index=True)
+    attempts = Column(Integer, default=0)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)

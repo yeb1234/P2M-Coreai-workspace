@@ -9,7 +9,9 @@ import time
 from app.database import Base, engine, ensure_runtime_schema, settings
 from app.services.admin_ai_queue import sync_db_queue_to_rq
 from app.services.ai_jobs import requeue_interrupted_ai_jobs
-from app.services.rq_client import ai_jobs_queue, get_redis_connection
+from app.services.background_tasks import requeue_stale_tasks
+from app.services.background_handlers import register_all as _register_bg_handlers
+from app.services.rq_client import ai_jobs_queue, background_queue, get_redis_connection
 from rq.worker import SimpleWorker
 
 logger = logging.getLogger(__name__)
@@ -59,6 +61,9 @@ def main() -> None:
         requeue_interrupted_ai_jobs()
     # Push any DB queued jobs that were created while Redis was unavailable
     sync_db_queue_to_rq()
+    # 通用任务：先注册 handler，再把 running/queued 的重新投递
+    _register_bg_handlers()
+    requeue_stale_tasks()
     logger.info("AI worker initialized, waiting for jobs...")
 
     # Import rq here to avoid issues if Redis is not available at import time
@@ -66,13 +71,17 @@ def main() -> None:
 
     redis_conn = get_redis_connection()
     queue = ai_jobs_queue()
+    bg_queue = background_queue()
 
     # Clean stale worker registrations so this new process can register
     _clean_dead_workers(redis_conn)
 
     WorkerCls = WindowsWorker if sys.platform == "win32" else Worker
     worker = WorkerCls(
-        queues=[queue],
+        # 两个队列都要消费：ai_jobs 是转写（长任务），
+        # background 是缩略图/向量化这类可以随时重来的活。
+        # 分开排队的意义：转写队列堵了，缩略图不该跟着等。
+        queues=[queue, bg_queue],
         connection=redis_conn,
         name=f"ai-worker-{os.getpid()}",
     )

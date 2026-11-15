@@ -83,6 +83,26 @@ def rescan_library():
     return RescanOut(**rescan_video_library())
 
 
+@router.get("/background-tasks/stats")
+def background_task_stats():
+    """通用后台任务的状态统计。
+
+    返回形如 {"queued": 3, "running": 1, "done": 120, "failed": 0}。
+    重启后想看「有没有任务被漏掉」，查 queued + running 就行。
+    """
+    from app.services.background_tasks import task_stats
+
+    return task_stats()
+
+
+@router.post("/background-tasks/requeue")
+def background_task_requeue():
+    """手动触发一次恢复。正常情况下不需要调 —— worker 启动时会自动跑。"""
+    from app.services.background_tasks import requeue_stale_tasks
+
+    return requeue_stale_tasks()
+
+
 @router.get("/thumbnails/status")
 def thumbnail_status():
     """缩略图补齐进度。

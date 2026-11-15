@@ -28,6 +28,7 @@ AI_JOB_RESULT_TTL_SECONDS = 24 * 60 * 60
 
 _redis_conn: redis.Redis | None = None
 _ai_jobs_queue: Queue | None = None
+_background_queue: Queue | None = None
 
 
 def get_redis_connection() -> redis.Redis:
@@ -69,3 +70,15 @@ def send_kill_to_worker(worker_name: str) -> None:
         send_kill_horse_command(get_redis_connection(), worker_name)
     except Exception:
         pass
+
+
+def background_queue() -> Queue:
+    """通用后台任务队列（缩略图、向量化等）。
+
+    和 ai_jobs 分开是为了互不阻塞：转写队列里有长任务时，
+    缩略图不该跟着排队。
+    """
+    global _background_queue
+    if _background_queue is None:
+        _background_queue = Queue("background", connection=get_redis_connection())
+    return _background_queue
