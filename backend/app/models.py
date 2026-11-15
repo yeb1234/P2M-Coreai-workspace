@@ -62,6 +62,16 @@ class Video(Base):
     #
     # 缩略图不需要这个 —— thumbnail IS NULL 本身就是「还没做」的完整信号。
     chunk_indexed_at = Column(DateTime, nullable=True)
+    # 缩略图生成失败计数。
+    #
+    # 为什么需要：扫描条件是「thumbnail IS NULL」，而损坏的视频文件
+    # 永远生成不出缩略图 —— 它会被每一轮扫描重新投递，无限重试，
+    # 白烧 ffmpeg 还刷日志。实测有一个文件（路径里带全角括号）
+    # 每 5 分钟失败一次。
+    #
+    # 到上限就不再自动重试；要重试走 admin 的 retry 接口（会清零）。
+    thumbnail_attempts = Column(Integer, nullable=False, server_default="0")
+    thumbnail_failed_at = Column(DateTime, nullable=True)
     tags = Column(String, nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     transcription = Column(Text, nullable=True)

@@ -181,6 +181,18 @@ def upgrade_postgres(engine) -> None:
             text("ALTER TABLE videos ADD COLUMN IF NOT EXISTS chunk_indexed_at TIMESTAMP")
         )
 
+        # 缩略图失败计数（见 models.Video.thumbnail_attempts 的注释）
+        # PG 11+ 带默认值加列是瞬时操作，不会重写表
+        conn.execute(
+            text(
+                "ALTER TABLE videos ADD COLUMN IF NOT EXISTS "
+                "thumbnail_attempts INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+        conn.execute(
+            text("ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_failed_at TIMESTAMP")
+        )
+
         # 业务查询索引
         for statement in (
             "CREATE INDEX IF NOT EXISTS ix_videos_category_sort ON videos (category_id, sort_key)",

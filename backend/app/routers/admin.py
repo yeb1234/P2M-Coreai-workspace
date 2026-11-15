@@ -156,6 +156,55 @@ def thumbnail_rescan(limit: int = 200):
     return {"queued": added, **get_thumbnail_worker().status()}
 
 
+@router.post("/thumbnails/retry/{video_id}")
+def thumbnail_retry(video_id: int):
+    """重置失败计数并立刻重试一张。
+
+    自动重试到 MAX_THUMBNAIL_ATTEMPTS 就放弃了（损坏的文件重试多少次都一样）。
+    换掉了视频文件、或怀疑是临时故障（磁盘忙、挂载没就绪）时，用这个重来。
+    """
+    from app.database import SessionLocal
+    from app.models import Video
+    from app.services.thumbnail_worker import get_thumbnail_worker
+
+    db = SessionLocal()
+    try:
+        video = db.query(Video).filter(Video.id == video_id).first()
+        if video is None:
+            raise HTTPException(status_code=404, detail="视频不存在")
+        video.thumbnail_attempts = 0
+        video.thumbnail_failed_at = None
+        db.commit()
+    finally:
+        db.close()
+
+    queued = get_thumbnail_worker().submit([video_id])
+    return {"video_id": video_id, "queued": queued, "attempts_reset": True}
+
+
+@router.post("/thumbnails/retry-failed")
+def thumbnail_retry_failed(limit: int = 500):
+    """把所有「已放弃」的视频计数清零，让扫描重新捡起它们。
+
+    典型场景：视频盘重新挂载后，之前因为读不到文件而失败的一批可以重来。
+    """
+    from sqlalchemy import text
+
+    from app.database import engine
+    from app.services.thumbnail_worker import MAX_THUMBNAIL_ATTEMPTS
+
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                "UPDATE videos SET thumbnail_attempts = 0, thumbnail_failed_at = NULL "
+                "WHERE thumbnail_attempts >= :max_attempts AND thumbnail IS NULL"
+            ),
+            {"max_attempts": MAX_THUMBNAIL_ATTEMPTS},
+        )
+        reset = result.rowcount or 0
+    return {"reset": reset, "note": "下一轮扫描会重新投递"}
+
+
 @router.post("/generate-thumbnails")
 def generate_thumbnails_for_ids(payload: dict):
     return generate_thumbnails_for_video_ids(payload.get("video_ids", []))

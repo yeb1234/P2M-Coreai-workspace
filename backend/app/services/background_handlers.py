@@ -56,13 +56,18 @@ def handle_thumbnail(task: BackgroundTask) -> None:
     # ② 无事务
     result = generate_thumbnail(str(resolve_media_path(filepath)), video_id)
     if not result:
+        # 手动/任务路径也要记账，否则「放弃」的判定只对自动扫描生效
+        from app.services.thumbnail_worker import _record_failure
+
+        _record_failure(video_id)
         raise RuntimeError(f"缩略图生成失败 video_id={video_id}")
 
     # ③ 短事务写
     db = SessionLocal()
     try:
         db.query(Video).filter(Video.id == video_id).update(
-            {"thumbnail": result}, synchronize_session=False
+            {"thumbnail": result, "thumbnail_attempts": 0, "thumbnail_failed_at": None},
+            synchronize_session=False,
         )
         db.commit()
     finally:
