@@ -562,6 +562,11 @@ class HybridSearchHit(BaseModel):
     vector_score: float | None = None
     rerank_score: float | None = None
     sources: list[str] = []
+    # 上下文扩展后：text 是合并出的段落，原始命中片段留在 raw_text。
+    # 少了这两个字段，前端无法判断这条结果覆盖了多长时间的内容，
+    # 也没法在高亮时区分「命中的是这一句」还是「展开的整段」。
+    raw_text: str | None = None
+    segment_count: int = 1
 
 
 class HybridSearchOut(BaseModel):
