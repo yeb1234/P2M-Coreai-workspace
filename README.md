@@ -192,6 +192,10 @@ npm run build
 
 ## 文档
 
+- [开发工作法（怎么在这个项目上安全改动）](docs/maintainability.md) ← 动手前先看
+- [可迁移的经验（哪些 bug 不报错）](docs/lessons.md)
+- [后台任务与重启续跑](docs/background-tasks.md)
+- [存储与跨设备同步审计](docs/storage-sync-audit.md)
 - [更新日志](docs/changelog.md)
 - [2.91 技术改进报告](docs/2026-05-13-2.91-technical-report.md)
 - [2.7 技术改进报告](docs/2026-05-12-2.7-technical-report.md)
