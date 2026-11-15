@@ -96,12 +96,12 @@ export const ShopPage: React.FC = () => {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[var(--bg-base)]">
-                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">订单号</th>
-                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">客户</th>
-                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">商品</th>
-                <th className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">金额</th>
-                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">状态</th>
-                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">物流</th>
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">订单号</th>
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">客户</th>
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">商品</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">金额</th>
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">状态</th>
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">物流</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-light)]">

@@ -181,12 +181,12 @@ export const UserManagementSection: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
                 <tr>
-                  <th className="px-3 py-2 font-medium">账号</th>
-                  <th className="px-3 py-2 font-medium">角色</th>
-                  <th className="px-3 py-2 font-medium">状态</th>
-                  <th className="px-3 py-2 font-medium">最近登录</th>
-                  <th className="px-3 py-2 font-medium">数据</th>
-                  <th className="px-3 py-2 text-right font-medium">操作</th>
+                  <th scope="col" className="px-3 py-2 font-medium">账号</th>
+                  <th scope="col" className="px-3 py-2 font-medium">角色</th>
+                  <th scope="col" className="px-3 py-2 font-medium">状态</th>
+                  <th scope="col" className="px-3 py-2 font-medium">最近登录</th>
+                  <th scope="col" className="px-3 py-2 font-medium">数据</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>

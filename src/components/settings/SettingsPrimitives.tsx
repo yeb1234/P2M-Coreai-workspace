@@ -42,8 +42,28 @@ export function SettingsHint({ children, className = '' }: { children: ReactNode
   return <p className={`text-xs text-[var(--text-muted)] ${className}`}>{children}</p>;
 }
 
-export function SettingsFieldLabel({ children }: { children: ReactNode }) {
-  return <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{children}</label>;
+/**
+ * 字段标签。
+ *
+ * htmlFor 必须传：不传的话 label 和 input 只是「视觉上挨着」，
+ * 读屏软件念到输入框时不会说这是什么字段。
+ * 加上之后点标签也能聚焦输入框，小屏上更好点。
+ */
+export function SettingsFieldLabel({
+  children,
+  htmlFor,
+}: {
+  children: ReactNode;
+  htmlFor?: string;
+}) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]"
+    >
+      {children}
+    </label>
+  );
 }
 
 export function SettingsTextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {

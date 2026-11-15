@@ -72,10 +72,13 @@ export const AuthPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">用户名</label>
+              <label htmlFor="auth-username" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">用户名</label>
               <input
+                id="auth-username"
                 type="text"
                 value={username}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? 'auth-error' : undefined}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
                 placeholder="输入用户名"
@@ -85,10 +88,13 @@ export const AuthPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">密码</label>
+              <label htmlFor="auth-password" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">密码</label>
               <input
+                id="auth-password"
                 type="password"
                 value={password}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? 'auth-error' : undefined}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
                 placeholder={isRegister ? '至少 8 位，含字母和数字' : '输入密码'}
@@ -98,10 +104,13 @@ export const AuthPage: React.FC = () => {
 
             {isRegister && (
               <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">确认密码</label>
+                <label htmlFor="auth-confirm" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">确认密码</label>
                 <input
+                  id="auth-confirm"
                   type="password"
                   value={confirm}
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? 'auth-error' : undefined}
                   onChange={(e) => setConfirm(e.target.value)}
                   className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
                   placeholder="再次输入密码"
@@ -122,8 +131,17 @@ export const AuthPage: React.FC = () => {
               </label>
             )}
 
+            {/* role="alert" 让读屏软件在错误出现时立刻播报，
+                而不是等用户 Tab 到下一个元素才听到。
+                id 供上面三个输入框的 aria-describedby 引用。 */}
             {error && (
-              <p className="text-xs text-[var(--danger)] bg-[var(--danger)]/5 px-3 py-2 rounded-lg">{error}</p>
+              <p
+                id="auth-error"
+                role="alert"
+                className="rounded-lg bg-[var(--danger-bg)] px-3 py-2 text-xs text-[var(--danger)]"
+              >
+                {error}
+              </p>
             )}
 
             <button

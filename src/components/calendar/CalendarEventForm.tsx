@@ -51,11 +51,11 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+        <label htmlFor="event-form-title" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
           标题 <span className="text-[var(--danger)]">*</span>
         </label>
         <input
-          type="text"
+          id="event-form-title" type="text"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-accent)]"
@@ -78,12 +78,12 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">开始时间</label>
-          <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} step="60" className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-accent)]" />
+          <label htmlFor="event-form-start" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">开始时间</label>
+          <input id="event-form-start" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} step="60" className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-accent)]" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">截止时间</label>
-          <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} step="60" className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-accent)]" />
+          <label htmlFor="event-form-due" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">截止时间</label>
+          <input id="event-form-due" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} step="60" className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-accent)]" />
         </div>
       </div>
 

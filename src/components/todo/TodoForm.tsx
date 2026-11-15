@@ -226,11 +226,11 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       className="space-y-3 md:space-y-4"
     >
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">
+        <label htmlFor="todo-form-title" className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">
           标题 <span className="text-[var(--danger)]">*</span>
         </label>
         <input
-          type="text"
+          id="todo-form-title" type="text"
           value={title}
           onChange={(event) => handleTitleChange(event.target.value)}
           onKeyDown={handleTitleKeyDown}

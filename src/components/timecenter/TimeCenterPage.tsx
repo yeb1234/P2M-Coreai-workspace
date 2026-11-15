@@ -396,12 +396,12 @@ export const TimeCenterPage: React.FC = () => {
           <table className="w-full min-w-[760px] border-separate border-spacing-y-1 text-sm">
             <thead>
               <tr className="text-left text-xs text-[var(--text-muted)]">
-                <th className="px-3 py-2 font-medium">类型</th>
-                <th className="px-3 py-2 font-medium">名称</th>
-                <th className="px-3 py-2 font-medium">目标</th>
-                <th className="px-3 py-2 font-medium">当前</th>
-                <th className="px-3 py-2 font-medium">状态</th>
-                <th className="px-3 py-2 text-right font-medium">操作</th>
+                <th scope="col" className="px-3 py-2 font-medium">类型</th>
+                <th scope="col" className="px-3 py-2 font-medium">名称</th>
+                <th scope="col" className="px-3 py-2 font-medium">目标</th>
+                <th scope="col" className="px-3 py-2 font-medium">当前</th>
+                <th scope="col" className="px-3 py-2 font-medium">状态</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">操作</th>
               </tr>
             </thead>
             <tbody>

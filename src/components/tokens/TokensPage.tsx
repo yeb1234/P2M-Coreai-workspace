@@ -154,12 +154,12 @@ export const TokensPage: React.FC = () => {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[var(--bg-base)]">
-                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">模型</th>
-                <th className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">供应商</th>
-                <th className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">输入 Tokens</th>
-                <th className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">输出 Tokens</th>
-                <th className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">请求数</th>
-                <th className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">花费</th>
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">模型</th>
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">供应商</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">输入 Tokens</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">输出 Tokens</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">请求数</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">花费</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-light)]">
