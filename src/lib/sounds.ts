@@ -324,16 +324,22 @@ class AmbientPlayer {
     void this.drainPreloadQueue();
   }
 
+  /**
+   * 预加载环境音。
+   *
+   * 只加载「当前选中的那一个」，不再全量排队。
+   *
+   * 原来会把 AMBIENT_PRELOAD_ORDER 里所有声音都排队下载 —— 实测首屏
+   * 因此发出 15 个 audio 请求、共 1147KB，占整个首屏传输量的 98%
+   * （js + css 才 20KB 左右）。而绝大多数用户根本不切环境音。
+   *
+   * 取舍：切声音时如果那个文件没缓存，会等一下才出声。换首屏快 1MB，
+   * 划算。
+   */
   preloadAll(preferredSound: AmbientSound = 'none'): void {
     if (preferredSound !== 'none') {
       this.preload(preferredSound, true);
     }
-
-    AMBIENT_PRELOAD_ORDER.forEach((sound) => {
-      if (sound !== preferredSound) {
-        this.preload(sound);
-      }
-    });
   }
 
   async play(sound: AmbientSound, volume?: number): Promise<boolean> {

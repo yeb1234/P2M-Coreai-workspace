@@ -16,7 +16,11 @@ export default defineConfig({
     },
   },
   build: {
-    emptyOutDir: false,
+    // 必须清空：之前是 false，导致每次构建只新增不删除旧 chunk。
+    // 累积下来 dist/assets 里堆了 839 个文件（同名页面 44 个 hash 版本），
+    // 镜像 71MB，而首页实际只引用 17 个 js。
+    // public/ 里的 favicon / icons / sounds 会被自动重新复制，不受影响。
+    emptyOutDir: true,
     rolldownOptions: {
       output: {
         manualChunks(id) {
