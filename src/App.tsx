@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { hasAuthToken } from './lib/authApi';
+import { initNotesSync } from './stores/notesStore';
 import { HashRouter } from 'react-router-dom';
 import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
@@ -11,6 +13,26 @@ import { useThemeScheduler } from './hooks/useThemeScheduler';
 registerAllPlugins();
 
 function WelcomeScreen({ username, onDone }: { username: string; onDone: () => void }) {
+  // 笔记同步要在「已登录」之后才能建（未登录时 setUserData 会 401）。
+  // 但登录是异步的，这里轮询等 token 出现，出现后初始化一次就停。
+  useEffect(() => {
+    if (hasAuthToken()) {
+      initNotesSync();
+      return;
+    }
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      tries += 1;
+      if (hasAuthToken()) {
+        window.clearInterval(timer);
+        initNotesSync();
+      } else if (tries > 60) {
+        window.clearInterval(timer); // 最多等 60 秒，之后不再尝试
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(onDone, 100);
     return () => clearTimeout(t);

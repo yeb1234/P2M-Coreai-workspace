@@ -294,3 +294,58 @@ export const useNotesStore = create<NotesState>()(
     }
   )
 );
+
+/**
+ * 笔记云端同步的接线。
+ *
+ * 由 App 在「已登录」之后调用一次：
+ *   - 先把云端快照拉下来（如果本地还是初始种子数据，用云端覆盖）
+ *   - 再订阅本地变化，防抖推送到云端
+ *
+ * 为什么要判断「本地是种子数据」：
+ * 新设备打开时本地只有 SEED_NOTES 那几条示例，如果直接推上去，
+ * 会把云端的真实笔记冲掉。
+ */
+let syncInitialized = false;
+
+export function initNotesSync(): void {
+  if (syncInitialized) return;
+  syncInitialized = true;
+
+  void (async () => {
+    const { pullNotes, scheduleNotesPush, NOTES_REMOTE_KEY } = await import('../lib/notesSync');
+    void NOTES_REMOTE_KEY;
+
+    const state = useNotesStore.getState();
+    const looksLikeSeed =
+      state.notes.length === SEED_NOTES.length &&
+      state.notes.every((n) => SEED_NOTES.some((s) => s.id === n.id));
+
+    const remote = await pullNotes();
+    if (remote && looksLikeSeed) {
+      // 本地还是示例数据，用云端覆盖
+      useNotesStore.setState({ notes: remote.notes, trash: remote.trash ?? {} });
+    } else if (remote) {
+      // 两边都有真实数据：按 updatedAt 粗判，谁新用谁（不做逐条合并）
+      const localTs = state.notes.reduce((m, n) => (n.updatedAt > m ? n.updatedAt : m), '');
+      if ((remote.updatedAt ?? '') > localTs) {
+        useNotesStore.setState({ notes: remote.notes, trash: remote.trash ?? {} });
+      }
+    }
+
+    // 订阅变化：只关心 notes / trash 的引用变化
+    let prevNotes = useNotesStore.getState().notes;
+    let prevTrash = useNotesStore.getState().trash;
+    useNotesStore.subscribe((s) => {
+      if (s.notes === prevNotes && s.trash === prevTrash) return;
+      prevNotes = s.notes;
+      prevTrash = s.trash;
+      scheduleNotesPush(() => ({
+        kind: 'notes-v1',
+        notes: useNotesStore.getState().notes,
+        trash: useNotesStore.getState().trash,
+        updatedAt: new Date().toISOString(),
+      }));
+    });
+  })();
+}
