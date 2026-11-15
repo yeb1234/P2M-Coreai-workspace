@@ -12,8 +12,8 @@ import re
 
 from sqlalchemy import text
 
-from app.database import engine, settings
-from app.tables import retrieval_table_name
+from app.database import engine
+from app.tables import CONTENT_CHUNKS
 
 logger = logging.getLogger(__name__)
 
@@ -79,28 +79,26 @@ def lexical_search(
     similarity_threshold: float = 0.12,
     min_text_len: int = 10,
 ) -> list[dict]:
-    """返回词法命中，按相似度降序。任何异常都降级为空列表，不阻塞语义检索。
+    """在语义块上做词法命中，按相似度降序。异常一律降级为空列表，不阻塞语义检索。
 
-    min_text_len 过滤掉「有什么用」「Langgraph」这类 3-8 字碎片：
-    trgm 相似度对短文本天然偏高，不过滤会让无信息量的片段挤掉真内容。
+    这里只有一个检索源（content_chunks）。原来的「碎片模式」走
+    subtitle_segments，已随 segment_embeddings 一起删除 ——
+    两条路径的调参完全不同（块模式关掉 trgm 相似度、阈值压到 0.04，
+    碎片模式要保留相似度、阈值 0.12），留着分支只会让线上行为取决于
+    一个配置项的取值，排查时非常费劲。
     """
     query = (query or "").strip()
     if not query:
         return []
 
-    # 语义块模式下换表。两块表的列名一致（id/text/video_id/start_sec/end_sec），
-    # 所以 SQL 结构可以完全复用。
-    #
-    # 表名从 app.tables 取，不在这里拼字面量：
-    # 两张表的 id 空间重叠，拼错了不会报错，只会静默命中另一批文本。
-    use_chunks = settings.retrieval_source == "chunks"
-    source_table = retrieval_table_name()
-    if use_chunks:
-        # 块至少 30 字，长度过滤没有意义；短句过滤是给碎片模式用的补丁
-        min_text_len = 0
-        # 565 字的文本和短 query 做 trigram 相似度天然偏低，
-        # 沿用木片时代的 0.12 会把绝大部分块挡在外面
-        similarity_threshold = min(similarity_threshold, 0.04)
+    # 表名从 app.tables 取，不写字面量
+    source_table = CONTENT_CHUNKS.name
+
+    # 块至少 30 字，长度过滤对块没有意义（保留 SQL 谓词是为了不漏改执行计划）
+    min_text_len = 0
+    # 565 字的文本和短 query 做 trigram 相似度天然偏低，
+    # 沿用碎片时代的 0.12 会把绝大部分块挡在外面
+    similarity_threshold = min(similarity_threshold, 0.04)
 
     filters: list[str] = []
     params: dict = {
@@ -134,18 +132,14 @@ def lexical_search(
     # 块模式下永远不用相似度匹配。
     # 565 字的块 vs 短 query，trigram 相似度天然极低；为了召回只能把阈值压到 0.04，
     # 结果 GIN 索引返回几万行候选，单次 1.2 秒。改用关键词 ILIKE 后 8ms。
-    if use_chunks:
-        use_similarity = False
-        for index, term in enumerate(extract_cjk_terms(query)):
-            key = f"cjk{index}"
-            clauses_cjk = f"s.text ILIKE :{key}"
-            params[key] = f"%{term.lower()}%"
-            token_conditions = (token_conditions or "") + f" OR ({clauses_cjk})"
-    else:
-        # 长句里整句 trgm 相似度会被稀释（实测「Promise 链式调用怎么用」耗时
-        # 1.2s 却对结果毫无贡献），此时只用技术术语 ILIKE，既快又准。
-        # 阈值取 8：中文 8 字以上基本是一句话而非术语。
-        use_similarity = len(query) <= 8 or not code_tokens
+    # 块模式永远不用相似度匹配：565 字的块 vs 短 query，trigram 相似度天然极低；
+    # 为了召回只能把阈值压到 0.04，结果 GIN 索引返回几万行候选，单次 1.2 秒。
+    # 改用关键词 ILIKE 后 8ms。
+    use_similarity = False
+    for index, term in enumerate(extract_cjk_terms(query)):
+        key = f"cjk{index}"
+        params[key] = f"%{term.lower()}%"
+        token_conditions = (token_conditions or "") + f" OR (s.text ILIKE :{key})"
     if use_similarity:
         where_clause = f"(s.text % :q{token_conditions})"
     elif token_conditions:

@@ -7,7 +7,8 @@
 `if session.user_id is not None and ...` 直接放行，等于任何登录用户
 都能读别人 162 条消息。这类 bug 靠人工点界面发现不了。
 
-这个脚本用两个临时账号交叉验证，跑完自动清理。
+这个脚本用两个固定测试账号（isolation-test-a / -b）交叉验证，
+可以反复跑：账号复用、不产生垃圾、不消耗注册限流额度。
 
 用法：
     python scripts/test_multi_user.py              # 默认 localhost
@@ -23,10 +24,21 @@ from datetime import datetime
 import httpx
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost"
-TAG = uuid.uuid4().hex[:6]
-USER_A = f"isoautoa{TAG}"
-USER_B = f"isoautob{TAG}"
+# 固定账号，不随机。
+#
+# 原来每次跑都用 uuid 后缀注册新号，问题是：
+#  1. 注册接口限流 5 次/小时/IP，连跑几轮就 429
+#  2. 脚本声称「跑完自动清理」，但实际没有任何清理逻辑，
+#     于是每跑一次数据库里就多一个 isoautoxxxxxx
+#
+# 改成固定账号 + 先登录、登录失败再注册：
+# 重复跑不产生垃圾，也不会撞限流。
+USER_A = "isolation-test-a"
+USER_B = "isolation-test-b"
 PASSWORD = "Test1234"
+
+# 只用于在输出里区分本轮数据
+TAG = uuid.uuid4().hex[:6]
 
 
 class Checker:
@@ -43,8 +55,19 @@ class Checker:
             print(f"  \033[31m✗\033[0m {name}  {detail}")
 
 
-def register(username: str) -> str:
+def ensure_account(username: str) -> str:
+    """拿到账号的 token：能登录就登录，不能才注册。
+
+    固定账号 + 登录优先，避免每次跑测试都新建用户。
+    """
     with httpx.Client(timeout=30) as c:
+        r = c.post(
+            f"{BASE}/api/auth/login",
+            json={"username": username, "password": PASSWORD},
+        )
+        if r.status_code == 200:
+            return r.json()["access_token"]
+
         r = c.post(
             f"{BASE}/api/auth/register",
             json={"username": username, "password": PASSWORD, "display_name": username},
@@ -59,11 +82,14 @@ def main() -> int:
     print(f"账号: {USER_A} / {USER_B}\n")
 
     try:
-        tok_a = register(USER_A)
-        tok_b = register(USER_B)
+        tok_a = ensure_account(USER_A)
+        tok_b = ensure_account(USER_B)
     except Exception as exc:
         print(f"注册失败，无法继续: {exc}")
         return 1
+
+    mem_id_for_cleanup = ""
+    notes_id_for_cleanup = None
 
     ha = {"Authorization": f"Bearer {tok_a}"}
     hb = {"Authorization": f"Bearer {tok_b}"}
@@ -77,6 +103,7 @@ def main() -> int:
         )
         ck.check("A 写记忆", r.status_code == 200, f"HTTP {r.status_code}")
         mem_id = r.json().get("id") if r.status_code == 200 else ""
+        mem_id_for_cleanup = mem_id
 
         profile_payload = {
             "profile": {
@@ -142,7 +169,10 @@ def main() -> int:
         print("\n[4] A 仍能正常读自己的")
         r = c.get(f"{BASE}/api/memory/items", headers=ha)
         items = r.json() if r.status_code == 200 else []
-        ck.check("A 能看到自己的记忆", len(items) == 1, f"看到 {len(items)} 条")
+        # 按内容断言，不按条数：测试账号是复用的，
+        # 库里可能有历史遗留条目，条数断言会随跑的次数变化
+        mine = [it for it in items if TAG in (it.get("content") or "")]
+        ck.check("A 能看到自己的记忆", len(mine) == 1, f"本轮 {len(mine)} 条 / 共 {len(items)} 条")
 
         print("\n[5] 未登录不能访问私有接口")
         for path in ["/api/memory/items", "/api/memory/profile", "/api/learning/journey"]:
@@ -157,6 +187,7 @@ def main() -> int:
         )
         ck.check("A 能建自己的笔记", r.status_code == 200, f"HTTP {r.status_code}")
         note_id = r.json().get("id") if r.status_code == 200 else None
+        notes_id_for_cleanup = note_id
         if note_id:
             ck.check(
                 "新建笔记是 private",
@@ -199,6 +230,14 @@ def main() -> int:
         r = c.get(f"{BASE}/api/videos?limit=1", headers=hb)
         total = (r.json() or {}).get("total", 0) if r.status_code == 200 else 0
         ck.check("B 能看视频库", total > 0, f"total={total}")
+
+        # ── 清理本轮写入的数据 ──
+        # 放在最后：前面的断言还要用它们。
+        # 账号本身复用（固定用户名 + 登录优先），不在这里删。
+        if notes_id_for_cleanup:
+            c.delete(f"{BASE}/api/notes/{notes_id_for_cleanup}", headers=ha)
+        if mem_id_for_cleanup:
+            c.delete(f"{BASE}/api/memory/items/{mem_id_for_cleanup}", headers=ha)
 
     total_checks = ck.passed + len(ck.failed)
     print(f"\n{'='*50}")

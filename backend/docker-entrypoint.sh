@@ -52,12 +52,5 @@ if [ "${MIGRATE_SQLITE:-false}" = "true" ]; then
     fi
 fi
 
-# 全量向量回填很慢（约 6 小时），放后台跑，日志写 /tmp
-if [ "${BACKFILL_EMBEDDINGS:-false}" = "true" ]; then
-    echo "[entrypoint] 后台启动向量回填，日志 /tmp/backfill.log"
-    nohup python scripts/backfill_embeddings.py --all --batch-size 256 \
-        > /tmp/backfill.log 2>&1 &
-fi
-
 echo "[entrypoint] 启动服务: $*"
 exec "$@"

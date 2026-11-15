@@ -311,8 +311,9 @@ class CalendarEvent(Base):
 
 # ============================================================
 # 3.0 新增：学习行为记忆 / 用户画像 / 学习路径 / Agent 审计
-# 注：segment_embeddings（pgvector 向量表）不在此映射，
-#     由 app/migrations.py 用原生 DDL 创建，避免 SQLite 兼容问题。
+# 注：content_chunks（pgvector 语义块表）不在此映射，
+#     定义在 app/tables.py —— halfvec 类型在 SQLite 上无法编译，
+#     挂到 Base.metadata 会让 create_all 直接抛错。
 # ============================================================
 
 

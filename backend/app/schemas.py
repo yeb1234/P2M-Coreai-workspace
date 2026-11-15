@@ -580,13 +580,3 @@ class HybridSearchOut(BaseModel):
     degraded: list[str] = []
     rerank_used: bool = False
     rerank_mode: str | None = None
-
-
-class VectorStatsOut(BaseModel):
-    embedded: int
-    eligible: int
-    coverage: float
-    videos: int
-    models: list[dict] = []
-    first_at: str | None = None
-    last_at: str | None = None

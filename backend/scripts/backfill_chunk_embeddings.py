@@ -1,10 +1,13 @@
 """回填 content_chunks 的向量。
 
-和 backfill_embeddings.py 的区别：
-那个是给 subtitle_segments（359 万条、平均 9 字）算向量，
-这个是给语义块（6 万条、平均 565 字）算。后者是检索应该用的单位。
+说明：正常情况下**不需要跑这个脚本**。
+转写完成后会自动投递索引任务，worker 也会定期扫描补齐，
+进程重启不丢（见 app/services/embedding_pipeline.py）。
 
-数据量差 60 倍，所以耗时从 6 小时降到约 12 分钟。
+这个脚本是 CLI 版，用于：
+  - 想手动全量补齐、看逐批进度
+  - API 起不来但数据库和嵌入服务可用
+两者的幂等判断一致（只补 embedding IS NULL 的块）。
 
 用法：
     python scripts/backfill_chunk_embeddings.py

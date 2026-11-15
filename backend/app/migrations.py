@@ -14,7 +14,7 @@ import logging
 from sqlalchemy import text
 
 from app.database import Base, settings
-from app.tables import SEGMENT_EMBEDDINGS, content_chunks_ddl, segment_embeddings_ddl
+from app.tables import CONTENT_CHUNKS, content_chunks_ddl
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ def upgrade_postgres(engine) -> None:
         # 修完手动 ANALYZE 只花 274ms，说明成本极低，没必要省。
         for table, analyze_scale in (
             ("subtitle_segments", 0.02),
-            (SEGMENT_EMBEDDINGS.name, 0.02),
+            (CONTENT_CHUNKS.name, 0.02),
             ("videos", 0.05),
         ):
             try:
@@ -142,14 +142,12 @@ def upgrade_postgres(engine) -> None:
 
     dim = _safe_dim()
     with engine.begin() as conn:
-        # 向量检索表（segment_embeddings / content_chunks）的 DDL 统一在
-        # app/tables.py 定义 —— 建表脚本 scripts/build_content_chunks.py
-        # 也用同一份，避免两处漂移。
+        # content_chunks 的 DDL 在 app/tables.py 定义，
+        # 建表脚本 scripts/build_content_chunks.py 也用同一份。
         #
-        # 之前 content_chunks 只在那个脚本里建，而 retrieval_source 默认就是
-        # "chunks"：新部署（没跑过脚本）一上来就查不存在的表，
+        # 之前它只在那个脚本里建：新部署（没跑过脚本）一上来检索就查不存在的表，
         # 报错还会被 lexical 的 except 吞成「降级为纯语义检索」。
-        for statement in (*segment_embeddings_ddl(dim), *content_chunks_ddl(dim)):
+        for statement in content_chunks_ddl(dim):
             conn.execute(text(statement))
 
         # 中文模糊检索：pg_trgm 的 GIN 索引支持 ILIKE '%词%' 走索引
@@ -300,30 +298,22 @@ def upgrade_sqlite_legacy(engine) -> None:
 
 
 def embedding_stats(engine) -> dict:
-    """向量覆盖率统计，供 /health 与后台任务使用。
+    """语义块向量覆盖率，供 /ready 使用。
 
-    SQLite 直接返回 0：那张表是 pgvector 专有的，之前 if/else 两个分支
-    写的是同一段 SQL，等于「以为兼容了，其实没兼容」。
+    原来统计的是 segment_embeddings（碎片表），那张表已删除 ——
+    它的 38% 覆盖率不代表检索坏了，只代表旧路径没人回填。
     """
     if not settings.is_postgres:
-        return {"embedded": 0, "eligible": 0, "coverage": 0.0}
+        return {"chunks": 0, "embedded": 0, "coverage": 0.0}
 
     with engine.connect() as conn:
         row = conn.execute(
-            text(
-                f"""
-                SELECT
-                  (SELECT count(*) FROM {SEGMENT_EMBEDDINGS.name}) AS embedded,
-                  (SELECT count(*) FROM subtitle_segments
-                    WHERE length(text) >= :min_len) AS eligible
-                """
-            ),
-            {"min_len": settings.embedding_min_text_len},
+            text(f"SELECT count(*), count(embedding) FROM {CONTENT_CHUNKS.name}")
         ).first()
-    embedded = int(row[0] or 0) if row else 0
-    eligible = int(row[1] or 0) if row else 0
+    total = int(row[0] or 0) if row else 0
+    embedded = int(row[1] or 0) if row else 0
     return {
+        "chunks": total,
         "embedded": embedded,
-        "eligible": eligible,
-        "coverage": round(embedded / eligible, 4) if eligible else 0.0,
+        "coverage": round(embedded / total, 4) if total else 0.0,
     }

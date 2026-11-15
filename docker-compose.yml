@@ -183,7 +183,6 @@ services:
       # ---- 启动开关 ----
       MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
       SQLITE_SOURCE_PATH: /data/source/learning_os.db
-      BACKFILL_EMBEDDINGS: ${BACKFILL_EMBEDDINGS:-false}
       TZ: Asia/Shanghai
     volumes:
       # 视频库只读挂载；改成你的实际路径
@@ -307,7 +306,6 @@ services:
       # ---- 启动开关 ----
       MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
       SQLITE_SOURCE_PATH: /data/source/learning_os.db
-      BACKFILL_EMBEDDINGS: ${BACKFILL_EMBEDDINGS:-false}
       TZ: Asia/Shanghai
     volumes:
       # 视频库只读挂载；改成你的实际路径

@@ -9,9 +9,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas import HybridSearchHit, HybridSearchOut, VectorStatsOut
+from app.schemas import HybridSearchHit, HybridSearchOut
 from app.services.hybrid_search import hybrid_search
-from app.services.vector_store import VectorStoreError, stats as vector_stats
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +58,3 @@ def search_hybrid(
         rerank_used=rerank and "rerank_ms" in result["timings"],
         rerank_mode=result.get("rerank_mode"),
     )
-
-
-@router.get("/stats", response_model=VectorStatsOut)
-def search_stats():
-    """向量覆盖率，用于判断检索能力是否已经建好。"""
-    try:
-        data = vector_stats()
-    except VectorStoreError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return VectorStatsOut(**data)

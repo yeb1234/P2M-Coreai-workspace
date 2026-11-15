@@ -68,7 +68,6 @@ class Settings(BaseSettings):
     embedding_dim: int = 1024
     embedding_batch_size: int = 16
     embedding_timeout_s: int = 120
-    embedding_min_text_len: int = 8
     rerank_enabled: bool = True
     rerank_top_n: int = 20
     rerank_keep: int = 6
@@ -131,12 +130,6 @@ class Settings(BaseSettings):
     # 生产必须是 true（只走 HTTPS）。本地 http 调试要设 false，否则浏览器不发送
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
-    # 检索数据源：
-    #   chunks   = 语义块（约 565 字/块），检索质量明显更好，默认
-    #   segments = 逐句字幕（约 9 字/条），历史实现，保留用于 A/B 对比
-    # 切换后不需要重启，但两边向量必须都已回填，否则会漏召回
-    retrieval_source: str = "chunks"
-
     # ---- 多用户每日配额（防单账号跑光外部 LLM 额度）----
     quota_chat_daily: int = 200
     quota_plan_daily: int = 20
@@ -263,21 +256,10 @@ def get_db():
         db.close()
 
 
-def _seg_emb_table() -> str:
-    """向量表名。
-
-    延迟导入：app.tables → app.models → app.database，模块级导入会成环。
-    表名不写字面量，避免和 app/tables.py 漂移。
-    """
-    from app.tables import SEGMENT_EMBEDDINGS
-
-    return SEGMENT_EMBEDDINGS.name
-
-
 def check_database(deep: bool = True) -> dict:
     """返回数据库连通性摘要。
 
-    deep=False 时不统计 segment_embeddings 行数：那是 300 万+ 的表，
+    deep=False 时不统计向量相关行数：那些表很大，
     而探针每 30 秒被打一次，把 count(*) 放进探针等于给数据库加了一份
     与业务无关的持续负载。存活探针只需要知道「连得上、查得动」。
     """
@@ -299,8 +281,11 @@ def check_database(deep: bool = True) -> dict:
                     pg_trgm_version=row[2],
                 )
             if deep:
-                info["segment_embeddings"] = connection.execute(
-                    text(f"SELECT count(*) FROM {_seg_emb_table()}")
+                # 深探针才查，浅探针每 30 秒一次，不该给库加无关负载
+                from app.tables import CONTENT_CHUNKS
+
+                info["content_chunks"] = connection.execute(
+                    text(f"SELECT count(*) FROM {CONTENT_CHUNKS.name}")
                 ).scalar()
     return info
 

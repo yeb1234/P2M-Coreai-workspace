@@ -19,8 +19,8 @@ import numpy as np
 from sqlalchemy import select
 
 from app.database import engine, settings
-from app.models import Category, SubtitleSegment, Video
-from app.tables import retrieval_table
+from app.models import Category, Video
+from app.tables import CONTENT_CHUNKS
 from app.services.embeddings import EmbeddingError, get_embedding_client
 from app.services.lexical import lexical_search
 from app.services.llm import build_chat_model
@@ -75,7 +75,7 @@ class Hit:
 def fetch_segments(segment_ids: list[int]) -> dict[int, dict]:
     """批量补齐片段元信息，避免逐条查询造成 N+1。
 
-    注意：必须跟着 retrieval_source 换表。
+    注意：必须取的是检索表（content_chunks），不是字幕表。
     chunk 的 id 和 subtitle_segments 的 id 空间是重叠的（都从 1 开始），
     用 chunk id 去查字幕表不会报错，只会静默返回**另一个东西的文本** ——
     表现为「检索结果莫名其妙」，极难定位。这个坑实际踩过一次。
@@ -83,9 +83,9 @@ def fetch_segments(segment_ids: list[int]) -> dict[int, dict]:
     if not segment_ids:
         return {}
 
-    # 表对象而不是字符串：切表由 retrieval_table() 统一决定，
-    # 写错表名会直接 KeyError，不会再出现「查了另一张表却正常返回」。
-    seg = retrieval_table()
+    # 表对象而不是字符串：写错表名会直接报错，
+    # 不会出现「查了另一张表却正常返回」
+    seg = CONTENT_CHUNKS
     video = Video.__table__
     category = Category.__table__
 
@@ -205,92 +205,6 @@ def _llm_rerank(query: str, hits: list[Hit], keep: int) -> list[Hit]:
     except Exception as exc:
         logger.warning("LLM 重排失败，保留 RRF 原序: %s", exc)
         return candidates[:keep]
-
-
-def expand_hit_context(
-    hits: list["Hit"],
-    *,
-    window_sec: float = 45.0,
-    max_chars: int = 700,
-) -> list["Hit"]:
-    """把命中的碎片字幕扩展成连续段落。
-
-    为什么必须做
-    ------------
-    字幕是逐句存的，实测 359 万条、平均 9 个字、中位数 8 个字。
-    一条命中的原文可能是「那我们就来看一下」，单独拿出来没有任何信息量，
-    模型既判断不了相关性，也没法据此回答。
-
-    这里按时间窗把前后片段拼起来：命中点前后各 window_sec 秒，
-    拼成一段完整的讲解再返回。时间戳同步扩展，前端跳转仍然准确。
-
-    为什么不改索引：扩上下文只影响「返回什么」，不影响「怎么找」。
-    能在不重建向量的前提下立刻改善输出质量。
-    真正的根治是语义分块（见 scripts/build_content_chunks.py），
-    但那要重跑一遍向量回填，适合放到独立批次做。
-    """
-    if not hits:
-        return hits
-
-    min_start = min(h.start_sec for h in hits) - window_sec
-    max_end = max(h.end_sec for h in hits) + window_sec
-    video_ids = list({h.video_id for h in hits})
-
-    # 这里**必须**是字幕表，不能跟 retrieval_source 走：
-    # 扩上下文要的是逐句时间轴（平均 9 字一条），
-    # 语义块太粗（565 字一坨），拿来拼段落会重复大段内容。
-    seg = SubtitleSegment.__table__
-    stmt = (
-        select(seg.c.video_id, seg.c.start_sec, seg.c.end_sec, seg.c.text)
-        .where(
-            seg.c.video_id.in_(video_ids),
-            seg.c.start_sec >= min_start,
-            seg.c.start_sec <= max_end,
-        )
-        .order_by(seg.c.video_id, seg.c.start_sec)
-    )
-    try:
-        with engine.connect() as conn:
-            rows = conn.execute(stmt).fetchall()
-    except Exception as exc:
-        logger.warning("上下文扩展失败，返回原始片段: %s", exc)
-        return hits
-
-    by_video: dict[int, list] = defaultdict(list)
-    for row in rows:
-        by_video[row.video_id].append(row)
-
-    for hit in hits:
-        timeline = by_video.get(hit.video_id) or []
-        if not timeline:
-            continue
-        lo = hit.start_sec - window_sec
-        hi = hit.end_sec + window_sec
-        window = [r for r in timeline if lo <= r.start_sec <= hi]
-        if not window:
-            continue
-
-        merged: list[str] = []
-        total = 0
-        for row in window:
-            piece = (row.text or "").strip()
-            if not piece:
-                continue
-            if total + len(piece) > max_chars:
-                break
-            merged.append(piece)
-            total += len(piece)
-
-        if not merged:
-            continue
-
-        hit.raw_text = hit.text
-        hit.text = "".join(merged)
-        hit.start_sec = window[0].start_sec
-        hit.end_sec = window[-1].end_sec
-        hit.segment_count = len(window)
-
-    return hits
 
 
 def dedupe_overlapping(
@@ -513,17 +427,13 @@ def hybrid_search(
     else:
         final = candidates[:top_k]
 
-    if settings.retrieval_source == "chunks":
-        # 块本身就是 565 字的完整上下文，不需要再扩展。
-        # 反过来，在块上做扩展会把相邻块拼进来，制造冗余。
-        final = dedupe_overlapping(final, max_per_video=2, overlap_ratio=0.3)
-    else:
-        # 碎片模式：命中的是 9 个字的字幕，必须按时间窗拼成段落，
-        # 否则模型拿到的是「那我们就来看一下」这种没有信息量的句子。
-        final = expand_hit_context(final)
-        # 扩展之后必须再去一次重：单条字幕只有 2 秒，时间上不重叠，
-        # 但扩成 90 秒段落后相邻命中会大面积重合
-        final = dedupe_overlapping(final, max_per_video=2)
+    # 块本身就是 565 字的完整上下文，不需要再扩展。
+    # 反过来，在块上做时间窗扩展会把相邻块拼进来，制造冗余。
+    #
+    # 碎片模式（在 subtitle_segments 上按时间窗拼段落）已随
+    # segment_embeddings 一起删除 —— 它解决的是「9 个字一条」的问题，
+    # 而检索单位已经不是碎片了。
+    final = dedupe_overlapping(final, max_per_video=2, overlap_ratio=0.3)
 
     # rerank_mode 不能放进 timings —— 那里是 dict[str, float]，
     # 塞字符串会让 Pydantic 校验失败，整个检索 500。踩过。

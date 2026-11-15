@@ -160,14 +160,10 @@ docker compose exec backend python scripts/migrate_sqlite_to_pg.py \
 首次迁移只带业务数据，向量需要重建（旧的 319 万条已验证为无效数据）。全量约 6 小时：
 
 ```bash
-# 方式一：入口脚本后台跑
-BACKFILL_EMBEDDINGS=true docker compose up -d backend
-
-# 方式二：手动进容器跑（可断点续跑）
-docker compose exec backend python scripts/backfill_embeddings.py --all --batch-size 256
-```
-
-进度看 `/tmp/backfill.log` 或 `curl localhost/api/search/stats`。
+# 建块 + 向量化已经自动化了，不需要手动跑脚本：
+# 转写完成后自动投递，worker 也会定期扫描补齐，进程重启不丢。
+curl localhost/api/admin/embeddings/status        # 看进度
+curl -X POST localhost/api/admin/embeddings/scan  # 手动催一轮（一般不用）
 
 ---
 
