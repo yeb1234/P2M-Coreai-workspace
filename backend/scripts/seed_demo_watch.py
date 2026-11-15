@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import text
 
 from app.database import SessionLocal
-from app.models import Video, WatchEvent, WatchHistory
+from app.models import User, Video, WatchEvent, WatchHistory
 from app.services.profile import recompute_profile, profile_summary_text
 
 random.seed(20261115)  # 固定种子，重跑结果一致
@@ -200,10 +200,14 @@ def build_sessions(
     return events, history
 
 
-def clean_demo(db) -> int:
-    removed = db.execute(
-        text("DELETE FROM watch_events WHERE session_id LIKE :p"), {"p": f"{DEMO_PREFIX}%"}
-    ).rowcount
+def clean_demo(db, user_id: int | None = None) -> int:
+    """清理 demo 事件。带 user_id 时只清这个人的，避免误删别人的真实数据。"""
+    where = "session_id LIKE :p"
+    params: dict = {"p": f"{DEMO_PREFIX}%"}
+    if user_id is not None:
+        where += " AND user_id = :uid"
+        params["uid"] = user_id
+    removed = db.execute(text(f"DELETE FROM watch_events WHERE {where}"), params).rowcount
     db.commit()
     return removed or 0
 
@@ -213,12 +217,23 @@ def main() -> int:
     parser.add_argument("--clean", action="store_true", help="只清理 demo 数据")
     parser.add_argument("--reset", action="store_true", help="先清理再生成")
     parser.add_argument("--days", type=int, default=30, help="数据跨度（天）")
+    parser.add_argument("--user", default="", help="绑定到哪个用户名（画像按用户隔离后必须指定）")
     args = parser.parse_args()
 
     db = SessionLocal()
     try:
+        user = None
+        if args.user:
+            user = db.query(User).filter(User.username == args.user).first()
+            if not user:
+                print(f"用户 {args.user} 不存在，先创建账号")
+                return 1
+        uid = user.id if user else None
+        if uid is None:
+            print("警告：未指定 --user，埋点 user_id 会是 NULL，画像查不到")
+
         if args.clean or args.reset:
-            removed = clean_demo(db)
+            removed = clean_demo(db, uid)
             print(f"已清理 demo 事件 {removed} 条")
 
         if args.clean:
@@ -271,14 +286,20 @@ def main() -> int:
         # 上线部署：刻意不给任何记录 —— 完全没碰过
         summary.append("上线部署: 0 个视频（从未打开）")
 
+        # 画像按 user_id 隔离后，不绑定用户的数据是谁都查不到的
+        for event in all_events:
+            event.user_id = uid
+        for row in all_history:
+            row.user_id = uid
+
         db.add_all(all_events)
         db.commit()
 
         # watch_history 同一视频只保留一条，避免重复
         video_ids = {h.video_id for h in all_history}
-        db.query(WatchHistory).filter(WatchHistory.video_id.in_(video_ids)).delete(
-            synchronize_session=False
-        )
+        db.query(WatchHistory).filter(
+            WatchHistory.video_id.in_(video_ids), WatchHistory.user_id == uid
+        ).delete(synchronize_session=False)
         db.add_all(all_history)
         db.commit()
 
@@ -286,7 +307,7 @@ def main() -> int:
         for line in summary:
             print(f"  · {line}")
 
-        profile = recompute_profile(db, None)
+        profile = recompute_profile(db, uid)
         print("\n画像重算结果：")
         print(f"  {profile_summary_text(profile)}")
         return 0

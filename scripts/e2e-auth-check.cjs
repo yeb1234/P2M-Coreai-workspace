@@ -1,7 +1,7 @@
 // 验证 Cookie 会话下的浏览器流程：登录 → 整页重载 → 登录态保持 → 可进入受保护页面
 const { chromium } = require('playwright');
 
-const USER = { username: 'cookie_test', password: 'Cookie1234' };
+const USER = { username: 'demo', password: 'Demo2026' };
 
 (async () => {
   const browser = await chromium.launch();

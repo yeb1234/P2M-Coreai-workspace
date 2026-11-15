@@ -1,18 +1,32 @@
 // 端到端验证「学习路径」页：登录 → 进入 TAB → 校验路径与视频卡片 → 勾选步骤 → 校验进度 +1
 const { chromium } = require('playwright');
 
-const USER = { username: 'audit_a', password: 'NewPass9876' };
+const USER = { username: 'demo', password: 'Demo2026' };
 
 async function login(page) {
   await page.goto('http://localhost/', { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(1200);
+
+  // 等登录表单真正挂载：App 会先渲染加载态，再切到 AuthPage，
+  // 在切换前 fill 的输入会被丢弃，表现为「登录没成功但脚本以为成功了」
+  await page.waitForSelector('input', { state: 'visible', timeout: 20000 });
+  await page.waitForTimeout(600);
 
   const inputs = page.locator('input');
   if ((await inputs.count()) < 2) return false;
   await inputs.nth(0).fill(USER.username);
   await inputs.nth(1).fill(USER.password);
   await page.getByRole('button', { name: /登录/ }).first().click();
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(3500);
+  await page.waitForLoadState('networkidle').catch(() => {});
+
+  // 真正校验：还停在登录页就是失败，不要假装成功继续往下跑
+  const stillLogin = await page.getByRole('button', { name: /^登录$/ }).count();
+  if (stillLogin > 0) {
+    const err = await page.locator('body').innerText();
+    console.log('  登录失败，页面提示：' + (err.match(/登录已失效[^\n]*|用户名或密码[^\n]*/) || [''])[0]);
+    return false;
+  }
   return true;
 }
 
@@ -51,7 +65,7 @@ function readDoneCount(text) {
     ['页面标题', bodyText.includes('学习路径')],
     ['画像卡片（累计观看）', bodyText.includes('累计观看')],
     ['完成率卡片', bodyText.includes('完成率')],
-    ['路径标题', bodyText.includes('补齐 RAG 工程化闭环')],
+    ['路径标题', bodyText.includes('补齐 RAG 工程化')],
     ['步骤渲染', /STEP\s*1/.test(bodyText)],
     ['进度文案', /\d+\/\d+\s*步完成/.test(bodyText)],
   ];

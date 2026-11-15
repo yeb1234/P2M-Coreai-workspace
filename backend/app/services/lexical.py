@@ -39,6 +39,36 @@ def extract_tokens(query: str, max_code_tokens: int = 6) -> list[str]:
     return tokens
 
 
+STOP_PHRASES = (
+    "怎么实现", "怎么做", "怎么办", "是什么", "有什么", "为什么", "哪个更",
+    "怎么样", "如何", "哪些", "可以", "能不能", "是不是",
+)
+
+
+def extract_cjk_terms(query: str, *, max_terms: int = 4, min_len: int = 2, max_len: int = 8) -> list[str]:
+    """从中文查询里抽关键词。
+
+    为什么需要：块模式下不能用 `text % query` 做相似度匹配 ——
+    565 字的块和 6 字 query 的 trigram 相似度天然极低，
+    为了召回只能把阈值压到 0.04，结果索引返回几万行，单次查询 1.2 秒。
+    改成先抽词再 ILIKE，走 GIN 索引，实测 8ms。
+
+    规则很朴素：按中文串切开，去掉疑问词尾巴，长度合适的留下。
+    没必要上分词器 —— 检索场景下多召回几个无关词，比漏召回好。
+    """
+    terms: list[str] = []
+    for chunk in CJK_RE.findall(query):
+        cleaned = chunk
+        for phrase in STOP_PHRASES:
+            cleaned = cleaned.replace(phrase, " ")
+        for piece in cleaned.split():
+            if min_len <= len(piece) <= max_len and piece not in STOPWORDS:
+                terms.append(piece)
+                if len(terms) >= max_terms:
+                    return terms
+    return terms
+
+
 def lexical_search(
     query: str,
     *,
@@ -93,14 +123,25 @@ def lexical_search(
         clauses = []
         for index, token in enumerate(code_tokens):
             key = f"tok{index}"
-            clauses.append(f"lower(s.text) LIKE :{key}")
+            clauses.append(f"s.text ILIKE :{key}")
             params[key] = f"%{token}%"
         token_conditions = " OR (" + " OR ".join(clauses) + ")"
 
-    # 长句里整句 trgm 相似度会被稀释（实测「Promise 链式调用怎么用」耗时
-    # 1.2s 却对结果毫无贡献），此时只用技术术语 ILIKE，既快又准。
-    # 阈值取 8：中文 8 字以上基本是一句话而非术语。
-    use_similarity = len(query) <= 8 or not code_tokens
+    # 块模式下永远不用相似度匹配。
+    # 565 字的块 vs 短 query，trigram 相似度天然极低；为了召回只能把阈值压到 0.04，
+    # 结果 GIN 索引返回几万行候选，单次 1.2 秒。改用关键词 ILIKE 后 8ms。
+    if use_chunks:
+        use_similarity = False
+        for index, term in enumerate(extract_cjk_terms(query)):
+            key = f"cjk{index}"
+            clauses_cjk = f"s.text ILIKE :{key}"
+            params[key] = f"%{term.lower()}%"
+            token_conditions = (token_conditions or "") + f" OR ({clauses_cjk})"
+    else:
+        # 长句里整句 trgm 相似度会被稀释（实测「Promise 链式调用怎么用」耗时
+        # 1.2s 却对结果毫无贡献），此时只用技术术语 ILIKE，既快又准。
+        # 阈值取 8：中文 8 字以上基本是一句话而非术语。
+        use_similarity = len(query) <= 8 or not code_tokens
     if use_similarity:
         where_clause = f"(s.text % :q{token_conditions})"
     elif token_conditions:
