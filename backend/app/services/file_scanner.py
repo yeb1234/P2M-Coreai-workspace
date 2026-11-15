@@ -10,6 +10,7 @@ from watchdog.observers import Observer
 from app.database import SessionLocal, settings
 from app.models import Category, Video
 from app.services.sprite import has_sprite, generate_sprite
+from app.utils.files import resolve_media_path
 
 
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"}
@@ -286,7 +287,7 @@ def scan_video_library() -> dict:
         remove_empty_categories(db)
         # Clear stale thumbnail paths
         for video in db.query(Video).filter(Video.thumbnail.isnot(None)).all():
-            if not Path(video.thumbnail).exists():
+            if not resolve_media_path(video.thumbnail).exists():
                 video.thumbnail = None
         db.commit()
         total = db.query(Video).count()

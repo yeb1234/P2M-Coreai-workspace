@@ -13,7 +13,7 @@ from app.services.subtitle_corrector import correct_segments_with_openai
 from app.services.subtitle_writer import write_vtt_output
 from app.services.transcribe_whisper import transcribe_wav
 from app.services.write_md import write_markdown_output
-from app.utils.files import safe_stem, unique_suffix
+from app.utils.files import resolve_media_path, safe_stem, unique_suffix
 from app.utils.serialization import dump_segments
 
 
@@ -147,7 +147,8 @@ def _apply_job_options(job: AiJob, options: AiJobOptions) -> None:
 
 
 def _build_job_paths(video: Video, job: AiJob) -> AiJobPaths:
-    source_path = Path(video.filepath)
+    # 容器内视频挂载在 /videos，数据库存的是宿主机绝对路径，需要映射
+    source_path = resolve_media_path(video.filepath)
     base_name = safe_stem(source_path.stem) or f"video-{video.id}"
     return AiJobPaths(
         source=source_path,
@@ -166,8 +167,8 @@ def _video_has_transcription_outputs(video: Video) -> bool:
     """
     if not video.transcription:
         return False
-    md_path = video.markdown_path and Path(video.markdown_path)
-    sub_path = video.subtitle_path and Path(video.subtitle_path)
+    md_path = video.markdown_path and resolve_media_path(video.markdown_path)
+    sub_path = video.subtitle_path and resolve_media_path(video.subtitle_path)
     return bool(md_path and md_path.exists() and sub_path and sub_path.exists())
 
 

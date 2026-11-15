@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     output_dir: str = ""
     thumbnail_dir: str = ""
     sprite_dir: str = ""
+    # 宿主机路径 -> 容器内路径的映射，多个用 ; 分隔，最长前缀优先。
+    # 例：D:/ITJC/thumbnails=/data/thumbnails;D:/ITJC=/videos
+    # 数据库里的 filepath 是容器化之前写入的 Windows 绝对路径，需要这层转换
+    path_map: str = ""
 
     # ---------------- 本地 LLM ----------------
     ollama_base_url: str = "http://localhost:11434"

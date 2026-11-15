@@ -1,0 +1,14 @@
+# GPU 加速所需的 CUDA 运行时（约 2-3GB）
+#
+# 只在需要 GPU 转写时安装：
+#   pip install -r requirements.txt -r requirements-cuda.txt
+#
+# Docker 构建时用 build arg 控制：
+#   docker compose build --build-arg INSTALL_CUDA=true backend
+#
+# 不装这三个包时，faster-whisper 的 device="auto" 会自动回退到 CPU（int8），
+# 功能正常但转写速度慢数倍。
+
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
+nvidia-cuda-runtime-cu12

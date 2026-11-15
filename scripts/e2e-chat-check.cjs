@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 const USER = { username: 'e2e_tester', password: 'e2e-test-2026' };
 
 async function login(page) {
-  await page.goto('http://localhost:5002/', { waitUntil: 'networkidle', timeout: 60000 });
+  await page.goto('http://localhost/', { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(1000);
 
   const inputs = page.locator('input');
@@ -39,7 +39,7 @@ async function login(page) {
   await page.screenshot({ path: 'test-results/after-login.png' });
 
   // 聊天入口在 AI 助手页，直接导航
-  await page.goto('http://localhost:5002/#/aiagent', { waitUntil: 'networkidle', timeout: 60000 });
+  await page.goto('http://localhost/#/aiagent', { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(1500);
   await page.screenshot({ path: 'test-results/aiagent-page.png' });
 

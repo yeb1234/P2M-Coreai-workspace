@@ -23,11 +23,9 @@ numpy>=2.0
 rq==1.16.2
 redis==5.0.8
 
-# ---- 语音转写 ----
+# ---- 语音转写（CPU 可用；GPU 加速见 requirements-cuda.txt）----
+# ctranslate2 会自动检测 CUDA，缺库时回退 CPU，因此 GPU 包是可选增强
 faster-whisper==1.0.3
-nvidia-cublas-cu12
-nvidia-cudnn-cu12
-nvidia-cuda-runtime-cu12
 
 # ---- 其他 ----
 watchdog==5.0.3

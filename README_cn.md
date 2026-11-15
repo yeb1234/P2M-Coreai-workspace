@@ -26,25 +26,41 @@
 
 ## 快速启动
 
-后端 / 生产入口使用 80 端口：
+### 方式一：Docker 一键启动（推荐，部署/交付用）
+
+```bash
+cp .env.example .env      # 填 POSTGRES_PASSWORD、JWT_SECRET、EXTERNAL_LLM_API_KEY
+docker compose up -d --build
+open http://localhost
+```
+
+一次起全套：PostgreSQL(pgvector) + Redis + 后端 + nginx 前端。
+GPU 转写、数据迁移、常见问题见 [docs/docker.md](docs/docker.md)。
+
+### 方式二：本地开发（改代码用这个）
+
+先只起数据库：
+
+```bash
+docker compose -f docker-compose.pg.yml --env-file .env up -d
+```
+
+后端（注意别用 8000，该端口被 Docker 占用）：
 
 ```bash
 cd backend
-.venv311/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+.venv311/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 ```
-
-- 本机：http://localhost
-- 局域网：`http://你的电脑IP`
 
 前端开发使用 5002 端口，支持 Vite 热更新：
 
 ```bash
 npm install
-npm run dev
+VITE_API_BASE_URL=http://127.0.0.1:8100 npm run dev
 ```
 
 - 前端开发：http://localhost:5002
-- API 自动代理到 80 端口
+- API 指向 8100
 
 ## 端口
 

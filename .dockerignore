@@ -1,17 +1,45 @@
+# 依赖与构建产物
 node_modules
 dist
+dist-ssr
+
+# 版本控制与密钥
 .git
+.gitignore
 .env
+.env-*.local
 *.db
+*.db-shm
+*.db-wal
+dump.rdb
+
+# 运行时数据
 output/
 thumbnails/
 sprites/
 work/
+.migration/
+test-results/
+
+# Python 本地环境与缓存
 backend/.venv311
-backend/__pycache__
-backend/app/__pycache__
+backend/.venv
+__pycache__/
+*.py[cod]
+
+# 根目录的一次性脚本（e2e 等）不进镜像；
+# 注意 backend/scripts 里的迁移与回填脚本必须保留
+/scripts
+/stop.py
+
+# 本地工具与模型（体积大且与镜像无关）
 tools/
+
+# 文档与编辑器
 docs/
 .claude
+.workbuddy
+.vscode
+.idea
 *.md
 !README.md

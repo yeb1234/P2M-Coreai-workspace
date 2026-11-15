@@ -1,5 +1,8 @@
 import json
+import logging
 import math
+import os
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -10,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import AiJob, Category, SubtitleSegment, Video, WatchHistory
+from app.utils.files import resolve_media_path
 from app.schemas import (
     AiJobCreate,
     NoteOut,
@@ -30,6 +34,23 @@ from app.utils.serialization import dump_segments, load_segments, to_output_url
 
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
+
+logger = logging.getLogger(__name__)
+
+
+def _is_foreign_platform_path(raw: str) -> bool:
+    """判断路径是否属于当前运行环境的「另一个平台」。
+
+    Windows 容器化前的库在 Linux 容器里会看到 `D:\\...`；
+    反之 Windows 上跑也可能遇到 `/data/...` 这种 Linux 路径。
+    命中时说明是路径映射缺失，不是文件真的没了。
+    """
+    text = str(raw or "")
+    if os.name != "nt" and re.match(r"^[A-Za-z]:[\\/]", text):
+        return True
+    if os.name == "nt" and text.startswith("/") and not text.startswith("//"):
+        return True
+    return False
 
 
 def active_job_map(db: Session, video_ids: list[int]) -> dict[int, AiJob]:
@@ -339,7 +360,7 @@ def stream_video(video_id: int, request: Request, db: Session = Depends(get_db))
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    video_path = Path(video.filepath)
+    video_path = resolve_media_path(video.filepath)
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="Video file not found")
 
@@ -392,12 +413,22 @@ def get_thumbnail(video_id: int, db: Session = Depends(get_db)):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    if video.thumbnail and Path(video.thumbnail).exists():
-        return FileResponse(video.thumbnail, media_type="image/jpeg")
-    # Clear stale path from DB so frontend can detect missing thumbnail
+    if video.thumbnail and resolve_media_path(video.thumbnail).exists():
+        return FileResponse(resolve_media_path(video.thumbnail), media_type="image/jpeg")
+    # 清空失效记录前先判断：如果这条路径明显属于另一个平台
+    # （例如 Linux 容器里存着 D:\... 的 Windows 路径），说明是路径映射没配好
+    # 而不是文件真的没了。此时误清会把好数据洗掉，只报 404 不动数据。
     if video.thumbnail:
-        video.thumbnail = None
-        db.commit()
+        if _is_foreign_platform_path(video.thumbnail):
+            logger.warning(
+                "缩略图路径属于其他平台，不做清理（检查 PATH_MAP）: video=%s path=%s",
+                video_id,
+                video.thumbnail,
+            )
+        else:
+            logger.info("缩略图文件缺失，清除记录: video=%s path=%s", video_id, video.thumbnail)
+            video.thumbnail = None
+            db.commit()
     placeholder = Path(__file__).parent.parent / "static" / "placeholder.png"
     if placeholder.exists():
         return FileResponse(str(placeholder), media_type="image/png")
@@ -538,7 +569,7 @@ def get_subtitle_file(video_id: int, db: Session = Depends(get_db)):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video or not video.subtitle_path:
         raise HTTPException(status_code=404, detail="Subtitle not found")
-    subtitle_file = Path(video.subtitle_path)
+    subtitle_file = resolve_media_path(video.subtitle_path)
     if not subtitle_file.exists():
         raise HTTPException(status_code=404, detail="Subtitle file missing")
     return FileResponse(subtitle_file, media_type="text/vtt", filename=subtitle_file.name)
@@ -562,12 +593,12 @@ def get_sprite_sheet(video_id: int, db: Session = Depends(get_db)):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    if not Path(video.filepath).exists():
+    if not resolve_media_path(video.filepath).exists():
         raise HTTPException(status_code=404, detail="Video file not found")
 
     sprite_path = get_sprite_path(video_id)
     if not has_sprite(video_id):
-        meta = get_or_generate_sprite(video.filepath, video_id)
+        meta = get_or_generate_sprite(str(resolve_media_path(video.filepath)), video_id)
         if not meta:
             raise HTTPException(status_code=500, detail="Sprite generation failed")
     else:
@@ -620,7 +651,7 @@ def update_segment(
 
     # Update VTT file on disk
     if video.subtitle_path:
-        subtitle_file = Path(video.subtitle_path)
+        subtitle_file = resolve_media_path(video.subtitle_path)
         if subtitle_file.exists():
             update_vtt_segment_text(subtitle_file, segment_index, new_text)
 
