@@ -5,6 +5,27 @@ import { PAGE_MAP, preloadPage } from '../../config/pageRegistry';
 import type { ActiveView } from '../../stores/uiStore';
 import { useDragResize } from '../../hooks/useDragResize';
 
+// 侧边栏分组。24 项平铺认知负担太重，按使用场景分三组。
+// 分组只影响「标题插在哪」，不影响用户拖拽出来的实际顺序 ——
+// 判断依据是「当前项和上一项是否同组」，同组就不重复插标题。
+const NAV_GROUPS: { label: string; ids: string[] }[] = [
+  {
+    label: '日常',
+    ids: ['dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'pomodoro', 'timecenter'],
+  },
+  {
+    label: '学习',
+    ids: ['learning', 'journey', 'video', 'transcriber', 'flashcards', 'leetcode', 'interview', 'reader', 'snippets'],
+  },
+  {
+    label: '工具',
+    ids: ['health', 'compare', 'shop', 'esports', 'stats', 'habits', 'bookmarks', 'tokens', 'codenav', 'aiagent', 'openclaw', 'hermes', 'settings'],
+  },
+];
+
+const GROUP_OF: Record<string, string> = {};
+NAV_GROUPS.forEach((g) => g.ids.forEach((id) => { GROUP_OF[id] = g.label; }));
+
 const HEADER_STYLE = { height: '56px' };
 const COLLAPSED_WIDTH = 56;
 const AUTO_COLLAPSE_WIDTH = 132;
@@ -18,6 +39,24 @@ export const Sidebar: React.FC = () => {
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
   const navOrder = useUIStore((s) => s.navOrder);
+  // 按分组聚合：组内保留用户拖拽出来的相对顺序，组间按 NAV_GROUPS 顺序。
+  // 不这么做的话，navOrder 的默认顺序里 compare/stats 夹在学习项中间，
+  // 分组标题会反复出现（工具/学习/工具/学习），比不分还乱。
+  const groupedNav = React.useMemo(() => {
+    const seen = new Set<string>();
+    const out: typeof navOrder = [];
+    NAV_GROUPS.forEach((g) => {
+      g.ids.forEach((id) => {
+        if (navOrder.includes(id as never) && !seen.has(id)) {
+          seen.add(id);
+          out.push(id as never);
+        }
+      });
+    });
+    // 不在任何分组里的（理论上没有）按原顺序追加，避免页面凭空消失
+    navOrder.forEach((id) => { if (!seen.has(id)) out.push(id); });
+    return out;
+  }, [navOrder]);
   const reorderNav = useUIStore((s) => s.reorderNav);
   const resetNavOrder = useUIStore((s) => s.resetNavOrder);
 
@@ -142,15 +181,23 @@ export const Sidebar: React.FC = () => {
         </div>
 
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto min-h-0">
-          {navOrder.filter((id) => !hiddenNavItems.includes(id)).map((id) => {
+          {groupedNav.filter((id) => !hiddenNavItems.includes(id)).map((id, idx, arr) => {
             const meta = PAGE_MAP[id];
             if (!meta) return null;
             const isDragging = dragId === id;
             const isDropTarget = overId === id && dragId !== id;
+            const group = GROUP_OF[id];
+            const prevGroup = idx > 0 ? GROUP_OF[arr[idx - 1]] : undefined;
+            const showGroupHeader = sidebarOpen && group && group !== prevGroup;
 
             return (
+              <React.Fragment key={id}>
+              {showGroupHeader && (
+                <div className="px-2.5 pb-1 pt-2.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
+                  {group}
+                </div>
+              )}
               <div
-                key={id}
                 ref={dragRef}
                 draggable
                 onDragStart={(e) => handleDragStart(e, id)}
@@ -190,6 +237,7 @@ export const Sidebar: React.FC = () => {
                   </button>
                 )}
               </div>
+              </React.Fragment>
             );
           })}
         </nav>
