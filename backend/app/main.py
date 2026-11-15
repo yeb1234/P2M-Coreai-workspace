@@ -36,19 +36,39 @@ def run_startup_scan() -> None:
 
 
 def _run_background_thumbnails() -> None:
+    """空闲时补缩略图/雪碧图。
+
+    两个开关都关着时直接返回，不要每 2 秒空转一次 —— 一个什么都不做的
+    死循环线程除了费电，还会让人误以为后台任务在跑。
+    """
     import time
+
+    if not settings.thumbnail_background_enabled and not settings.sprite_background_enabled:
+        return
+
     idle_cycles = 0
     while True:
         time.sleep(max(1, settings.ai_worker_poll_interval or 2))
         idle_cycles += 1
         thumbnail_cycles = max(1, int(settings.thumbnail_background_idle_cycles or 10))
         thumbnail_limit = max(1, int(settings.thumbnail_background_limit or 1))
-        if settings.thumbnail_background_enabled and idle_cycles % thumbnail_cycles == 0:
-            from app.services.file_scanner import generate_missing_thumbnails
-            generate_missing_thumbnails(limit=thumbnail_limit)
-        if settings.sprite_background_enabled and idle_cycles % thumbnail_cycles == 0:
-            from app.services.file_scanner import generate_missing_sprites
-            generate_missing_sprites(limit=thumbnail_limit)
+        if idle_cycles % thumbnail_cycles != 0:
+            continue
+        # 单次失败不能让整条后台链路死掉：ffmpeg 偶尔会因文件被占用报错
+        if settings.thumbnail_background_enabled:
+            try:
+                from app.services.file_scanner import generate_missing_thumbnails
+
+                generate_missing_thumbnails(limit=thumbnail_limit)
+            except Exception:
+                logger.exception("后台生成缩略图失败，跳过本轮")
+        if settings.sprite_background_enabled:
+            try:
+                from app.services.file_scanner import generate_missing_sprites
+
+                generate_missing_sprites(limit=thumbnail_limit)
+            except Exception:
+                logger.exception("后台生成雪碧图失败，跳过本轮")
 
 
 def _drain_worker_stdout(proc: subprocess.Popen) -> None:
@@ -60,6 +80,73 @@ def _drain_worker_stdout(proc: subprocess.Popen) -> None:
             print(f"[worker] {line}", end="", file=sys.stderr, flush=True)
     except Exception:
         pass
+
+
+class WorkerSupervisor:
+    """托管 AI 转写 worker 子进程。
+
+    为什么要有它：worker 是独立进程（faster-whisper 崩溃不能带走 API），
+    但早期只在启动时 Popen 一次，进程死了没人知道 —— AI 任务会一直排队，
+    前端看到「排队中」永远不动。这里加一个监督线程，退出就重拉。
+    """
+
+    RESTART_DELAY_S = 5
+
+    def __init__(self, backend_dir: str):
+        self.backend_dir = backend_dir
+        self._stop = threading.Event()
+        self._proc: subprocess.Popen | None = None
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(
+            target=self._run, name="ai-worker-supervisor", daemon=True
+        )
+        self._thread.start()
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "app.worker"],
+                    cwd=self.backend_dir,
+                    encoding="utf-8",
+                    errors="replace",
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+            except Exception:
+                logger.exception("AI worker 启动失败，%s 秒后重试", self.RESTART_DELAY_S)
+                self._stop.wait(self.RESTART_DELAY_S)
+                continue
+
+            self._proc = proc
+            logger.info("AI worker 已启动 pid=%s", proc.pid)
+            threading.Thread(
+                target=_drain_worker_stdout, args=(proc,), name="worker-stdout-drain", daemon=True
+            ).start()
+
+            code = proc.wait()
+            if self._stop.is_set():
+                break
+            logger.error(
+                "AI worker 退出 code=%s，%s 秒后重启（期间 AI 任务不会被消费）",
+                code,
+                self.RESTART_DELAY_S,
+            )
+            self._stop.wait(self.RESTART_DELAY_S)
+
+    def stop(self) -> None:
+        self._stop.set()
+        proc = self._proc
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.terminate()
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            except Exception:
+                logger.exception("停止 AI worker 失败")
 
 
 def _warmup_retrieval() -> None:
@@ -87,25 +174,13 @@ async def lifespan(_app: FastAPI):
     threading.Thread(target=_warmup_retrieval, name="embedding-warmup", daemon=True).start()
     # Start background thumbnail/sprite worker thread
     threading.Thread(target=_run_background_thumbnails, name="thumbnail-worker", daemon=True).start()
-    # Start AI RQ worker as a subprocess (independent process, can be killed)
+    # AI 转写 worker：独立进程 + 监督线程，崩了自动重拉
     backend_dir = str(Path(__file__).resolve().parent.parent)
-    worker_proc = subprocess.Popen(
-        [sys.executable, "-m", "app.worker"],
-        cwd=backend_dir,
-        encoding="utf-8",
-        errors="replace",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    threading.Thread(target=_drain_worker_stdout, args=(worker_proc,), name="worker-stdout-drain", daemon=True).start()
-    print(f"AI RQ worker subprocess started: pid={worker_proc.pid}", file=sys.stderr, flush=True)
+    supervisor = WorkerSupervisor(backend_dir)
+    supervisor.start()
     yield
     stop_file_watcher()
-    try:
-        worker_proc.terminate()
-        worker_proc.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        worker_proc.kill()
+    supervisor.stop()
 
 
 app = FastAPI(
@@ -169,11 +244,14 @@ async def serve_sound_asset(full_path: str):
 
 @app.get("/health")
 def health():
-    """存活探针：只验证进程与数据库连接，必须快速返回。"""
+    """存活探针：只验证进程与数据库连通，必须快速返回。
+
+    详细指标（向量覆盖率、LLM 可达性）在 /ready 和 /api/admin/health。
+    """
     from app.database import check_database
 
     try:
-        db_info = check_database()
+        db_info = check_database(deep=False)
         db_ok = True
     except Exception as exc:
         logger.error("健康检查数据库失败: %s", exc)

@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ListTodo, Calendar, StickyNote, Timer, PlayCircle, BarChart3,
   BookOpen, Code2, Target, Layers, Bookmark, Heart, GitCompare, ShoppingCart,
   Trophy, Coins, MessageSquare, Compass, Bot, Package, Workflow, Settings,
-  AlarmClock, Captions,
+  AlarmClock, Captions, Route,
 } from 'lucide-react';
 import type { ActiveView } from '../stores/uiStore';
 
@@ -22,6 +22,7 @@ const NotesPage = lazyPage(() => import('../components/notes/NotesPage'), 'Notes
 const PomodoroPage = lazyPage(() => import('../components/pomodoro/PomodoroPage'), 'PomodoroPage');
 const TimeCenterPage = lazyPage(() => import('../components/timecenter/TimeCenterPage2'), 'TimeCenterPage2');
 const VideoPage = lazyPage(() => import('../components/video/VideoPage'), 'VideoPage');
+const LearningPathPage = lazyPage(() => import('../components/learning/LearningPathPage'), 'LearningPathPage');
 const TranscriberPage = lazyPage(() => import('../components/transcriber/TranscriberPage'), 'TranscriberPage');
 const HealthPage = lazyPage(() => import('../components/health/HealthPage'), 'HealthPage');
 const ComparePage = lazyPage(() => import('../components/compare/ComparePage'), 'ComparePage');
@@ -62,6 +63,7 @@ const PAGE_LOADERS: Record<ActiveView, () => Promise<unknown>> = {
   pomodoro: () => import('../components/pomodoro/PomodoroPage'),
   timecenter: () => import('../components/timecenter/TimeCenterPage2'),
   video: () => import('../components/video/VideoPage'),
+  learning: () => import('../components/learning/LearningPathPage'),
   transcriber: () => import('../components/transcriber/TranscriberPage'),
   health: () => import('../components/health/HealthPage'),
   compare: () => import('../components/compare/ComparePage'),
@@ -102,6 +104,7 @@ export const PAGES: PageEntry[] = [
   { id: 'pomodoro', path: 'pomodoro', component: PomodoroPage, label: '番茄钟', icon: <Timer size={20} />, color: 'text-[var(--accent)]' },
   { id: 'timecenter', path: 'timecenter', component: TimeCenterPage, label: '时间中心', icon: <AlarmClock size={20} />, color: 'text-[var(--accent)]' },
   { id: 'video', path: 'video', component: VideoPage, label: 'IT视频站', icon: <PlayCircle size={20} />, color: 'text-[#ec4899]' },
+  { id: 'learning', path: 'learning', component: LearningPathPage, label: '学习路径', icon: <Route size={20} />, color: 'text-[#16a34a]' },
   { id: 'transcriber', path: 'transcriber', component: TranscriberPage, label: '字幕转录王', icon: <Captions size={20} />, color: 'text-[#06b6d4]' },
   { id: 'health', path: 'health', component: HealthPage, label: '健康助手', icon: <Heart size={20} />, color: 'text-[#ec4899]', dev: true },
   { id: 'compare', path: 'compare', component: ComparePage, label: '产品对比', icon: <GitCompare size={20} />, color: 'text-[#06b6d4]', dev: true },

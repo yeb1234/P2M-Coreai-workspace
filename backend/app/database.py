@@ -109,9 +109,14 @@ class Settings(BaseSettings):
     # ---------------- 安全 ----------------
     jwt_secret: str = "dev-only-change-me-please-set-JWT_SECRET-in-env"
     jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 24
+    # 缩短到 12 小时：令牌泄露的暴露窗口直接砍半，配合 token_version 可强制下线
+    jwt_expire_hours: int = 12
     cors_origins: str = DEFAULT_CORS_ORIGINS
-    enable_docs: bool = True
+    enable_docs: bool = False
+    # 关闭后只有管理员能建号。个人/小团队部署建议关，避免公网被灌号
+    allow_registration: bool = False
+    # 逗号分隔的用户名白名单，命中即以 admin 角色注册
+    admin_usernames: str = ""
 
     model_config = SettingsConfigDict(
         env_file=str(ROOT_DIR / ".env"),
@@ -128,6 +133,14 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         items = [part.strip() for part in (self.cors_origins or "").split(",") if part.strip()]
         return items or ["http://localhost:5002"]
+
+    @property
+    def admin_username_set(self) -> set[str]:
+        return {
+            part.strip().lower()
+            for part in (self.admin_usernames or "").split(",")
+            if part.strip()
+        }
 
     @property
     def resolved_work_dir(self) -> str:
@@ -223,8 +236,13 @@ def get_db():
         db.close()
 
 
-def check_database() -> dict:
-    """返回数据库连通性摘要，供 /health 与 /ready 使用。"""
+def check_database(deep: bool = True) -> dict:
+    """返回数据库连通性摘要。
+
+    deep=False 时不统计 segment_embeddings 行数：那是 300 万+ 的表，
+    而探针每 30 秒被打一次，把 count(*) 放进探针等于给数据库加了一份
+    与业务无关的持续负载。存活探针只需要知道「连得上、查得动」。
+    """
     info: dict = {"backend": "postgresql" if settings.is_postgres else "sqlite"}
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
@@ -242,9 +260,10 @@ def check_database() -> dict:
                     pgvector_version=row[1],
                     pg_trgm_version=row[2],
                 )
-            info["segment_embeddings"] = connection.execute(
-                text("SELECT count(*) FROM segment_embeddings")
-            ).scalar()
+            if deep:
+                info["segment_embeddings"] = connection.execute(
+                    text("SELECT count(*) FROM segment_embeddings")
+                ).scalar()
     return info
 
 

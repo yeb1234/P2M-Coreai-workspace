@@ -20,9 +20,10 @@ from datetime import datetime
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt import create_react_agent
 
-from app.agents.tools import ALL_TOOLS
+from app.agents.tools import ALL_TOOLS, set_tool_user
 from app.database import SessionLocal
 from app.models import AgentRun
+from app.services.learning_context import active_path_text
 from app.services.llm import build_chat_model
 from app.services.memory import load_conversation, memory_text
 from app.services.profile import profile_summary_text, recompute_profile
@@ -41,6 +42,8 @@ BASE_PROMPT = """你是「灵境小助手」，一个长在本地视频学习平
 - 引用视频片段时必须带上《视频标题》和时间点（mm:ss），方便用户跳转。
 - 检索到 0 条就如实说没找到，并给出替代建议（换关键词/换分类/先补字幕）。禁止编造内容。
 - 问「我学得怎么样」「下一步学什么」之前，必须先调用工具拿真实数据，不要凭印象回答。
+- 用户已经有学习路径时，回答「下一步学什么」必须先调用 get_my_learning_path，
+  按路径里排好的顺序推进；只有路径明显不合适时才建议调整，并说明理由。
 - 用户的问题如果和视频库无关（写代码、查天气），正常回答但要简短，不要硬扯到视频上。
 - 中文回答。技术术语保留英文原名。不用表情符号堆砌。
 
@@ -90,6 +93,18 @@ def build_system_prompt(ctx: AgentContext) -> str:
                 parts.append(f"## 长期记忆（用户已确认的事实与偏好）\n{memories}")
         except Exception as exc:
             logger.warning("长期记忆读取失败: %s", exc)
+
+        # 路径是「用户自己确认过的节奏」，比模型临场发挥的建议优先级更高。
+        # 放进系统提示词而不是只做成工具，是为了让模型每轮都看得见，
+        # 不会在推荐时给出一套和已有路径冲突的方案。
+        try:
+            path_text = active_path_text(db, ctx.user_id)
+            if path_text:
+                parts.append(
+                    "## 当前学习路径（用户已确认，回答「下一步」时优先对齐它）\n" + path_text
+                )
+        except Exception as exc:
+            logger.warning("学习路径读取失败: %s", exc)
     finally:
         db.close()
 
@@ -161,6 +176,9 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
 
     system_prompt = build_system_prompt(ctx)
     history = _build_history(ctx)
+
+    # 工具靠这个知道「是谁在问」，否则会读到别人的画像与路径
+    set_tool_user(ctx.user_id)
 
     model = build_chat_model("external", temperature=0.3)
     agent = create_react_agent(model, ALL_TOOLS, prompt=system_prompt)
@@ -239,6 +257,10 @@ async def stream_chat(ctx: AgentContext, message: str):
     run_id = unique_suffix()
     system_prompt = build_system_prompt(ctx)
     history = _build_history(ctx)
+
+    # 同上：工具需要知道当前用户。异步流式路径里工具仍在本协程上下文执行，
+    # ContextVar 能正常传递。
+    set_tool_user(ctx.user_id)
 
     model = build_chat_model("external", temperature=0.3, streaming=True)
     agent = create_react_agent(model, ALL_TOOLS, prompt=system_prompt)

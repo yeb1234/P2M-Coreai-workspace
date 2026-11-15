@@ -56,7 +56,9 @@ services:
       - -c
       - log_min_duration_statement=500
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # 只绑回环地址：容器之间走内部网络，宿主机工具能连，公网扫不到。
+      # 原来绑 0.0.0.0，机器一旦有公网 IP，5432 就是对全世界开放的。
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - siteyeb-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -72,7 +74,8 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      # Redis 没有密码，绝不能暴露到 0.0.0.0
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - siteyeb-redis:/data
     healthcheck:
@@ -130,8 +133,15 @@ services:
       REDIS_URL: redis://redis:6379/0
       # ---- 安全 ----
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 必须设置且长度 >= 32}
-      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-24}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-12}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5002}
+      # 注册默认关闭：公网被扫到就会有人灌号。首个账号建好后设 false，
+      # 后续账号由管理员通过 /api/auth/create-user 开通
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      # 逗号分隔的管理员用户名白名单
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      # 接口文档默认不对外。要调试时临时设 true
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
       # ---- 启动开关 ----
       MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
       SQLITE_SOURCE_PATH: /data/source/learning_os.db

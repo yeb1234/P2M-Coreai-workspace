@@ -151,3 +151,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+// apiFetch 收到 401 时会广播这个事件（令牌过期，或因改密码被服务端撤销）。
+// 在这里统一把登录态清掉，避免每个调用点各写一遍。
+if (typeof window !== 'undefined') {
+  window.addEventListener('p2m:auth-expired', () => {
+    setCurrentUser(null);
+    useAuthStore.setState({ currentUser: null, error: '登录已失效，请重新登录' });
+  });
+}

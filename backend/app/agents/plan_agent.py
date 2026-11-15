@@ -36,6 +36,7 @@ MIN_VIDEO_SCORE = 0.45  # 低于此分视为「库里没有真正讲这个的内
 
 
 class PlanState(TypedDict, total=False):
+    user_id: int
     goal_title: str
     target_role: str
     deadline: str
@@ -274,9 +275,15 @@ def node_persist(state: PlanState) -> PlanState:
 
     db = SessionLocal()
     try:
+        owner_id = int(state.get("user_id") or 0) or None
         goal = (
             db.query(LearningGoal)
-            .filter(LearningGoal.title == state.get("goal_title"), LearningGoal.status == "active")
+            .filter(
+                LearningGoal.title == state.get("goal_title"),
+                LearningGoal.status == "active",
+                # 多用户：同名目标不能复用别人的
+                LearningGoal.user_id == owner_id,
+            )
             .first()
         )
         if goal is None:
@@ -288,6 +295,7 @@ def node_persist(state: PlanState) -> PlanState:
                     deadline = None
             goal = LearningGoal(
                 id=unique_suffix(),
+                user_id=owner_id,
                 title=state.get("goal_title") or "未命名目标",
                 target_role=state.get("target_role"),
                 deadline=deadline,
@@ -302,6 +310,7 @@ def node_persist(state: PlanState) -> PlanState:
         path = LearningPath(
             id=unique_suffix(),
             goal_id=goal.id,
+            user_id=owner_id,
             title=f"{goal.title} · 学习路径",
             summary=(state.get("plan_summary") or "")[:500],
             status="draft",
@@ -372,9 +381,11 @@ def generate_learning_path(
     deadline: str = "",
     weekly_hours: float = 10.0,
     skills: list[str] | None = None,
+    user_id: int | None = None,
 ) -> dict:
     """对外入口：跑一遍规划图，返回路径 id 与步骤。"""
     initial: PlanState = {
+        "user_id": int(user_id) if user_id else 0,
         "goal_title": goal_title,
         "target_role": target_role,
         "deadline": deadline,

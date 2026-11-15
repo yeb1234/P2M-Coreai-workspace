@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 
+from app.auth import require_admin
 from app.database import get_db
 from app.models import AiJob, Note, SubtitleSegment, Video
 from app.schemas import AiJobBatchCreate, AiJobBatchOut, AiJobBatchSkippedItem, AiJobListItem, AiJobListOut, AiJobOut
@@ -139,7 +140,13 @@ def _prepare_force_rerun(db: Session, video: Video) -> None:
 
 
 @router.post("/batch", response_model=AiJobBatchOut)
-def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
+def batch_ai_jobs(
+    payload: AiJobBatchCreate,
+    db: Session = Depends(get_db),
+    # 转写是重资源操作：一次批量能把 CPU 吃满几小时。
+    # 不鉴权等于让任何能访问站点的人给你的机器排满 whisper 任务。
+    _admin=Depends(require_admin),
+):
     unique_ids = list(dict.fromkeys(payload.video_ids))
     videos = db.query(Video).filter(Video.id.in_(unique_ids)).all()
     video_by_id = {video.id: video for video in videos}

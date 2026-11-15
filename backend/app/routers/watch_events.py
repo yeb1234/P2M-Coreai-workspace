@@ -13,12 +13,13 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func
 
+from app.auth import get_current_user, get_optional_user
 from app.database import SessionLocal
-from app.models import Video, WatchEvent
+from app.models import User, Video, WatchEvent
 from app.services.profile import VALID_EVENT_TYPES, recompute_profile
 
 logger = logging.getLogger(__name__)
@@ -51,12 +52,20 @@ class WatchEventBatchOut(BaseModel):
 
 
 @router.post("", response_model=WatchEventBatchOut)
-def ingest_watch_events(payload: WatchEventBatchIn):
-    """批量写入播放事件。整体一次事务，避免 480 次心跳产生 480 次 commit。"""
+def ingest_watch_events(
+    payload: WatchEventBatchIn,
+    user: User | None = Depends(get_optional_user),
+):
+    """批量写入播放事件。整体一次事务，避免 480 次心跳产生 480 次 commit。
+
+    用可选登录而不是强制登录：埋点属于统计链路，令牌过期不该让播放器报错。
+    未登录时 user_id 落 NULL，管理员可在后台看到这批「无主」数据。
+    """
     db = SessionLocal()
     accepted = 0
     rejected = 0
     total_delta = 0.0
+    user_id = user.id if user else None
     try:
         valid_video_ids = {
             row[0]
@@ -77,6 +86,7 @@ def ingest_watch_events(payload: WatchEventBatchIn):
             delta = max(0.0, min(float(event.delta_sec or 0.0), MAX_DELTA_SEC))
             rows.append(
                 WatchEvent(
+                    user_id=user_id,
                     video_id=event.video_id,
                     session_id=(event.session_id or "")[:64] or None,
                     event_type=event.event_type,
@@ -104,26 +114,29 @@ def ingest_watch_events(payload: WatchEventBatchIn):
 
 
 @router.get("/stats")
-def watch_event_stats(days: int = Query(7, ge=1, le=365)):
+def watch_event_stats(
+    days: int = Query(7, ge=1, le=365),
+    user: User = Depends(get_current_user),
+):
     """埋点健康度：有多少天有数据、累计多久、最近一次是什么时候。
 
-    用来判断「埋点是否真的在工作」，而不是等画像算出来发现全是零。
+    按当前用户过滤。管理员想看全局用 /api/admin/health。
     """
     db = SessionLocal()
     try:
         since = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        total = db.query(func.count(WatchEvent.id)).scalar() or 0
-        recent = (
-            db.query(func.count(WatchEvent.id))
-            .filter(WatchEvent.occurred_at >= since)
-            .scalar()
-            or 0
-        )
-        last_at = db.query(func.max(WatchEvent.occurred_at)).scalar()
-        total_sec = db.query(func.coalesce(func.sum(WatchEvent.delta_sec), 0.0)).scalar() or 0.0
+        base = db.query(WatchEvent).filter(WatchEvent.user_id == user.id)
+        total = base.count()
+        recent = base.filter(WatchEvent.occurred_at >= since).count()
+        last_at = db.query(func.max(WatchEvent.occurred_at)).filter(
+            WatchEvent.user_id == user.id
+        ).scalar()
+        total_sec = db.query(func.coalesce(func.sum(WatchEvent.delta_sec), 0.0)).filter(
+            WatchEvent.user_id == user.id
+        ).scalar() or 0.0
         active_days = (
             db.query(func.count(func.distinct(func.date(WatchEvent.occurred_at))))
-            .filter(WatchEvent.delta_sec > 0)
+            .filter(WatchEvent.user_id == user.id, WatchEvent.delta_sec > 0)
             .scalar()
             or 0
         )
@@ -140,11 +153,11 @@ def watch_event_stats(days: int = Query(7, ge=1, le=365)):
 
 
 @router.post("/recompute-profile")
-def recompute():
+def recompute(user: User = Depends(get_current_user)):
     """手动触发画像重算（埋点灌入后、或想立刻看到最新画像时用）。"""
     db = SessionLocal()
     try:
-        profile = recompute_profile(db, None)
+        profile = recompute_profile(db, user.id)
         return {
             "user_id": profile.user_id,
             "videos_started": profile.videos_started,

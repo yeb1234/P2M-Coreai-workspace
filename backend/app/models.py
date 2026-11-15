@@ -79,6 +79,8 @@ class WatchHistory(Base):
     __tablename__ = "watch_history"
 
     id = Column(Integer, primary_key=True, index=True)
+    # 多用户隔离键。历史数据迁移时统一归给系统 owner
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     video_id = Column(Integer, ForeignKey("videos.id"), nullable=False)
     progress = Column(Float, default=0)
     duration = Column(Float, default=0)
@@ -205,6 +207,12 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     display_name = Column(String, nullable=True)
+    # admin 可见管理端配置与队列操作；member 只能读写自己的学习数据
+    role = Column(String, nullable=False, default="member", server_default="member")
+    # 改密码时 +1，使此前签发的所有令牌立即失效（无状态 JWT 的唯一撤销手段）
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 

@@ -8,8 +8,37 @@ export function resolveApiUrl(url: string | null | undefined): string | null {
 
 type ApiFetchInit = RequestInit & { timeoutMs?: number };
 
-async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
-  const { timeoutMs = 60000, signal, ...fetchInit } = init ?? {};
+const AUTH_TOKEN_KEY = 'p2m-auth-token';
+
+/** 当前令牌。登录态存在 localStorage 是已知妥协：改成 httpOnly Cookie 需要后端
+ *  同时改 CSRF 防护与跨域策略，留到正式对外部署时再做。 */
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** 把后端的结构化错误解析成人话，而不是把 JSON 原样丢给用户。 */
+function extractErrorMessage(status: number, raw: string): string {
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const detail = parsed?.error?.message ?? parsed?.detail;
+      if (typeof detail === 'string' && detail) return detail;
+    } catch {
+      /* 非 JSON，走下面的截断 */
+    }
+  }
+  if (status === 403) return '没有权限执行这个操作';
+  if (status === 404) return '接口不存在，可能是版本不匹配';
+  if (status >= 500) return '服务端出错了，请稍后重试';
+  return raw ? raw.slice(0, 200) : `请求失败（HTTP ${status}）`;
+}
+
+export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
+  const { timeoutMs = 60000, signal, headers: initHeaders, ...fetchInit } = init ?? {};
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   if (signal) {
@@ -17,11 +46,19 @@ async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
     else signal.addEventListener('abort', () => controller.abort(), { once: true });
   }
 
+  // 认证头必须自动附加。早期所有请求都是匿名的，加了鉴权后会全部 401。
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(initHeaders as Record<string, string> | undefined),
+  };
+  const token = getAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   let res: Response;
   try {
     res = await fetch(resolveApiPath(path), {
-      headers: { 'Content-Type': 'application/json', ...fetchInit.headers },
       ...fetchInit,
+      headers,
       signal: controller.signal,
     });
   } catch (err) {
@@ -30,9 +67,21 @@ async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
   } finally {
     window.clearTimeout(timeout);
   }
+
+  if (res.status === 401) {
+    // 令牌过期或已被撤销（改密码 / 管理员踢下线），统一回到登录态
+    try {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    } catch {
+      /* 隐私模式下可能不可写，忽略 */
+    }
+    window.dispatchEvent(new CustomEvent('p2m:auth-expired'));
+    throw new Error('登录已失效，请重新登录');
+  }
+
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(extractErrorMessage(res.status, text));
   }
   return res.json();
 }

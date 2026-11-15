@@ -11,8 +11,9 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user, require_admin
 from app.database import get_db
-from app.models import AiJob, Category, SubtitleSegment, Video, WatchHistory
+from app.models import AiJob, Category, SubtitleSegment, User, Video, WatchHistory
 from app.utils.files import resolve_media_path
 from app.schemas import (
     AiJobCreate,
@@ -436,7 +437,11 @@ def get_thumbnail(video_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/history")
-def save_watch_history(payload: WatchHistoryIn, db: Session = Depends(get_db)):
+def save_watch_history(
+    payload: WatchHistoryIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     video = db.query(Video).filter(Video.id == payload.video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -445,9 +450,10 @@ def save_watch_history(payload: WatchHistoryIn, db: Session = Depends(get_db)):
         video.duration = payload.duration
 
     completed = bool(payload.duration and payload.progress / payload.duration >= 0.9)
+    # 必须带 user_id：否则「2 分钟内合并同一条记录」会把别人的进度当成自己的覆盖掉
     latest = (
         db.query(WatchHistory)
-        .filter(WatchHistory.video_id == payload.video_id)
+        .filter(WatchHistory.video_id == payload.video_id, WatchHistory.user_id == user.id)
         .order_by(WatchHistory.watched_at.desc())
         .first()
     )
@@ -460,6 +466,7 @@ def save_watch_history(payload: WatchHistoryIn, db: Session = Depends(get_db)):
     else:
         db.add(
             WatchHistory(
+                user_id=user.id,
                 video_id=payload.video_id,
                 progress=payload.progress,
                 duration=payload.duration,
@@ -472,7 +479,13 @@ def save_watch_history(payload: WatchHistoryIn, db: Session = Depends(get_db)):
 
 
 @router.post("/{video_id}/ai-jobs")
-def start_ai_job(video_id: int, payload: AiJobCreate, db: Session = Depends(get_db)):
+def start_ai_job(
+    video_id: int,
+    payload: AiJobCreate,
+    db: Session = Depends(get_db),
+    # 起转写任务会长时间占满 CPU，属管理操作
+    _admin=Depends(require_admin),
+):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -484,7 +497,13 @@ def start_ai_job(video_id: int, payload: AiJobCreate, db: Session = Depends(get_
 
 
 @router.post("/{video_id}/favorite", response_model=VideoOut)
-def set_video_favorite(video_id: int, payload: VideoFavoriteIn, db: Session = Depends(get_db)):
+def set_video_favorite(
+    video_id: int,
+    payload: VideoFavoriteIn,
+    db: Session = Depends(get_db),
+    # 收藏作用于共享视频库，成员登录后即可标记
+    _user=Depends(get_current_user),
+):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -623,6 +642,7 @@ def update_segment(
     segment_index: int,
     payload: SubtitleSegmentUpdate,
     db: Session = Depends(get_db),
+    _admin=Depends(require_admin),  # 改字幕等于改检索语料，仅管理员可操作
 ):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:

@@ -4,7 +4,7 @@ import { idbStorage } from '../lib/idbStorage';
 import { type ThemeVars, type ThemeScheduleRule, THEME_PRESETS, applyTheme, DEFAULT_THEME_SCHEDULE_RULES } from '../lib/themes';
 import { VIEW_PATH } from '../config/pageRegistry';
 
-export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'pomodoro' | 'timecenter' | 'video' | 'transcriber' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
+export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'pomodoro' | 'timecenter' | 'learning' | 'video' | 'transcriber' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
 
 export type FontSize = 'sm' | 'md' | 'lg';
 export type ThemeId = string;
@@ -12,7 +12,7 @@ export type NoteEnterBehavior = 'enter_save' | 'enter_newline';
 
 const DEFAULT_NAV_ORDER: ActiveView[] = [
   'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'pomodoro', 'timecenter',
-  'health', 'video', 'transcriber', 'compare', 'shop', 'esports',
+  'health', 'learning', 'video', 'transcriber', 'compare', 'shop', 'esports',
   'stats', 'reader', 'snippets', 'habits',
   'flashcards', 'bookmarks', 'tokens',
   'leetcode', 'interview', 'codenav', 'aiagent', 'openclaw', 'hermes',

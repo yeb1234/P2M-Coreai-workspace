@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TranscriptSegment(BaseModel):
@@ -366,19 +366,45 @@ class AssistantConnectionTestOut(BaseModel):
 
 
 class UserRegister(BaseModel):
-    username: str = Field(min_length=2, max_length=50)
-    password: str = Field(min_length=4, max_length=128)
+    username: str = Field(min_length=2, max_length=50, pattern=r"^[A-Za-z0-9_.-]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        """只挡最差的一批：纯数字、纯字母、纯符号。
+
+        不做「必须含大写+特殊字符」那套，实测只会逼出 Password1! 这种更差的东西。
+        """
+        if value.isdigit() or value.isalpha():
+            raise ValueError("密码需要同时包含字母和数字")
+        if value.lower() in {"password", "12345678", "qwertyui", "admin123"}:
+            raise ValueError("这个密码太常见了，换一个")
+        return value
 
 
 class UserLogin(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=50)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        if value.isdigit() or value.isalpha():
+            raise ValueError("密码需要同时包含字母和数字")
+        return value
 
 
 class UserOut(BaseModel):
     id: int
     username: str
     display_name: str | None = None
+    role: str = "member"
     model_config = {"from_attributes": True}
 
 

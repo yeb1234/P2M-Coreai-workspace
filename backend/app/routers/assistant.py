@@ -2,20 +2,31 @@
 
 /chat        同步返回完整答案（旧前端兼容，走轻量单轮链路）
 /chat/stream SSE 流式（Agent + 工具调用，前端推荐）
+
+安全说明
+--------
+/models 和 /connection-test 接受用户传入的 base_url，服务端会真的去发请求。
+早期版本这两个端点没有任何鉴权，等于把服务器当成任意请求的跳板（SSRF）：
+攻击者可以让它去访问内网地址、云元数据接口，再把响应内容读走。
+
+现在改成：仅管理员可用 + 只允许 http/https。
+管理员本身就有配置模型地址的权限，允许内网是必要的（本地 LM Studio 就在内网）。
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import desc
 
 from app.agents.chat_agent import AgentContext, stream_chat
+from app.auth import get_current_user, require_admin
 from app.database import SessionLocal
-from app.models import ChatMessage, ChatSession
+from app.models import ChatMessage, ChatSession, User
 from app.schemas import (
     AssistantChatCreate,
     AssistantChatOut,
@@ -27,14 +38,29 @@ from app.schemas import (
 from app.services.assistant import run_assistant_chat
 from app.services.llm_client import OpenAICompatibleClient
 from app.services.memory import append_message, ensure_session, maybe_compress
+from app.services.rate_limit import chat_limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
 
+def _load_session_for_user(db, session_id: str, user: User) -> ChatSession:
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    # 归属不符按不存在处理，避免通过状态码差异探测别人的会话 id
+    if session.user_id is not None and session.user_id != user.id and (user.role or "") != "admin":
+        raise HTTPException(status_code=404, detail="会话不存在")
+    return session
+
+
 @router.post("/chat", response_model=AssistantChatOut)
-def assistant_chat(payload: AssistantChatCreate):
+def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_current_user)):
+    allowed, _ = chat_limiter.hit(str(user.id))
+    if not allowed:
+        raise HTTPException(status_code=429, detail="提问太频繁，缓一下")
+
     result = run_assistant_chat(
         message=payload.message,
         page_context=payload.page_context,
@@ -51,14 +77,20 @@ def assistant_chat(payload: AssistantChatCreate):
 
 
 @router.post("/chat/stream")
-async def assistant_chat_stream(payload: AssistantChatCreate):
+async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depends(get_current_user)):
     """SSE 流式对话。事件：token / tool_start / tool_end / done / error
 
     每个事件是一行 `data: {json}`，done 事件里带 run_id 与工具轨迹。
     """
+    allowed, remaining = chat_limiter.hit(str(user.id))
+    if not allowed:
+        raise HTTPException(status_code=429, detail="提问太频繁，缓一下再问")
+
     db = SessionLocal()
     try:
-        session = ensure_session(db, payload.session_id, video_id=payload.video_id)
+        session = ensure_session(
+            db, payload.session_id, video_id=payload.video_id, user_id=user.id
+        )
         session_id = session.id
         append_message(db, session_id, "user", payload.message)
     finally:
@@ -66,6 +98,7 @@ async def assistant_chat_stream(payload: AssistantChatCreate):
 
     ctx = AgentContext(
         session_id=session_id,
+        user_id=user.id,
         video_id=payload.video_id,
         page_context=payload.page_context,
         system_prompt_extra=payload.system_prompt,
@@ -103,10 +136,19 @@ async def assistant_chat_stream(payload: AssistantChatCreate):
 
 
 @router.get("/sessions")
-def list_sessions(limit: int = Query(20, ge=1, le=100)):
+def list_sessions(
+    limit: int = Query(20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+):
     db = SessionLocal()
     try:
-        rows = db.query(ChatSession).order_by(desc(ChatSession.updated_at)).limit(limit).all()
+        rows = (
+            db.query(ChatSession)
+            .filter(ChatSession.user_id == user.id)
+            .order_by(desc(ChatSession.updated_at))
+            .limit(limit)
+            .all()
+        )
         return [
             {
                 "id": row.id,
@@ -123,12 +165,14 @@ def list_sessions(limit: int = Query(20, ge=1, le=100)):
 
 
 @router.get("/sessions/{session_id}/messages")
-def get_session_messages(session_id: str, limit: int = Query(50, ge=1, le=200)):
+def get_session_messages(
+    session_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    user: User = Depends(get_current_user),
+):
     db = SessionLocal()
     try:
-        session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
-        if not session:
-            raise HTTPException(status_code=404, detail="会话不存在")
+        session = _load_session_for_user(db, session_id, user)
 
         rows = (
             db.query(ChatMessage)
@@ -157,7 +201,7 @@ def get_session_messages(session_id: str, limit: int = Query(50, ge=1, le=200)):
 
 
 def normalize_openai_base_url(value: str) -> str:
-    trimmed = value.strip().rstrip("/")
+    trimmed = (value or "").strip().rstrip("/")
     if trimmed.endswith("/v1/chat/completions"):
         return trimmed[: -len("/chat/completions")]
     if trimmed.endswith("/chat/completions"):
@@ -165,10 +209,24 @@ def normalize_openai_base_url(value: str) -> str:
     return trimmed
 
 
+def _validate_outbound_url(value: str) -> str:
+    """挡住 file:// gopher:// 之类的协议，只允许 http/https 出站。"""
+    normalized = normalize_openai_base_url(value)
+    parsed = urlparse(normalized)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=422, detail="模型地址只支持 http 或 https")
+    if not parsed.hostname:
+        raise HTTPException(status_code=422, detail="模型地址不合法")
+    return normalized
+
+
 @router.post("/models", response_model=AssistantModelListOut)
-def assistant_models(payload: AssistantModelListCreate):
+def assistant_models(
+    payload: AssistantModelListCreate,
+    _admin: User = Depends(require_admin),
+):
     client = OpenAICompatibleClient(
-        base_url=normalize_openai_base_url(payload.base_url),
+        base_url=_validate_outbound_url(payload.base_url),
         api_key=payload.api_key,
         timeout_s=30,
     )
@@ -176,9 +234,12 @@ def assistant_models(payload: AssistantModelListCreate):
 
 
 @router.post("/connection-test", response_model=AssistantConnectionTestOut)
-def assistant_connection_test(payload: AssistantConnectionTestCreate):
+def assistant_connection_test(
+    payload: AssistantConnectionTestCreate,
+    _admin: User = Depends(require_admin),
+):
     client = OpenAICompatibleClient(
-        base_url=normalize_openai_base_url(payload.base_url),
+        base_url=_validate_outbound_url(payload.base_url),
         api_key=payload.api_key,
         timeout_s=120,
     )

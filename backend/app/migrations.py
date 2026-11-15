@@ -25,6 +25,61 @@ def _safe_dim() -> int:
     return dim
 
 
+def _claim_legacy_ownership(conn) -> None:
+    """把多用户改造之前的数据归给 owner，并保证系统里有管理员。
+
+    3.0 之前的表要么没有 user_id（watch_history），要么有但一直是 NULL。
+    如果不做归属，改成按 user_id 过滤后 owner 自己的历史数据会全部消失。
+
+    owner 的选取顺序：
+    1. ADMIN_USERNAMES 白名单里第一个真实存在的账号
+    2. 最早创建的非占位账号（username != 'local'）
+    3. 最早创建的任何账号
+    """
+    rows = conn.execute(text("SELECT id, username, role FROM users ORDER BY id")).fetchall()
+    if not rows:
+        return
+
+    admins = {name.strip().lower() for name in (settings.admin_usernames or "").split(",") if name.strip()}
+    owner_id = None
+    for row in rows:
+        if row[1] and row[1].lower() in admins:
+            owner_id = row[0]
+            break
+    if owner_id is None:
+        for row in rows:
+            if row[1] != "local":
+                owner_id = row[0]
+                break
+    if owner_id is None:
+        owner_id = rows[0][0]
+
+    # 保证至少有一个管理员，否则升级后管理端没人能进
+    has_admin = conn.execute(text("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1")).first()
+    if not has_admin:
+        conn.execute(
+            text("UPDATE users SET role = 'admin' WHERE id = :uid"), {"uid": owner_id}
+        )
+        logger.info("已将用户 id=%s 提升为管理员", owner_id)
+
+    # 历史数据归属
+    for table, column in (
+        ("watch_events", "user_id"),
+        ("watch_history", "user_id"),
+        ("learning_goals", "user_id"),
+        ("learning_paths", "user_id"),
+    ):
+        try:
+            result = conn.execute(
+                text(f"UPDATE {table} SET {column} = :uid WHERE {column} IS NULL"),
+                {"uid": owner_id},
+            )
+            if result.rowcount:
+                logger.info("归属历史数据 %s.%s: %s 行 -> 用户 %s", table, column, result.rowcount, owner_id)
+        except Exception as exc:
+            logger.debug("归属 %s 失败（表或列可能不存在）: %s", table, exc)
+
+
 def upgrade_postgres(engine) -> None:
     """建扩展、建表、建索引。可重复执行。"""
     from app import models  # noqa: F401  确保 metadata 已注册
@@ -34,6 +89,32 @@ def upgrade_postgres(engine) -> None:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
 
     Base.metadata.create_all(bind=engine)
+
+    # create_all 只补缺失的表，不会给已存在的表加列。
+    # 多用户字段必须显式 ALTER，否则 upgrade 到新版后隔离条件会直接报列不存在。
+    with engine.begin() as conn:
+        # ---- users：角色 / 令牌版本 / 启停 ----
+        for statement in (
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'member'",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP",
+        ):
+            conn.execute(text(statement))
+
+        conn.execute(
+            text("ALTER TABLE watch_history ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_watch_history_user ON watch_history (user_id, watched_at DESC)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_watch_events_user_time ON watch_events (user_id, occurred_at DESC)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_chat_sessions_user ON chat_sessions (user_id, updated_at DESC)")
+        )
+        _claim_legacy_ownership(conn)
 
     dim = _safe_dim()
     with engine.begin() as conn:

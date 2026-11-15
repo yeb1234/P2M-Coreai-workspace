@@ -32,7 +32,10 @@ RUN npm run build
 FROM docker.m.daocloud.io/library/nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/nginx.conf
+# 安全头单独成文件：location 里的 add_header 会清空父块继承，
+# 所以每个 location 都要 include 一次
+COPY nginx-security-headers.conf /etc/nginx/security-headers.conf
 
 EXPOSE 80
 

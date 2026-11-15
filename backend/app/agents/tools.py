@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextvars import ContextVar
 from datetime import datetime, timedelta
 
 from langchain_core.tools import tool
@@ -17,9 +18,23 @@ from sqlalchemy import desc, func, text
 from app.database import SessionLocal
 from app.models import LearningGoal, LearningPath, Note, Video, WatchEvent, WatchHistory
 from app.services.hybrid_search import hybrid_search
+from app.services.learning_context import active_path_text
 from app.services.profile import profile_summary_text, recompute_profile
 
 logger = logging.getLogger(__name__)
+
+# 当前对话是谁在问。
+# 工具函数的签名对模型可见，加个 user_id 参数会让模型有机会乱填别人的 id，
+# 所以走 ContextVar：由 chat_agent 在进入 Agent 前设置，模型看不到也改不了。
+_tool_user_id: ContextVar[int | None] = ContextVar("tool_user_id", default=None)
+
+
+def set_tool_user(user_id: int | None) -> None:
+    _tool_user_id.set(user_id)
+
+
+def _uid() -> int | None:
+    return _tool_user_id.get()
 
 
 def _fmt_ts(seconds: float) -> str:
@@ -95,7 +110,7 @@ def get_learning_profile() -> str:
     """
     db = SessionLocal()
     try:
-        profile = recompute_profile(db, None)
+        profile = recompute_profile(db, _uid())
         return profile_summary_text(profile)
     except Exception as exc:
         logger.warning("读取画像失败: %s", exc)
@@ -109,28 +124,31 @@ def get_recent_activity(days: int = 7) -> str:
     """最近 N 天的观看与学习活动。用于回答「我最近看了什么」「进度如何」。"""
     days = max(1, min(int(days or 7), 90))
     since = datetime.now() - timedelta(days=days)
+    uid = _uid()
     db = SessionLocal()
     try:
         # 统计与明细必须分开查。
         # 原来的写法是「取最近 200 条事件 → 求和」，结果是：
         # 200 条只覆盖了不到一天，报出来的「最近 7 天」比实际少了 8 倍。
         # 聚合走 SQL，明细才用 LIMIT。
-        total_sec = (
-            db.query(func.coalesce(func.sum(WatchEvent.delta_sec), 0.0))
-            .filter(WatchEvent.occurred_at >= since)
-            .scalar()
-            or 0.0
+        total_query = db.query(func.coalesce(func.sum(WatchEvent.delta_sec), 0.0)).filter(
+            WatchEvent.occurred_at >= since
         )
+        if uid is not None:
+            total_query = total_query.filter(WatchEvent.user_id == uid)
+        total_sec = total_query.scalar() or 0.0
 
         if not total_sec:
             # 退化到 watch_history，老数据只有进度快照
-            history = (
+            history_query = (
                 db.query(WatchHistory, Video.title)
                 .join(Video, Video.id == WatchHistory.video_id)
                 .filter(WatchHistory.watched_at >= since)
-                .order_by(desc(WatchHistory.watched_at))
-                .limit(50)
-                .all()
+            )
+            if uid is not None:
+                history_query = history_query.filter(WatchHistory.user_id == uid)
+            history = (
+                history_query.order_by(desc(WatchHistory.watched_at)).limit(50).all()
             )
             if not history:
                 return f"最近 {days} 天没有观看记录。"
@@ -140,11 +158,15 @@ def get_recent_activity(days: int = 7) -> str:
                 lines.append(f"- 《{title}》 进度 {pct:.0f}% {'已完成' if record.completed else ''}")
             return "\n".join(lines)
 
-        by_video = (
+        video_query = (
             db.query(Video.title, func.sum(WatchEvent.delta_sec).label("secs"))
             .join(Video, Video.id == WatchEvent.video_id)
             .filter(WatchEvent.occurred_at >= since)
-            .group_by(Video.title)
+        )
+        if uid is not None:
+            video_query = video_query.filter(WatchEvent.user_id == uid)
+        by_video = (
+            video_query.group_by(Video.title)
             .order_by(func.sum(WatchEvent.delta_sec).desc())
             .limit(10)
             .all()
@@ -164,15 +186,13 @@ def get_recent_activity(days: int = 7) -> str:
 @tool
 def get_learning_goal() -> str:
     """读取当前学习目标与已有学习路径的进度。规划路径前必须先看这里。"""
+    uid = _uid()
     db = SessionLocal()
     try:
-        goals = (
-            db.query(LearningGoal)
-            .filter(LearningGoal.status == "active")
-            .order_by(desc(LearningGoal.updated_at))
-            .limit(3)
-            .all()
-        )
+        goal_query = db.query(LearningGoal).filter(LearningGoal.status == "active")
+        if uid is not None:
+            goal_query = goal_query.filter(LearningGoal.user_id == uid)
+        goals = goal_query.order_by(desc(LearningGoal.updated_at)).limit(3).all()
         if not goals:
             return "当前没有设定学习目标。需要先和用户确认目标岗位、期限与每周可投入时间。"
 
@@ -199,6 +219,31 @@ def get_learning_goal() -> str:
                     f"  已有路径「{path.title}」，{done}/{len(path.steps)} 步已完成"
                 )
         return "\n".join(lines)
+    finally:
+        db.close()
+
+
+@tool
+def get_my_learning_path() -> str:
+    """读取「学习路径」页里正在推进的路径：每步做什么、进度、绑定的视频。
+
+    回答「我下一步学什么」「我的路径走到哪了」「这周该做哪一步」之前先调用它。
+    如果用户还没建过路径，如实说没有，并建议他先去「学习路径」页生成一条，
+    不要凭空替他设计一套课程。
+    """
+    db = SessionLocal()
+    try:
+        text = active_path_text(db, _uid())
+        if not text:
+            return (
+                "用户目前没有正在推进的学习路径。"
+                "如果他想有明确节奏，建议他去「学习路径」页设定目标后生成一条 —— "
+                "生成出来的每一步都会绑定库里真实存在的视频。"
+            )
+        return text
+    except Exception as exc:
+        logger.warning("读取学习路径失败: %s", exc)
+        return "暂时读不到学习路径。"
     finally:
         db.close()
 
@@ -380,6 +425,7 @@ ALL_TOOLS = [
     get_learning_profile,
     get_recent_activity,
     get_learning_goal,
+    get_my_learning_path,
     recommend_next_videos,
     search_notes,
 ]

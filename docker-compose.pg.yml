@@ -43,7 +43,8 @@ services:
       - -c
       - log_min_duration_statement=500
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # 只绑回环，避免数据库端口对公网开放
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - siteyeb-pgdata:/var/lib/postgresql/data
     healthcheck:

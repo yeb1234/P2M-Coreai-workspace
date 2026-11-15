@@ -176,17 +176,16 @@ def recompute_profile(db: Session, user_id: int | None = None) -> UserProfile:
     resolved_id = resolve_user_id(db, user_id)
     since_30d = datetime.now() - timedelta(days=30)
 
-    event_query = db.query(WatchEvent)
-    if user_id is not None:
-        event_query = event_query.filter(WatchEvent.user_id == user_id)
-    events = event_query.all()
+    # 必须用 resolved_id 而不是入参 user_id。
+    # 入参为 None 时原实现会跳过过滤，把所有用户的事件加在一起算到一个人头上，
+    # 多用户下等于画像串号。
+    events = db.query(WatchEvent).filter(WatchEvent.user_id == resolved_id).all()
 
     total_watch_sec = sum(float(e.delta_sec or 0) for e in events)
     event_video_ids = {e.video_id for e in events if e.event_type in ("play", "heartbeat")}
 
     # 完成度以 watch_history 为准（播放器上报的进度快照）
-    # 注：watch_history 目前没有 user_id 列，单用户场景下不按用户过滤
-    history = db.query(WatchHistory).all()
+    history = db.query(WatchHistory).filter(WatchHistory.user_id == resolved_id).all()
     history_video_ids = {h.video_id for h in history}
     completed_ids = {h.video_id for h in history if h.completed}
 
@@ -222,10 +221,10 @@ def recompute_profile(db: Session, user_id: int | None = None) -> UserProfile:
     profile.active_days_30d = len(
         {e.occurred_at.date() for e in events if e.occurred_at and e.occurred_at >= since_30d and e.delta_sec > 0}
     )
-    profile.streak_days = _streak_days(db, user_id)
+    profile.streak_days = _streak_days(db, resolved_id)
     profile.notes_count = int(notes_count)
-    profile.active_hours = _hour_histogram(db, user_id, since_30d)
-    profile.top_categories = _top_categories(db, user_id, since_30d)
+    profile.active_hours = _hour_histogram(db, resolved_id, since_30d)
+    profile.top_categories = _top_categories(db, resolved_id, since_30d)
     profile.last_active_at = last_active
     profile.computed_at = datetime.now()
 
@@ -270,5 +269,8 @@ def profile_summary_text(profile: UserProfile) -> str:
         best_hours = sorted(data["active_hours"].items(), key=lambda kv: kv[1], reverse=True)[:3]
         parts.append("最常学习时段：" + "、".join(f"{h}点" for h, _ in best_hours))
     if data["notes_count"]:
-        parts.append(f"累计笔记 {data['notes_count']} 篇")
+        # Note 表没有 user_id：它是 AI 转写产物，属于共享视频库。
+        # 不加这个限定，模型会把「库里有 8770 篇笔记」读成「你记了 8770 篇笔记」，
+        # 进而给出「你只记不看」这种错误结论。
+        parts.append(f"视频库内已有 {data['notes_count']} 篇转写笔记（全库统计，非个人记录）")
     return "；".join(parts) + "。"

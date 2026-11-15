@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth import require_admin
 from app.schemas import AssistantRuntimeSettingsIn, AssistantRuntimeSettingsOut, RescanOut, TranscriptionSettingsIn, TranscriptionSettingsOut
 from app.services import admin_ai_queue
 from app.services.admin_health import backend_health as collect_backend_health
@@ -18,7 +19,31 @@ from app.services.admin_settings import (
 )
 
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+# 整个管理端统一要求管理员角色。
+# 早期这些端点完全没有鉴权：任何能访问 80 端口的人都能改 LLM 配置、
+# 清空任务队列、触发全盘扫描，并通过 GET /assistant-settings 读到明文 API Key。
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
+
+# 密钥掩码占位：GET 返回它代替真实值，PUT 收到它时表示「保持原样」。
+# 这样前端设置页仍能正常回填，但网络响应里不再出现明文密钥。
+MASKED_SECRET = "__MASKED__"
+
+
+def _mask(value: str) -> str:
+    if not value:
+        return ""
+    return MASKED_SECRET
+
+
+def _unmask(new_value: str | None, current_value: str) -> str:
+    """PUT 时决定是否真的更新密钥。"""
+    if new_value is None or new_value == MASKED_SECRET:
+        return current_value
+    return new_value
 
 
 @router.post("/rescan", response_model=RescanOut)
@@ -67,18 +92,32 @@ def save_transcription_settings(payload: TranscriptionSettingsIn):
 
 @router.get("/assistant-settings", response_model=AssistantRuntimeSettingsOut)
 def get_assistant_runtime_settings():
-    return AssistantRuntimeSettingsOut(**load_assistant_runtime_settings())
+    data = load_assistant_runtime_settings()
+    # 密钥一律不回明文，只告诉前端「有值 / 没值」
+    data["local_api_key"] = _mask(data.get("local_api_key") or "")
+    data["external_api_key"] = _mask(data.get("external_api_key") or "")
+    return AssistantRuntimeSettingsOut(**data)
 
 
 @router.put("/assistant-settings", response_model=AssistantRuntimeSettingsOut)
 def save_assistant_runtime_settings(payload: AssistantRuntimeSettingsIn):
     current = load_assistant_runtime_settings()
     updates = payload.model_dump(exclude_unset=True)
+
+    # 掩码占位表示「前端没改这一项」，保留库里的真实值
+    for key in ("local_api_key", "external_api_key"):
+        if key in updates:
+            updates[key] = _unmask(updates[key], current.get(key) or "")
+
     next_settings = persist_assistant_runtime_settings({**current, **updates})
     if "llm_usage_policy" in updates:
         transcription = load_transcription_settings()
         persist_transcription_settings({**transcription, "llm_usage_policy": next_settings["llm_usage_policy"]})
-    return AssistantRuntimeSettingsOut(**next_settings)
+
+    response = dict(next_settings)
+    response["local_api_key"] = _mask(response.get("local_api_key") or "")
+    response["external_api_key"] = _mask(response.get("external_api_key") or "")
+    return AssistantRuntimeSettingsOut(**response)
 
 
 @router.get("/health")
