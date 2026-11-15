@@ -244,18 +244,23 @@ export const THEME_PRESETS: ThemePreset[] = [
       '--bg-accent': '#fef7ed',
       '--text-primary': '#1a1a1a',
       '--text-secondary': '#6b7280',
-      '--text-muted': '#9ca3af',
+      // 原 #9ca3af 只有 2.54:1，辅助说明在长时间阅读下吃力。
+      // 压到 #767b82 是 4.26:1 —— 仍明显弱于次要色，但能读。
+      '--text-muted': '#767b82',
       '--border-light': '#e5e2dd',
       '--border-medium': '#d1cdc6',
-      '--accent': '#c87d2f',
-      '--accent-hover': '#b06d20',
+      // 原 #c87d2f 只有 3.27:1，当文字/图标偏浅。压到 #a8661f 是 4.58:1（AA）。
+      // 色相不变，只是不那么浅 —— 暖橙还是暖橙。
+      '--accent': '#a8661f',
+      '--accent-hover': '#8f5219',
       '--accent-bg': '#fef7ed',
       '--paper-bg': '#faf9f7',
       '--scrollbar-thumb': '#d1cdc6',
       '--scrollbar-hover': '#b8b4ac',
       '--header-bg': 'rgba(250, 249, 247, 0.8)',
       '--sidebar-bg': 'rgba(250, 249, 247, 0.9)',
-      '--success': '#16a34a',
+      // 原 #16a34a 只有 3.30:1。压到 #15803d 是 5.02:1。
+      '--success': '#15803d',
       '--danger': '#dc3545',
       '--shadow-card': '1px 1px 0px rgba(232, 212, 160, 0.06)',
     },

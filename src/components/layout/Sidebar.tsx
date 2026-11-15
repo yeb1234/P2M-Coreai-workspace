@@ -219,12 +219,17 @@ export const Sidebar: React.FC = () => {
                   {meta.icon}
                 </span>
                 {sidebarOpen && (
-                  <span className="flex min-w-0 items-center gap-1">
+                  <span className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate text-sm font-medium">{meta.label}</span>
-                    {/* 「开发中」是状态标识，不能跟着标题一起被截断。
-                        之前它嵌在 truncate 容器里，字号一上提就把三个字切掉了。 */}
+                    {/* 24 个菜单里 13 个带「开发中」，这个标签已经不传递信息了，
+                        还把标题挤成「闪卡记...」。改成状态点：标题完整优先，
+                        状态用 1.5px 的点表示，hover 时 title 给出说明。 */}
                     {meta.dev && (
-                      <span className="shrink-0 text-xs text-[var(--accent)] opacity-70">开发中</span>
+                      <span
+                        title="功能开发中"
+                        aria-label="功能开发中"
+                        className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)] opacity-50"
+                      />
                     )}
                   </span>
                 )}
@@ -265,9 +270,11 @@ export const Sidebar: React.FC = () => {
                 return (
                   <div key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--bg-elevated)] transition-colors">
                     <span className="text-[var(--text-muted)]">{meta.icon}</span>
-                    <span className="flex min-w-0 flex-1 items-center gap-1 text-xs text-[var(--text-secondary)]">
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-[var(--text-secondary)]">
                       <span className="truncate">{meta.label}</span>
-                      {meta.dev && <span className="shrink-0 opacity-70">开发中</span>}
+                      {meta.dev && (
+                        <span title="功能开发中" className="h-1 w-1 shrink-0 rounded-full bg-current opacity-50" />
+                      )}
                     </span>
                     <button
                       onClick={() => showNav(id)}
