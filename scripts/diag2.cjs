@@ -1,0 +1,20 @@
+const { chromium } = require('playwright');
+(async () => {
+  const b = await chromium.launch();
+  const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
+  const logs = [];
+  p.on('console', (m) => { if (m.text().includes('nav-diag')) logs.push(m.text()); });
+  p.on('pageerror', (e) => logs.push('PAGEERROR: ' + e.message));
+  await p.goto('http://localhost', { waitUntil: 'domcontentloaded' });
+  await p.waitForSelector('input', { state: 'visible', timeout: 20000 });
+  await p.waitForTimeout(600);
+  const ins = p.locator('input');
+  await ins.nth(0).fill('demo');
+  await ins.nth(1).fill('Demo2026');
+  await p.getByRole('button', { name: /登录/ }).first().click();
+  await p.waitForTimeout(4000);
+  console.log('nav-diag 日志条数:', logs.length);
+  logs.slice(0, 3).forEach((l) => console.log('  ' + l));
+  if (!logs.length) console.log('  (没有输出 —— 说明这段代码没执行或没被编进去)');
+  await b.close();
+})().catch((e) => { console.error(e.message); process.exit(1); });

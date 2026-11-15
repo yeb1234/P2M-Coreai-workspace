@@ -173,6 +173,23 @@ def get_profile(user: User = Depends(get_current_user)):
         db.close()
 
 
+@router.get("/journey")
+def get_journey(user: User = Depends(get_current_user)):
+    """学习轨迹：等级、成就、热力图。
+
+    和 /profile 的区别：profile 是给 Agent 判断该学什么用的，
+    journey 是给人看的 —— 关心的是「我走到哪了」，不是「我该学什么」。
+    数据来自五个源：观看、完成、笔记、日程、番茄钟。
+    """
+    from app.services.journey import build_journey
+
+    db = SessionLocal()
+    try:
+        return build_journey(db, user.id)
+    finally:
+        db.close()
+
+
 @router.get("/goals")
 def list_goals(
     limit: int = Query(20, ge=1, le=100),

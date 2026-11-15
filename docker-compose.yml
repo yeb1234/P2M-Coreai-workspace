@@ -207,6 +207,10 @@ services:
       retries: 3
 
   frontend:
+    # 本机开发：直接挂宿主机 dist，省掉「改完前端要重建镜像」这一环。
+    # 生产部署时删掉这两行，靠镜像内的 COPY --from=build 提供静态文件。
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
     build:
       context: .
       dockerfile: Dockerfile

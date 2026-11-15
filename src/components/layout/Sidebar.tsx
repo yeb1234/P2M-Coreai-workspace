@@ -20,6 +20,7 @@ export const Sidebar: React.FC = () => {
   const navOrder = useUIStore((s) => s.navOrder);
   const reorderNav = useUIStore((s) => s.reorderNav);
   const resetNavOrder = useUIStore((s) => s.resetNavOrder);
+
   const hiddenNavItems = useUIStore((s) => s.hiddenNavItems);
   const hideNav = useUIStore((s) => s.hideNav);
   const showNav = useUIStore((s) => s.showNav);
