@@ -62,12 +62,29 @@ def _drain_worker_stdout(proc: subprocess.Popen) -> None:
         pass
 
 
+def _warmup_retrieval() -> None:
+    """预热 embedding 模型。
+
+    LM Studio 首次加载 bge-m3 约 2 秒，不预热的话第一个查询会莫名很慢，
+    用户会以为检索卡死了。
+    """
+    try:
+        from app.services.embeddings import get_embedding_client
+
+        started = time.time()
+        get_embedding_client().embed(["预热"])
+        logger.info("embedding 预热完成 %.2fs", time.time() - started)
+    except Exception as exc:
+        logger.warning("embedding 预热失败（检索将退化为纯词法）: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_runtime_schema()
     start_file_watcher()
     threading.Thread(target=run_startup_scan, name="startup-video-scan", daemon=True).start()
+    threading.Thread(target=_warmup_retrieval, name="embedding-warmup", daemon=True).start()
     # Start background thumbnail/sprite worker thread
     threading.Thread(target=_run_background_thumbnails, name="thumbnail-worker", daemon=True).start()
     # Start AI RQ worker as a subprocess (independent process, can be killed)

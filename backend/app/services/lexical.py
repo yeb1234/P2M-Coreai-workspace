@@ -86,6 +86,17 @@ def lexical_search(
             params[key] = f"%{token}%"
         token_conditions = " OR (" + " OR ".join(clauses) + ")"
 
+    # 长句里整句 trgm 相似度会被稀释（实测「Promise 链式调用怎么用」耗时
+    # 1.2s 却对结果毫无贡献），此时只用技术术语 ILIKE，既快又准。
+    # 阈值取 8：中文 8 字以上基本是一句话而非术语。
+    use_similarity = len(query) <= 8 or not code_tokens
+    if use_similarity:
+        where_clause = f"(s.text % :q{token_conditions})"
+    elif token_conditions:
+        where_clause = f"(1=0{token_conditions})"
+    else:
+        return []
+
     sql = f"""
         SELECT
             s.id            AS segment_id,
@@ -98,7 +109,7 @@ def lexical_search(
             similarity(s.text, :q) AS sim
         FROM subtitle_segments s
         JOIN videos v ON v.id = s.video_id
-        WHERE (s.text % :q{token_conditions}){filter_sql}
+        WHERE {where_clause}{filter_sql}
           AND (length(s.text) >= :min_len OR s.text ILIKE :q_like)
         ORDER BY sim DESC, length(s.text) ASC
         LIMIT :limit
