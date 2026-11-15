@@ -32,6 +32,7 @@ from app.auth import get_current_user
 from app.database import SessionLocal
 from app.models import AgentRun, LearningGoal, LearningPath, LearningPathStep, User, Video
 from app.services.profile import profile_to_dict, recompute_profile
+from app.services.quota import plan_quota_for, quota_exceeded_detail
 from app.services.rate_limit import plan_limiter
 from app.utils.files import unique_suffix
 
@@ -239,6 +240,12 @@ def generate_path(payload: PathGenerateRequest, user: User = Depends(get_current
     allowed, _ = plan_limiter.hit(str(user.id))
     if not allowed:
         raise HTTPException(status_code=429, detail="生成太频繁了，等几分钟再试")
+
+    # 规划一次要多次 LLM 调用 + 检索，是最贵的一段。去重之后仍要防整天累计
+    quota = plan_quota_for(user.role)
+    quota_ok, quota_used, quota_limit = quota.consume(user.id)
+    if not quota_ok:
+        raise HTTPException(status_code=429, detail=quota_exceeded_detail(quota_used, quota_limit, "路径生成"))
 
     db = SessionLocal()
     run_id = unique_suffix()

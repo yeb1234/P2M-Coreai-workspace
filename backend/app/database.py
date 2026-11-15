@@ -122,6 +122,12 @@ class Settings(BaseSettings):
     # 生产必须是 true（只走 HTTPS）。本地 http 调试要设 false，否则浏览器不发送
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
+    # ---- 多用户每日配额（防单账号跑光外部 LLM 额度）----
+    quota_chat_daily: int = 200
+    quota_plan_daily: int = 20
+    # 管理员倍率：要能压测和排查，但也不是无限
+    quota_admin_multiplier: int = 5
+
     # 额外要求：非 GET 请求必须带 Origin 且命中白名单（挡 CSRF，SameSite 之外的第二道）
 
     model_config = SettingsConfigDict(

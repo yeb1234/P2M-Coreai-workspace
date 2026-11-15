@@ -38,6 +38,7 @@ from app.schemas import (
 from app.services.assistant import run_assistant_chat
 from app.services.llm_client import OpenAICompatibleClient
 from app.services.memory import append_message, ensure_session, maybe_compress
+from app.services.quota import chat_quota_for, quota_exceeded_detail
 from app.services.rate_limit import chat_limiter
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,12 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
     allowed, _ = chat_limiter.hit(str(user.id))
     if not allowed:
         raise HTTPException(status_code=429, detail="提问太频繁，缓一下")
+
+    # 限流管瞬时速率，配额管每天总量。两个都要：只限流不限额，慢速刷也能跑光额度
+    quota = chat_quota_for(user.role)
+    ok, used, limit = quota.consume(user.id)
+    if not ok:
+        raise HTTPException(status_code=429, detail=quota_exceeded_detail(used, limit, "对话"))
 
     result = run_assistant_chat(
         message=payload.message,
@@ -85,6 +92,11 @@ async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depen
     allowed, remaining = chat_limiter.hit(str(user.id))
     if not allowed:
         raise HTTPException(status_code=429, detail="提问太频繁，缓一下再问")
+
+    quota = chat_quota_for(user.role)
+    ok, used, limit = quota.consume(user.id)
+    if not ok:
+        raise HTTPException(status_code=429, detail=quota_exceeded_detail(used, limit, "对话"))
 
     db = SessionLocal()
     try:
