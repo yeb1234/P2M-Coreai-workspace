@@ -101,8 +101,12 @@ function PomodoroSettings() {
         ))}
       </div>
       <div>
-        <SettingsFieldLabel htmlFor="pomodoro-ambient">背景音模式</SettingsFieldLabel>
-        <div className="auto-grid-compact">
+        {/* 这里是一组选项按钮，不是单个控件 —— 用 htmlFor 会指向不存在的元素。
+            改成 group + aria-labelledby，读屏软件会念「背景音模式 分组」。 */}
+        <span id="pomodoro-ambient-label" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+          背景音模式
+        </span>
+        <div role="group" aria-labelledby="pomodoro-ambient-label" className="auto-grid-compact">
           {[
             { value: 'manual' as const, label: '手动', desc: '背景音由番茄钟面板手动开关。' },
             { value: 'focus' as const, label: '专注', desc: '只在专注阶段计时时自动播放。' },
