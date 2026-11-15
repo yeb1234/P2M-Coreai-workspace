@@ -73,6 +73,15 @@ class Settings(BaseSettings):
     rerank_top_n: int = 20
     rerank_keep: int = 6
 
+    # 专用 reranker（cross-encoder）。留空则回退到原来的 LLM listwise 重排。
+    # 用 API 而不是本地 LM Studio：后者 /v1/rerank 支持不一致。
+    rerank_api_url: str = "https://api.siliconflow.cn/v1/rerank"
+    rerank_api_key: str = ""
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"
+    # cross-encoder 的分数区分度极大（相关 0.99 / 无关 0.00002），
+    # 所以这里的阈值是真正可用的 —— 向量余弦分做不到这一点
+    rerank_min_score: float = 0.02
+
     # ---------------- Whisper ----------------
     default_whisper_model: str = "small"
     default_language: str = "zh"

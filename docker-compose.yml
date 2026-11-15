@@ -148,6 +148,13 @@ services:
       # 模型从国内镜像拉，否则 3GB 下载会卡死
       HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
       HF_HOME: /data/hf
+      # ---- 重排 ----
+      # 注意：compose 的 environment 是白名单，.env 里多写的键不会自动传进来。
+      # 这个坑在 whisper、embedding、rerank 上各踩过一次。
+      RERANK_API_URL: ${RERANK_API_URL:-}
+      RERANK_API_KEY: ${RERANK_API_KEY:-}
+      RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
+      RERANK_MIN_SCORE: ${RERANK_MIN_SCORE:-0.02}
       # ---- 检索 ----
       # chunks = 语义块（565 字/块），segments = 逐句字幕（9 字/条）
       # 切到 chunks 前必须确认 content_chunks 的向量覆盖率 > 95%，

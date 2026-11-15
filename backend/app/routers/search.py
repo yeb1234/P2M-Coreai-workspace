@@ -57,6 +57,7 @@ def search_hybrid(
         timings=result["timings"],
         degraded=result["degraded"],
         rerank_used=rerank and "rerank_ms" in result["timings"],
+        rerank_mode=result.get("rerank_mode"),
     )
 
 

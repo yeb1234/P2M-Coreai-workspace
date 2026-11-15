@@ -329,6 +329,40 @@ def dedupe_overlapping(
     return kept
 
 
+def _api_rerank(query: str, hits: list[Hit], keep: int) -> list[Hit] | None:
+    """专用 cross-encoder 重排。
+
+    返回值的语义必须区分清楚，这是之前踩过的坑：
+      None  -> 调用失败（无 key / 限流 / 超时），调用方应 fallback 到 LLM 重排
+      []    -> 全部低于阈值，**模型明确认为都不相关**，要尊重，直接返回空结果
+      [...] -> 正常排序结果
+
+    把 None 和 [] 混为一谈，就会出现「模型说没有、代码却硬凑三条」的问题。
+    """
+    from app.services.rerank_client import rerank
+
+    pool = hits[: settings.rerank_top_n]
+    if not pool:
+        return None
+
+    ranked = rerank(query, [h.text for h in pool], top_n=len(pool))
+    if ranked is None:
+        return None
+
+    out: list[Hit] = []
+    for index, score in ranked:
+        if index >= len(pool):
+            continue
+        hit = pool[index]
+        if score < settings.rerank_min_score:
+            continue
+        hit.rerank_score = round(score, 4)
+        out.append(hit)
+        if len(out) >= keep:
+            break
+    return out
+
+
 def hybrid_search(
     query: str,
     *,
@@ -450,10 +484,19 @@ def hybrid_search(
     if len(candidates) > top_k * 4:
         candidates = candidates[: top_k * 4]
 
+    rerank_mode: str | None = None
     should_rerank = settings.rerank_enabled if use_rerank is None else use_rerank
     if should_rerank and candidates:
         started = time.perf_counter()
-        final = _llm_rerank(query, candidates, keep=top_k)
+        api_result = _api_rerank(query, candidates, keep=top_k)
+        if api_result is None:
+            # 专用 reranker 不可用（没配 key / 被限流 / 超时），退回 LLM listwise。
+            # 退回路径慢 10 倍且不稳，但比没有重排好。
+            rerank_mode = "llm_fallback"
+            final = _llm_rerank(query, candidates, keep=top_k)
+        else:
+            rerank_mode = "cross_encoder"
+            final = api_result
         timings["rerank_ms"] = round((time.perf_counter() - started) * 1000, 1)
     else:
         final = candidates[:top_k]
@@ -470,4 +513,6 @@ def hybrid_search(
         # 但扩成 90 秒段落后相邻命中会大面积重合
         final = dedupe_overlapping(final, max_per_video=2)
 
-    return {"hits": final, "timings": timings, "degraded": degraded}
+    # rerank_mode 不能放进 timings —— 那里是 dict[str, float]，
+    # 塞字符串会让 Pydantic 校验失败，整个检索 500。踩过。
+    return {"hits": final, "timings": timings, "degraded": degraded, "rerank_mode": rerank_mode}

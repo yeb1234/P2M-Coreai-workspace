@@ -575,6 +575,7 @@ class HybridSearchOut(BaseModel):
     timings: dict[str, float] = {}
     degraded: list[str] = []
     rerank_used: bool = False
+    rerank_mode: str | None = None
 
 
 class VectorStatsOut(BaseModel):
