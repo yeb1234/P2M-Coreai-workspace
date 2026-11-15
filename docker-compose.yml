@@ -168,6 +168,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:5002}
       # 注册默认关闭：公网被扫到就会有人灌号。首个账号建好后设 false，
       # 后续账号由管理员通过 /api/auth/create-user 开通
+      # 默认 true 是为了本机演示方便，会覆盖代码里的 False。
+      # 公网部署务必在 .env 里显式设成 false，改由管理员手工开通账号。
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
       # 逗号分隔的管理员用户名白名单
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
