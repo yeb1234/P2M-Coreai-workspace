@@ -205,6 +205,11 @@ def _set_task_state(task_id: str, **fields: Any) -> None:
 
 def run_background_task(task_id: str) -> None:
     """RQ 调用的入口。按 kind 分派到具体处理函数。"""
+    # 同转写任务：用 task id 串起同一个任务的全部日志
+    from app.core.observability import bind_request_id
+
+    bind_request_id(f"bg-{task_id}"[:64])
+
     db = SessionLocal()
     try:
         task = db.query(BackgroundTask).filter(BackgroundTask.id == task_id).first()

@@ -35,6 +35,18 @@ class Settings(BaseSettings):
 
     # ---------------- 路径 ----------------
     video_folder: str = str(ROOT_DIR / "videos")
+    # ---- 日志 ----
+    log_level: str = "INFO"
+    # 为空则只走 stdout（交给 docker 采集）；设了目录就额外写一份 JSONL 到磁盘。
+    # 为什么两处都写：stdout 给 docker logs 用，文件给「重建容器后还能查历史」用。
+    log_dir: str = ""
+    # 进程名，决定文件名：{log_dir}/{log_file_name}.jsonl
+    # backend 和 worker 必须用不同文件 —— RotatingFileHandler 不是多进程安全的，
+    # 两个进程同时轮转同一个文件会互相截断。
+    log_file_name: str = "app"
+    log_max_bytes: int = 20 * 1024 * 1024
+    log_backup_count: int = 5
+
     work_dir: str = ""
     output_dir: str = ""
     thumbnail_dir: str = ""

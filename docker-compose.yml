@@ -22,6 +22,13 @@ services:
   postgres:
     image: docker.m.daocloud.io/pgvector/pgvector:pg17
     container_name: siteyeb-pg
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
     # Docker 默认 /dev/shm 只有 64MB，而 PostgreSQL 的 posix 共享内存
     # 就走这里。并行查询（work_mem 64MB × 2 worker）会直接把它撑爆，
@@ -71,6 +78,13 @@ services:
   redis:
     image: docker.m.daocloud.io/library/redis:7-alpine
     container_name: siteyeb-redis
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
     # RQ 队列不能淘汰任务：内存满时宁可写入失败，也不能悄悄丢掉待处理任务。
     # 之前没设上限（maxmemory 0 = 不限），队列堆积时会把宿主机内存吃光。
@@ -102,6 +116,13 @@ services:
         PIP_INDEX: ${PIP_INDEX:-https://pypi.tuna.tsinghua.edu.cn/simple}
     image: siteyeb-backend:3.0
     container_name: siteyeb-backend
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
     depends_on:
       postgres:
@@ -118,6 +139,11 @@ services:
       DB_MAX_OVERFLOW: "20"
       # ---- 路径 ----
       VIDEO_FOLDER: /videos
+      # ---- 日志 ----
+      # 落盘到挂载出来的 ./logs，容器重建后历史还在
+      LOG_DIR: /data/logs
+      LOG_FILE_NAME: backend
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       WORK_DIR: /data/work
       OUTPUT_DIR: /data/output
       THUMBNAIL_DIR: /data/thumbnails
@@ -196,6 +222,8 @@ services:
       - ${VIDEO_HOST_PATH:-D:/ITJC}/sprites:/data/sprites
       - ${VIDEO_HOST_PATH:-D:/ITJC}/output:/data/output
       - ${VIDEO_HOST_PATH:-D:/ITJC}/work:/data/work
+      # 日志挂出来：容器重建后 docker logs 就没了，历史只能靠这份
+      - ./logs:/data/logs
       # 需要从 SQLite 迁移时，把旧库放到这里（只读）
       - ${SQLITE_SOURCE_DIR:-./.migration}:/data/source:ro
       # faster-whisper 模型缓存。不挂载的话每次重建容器都要重下 3GB
@@ -224,6 +252,13 @@ services:
   worker:
     image: siteyeb-backend:3.0
     container_name: siteyeb-worker
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
     command: ["python", "-m", "app.worker"]
     depends_on:
@@ -241,6 +276,11 @@ services:
       DB_MAX_OVERFLOW: "20"
       # ---- 路径 ----
       VIDEO_FOLDER: /videos
+      # ---- 日志 ----
+      # 落盘到挂载出来的 ./logs，容器重建后历史还在
+      LOG_DIR: /data/logs
+      LOG_FILE_NAME: worker
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       WORK_DIR: /data/work
       OUTPUT_DIR: /data/output
       THUMBNAIL_DIR: /data/thumbnails
@@ -319,6 +359,8 @@ services:
       - ${VIDEO_HOST_PATH:-D:/ITJC}/sprites:/data/sprites
       - ${VIDEO_HOST_PATH:-D:/ITJC}/output:/data/output
       - ${VIDEO_HOST_PATH:-D:/ITJC}/work:/data/work
+      # 日志挂出来：容器重建后 docker logs 就没了，历史只能靠这份
+      - ./logs:/data/logs
       # 需要从 SQLite 迁移时，把旧库放到这里（只读）
       - ${SQLITE_SOURCE_DIR:-./.migration}:/data/source:ro
       # faster-whisper 模型缓存。不挂载的话每次重建容器都要重下 3GB
@@ -343,6 +385,13 @@ services:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     image: siteyeb-frontend:3.0
     container_name: siteyeb-frontend
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
     depends_on:
       backend:

@@ -51,6 +51,12 @@ def _enqueue_chunk_index(video_id: int) -> None:
 
 def run_ai_job_task(job_id: str) -> None:
     """RQ task entry point: execute a single AI job end-to-end."""
+    # 用 job_id 当 request_id：一次转写会打十几条日志，
+    # 有了这个就能 grep 一个 id 看完整过程（和 HTTP 请求同一套字段）
+    from app.core.observability import bind_request_id
+
+    bind_request_id(f"job-{job_id}"[:64])
+
     db = SessionLocal()
     try:
         job = db.query(AiJob).filter(AiJob.id == job_id).first()

@@ -14,7 +14,7 @@ from sqlalchemy import func
 
 from app.core.csrf import CSRFGuardMiddleware
 from app.core.errors import register_exception_handlers
-from app.core.observability import RequestContextMiddleware, configure_logging
+from app.core.observability import RequestContextMiddleware, setup_from_settings
 from app.database import Base, SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
 from app.routers import admin, ai_jobs, assistant, auth, calendar_events, categories, learning, memory_admin, notes, schedule_items, search, user_data, videos, watch_events
@@ -24,7 +24,7 @@ from app.services.file_scanner import scan_video_library, start_file_watcher, st
 DIST_DIR = Path(__file__).resolve().parents[2] / "dist"
 APP_STARTED_AT = time.time()
 
-configure_logging()
+setup_from_settings("backend")
 logger = logging.getLogger(__name__)
 
 

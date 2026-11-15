@@ -55,6 +55,20 @@ class ServiceUnavailableError(AppError):
     message = "服务暂不可用"
 
 
+def _bind_rid(request: Request) -> None:
+    """把 request_id 从 scope 回填进 contextvar。
+
+    为什么需要：@app.exception_handler(Exception) 挂在 ServerErrorMiddleware 上，
+    比 BaseHTTPMiddleware 更外层 —— 那个上下文里读不到中间件设的 contextvar。
+    不回填的话，500 的日志和响应体里 request_id 都是 "-"，
+    而响应体又写着「请附带 request_id 反馈」，等于让人拿个空号去查。
+    """
+    from app.core.observability import bind_request_id
+
+    rid = request.scope.get("request_id") or request.headers.get("x-request-id") or "-"
+    bind_request_id(str(rid))
+
+
 def _payload(code: str, message: str, detail: object = None) -> dict:
     body: dict = {"error": {"code": code, "message": message, "request_id": request_id_var.get()}}
     if detail is not None:
@@ -65,6 +79,7 @@ def _payload(code: str, message: str, detail: object = None) -> dict:
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_request: Request, exc: AppError):
+        _bind_rid(_request)
         if exc.status_code >= 500:
             logger.error("业务异常 %s: %s", exc.code, exc.message, exc_info=exc)
         else:
@@ -95,6 +110,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def handle_unexpected(_request: Request, exc: Exception):
+        _bind_rid(_request)
         logger.exception("未捕获异常")
         return JSONResponse(
             status_code=500,

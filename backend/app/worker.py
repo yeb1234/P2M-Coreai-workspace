@@ -50,6 +50,12 @@ class WindowsWorker(SimpleWorker):
 
 
 def main() -> None:
+    # worker 之前完全没配日志，跑的全是 RQ 的纯文本。
+    # 而它是转写/建块这些长任务待的地方，恰恰最需要结构化日志。
+    from app.core.observability import setup_from_settings
+
+    setup_from_settings("worker")
+
     logger.info("AI RQ worker starting...")
     if sys.platform != "win32":
         signal.signal(signal.SIGINT, _stop)

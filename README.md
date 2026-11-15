@@ -198,11 +198,20 @@ npm run build
 bash scripts/diagnose.sh
 ```
 
-打出容器状态、健康探针最后输出、PG 长事务/锁等待、worker 注册与队列积压。
+打出容器状态、健康探针最后输出、PG 长事务/锁等待、worker 注册与队列积压、nginx 错误。
+
+查日志：
+
+```bash
+bash scripts/logq.sh errors --since 1h   # 错误（含异常类型与 request_id）
+bash scripts/logq.sh req <request_id>    # 一次请求/一个任务的完整日志
+bash scripts/logq.sh stats --since 24h   # 按级别/logger/状态码聚合
+```
 
 ## 文档
 
 - [开发工作法（怎么在这个项目上安全改动）](docs/maintainability.md) ← 动手前先看
+- [日志方案（落盘/轮转/查询/升级时机）](docs/logging.md)
 - [可迁移的经验（哪些 bug 不报错）](docs/lessons.md)
 - [后台任务与重启续跑](docs/background-tasks.md)
 - [存储与跨设备同步审计](docs/storage-sync-audit.md)
