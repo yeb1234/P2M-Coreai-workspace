@@ -199,8 +199,8 @@ export function AISettings() {
         </div>
         <div className="grid gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">接口地址</label>
-            <input
+            <label htmlFor="f-85624c" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">接口地址</label>
+            <input id="f-85624c"
               value={form[baseKey]}
               onChange={(e) => updateForm({ [baseKey]: e.target.value } as Partial<AssistantRuntimeSettingsDto>)}
               className="w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm"
@@ -208,8 +208,8 @@ export function AISettings() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">API Key</label>
-            <input
+            <label htmlFor="f-d876ff" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">API Key</label>
+            <input id="f-d876ff"
               type="password"
               value={form[apiKey]}
               onChange={(e) => updateForm({ [apiKey]: e.target.value } as Partial<AssistantRuntimeSettingsDto>)}
@@ -256,8 +256,8 @@ export function AISettings() {
       </div>
 
       <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-3">
-        <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">兜底方案</label>
-        <select
+        <label htmlFor="f-76ae17" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">兜底方案</label>
+        <select id="f-76ae17"
           value={form.llm_usage_policy}
           onChange={(e) => updateForm({ llm_usage_policy: e.target.value as LlmUsagePolicy })}
           className="w-full rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-sm"
@@ -268,8 +268,8 @@ export function AISettings() {
       </div>
 
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">系统提示词</label>
-        <textarea value={draftSystemPrompt} onChange={(e) => setDraftSystemPrompt(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-sm" />
+        <label htmlFor="f-cbdb6b" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">系统提示词</label>
+        <textarea id="f-cbdb6b" value={draftSystemPrompt} onChange={(e) => setDraftSystemPrompt(e.target.value)} className="min-h-24 w-full resize-y rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-sm" />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

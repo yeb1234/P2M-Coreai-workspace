@@ -307,8 +307,8 @@ export function TranscriptionSettings() {
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">转写引擎</label>
-        <select
+        <label htmlFor="f-1a10c7" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">转写引擎</label>
+        <select id="f-1a10c7"
           value={form.whisperEngine}
           onChange={(e) => updateForm({ whisperEngine: e.target.value })}
           className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
@@ -341,8 +341,8 @@ export function TranscriptionSettings() {
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Whisper 模型</label>
-        <select
+        <label htmlFor="f-bb45e0" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Whisper 模型</label>
+        <select id="f-bb45e0"
           value={form.whisperModel}
           onChange={(e) => updateForm({ whisperModel: e.target.value })}
           className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
@@ -441,16 +441,16 @@ export function TranscriptionSettings() {
       <div className="auto-grid-wide items-start">
         <div className="auto-grid-panels">
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">识别语言</label>
-            <input
+            <label htmlFor="f-e57f3c" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">识别语言</label>
+            <input id="f-e57f3c"
               value={form.language}
               onChange={(e) => updateForm({ language: e.target.value })}
               className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">总结目标字数上限</label>
-            <input
+            <label htmlFor="f-71a75d" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">总结目标字数上限</label>
+            <input id="f-71a75d"
               inputMode="numeric"
               value={drafts.wordLimit}
               onChange={(e) => setNumberDraft('wordLimit', e.target.value)}
@@ -481,8 +481,8 @@ export function TranscriptionSettings() {
             </div>
           )}
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">compute_type</label>
-            <select
+            <label htmlFor="f-73edb8" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">compute_type</label>
+            <select id="f-73edb8"
               value={form.computeType}
               onChange={(e) => updateForm({ computeType: e.target.value })}
               className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
@@ -494,8 +494,8 @@ export function TranscriptionSettings() {
             <p className="mt-1 text-xs leading-4 text-[var(--text-muted)]">只影响 faster-whisper CPU 路线；whisper.cpp 外部引擎忽略这里。</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">beam_size</label>
-            <input
+            <label htmlFor="f-031a56" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">beam_size</label>
+            <input id="f-031a56"
               inputMode="numeric"
               value={drafts.beamSize}
               onChange={(e) => setNumberDraft('beamSize', e.target.value)}
@@ -506,8 +506,8 @@ export function TranscriptionSettings() {
             <p className="mt-1 text-xs leading-4 text-[var(--text-muted)]">候选搜索宽度。越大越稳但更慢，课程字幕一般 3-5。</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">best_of</label>
-            <input
+            <label htmlFor="f-b34449" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">best_of</label>
+            <input id="f-b34449"
               inputMode="numeric"
               value={drafts.bestOf}
               onChange={(e) => setNumberDraft('bestOf', e.target.value)}
@@ -518,8 +518,8 @@ export function TranscriptionSettings() {
             <p className="mt-1 text-xs leading-4 text-[var(--text-muted)]">多采样后择优。temperature 为 0 时影响很小。</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">temperature</label>
-            <input
+            <label htmlFor="f-eef438" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">temperature</label>
+            <input id="f-eef438"
               inputMode="decimal"
               value={drafts.temperature}
               onChange={(e) => setNumberDraft('temperature', e.target.value)}
@@ -583,8 +583,8 @@ export function TranscriptionSettings() {
             <p className="mt-1 text-xs text-[var(--text-muted)]">影响新的视频总结、字幕校对和右侧灵境小助手。保存后生效。</p>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">字幕校对提示词模板</label>
-            <textarea
+            <label htmlFor="f-2a2d5e" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">字幕校对提示词模板</label>
+            <textarea id="f-2a2d5e"
               value={form.subtitleCorrectionPrompt}
               onChange={(e) => updateForm({ subtitleCorrectionPrompt: e.target.value })}
               rows={4}

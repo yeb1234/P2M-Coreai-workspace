@@ -242,8 +242,8 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
       </div>
 
       <div>
-        <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">描述</label>
-        <textarea
+        <label htmlFor="f-3bdd08" className="block text-xs md:text-sm font-medium text-[var(--text-secondary)] mb-1">描述</label>
+        <textarea id="f-3bdd08"
           ref={descriptionInputRef}
           value={description}
           onChange={(event) => setDescription(event.target.value)}

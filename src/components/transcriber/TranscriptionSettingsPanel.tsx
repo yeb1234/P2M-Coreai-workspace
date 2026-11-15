@@ -240,8 +240,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
 
       {/* Engine */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">转写引擎</label>
-        <select
+        <label htmlFor="f-1a10c7" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">转写引擎</label>
+        <select id="f-1a10c7"
           value={settings.whisperEngine}
           onChange={(e) => handleEngineChange(e.target.value)}
           className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
@@ -252,8 +252,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">模型尺寸</label>
-        <select
+        <label htmlFor="f-9b3022" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">模型尺寸</label>
+        <select id="f-9b3022"
           value={settings.whisperModel}
           onChange={(e) => onChange({ whisperModel: e.target.value })}
           className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
@@ -369,16 +369,16 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">语言</label>
-          <input
+          <label htmlFor="f-295bb7" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">语言</label>
+          <input id="f-295bb7"
             value={settings.language}
             onChange={(e) => onChange({ language: e.target.value })}
             className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">计算精度</label>
-          <select
+          <label htmlFor="f-101ceb" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">计算精度</label>
+          <select id="f-101ceb"
             value={settings.computeType}
             onChange={(e) => onChange({ computeType: e.target.value })}
             disabled={isWhisperCpp}
@@ -402,8 +402,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
 
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">beam_size</label>
-          <input
+          <label htmlFor="f-031a56" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">beam_size</label>
+          <input id="f-031a56"
             type="number"
             min={1}
             max={10}
@@ -413,8 +413,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">best_of</label>
-          <input
+          <label htmlFor="f-b34449" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">best_of</label>
+          <input id="f-b34449"
             type="number"
             min={1}
             max={10}
@@ -424,8 +424,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">温度</label>
-          <input
+          <label htmlFor="f-c9bf0b" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">温度</label>
+          <input id="f-c9bf0b"
             type="number"
             min={0}
             max={1}
@@ -448,8 +448,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           </div>
         ) : (
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">CPU 转写线程</label>
-            <input
+            <label htmlFor="f-c19562" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">CPU 转写线程</label>
+            <input id="f-c19562"
               type="number"
               min={1}
               max={128}
@@ -460,8 +460,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           </div>
         )}
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">总结字数</label>
-          <input
+          <label htmlFor="f-dedcea" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">总结字数</label>
+          <input id="f-dedcea"
             type="number"
             min={50}
             max={2000}

@@ -66,8 +66,8 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">描述</label>
-        <textarea
+        <label htmlFor="f-3bdd08" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">描述</label>
+        <textarea id="f-3bdd08"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all resize-none bg-[var(--bg-accent)]"

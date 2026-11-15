@@ -51,8 +51,8 @@ export const AIAgentPage: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs font-medium text-[var(--text-secondary)]">系统提示词</label>
-          <textarea
+          <label htmlFor="f-cbdb6b" className="text-xs font-medium text-[var(--text-secondary)]">系统提示词</label>
+          <textarea id="f-cbdb6b"
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             className="w-full min-h-28 text-sm resize-y"
