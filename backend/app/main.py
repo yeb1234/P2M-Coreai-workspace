@@ -179,13 +179,22 @@ async def lifespan(_app: FastAPI):
     get_thumbnail_worker().start_auto_scan()
     if settings.sprite_background_enabled:
         threading.Thread(target=_run_background_sprites, name="sprite-worker", daemon=True).start()
-    # AI 转写 worker：独立进程 + 监督线程，崩了自动重拉
-    backend_dir = str(Path(__file__).resolve().parent.parent)
-    supervisor = WorkerSupervisor(backend_dir)
-    supervisor.start()
+    # AI 转写 worker：独立进程 + 监督线程，崩了自动重拉。
+    #
+    # 只在「没有外部 worker」时启用。docker compose 里 worker 是独立服务，
+    # 再在内嵌一个就是两个 worker 抢同一个队列，还会互相清对方注册。
+    supervisor: WorkerSupervisor | None = None
+    if settings.ai_worker_embedded:
+        backend_dir = str(Path(__file__).resolve().parent.parent)
+        supervisor = WorkerSupervisor(backend_dir)
+        supervisor.start()
+    else:
+        logger.info("内嵌 worker 已关闭（由外部 worker 服务消费队列）")
+
     yield
     stop_file_watcher()
-    supervisor.stop()
+    if supervisor is not None:
+        supervisor.stop()
 
 
 app = FastAPI(

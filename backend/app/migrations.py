@@ -142,6 +142,14 @@ def upgrade_postgres(engine) -> None:
 
     dim = _safe_dim()
     with engine.begin() as conn:
+        # DDL 要拿表的排他锁，而 ALTER TABLE 会排在任何长事务后面。
+        # 不给超时的话，只要有人攥着 videos 的读事务（比如缩略图线程
+        # 把 ffmpeg 夹在 SELECT 和 commit 之间），这里就会无限等待 ——
+        # 后端卡在「初始化 schema」，healthcheck 一直失败，整站 502。
+        # 实际发生过：等了 12 分钟，只能人工 kill 会话。
+        #
+        # 20 秒足够跨过正常的短事务；超时直接报错，比无声卡死好诊断。
+        conn.execute(text("SET LOCAL lock_timeout = '20s'"))
         # content_chunks 的 DDL 在 app/tables.py 定义，
         # 建表脚本 scripts/build_content_chunks.py 也用同一份。
         #

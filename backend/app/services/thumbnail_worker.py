@@ -192,39 +192,68 @@ class ThumbnailWorker:
     # ── 内部 ──────────────────────────────────────────────────
 
     def _run_one(self, video_id: int) -> None:
-        db = SessionLocal()
-        try:
-            video = db.query(Video).filter(Video.id == video_id).first()
-            if video is None:
-                return
-            # 再查一次：可能在排队期间已经被别人生成好了
-            if video.thumbnail:
-                return
+        """生成单个缩略图。
 
+        三步分开，**任何 DB 事务都不跨越 ffmpeg**：
+
+            短事务读 filepath → 关连接 → 跑 ffmpeg → 短事务写 thumbnail
+
+        为什么必须这样：一个 SELECT 会让 session 持有 videos 表的
+        ACCESS SHARE 锁，直到事务结束。原来把 generate_thumbnail（0.3-2 秒，
+        长视频更久）夹在 SELECT 和 commit 之间，4 个线程就是 4 个
+        `idle in transaction` 一直压着 videos 表 ——
+        `ALTER TABLE videos ADD COLUMN` 直接堵死，后端起不来。
+        这个故障实际发生过：迁移卡了 12 分钟，healthcheck 一直失败，整站 502。
+        """
+        try:
+            # ① 短事务：只取需要的字段
+            db = SessionLocal()
+            try:
+                row = (
+                    db.query(Video.filepath, Video.thumbnail)
+                    .filter(Video.id == video_id)
+                    .first()
+                )
+                if row is None:
+                    return
+                # 再查一次：可能在排队期间已经被别人生成好了
+                if row.thumbnail:
+                    return
+                filepath = row.filepath
+            finally:
+                db.close()
+
+            # ② 无事务的耗时操作
             # DB 里存的是容器化之前的 Windows 绝对路径（D://ITJC//...），
             # 容器里视频挂在 /videos，直接喂原路径必然 FileNotFoundError。
-            # resolve_media_path 按 PATH_MAP 做前缀替换，这一步之前漏了 ——
-            # 一上线日志里全是「缩略图生成失败」。
-            resolved = resolve_media_path(video.filepath)
-            path = str(resolved)
+            # resolve_media_path 按 PATH_MAP 做前缀替换。
+            path = str(resolve_media_path(filepath))
             result = generate_thumbnail(path, video_id)
-            if result:
-                video.thumbnail = result
-                db.commit()
-                with self._lock:
-                    self._stats.succeeded += 1
-            else:
+
+            if not result:
                 with self._lock:
                     self._stats.failed += 1
                 logger.warning("缩略图生成失败：video_id=%s path=%s", video_id, path)
+                return
+
+            # ③ 短事务：写回。用 Core UPDATE，不加载整个对象
+            db = SessionLocal()
+            try:
+                db.query(Video).filter(Video.id == video_id).update(
+                    {"thumbnail": result}, synchronize_session=False
+                )
+                db.commit()
+            finally:
+                db.close()
+
+            with self._lock:
+                self._stats.succeeded += 1
         except Exception as exc:  # noqa: BLE001
-            db.rollback()
             with self._lock:
                 self._stats.failed += 1
                 self._stats.last_error = f"video_id={video_id}: {exc}"
             logger.exception("缩略图生成异常：video_id=%s", video_id)
         finally:
-            db.close()
             with self._lock:
                 self._inflight.discard(video_id)
 

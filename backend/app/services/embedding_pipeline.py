@@ -95,7 +95,7 @@ def _latest_subtitle_at(db, video_id: int) -> datetime | None:
     )
 
 
-def _build_chunks(db, video_id: int) -> int:
+def _build_chunks(video_id: int) -> int:
     """删掉旧块、按当前字幕重建。向量留空，由 _embed_pending 补。
 
     删+插而不是原地更新：分块边界会随字幕内容变化整体移动，
@@ -103,40 +103,46 @@ def _build_chunks(db, video_id: int) -> int:
     """
     from sqlalchemy import text
 
-    rows = (
-        db.query(SubtitleSegment.start_sec, SubtitleSegment.end_sec, SubtitleSegment.text)
-        .filter(SubtitleSegment.video_id == video_id)
-        .order_by(SubtitleSegment.start_sec)
-        .all()
-    )
-    segments = [(r.start_sec, r.end_sec, r.text) for r in rows]
-    chunks = split_into_chunks(segments)
-
-    db.execute(
-        text("DELETE FROM content_chunks WHERE video_id = :vid"), {"vid": video_id}
-    )
-    if chunks:
-        db.execute(
-            text(
-                "INSERT INTO content_chunks "
-                "(video_id, chunk_index, start_sec, end_sec, text, char_count, segment_count) "
-                "VALUES (:vid, :idx, :s, :e, :t, :c, :n)"
-            ),
-            [
-                {
-                    "vid": video_id,
-                    "idx": index,
-                    "s": c["start_sec"],
-                    "e": c["end_sec"],
-                    "t": c["text"],
-                    "c": c["char_count"],
-                    "n": c["segment_count"],
-                }
-                for index, c in enumerate(chunks)
-            ],
+    # 自己开短 session：建块是纯 DB 操作，几毫秒。
+    # 不让调用方传 session 进来，是为了杜绝「顺手把网络请求夹在事务中间」。
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(SubtitleSegment.start_sec, SubtitleSegment.end_sec, SubtitleSegment.text)
+            .filter(SubtitleSegment.video_id == video_id)
+            .order_by(SubtitleSegment.start_sec)
+            .all()
         )
-    db.commit()
-    return len(chunks)
+        segments = [(r.start_sec, r.end_sec, r.text) for r in rows]
+        chunks = split_into_chunks(segments)
+
+        db.execute(
+            text("DELETE FROM content_chunks WHERE video_id = :vid"), {"vid": video_id}
+        )
+        if chunks:
+            db.execute(
+                text(
+                    "INSERT INTO content_chunks "
+                    "(video_id, chunk_index, start_sec, end_sec, text, char_count, segment_count) "
+                    "VALUES (:vid, :idx, :s, :e, :t, :c, :n)"
+                ),
+                [
+                    {
+                        "vid": video_id,
+                        "idx": index,
+                        "s": c["start_sec"],
+                        "e": c["end_sec"],
+                        "t": c["text"],
+                        "c": c["char_count"],
+                        "n": c["segment_count"],
+                    }
+                    for index, c in enumerate(chunks)
+                ],
+            )
+        db.commit()
+        return len(chunks)
+    finally:
+        db.close()
 
 
 def _embed_pending(video_id: int, *, batch_size: int = EMBED_BATCH_SIZE) -> int:
@@ -193,64 +199,82 @@ def _embed_pending(video_id: int, *, batch_size: int = EMBED_BATCH_SIZE) -> int:
 def index_video(video_id: int, *, force: bool = False) -> dict:
     """给一个视频建块并向量化。幂等，可重复调用。
 
-    force=True 时无条件重建（模型换版本、参数调整后用）。
+    **全程不让 DB 事务跨越网络请求（嵌入服务）**：
+        短事务读状态 → 短事务建块 → 无事务调嵌入 → 短事务写标记
+
+    嵌入一个视频可能几十秒（大视频几十块），如果中间攥着事务，
+    `videos` 上的 ACCESS SHARE 会把 `ALTER TABLE videos` 卡死。
+    缩略图那边就是这么把后端启动卡了 12 分钟的。
+
+    force=True 时无条件重建（换模型、调分块参数后用）。
     """
+    # ── ① 读状态（短事务）──
     db = SessionLocal()
     try:
-        video = db.query(Video).filter(Video.id == video_id).first()
+        video = db.query(Video.id, Video.chunk_indexed_at).filter(Video.id == video_id).first()
         if video is None:
             raise ValueError(f"视频不存在 id={video_id}")
-
+        indexed_at = video.chunk_indexed_at
         latest_sub = _latest_subtitle_at(db, video_id)
-        if latest_sub is None:
-            # 没字幕就没得切。不要打标记 —— 将来转写完了还能被扫到。
-            return {"video_id": video_id, "status": "skipped", "reason": "没有字幕"}
-
-        chunk_count, missing, min_created = _chunk_state(video_id)
-
-        # 块是否基于当前这版字幕
-        chunks_current = (
-            chunk_count > 0 and min_created is not None and min_created >= latest_sub
-        )
-        # 块和向量是否都齐了
-        up_to_date = (
-            chunks_current
-            and missing == 0
-            and video.chunk_indexed_at is not None
-            and video.chunk_indexed_at >= latest_sub
-        )
-
-        if up_to_date and not force:
-            return {"video_id": video_id, "status": "skipped", "reason": "已是最新"}
-
-        rebuilt = 0
-        if force or not chunks_current:
-            rebuilt = _build_chunks(db, video_id)
-            chunk_count, missing, _ = _chunk_state(video_id)
-            if chunk_count == 0:
-                # 字幕太短，切不出块。打标记避免每轮扫描都重新投递。
-                video.chunk_indexed_at = datetime.now()
-                db.commit()
-                return {"video_id": video_id, "status": "empty", "chunks": 0}
-
-        embedded = _embed_pending(video_id)
-
-        # 只有全部补齐才打标记 —— 中途挂了下次继续补向量，不重建
-        _, still_missing, _ = _chunk_state(video_id)
-        if still_missing == 0:
-            video.chunk_indexed_at = datetime.now()
-            db.commit()
-
-        return {
-            "video_id": video_id,
-            "status": "indexed",
-            "rebuilt": rebuilt,
-            "embedded": embedded,
-            "chunks": chunk_count,
-            "pending_vectors": still_missing,
-        }
     finally:
         db.close()
+
+    if latest_sub is None:
+        # 没字幕就没得切。不要打标记 —— 将来转写完了还能被扫到。
+        return {"video_id": video_id, "status": "skipped", "reason": "没有字幕"}
+
+    chunk_count, missing, min_created = _chunk_state(video_id)
+
+    # 块是否基于当前这版字幕
+    chunks_current = chunk_count > 0 and min_created is not None and min_created >= latest_sub
+    # 块和向量是否都齐了
+    up_to_date = (
+        chunks_current
+        and missing == 0
+        and indexed_at is not None
+        and indexed_at >= latest_sub
+    )
+    if up_to_date and not force:
+        return {"video_id": video_id, "status": "skipped", "reason": "已是最新"}
+
+    rebuilt = 0
+    if force or not chunks_current:
+        rebuilt = _build_chunks(video_id)
+        chunk_count, _, _ = _chunk_state(video_id)
+        if chunk_count == 0:
+            # 字幕太短，切不出块。打标记避免每轮扫描都重新投递。
+            _mark_indexed(video_id)
+            return {"video_id": video_id, "status": "empty", "chunks": 0}
+
+    # ── ② 向量化（无事务，纯网络 + 分批短写）──
+    embedded = _embed_pending(video_id)
+
+    # ── ③ 只有全部补齐才打标记（短事务）──
+    _, still_missing, _ = _chunk_state(video_id)
+    if still_missing == 0:
+        _mark_indexed(video_id)
+
+    return {
+        "video_id": video_id,
+        "status": "indexed",
+        "rebuilt": rebuilt,
+        "embedded": embedded,
+        "chunks": chunk_count,
+        "pending_vectors": still_missing,
+    }
+
+
+def _mark_indexed(video_id: int) -> None:
+    """写入「索引完成」时间戳。短事务，Core UPDATE，不加载对象。"""
+    from sqlalchemy import text
+
+    from app.database import engine
+
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE videos SET chunk_indexed_at = now() WHERE id = :vid"),
+            {"vid": video_id},
+        )
 
 
 def scan_missing(limit: int = SCAN_BATCH) -> dict:

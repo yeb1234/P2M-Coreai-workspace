@@ -109,6 +109,9 @@ services:
       redis:
         condition: service_healthy
     environment:
+      # worker 由下面的独立服务负责，API 进程不要再内嵌一个 ——
+      # 两个 RQ worker 会抢同一队列并互相清掉注册
+      AI_WORKER_EMBEDDED: "false"
       # ---- 数据库 ----
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-p2user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-p2learning}
       DB_POOL_SIZE: "10"

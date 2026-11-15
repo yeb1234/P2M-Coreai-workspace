@@ -31,22 +31,39 @@ logger = logging.getLogger(__name__)
 
 @register_task("thumbnail")
 def handle_thumbnail(task: BackgroundTask) -> None:
-    """补单个缩略图。幂等：已有缩略图直接跳过。"""
+    """补单个缩略图。幂等：已有缩略图直接跳过。
+
+    和 thumbnail_worker._run_one 同样的三段式：读 → ffmpeg → 写。
+    DB 事务绝不跨越 ffmpeg —— 否则 videos 表被 ACCESS SHARE 压住，
+    迁移里的 ALTER TABLE videos 会一直等锁。
+    """
     from app.services.file_scanner import generate_thumbnail
 
+    video_id = int(task.target_id)
+
+    # ① 短事务读
     db = SessionLocal()
     try:
-        video = db.query(Video).filter(Video.id == int(task.target_id)).first()
-        if video is None:
-            raise ValueError(f"视频不存在 id={task.target_id}")
-        if video.thumbnail:
+        row = db.query(Video.filepath, Video.thumbnail).filter(Video.id == video_id).first()
+        if row is None:
+            raise ValueError(f"视频不存在 id={video_id}")
+        if row.thumbnail:
             return
+        filepath = row.filepath
+    finally:
+        db.close()
 
-        resolved = resolve_media_path(video.filepath)
-        result = generate_thumbnail(str(resolved), video.id)
-        if not result:
-            raise RuntimeError(f"缩略图生成失败 video_id={video.id}")
-        video.thumbnail = result
+    # ② 无事务
+    result = generate_thumbnail(str(resolve_media_path(filepath)), video_id)
+    if not result:
+        raise RuntimeError(f"缩略图生成失败 video_id={video_id}")
+
+    # ③ 短事务写
+    db = SessionLocal()
+    try:
+        db.query(Video).filter(Video.id == video_id).update(
+            {"thumbnail": result}, synchronize_session=False
+        )
         db.commit()
     finally:
         db.close()

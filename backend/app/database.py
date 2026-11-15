@@ -102,6 +102,17 @@ class Settings(BaseSettings):
 
     # ---------------- 队列 ----------------
     redis_url: str = "redis://localhost:6379/0"
+    # 是否在 API 进程里内嵌一个 worker 子进程。
+    #
+    # True（默认）：单进程部署时也能跑转写，起一个子进程 + 监督线程，崩了重拉。
+    # False：worker 由外部编排负责（docker compose 的 worker 服务）。
+    #
+    # **两种模式不能同时开**。两个 RQ worker 会抢同一个队列，
+    # 还会互相把对方的注册记录当僵尸清掉（_clean_dead_workers），
+    # 表现为「明明有 worker 在跑，任务却一直排队」。
+    # 这个冲突实际发生过：容器里的 worker 和后端拉起的 worker 同时活着，
+    # Redis 里只剩一个注册。
+    ai_worker_embedded: bool = True
     ai_worker_concurrency: int = 1
     ai_worker_poll_interval: float = 2.0
     ai_worker_requeue_running_on_start: bool = True
