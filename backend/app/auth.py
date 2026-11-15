@@ -25,7 +25,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -175,10 +175,49 @@ def _user_from_token(token: str, db: Session) -> User:
     return user
 
 
+def extract_token(request: Request, bearer: str | None = None) -> str | None:
+    """从请求里取令牌，Cookie 优先于 Authorization。
+
+    Cookie 是主路径：httpOnly 意味着 JS（包括被注入的脚本）读不到它，
+    XSS 拿不到令牌就没法把会话带出去。
+    Authorization 头保留给脚本/CLI 调用，也兼容升级前还存着旧令牌的浏览器。
+    """
+    cookie_token = request.cookies.get(settings.session_cookie_name)
+    if cookie_token:
+        return cookie_token
+    return bearer
+
+
+def set_session_cookie(response: Response, token: str) -> None:
+    max_age = int(settings.jwt_expire_hours * 3600)
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=token,
+        max_age=max_age,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        path="/",
+    )
+
+
+def clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.session_cookie_name,
+        path="/",
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+    )
+
+
 def get_current_user(
-    token: str | None = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    request: Request,
+    bearer: str | None = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ) -> User:
     """必须登录。未登录一律 401。"""
+    token = extract_token(request, bearer)
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -189,13 +228,16 @@ def get_current_user(
 
 
 def get_optional_user(
-    token: str | None = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    request: Request,
+    bearer: str | None = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ) -> User | None:
     """可匿名访问的端点用这个。
 
     注意：这里对无效令牌返回 None 而不是抛错。埋点这类端点宁可丢一条统计，
     也不能因为令牌过期就让播放器开始报错。
     """
+    token = extract_token(request, bearer)
     if not token:
         return None
     try:

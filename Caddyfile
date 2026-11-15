@@ -1,0 +1,52 @@
+# Caddy 配置：自动 HTTPS + 反向代理到前端容器
+#
+# 为什么用 Caddy 而不是 nginx + certbot：
+# 证书申请、续期、HTTP->HTTPS 跳转、HTTP/2 都是默认行为，配置只有三行。
+# nginx 方案要写 cron 跑 certbot、处理 webroot、还要自己加 HSTS，出错面大得多。
+
+{
+	# 生产环境关掉管理 API 的对外监听
+	admin 127.0.0.1:2019
+	# 证书到期前 30 天自动续；续期失败会退避重试
+	email {$ACME_EMAIL:admin@example.com}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# 后端产物可能较大（字幕、截图包），放宽请求体
+	request_body {
+		max_size 50MB
+	}
+
+	# 反代到前端容器；nginx 里已经把 /api 转到 backend 了，这里不需要重复配置
+	reverse_proxy host.docker.internal:{$WEB_PORT:8080} {
+		# 流式对话：Caddy 默认不缓冲响应，这里显式声明，避免以后换配置时被改坏
+		flush_interval -1
+		transport http {
+			read_timeout 310s
+		}
+	}
+
+	# 安全响应头（nginx 里也有一份，这里是外层的第二道）
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 50MB
+			roll_keep 5
+		}
+		format json
+	}
+}
+
+# 没有域名时用 IP 访问会拿不到证书，这里给个明确提示而不是超时
+:80 {
+	respond "请通过 HTTPS 域名访问；如尚未配置域名，请直接使用内网地址。" 421
+}

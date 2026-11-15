@@ -21,6 +21,15 @@
 >
 > **首次部署必读**：`ALLOW_REGISTRATION=true` 注册第一个账号（自动成为管理员），之后改回 `false`；
 > `JWT_SECRET` 必须换成长随机串。公网部署必须前置 HTTPS。
+>
+> **会话与多用户（2026-11-15 晚）**
+>
+> 令牌从 localStorage 搬进 **httpOnly Cookie**（JS 读不到，XSS 偷不走），并补上 CSRF 三道防线；
+> 前端存储按 `user_id` 分区，切换账号整页重载，杜绝串号；新增「设置 → 用户管理」图形界面
+> （建号 / 改角色 / 停用 / 重置密码 / 删除，含三条防呆规则）。
+>
+> 上线能力：`docker-compose.https.yml` + `Caddyfile` 自动证书、`scripts/backup.sh` 备份、
+> `scripts/preflight.sh` 16 项自检。完整步骤见 **[docs/deploy.md](docs/deploy.md)**。
 
 ## 当前功能
 

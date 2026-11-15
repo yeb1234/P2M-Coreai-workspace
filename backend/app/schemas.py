@@ -418,6 +418,39 @@ class UserDataItem(BaseModel):
     value: str
 
 
+# ---------------- 管理员：用户管理 ----------------
+
+
+class AdminUserOut(BaseModel):
+    id: int
+    username: str
+    display_name: Optional[str] = None
+    role: str = "member"
+    is_active: bool = True
+    last_login_at: Optional[str] = None
+    created_at: Optional[str] = None
+    # 便于管理员判断「这个号到底有没有在用」
+    watch_events: int = 0
+    learning_paths: int = 0
+
+
+class AdminUserUpdate(BaseModel):
+    role: Optional[Literal["admin", "member"]] = None
+    is_active: Optional[bool] = None
+    display_name: Optional[str] = Field(default=None, max_length=50)
+
+
+class AdminPasswordReset(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        if value.isdigit() or value.isalpha():
+            raise ValueError("密码需要同时包含字母和数字")
+        return value
+
+
 class UserDataBulkImport(BaseModel):
     users: list[dict]
     kv_data: dict[str, str]

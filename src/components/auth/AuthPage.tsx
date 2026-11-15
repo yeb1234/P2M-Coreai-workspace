@@ -3,21 +3,26 @@ import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../stores';
 import { playInteractionSound } from '../../lib/sounds';
 
-const REMEMBER_KEY = 'p2m-remember';
+// 只记住用户名。早期版本把明文密码也塞进 localStorage 实现「记住密码」——
+// 那是把口令写在硬盘上，任何 XSS 或共享电脑都能直接读走。
+// 密码交给浏览器自带的凭据管理器（下面的 autoComplete 属性），
+// 它加密存储且与系统钥匙串绑定，比自建方案安全得多。
+const REMEMBER_KEY = 'p2m-remember-username';
 
-function loadRemembered(): { username: string; password: string } | null {
+function loadRememberedUsername(): string {
   try {
-    const raw = localStorage.getItem(REMEMBER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+    return localStorage.getItem(REMEMBER_KEY) || '';
+  } catch {
+    return '';
+  }
 }
 
 export const AuthPage: React.FC = () => {
-  const remembered = loadRemembered();
+  const rememberedName = loadRememberedUsername();
   const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState(remembered?.username ?? '');
-  const [password, setPassword] = useState(remembered?.password ?? '');
-  const [remember, setRemember] = useState(!!remembered);
+  const [username, setUsername] = useState(rememberedName);
+  const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(!!rememberedName);
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -34,8 +39,9 @@ export const AuthPage: React.FC = () => {
     const fn = isRegister ? register : login;
     const ok = await fn(username, password);
     playInteractionSound(ok ? 'success' : 'error');
+    // 只存用户名，绝不存密码
     if (ok && remember) {
-      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ username, password }));
+      localStorage.setItem(REMEMBER_KEY, username);
     } else if (ok && !remember) {
       localStorage.removeItem(REMEMBER_KEY);
     }
@@ -85,7 +91,7 @@ export const AuthPage: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10 transition-colors"
-                placeholder="输入密码"
+                placeholder={isRegister ? '至少 8 位，含字母和数字' : '输入密码'}
                 autoComplete={isRegister ? 'new-password' : 'current-password'}
               />
             </div>

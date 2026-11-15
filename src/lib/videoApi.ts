@@ -1,4 +1,5 @@
 import { API_BASE, resolveApiPath } from './apiBase';
+import { clearSession } from './authApi';
 
 export function resolveApiUrl(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -8,17 +9,8 @@ export function resolveApiUrl(url: string | null | undefined): string | null {
 
 type ApiFetchInit = RequestInit & { timeoutMs?: number };
 
-const AUTH_TOKEN_KEY = 'p2m-auth-token';
-
-/** 当前令牌。登录态存在 localStorage 是已知妥协：改成 httpOnly Cookie 需要后端
- *  同时改 CSRF 防护与跨域策略，留到正式对外部署时再做。 */
-export function getAuthToken(): string | null {
-  try {
-    return localStorage.getItem(AUTH_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
+// 会话凭证在 httpOnly Cookie 里，JS 读不到；这里只负责带上 Cookie
+const CREDENTIAL_MODE: RequestCredentials = API_BASE ? 'include' : 'same-origin';
 
 /** 把后端的结构化错误解析成人话，而不是把 JSON 原样丢给用户。 */
 function extractErrorMessage(status: number, raw: string): string {
@@ -46,18 +38,16 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
     else signal.addEventListener('abort', () => controller.abort(), { once: true });
   }
 
-  // 认证头必须自动附加。早期所有请求都是匿名的，加了鉴权后会全部 401。
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(initHeaders as Record<string, string> | undefined),
   };
-  const token = getAuthToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
 
   let res: Response;
   try {
     res = await fetch(resolveApiPath(path), {
       ...fetchInit,
+      credentials: CREDENTIAL_MODE,
       headers,
       signal: controller.signal,
     });
@@ -69,12 +59,8 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   }
 
   if (res.status === 401) {
-    // 令牌过期或已被撤销（改密码 / 管理员踢下线），统一回到登录态
-    try {
-      localStorage.removeItem(AUTH_TOKEN_KEY);
-    } catch {
-      /* 隐私模式下可能不可写，忽略 */
-    }
+    // 会话过期或已被撤销（改密码 / 管理员踢下线），统一回到登录态
+    clearSession();
     window.dispatchEvent(new CustomEvent('p2m:auth-expired'));
     throw new Error('登录已失效，请重新登录');
   }

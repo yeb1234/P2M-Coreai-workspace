@@ -14,15 +14,17 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth import (
+    clear_session_cookie,
     create_token,
     get_current_user,
     hash_password,
     needs_rehash,
     require_admin,
+    set_session_cookie,
     verify_password,
 )
 from app.database import get_db, settings
@@ -78,9 +80,16 @@ def _should_be_admin(db: Session, username: str) -> bool:
     return has_admin is None
 
 
-def _token_response(user: User) -> TokenOut:
+def _issue_session(response: Response, user: User) -> TokenOut:
+    """签发令牌并写入 httpOnly Cookie。
+
+    响应体里仍然带 access_token，是为了让脚本/CLI 能直接用；
+    前端不持久化它 —— 浏览器侧只依赖 Cookie，JS 读不到，XSS 也就偷不走。
+    """
+    token = create_token(user)
+    set_session_cookie(response, token)
     return TokenOut(
-        access_token=create_token(user),
+        access_token=token,
         user=UserOut(
             id=user.id,
             username=user.username,
@@ -91,7 +100,12 @@ def _token_response(user: User) -> TokenOut:
 
 
 @router.post("/register", response_model=TokenOut)
-def register(body: UserRegister, request: Request, db: Session = Depends(get_db)):
+def register(
+    body: UserRegister,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     if not settings.allow_registration:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -119,11 +133,16 @@ def register(body: UserRegister, request: Request, db: Session = Depends(get_db)
     db.refresh(user)
     logger.info("新用户注册 id=%s role=%s", user.id, role)
 
-    return _token_response(user)
+    return _issue_session(response, user)
 
 
 @router.post("/login", response_model=TokenOut)
-def login(body: UserLogin, request: Request, db: Session = Depends(get_db)):
+def login(
+    body: UserLogin,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     ip = _client_ip(request)
     normalized = _normalize(body.username)
 
@@ -157,7 +176,7 @@ def login(body: UserLogin, request: Request, db: Session = Depends(get_db)):
     db.refresh(user)
 
     login_user_limiter.reset(normalized)
-    return _token_response(user)
+    return _issue_session(response, user)
 
 
 @router.get("/me", response_model=UserOut)
@@ -170,9 +189,21 @@ def me(user: User = Depends(get_current_user)):
     )
 
 
+@router.post("/logout")
+def logout(response: Response):
+    """清除会话 Cookie。
+
+    令牌本身仍然有效直到过期（无状态），所以真正的强制下线要靠
+    token_version：改密码或管理员踢人时 +1，旧令牌立刻作废。
+    """
+    clear_session_cookie(response)
+    return {"ok": True}
+
+
 @router.post("/change-password")
 def change_password(
     body: PasswordChange,
+    response: Response,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -185,6 +216,8 @@ def change_password(
     # 使所有已签发的令牌失效，包括当前这台设备，强制重新登录
     user.token_version = int(user.token_version or 0) + 1
     db.commit()
+    # Cookie 里还是旧令牌，留着只会每次请求 401，直接清掉
+    clear_session_cookie(response)
     logger.info("用户 %s 修改密码，旧令牌已全部作废", user.username)
     return {"ok": True, "message": "密码已更新，请重新登录"}
 

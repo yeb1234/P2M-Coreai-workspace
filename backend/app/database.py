@@ -117,6 +117,12 @@ class Settings(BaseSettings):
     allow_registration: bool = False
     # 逗号分隔的用户名白名单，命中即以 admin 角色注册
     admin_usernames: str = ""
+    # 会话 Cookie：令牌放 httpOnly Cookie，JS 读不到，XSS 也偷不走
+    session_cookie_name: str = "p2m_session"
+    # 生产必须是 true（只走 HTTPS）。本地 http 调试要设 false，否则浏览器不发送
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
+    # 额外要求：非 GET 请求必须带 Origin 且命中白名单（挡 CSRF，SameSite 之外的第二道）
 
     model_config = SettingsConfigDict(
         env_file=str(ROOT_DIR / ".env"),

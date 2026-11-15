@@ -142,6 +142,11 @@ services:
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
       # 接口文档默认不对外。要调试时临时设 true
       ENABLE_DOCS: ${ENABLE_DOCS:-false}
+      # 会话 Cookie：令牌放 httpOnly Cookie，JS 读不到
+      # 生产（HTTPS）必须设 COOKIE_SECURE=true，否则 Cookie 会明文过网
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-p2m_session}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
       # ---- 启动开关 ----
       MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
       SQLITE_SOURCE_PATH: /data/source/learning_os.db

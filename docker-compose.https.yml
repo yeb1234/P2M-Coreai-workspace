@@ -1,0 +1,48 @@
+# HTTPS 反向代理（可选叠加层）
+#
+# 为什么单独一个文件：
+# 本地开发/内网用不到 TLS，硬塞进主 compose 会让每次起服务都要求域名和证书。
+# 需要公网访问时叠加：
+#
+#   DOMAIN=learn.example.com docker compose \
+#     -f docker-compose.yml -f docker-compose.https.yml up -d --build
+#
+# Caddy 会自动申请并续期 Let's Encrypt 证书，不需要手工跑 certbot。
+# 前提：域名 A 记录已指向这台机器，且 80/443 能从公网访问。
+
+services:
+  # 前端不再直接对外，只绑回环给 Caddy 用
+  frontend:
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: siteyeb-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - siteyeb-caddy-data:/data      # 证书必须持久化，否则重启会重新申请，容易触发限流
+      - siteyeb-caddy-config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?需要设置 DOMAIN，例如 learn.example.com}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  siteyeb-caddy-data:
+    name: siteyeb-caddy-data
+  siteyeb-caddy-config:
+    name: siteyeb-caddy-config

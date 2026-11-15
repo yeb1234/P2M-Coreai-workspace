@@ -1,71 +1,170 @@
-import { resolveApiPath } from './apiBase';
+import { API_BASE, resolveApiPath } from './apiBase';
 
-export function hasAuthToken(): boolean {
-  return !!localStorage.getItem('p2m-auth-token');
+/**
+ * 会话说明
+ * --------
+ * 令牌放在 httpOnly Cookie 里，JS 读不到 —— 即使页面被注入脚本，
+ * 也没法把会话带出去。这里只存一个「当前是谁」的数字 id，用于本地存储分区，
+ * 它不是凭证，被看到也没有危害。
+ */
+export const SESSION_USER_KEY = 'p2m-auth-user-id';
+const LEGACY_TOKEN_KEY = 'p2m-auth-token';
+
+// 同源部署用 same-origin；跨域（VITE_API_BASE_URL 指向别的域名）必须 include
+const CREDENTIAL_MODE: RequestCredentials = API_BASE ? 'include' : 'same-origin';
+
+export function getSessionUserId(): string | null {
+  try {
+    return localStorage.getItem(SESSION_USER_KEY);
+  } catch {
+    return null;
+  }
 }
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('p2m-auth-token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+export function hasSession(): boolean {
+  return !!getSessionUserId();
+}
+
+/** 历史名字保留：判断是否处于登录态。真正的凭证在 Cookie 里。 */
+export function hasAuthToken(): boolean {
+  return hasSession();
+}
+
+export function markSession(userId: number): void {
+  try {
+    localStorage.setItem(SESSION_USER_KEY, String(userId));
+    // 升级前把令牌存在 localStorage 的，必须清掉：
+    // 不改的话旧令牌还留在 JS 可读的地方，等于换了个位置继续暴露
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  } catch {
+    /* 隐私模式写不进去，退化为不分区 */
+  }
+}
+
+export function clearSession(): void {
+  try {
+    localStorage.removeItem(SESSION_USER_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(resolveApiPath(path), {
     ...init,
+    credentials: CREDENTIAL_MODE,
     headers: {
       'Content-Type': 'application/json',
-      ...authHeaders(),
       ...init?.headers,
     },
   });
-  if (res.status === 401 && localStorage.getItem('p2m-auth-token')) {
-    localStorage.removeItem('p2m-auth-token');
-    window.dispatchEvent(new CustomEvent('auth:expired'));
+  if (res.status === 401) {
+    clearSession();
+    window.dispatchEvent(new CustomEvent('p2m:auth-expired'));
   }
   return res;
 }
 
-export async function loginUser(username: string, password: string) {
+export interface AuthUser {
+  id: number;
+  username: string;
+  display_name: string | null;
+  role?: string;
+}
+
+export interface AuthResult {
+  access_token: string;
+  user: AuthUser;
+}
+
+async function readAuthError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    return body?.error?.message || body?.detail || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function loginUser(username: string, password: string): Promise<AuthResult> {
   const res = await fetch(resolveApiPath('/api/auth/login'), {
     method: 'POST',
+    credentials: CREDENTIAL_MODE,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  if (!res.ok) throw new Error('login failed');
-  return res.json() as Promise<{ access_token: string; user: { id: number; username: string; display_name: string | null } }>;
+  if (!res.ok) {
+    throw new Error(await readAuthError(res, '用户名或密码错误'));
+  }
+  const data = (await res.json()) as AuthResult;
+  markSession(data.user.id);
+  return data;
 }
 
-export async function registerUser(username: string, password: string) {
+export async function registerUser(username: string, password: string): Promise<AuthResult> {
   const res = await fetch(resolveApiPath('/api/auth/register'), {
     method: 'POST',
+    credentials: CREDENTIAL_MODE,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  if (!res.ok) throw new Error('register failed');
-  return res.json() as Promise<{ access_token: string; user: { id: number; username: string; display_name: string | null } }>;
+  if (!res.ok) {
+    throw new Error(await readAuthError(res, '注册失败'));
+  }
+  const data = (await res.json()) as AuthResult;
+  markSession(data.user.id);
+  return data;
 }
 
-export async function getMe() {
+export async function logoutUser(): Promise<void> {
+  try {
+    await fetch(resolveApiPath('/api/auth/logout'), {
+      method: 'POST',
+      credentials: CREDENTIAL_MODE,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch {
+    /* 网络失败也要清本地状态，否则用户会卡在假的登录态里 */
+  }
+  clearSession();
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<string> {
+  const res = await authFetch('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+  if (!res.ok) {
+    throw new Error(await readAuthError(res, '修改失败'));
+  }
+  const data = (await res.json()) as { message?: string };
+  return data.message || '密码已更新';
+}
+
+export async function getMe(): Promise<AuthUser> {
   const res = await authFetch('/api/auth/me');
   if (!res.ok) throw new Error('not authenticated');
-  return res.json() as Promise<{ id: number; username: string; display_name: string | null }>;
+  return (await res.json()) as AuthUser;
 }
 
-export async function migrateFromIDB(users: { username: string; passwordHash: string; displayName?: string }[], kvData: Record<string, string>) {
-  const res = await fetch(resolveApiPath('/api/auth/migrate'), {
+export async function migrateFromIDB(
+  users: { username: string; passwordHash: string; displayName?: string }[],
+  kvData: Record<string, string>
+) {
+  const res = await authFetch('/api/auth/migrate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ users, kv_data: kvData }),
   });
   if (!res.ok) throw new Error('migration failed');
-  return res.json() as Promise<{ migrated_users: number; kv_imported: number }>;
+  return (await res.json()) as { migrated_users: number; kv_imported: number };
 }
 
 export async function getUserData(storeKey: string): Promise<string | null> {
   const res = await authFetch(`/api/user-data/${encodeURIComponent(storeKey)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error('failed to get user data');
-  const data = await res.json() as { value: string };
+  const data = (await res.json()) as { value: string };
   return data.value;
 }
 

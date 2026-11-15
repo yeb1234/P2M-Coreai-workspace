@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import func
 
+from app.core.csrf import CSRFGuardMiddleware
 from app.core.errors import register_exception_handlers
 from app.core.observability import RequestContextMiddleware, configure_logging
 from app.database import Base, SessionLocal, engine, ensure_runtime_schema, settings
@@ -192,7 +193,8 @@ app = FastAPI(
 )
 
 # 显式来源：allow_origins=["*"] 与 allow_credentials=True 是无效组合，
-# 浏览器会直接拒绝，而且等于关闭了同源保护
+# 浏览器会直接拒绝，而且等于关闭了同源保护。
+# 用 Cookie 会话必须 allow_credentials=True，前端才能带上 HttpOnly Cookie。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -201,7 +203,9 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     expose_headers=["X-Sprite-Meta", "X-Request-ID"],
 )
-# 放最外层，保证 CORS 预检也带上 request_id
+# CSRF 在 CORS 之内：Cookie 会话的写请求必须来源可信
+app.add_middleware(CSRFGuardMiddleware)
+# 放最外层，保证 CORS 预检与 CSRF 拒绝也带上 request_id
 app.add_middleware(RequestContextMiddleware)
 
 register_exception_handlers(app)

@@ -1,7 +1,34 @@
-from fastapi import APIRouter, Depends
+import logging
 
-from app.auth import require_admin
-from app.schemas import AssistantRuntimeSettingsIn, AssistantRuntimeSettingsOut, RescanOut, TranscriptionSettingsIn, TranscriptionSettingsOut
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
+
+from app.auth import hash_password, require_admin
+from app.database import SessionLocal
+from app.models import (
+    ChatMessage,
+    ChatSession,
+    LearningGoal,
+    LearningPath,
+    LearningPathStep,
+    ScheduleItem,
+    User,
+    UserData,
+    UserProfile,
+    WatchEvent,
+    WatchHistory,
+)
+from app.schemas import (
+    AdminPasswordReset,
+    AdminUserOut,
+    AdminUserUpdate,
+    AssistantRuntimeSettingsIn,
+    AssistantRuntimeSettingsOut,
+    RescanOut,
+    TranscriptionSettingsIn,
+    TranscriptionSettingsOut,
+)
+from sqlalchemy.orm import Session
 from app.services import admin_ai_queue
 from app.services.admin_health import backend_health as collect_backend_health
 from app.services.admin_library import (
@@ -11,6 +38,8 @@ from app.services.admin_library import (
     rescan_library as rescan_video_library,
     whisper_models as list_whisper_models,
 )
+logger = logging.getLogger(__name__)
+
 from app.services.admin_settings import (
     load_assistant_runtime_settings,
     load_transcription_settings,
@@ -183,3 +212,168 @@ def clear_completed_ai_jobs():
 @router.post("/ai-jobs/clear-all")
 def clear_all_ai_jobs():
     return admin_ai_queue.clear_all_ai_jobs()
+
+
+# ---------------------------------------------------------------------------
+# 用户管理
+#
+# 这些端点在 router 级 require_admin 之下，所以不用重复声明依赖。
+# 但有几个「自伤」操作必须显式拦住：把自己降级、停用或删掉最后一个管理员，
+# 一旦发生就没人能再进管理端，只能改数据库。
+# ---------------------------------------------------------------------------
+
+
+def _admin_count(db: Session, exclude_id: int | None = None) -> int:
+    query = db.query(func.count(User.id)).filter(User.role == "admin", User.is_active.is_(True))
+    if exclude_id is not None:
+        query = query.filter(User.id != exclude_id)
+    return int(query.scalar() or 0)
+
+
+@router.get("/users", response_model=list[AdminUserOut])
+def list_users(limit: int = Query(100, ge=1, le=500)):
+    db = SessionLocal()
+    try:
+        rows = db.query(User).order_by(User.id).limit(limit).all()
+        ids = [u.id for u in rows]
+        event_counts = dict(
+            db.query(WatchEvent.user_id, func.count(WatchEvent.id))
+            .filter(WatchEvent.user_id.in_(ids))
+            .group_by(WatchEvent.user_id)
+            .all()
+        ) if ids else {}
+        path_counts = dict(
+            db.query(LearningPath.user_id, func.count(LearningPath.id))
+            .filter(LearningPath.user_id.in_(ids))
+            .group_by(LearningPath.user_id)
+            .all()
+        ) if ids else {}
+        return [
+            AdminUserOut(
+                id=u.id,
+                username=u.username,
+                display_name=u.display_name,
+                role=u.role or "member",
+                is_active=bool(u.is_active),
+                last_login_at=u.last_login_at.isoformat() if u.last_login_at else None,
+                created_at=u.created_at.isoformat() if u.created_at else None,
+                watch_events=int(event_counts.get(u.id, 0)),
+                learning_paths=int(path_counts.get(u.id, 0)),
+            )
+            for u in rows
+        ]
+    finally:
+        db.close()
+
+
+@router.patch("/users/{user_id}", response_model=AdminUserOut)
+def update_user(
+    user_id: int,
+    payload: AdminUserUpdate,
+    admin: User = Depends(require_admin),
+):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+
+        updates = payload.model_dump(exclude_unset=True)
+
+        if "role" in updates and updates["role"] != "admin":
+            if user.id == admin.id:
+                raise HTTPException(status_code=400, detail="不能降级自己，请让另一个管理员操作")
+            if _admin_count(db, exclude_id=user.id) == 0:
+                raise HTTPException(status_code=400, detail="至少要保留一个启用的管理员")
+
+        if "is_active" in updates and updates["is_active"] is False:
+            if user.id == admin.id:
+                raise HTTPException(status_code=400, detail="不能停用自己")
+            if _admin_count(db, exclude_id=user.id) == 0:
+                raise HTTPException(status_code=400, detail="至少要保留一个启用的管理员")
+            # 停用即踢下线：令牌版本 +1，已签发的全部失效
+            user.token_version = int(user.token_version or 0) + 1
+
+        for key, value in updates.items():
+            setattr(user, key, value)
+
+        db.commit()
+        db.refresh(user)
+        logger.info("管理员 %s 修改用户 %s: %s", admin.username, user.username, updates)
+        return AdminUserOut(
+            id=user.id,
+            username=user.username,
+            display_name=user.display_name,
+            role=user.role or "member",
+            is_active=bool(user.is_active),
+            last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
+            created_at=user.created_at.isoformat() if user.created_at else None,
+        )
+    finally:
+        db.close()
+
+
+@router.post("/users/{user_id}/reset-password")
+def reset_user_password(
+    user_id: int,
+    payload: AdminPasswordReset,
+    admin: User = Depends(require_admin),
+):
+    """管理员重置他人密码。旧令牌全部作废，用户需用新密码重新登录。"""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        user.password_hash = hash_password(payload.new_password)
+        user.token_version = int(user.token_version or 0) + 1
+        db.commit()
+        logger.info("管理员 %s 重置了用户 %s 的密码", admin.username, user.username)
+        return {"ok": True, "message": "密码已重置，该用户的登录状态已全部失效"}
+    finally:
+        db.close()
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, admin: User = Depends(require_admin)):
+    """删除账号及其个人数据。视频库、字幕、向量等共享资源不受影响。"""
+    if user_id == admin.id:
+        raise HTTPException(status_code=400, detail="不能删除自己")
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        if (user.role or "") == "admin" and _admin_count(db, exclude_id=user.id) == 0:
+            raise HTTPException(status_code=400, detail="不能删除最后一个启用的管理员")
+
+        # 外键没有 ON DELETE CASCADE，按依赖顺序手工清
+        path_ids = [
+            row[0] for row in db.query(LearningPath.id).filter(LearningPath.user_id == user_id).all()
+        ]
+        if path_ids:
+            db.query(LearningPathStep).filter(LearningPathStep.path_id.in_(path_ids)).delete(
+                synchronize_session=False
+            )
+        db.query(LearningPath).filter(LearningPath.user_id == user_id).delete(synchronize_session=False)
+        db.query(LearningGoal).filter(LearningGoal.user_id == user_id).delete(synchronize_session=False)
+        db.query(WatchEvent).filter(WatchEvent.user_id == user_id).delete(synchronize_session=False)
+        db.query(WatchHistory).filter(WatchHistory.user_id == user_id).delete(synchronize_session=False)
+        db.query(UserProfile).filter(UserProfile.user_id == user_id).delete(synchronize_session=False)
+        session_ids = [
+            row[0] for row in db.query(ChatSession.id).filter(ChatSession.user_id == user_id).all()
+        ]
+        if session_ids:
+            db.query(ChatMessage).filter(ChatMessage.session_id.in_(session_ids)).delete(
+                synchronize_session=False
+            )
+        db.query(ChatSession).filter(ChatSession.user_id == user_id).delete(synchronize_session=False)
+        db.query(UserData).filter(UserData.user_id == user_id).delete(synchronize_session=False)
+        db.query(ScheduleItem).filter(ScheduleItem.user_id == user_id).delete(synchronize_session=False)
+        db.delete(user)
+        db.commit()
+        logger.info("管理员 %s 删除了用户 %s（id=%s）", admin.username, user.username, user_id)
+        return {"ok": True, "deleted_user_id": user_id}
+    finally:
+        db.close()

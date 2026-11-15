@@ -158,8 +158,8 @@ async function doWrite(name: string, value: string) {
       // Fall through to local storage as fallback
     }
   }
-  if (!db) { memoryKv.set(name, value); return; }
-  await db.kv.put({ key: name, value });
+  if (!db) { memoryKv.set(idbKey(name), value); return; }
+  await db.kv.put({ key: idbKey(name), value });
 }
 
 function scheduleLocalWrite(name: string, value: string) {
@@ -185,12 +185,19 @@ function scheduleLocalWrite(name: string, value: string) {
 }
 
 async function doLocalWrite(name: string, value: string) {
-  if (!db) { memoryKv.set(name, value); return; }
-  await db.kv.put({ key: name, value });
+  if (!db) { memoryKv.set(idbKey(name), value); return; }
+  await db.kv.put({ key: idbKey(name), value });
+}
+
+/** IndexedDB 的 key 加用户前缀。后端按 user_id 隔离，本地兜底也必须隔离。 */
+function idbKey(name: string): string {
+  const uid = localStorage.getItem('p2m-auth-user-id');
+  return uid ? `u${uid}:${name}` : name;
 }
 
 function scopedLocalName(name: string): string {
-  return currentUser ? `${currentUser}:${name}` : name;
+  const uid = localStorage.getItem('p2m-auth-user-id');
+  return uid ? `u${uid}:${name}` : name;
 }
 
 function baseLocalName(name: string): string {
@@ -205,38 +212,40 @@ function shouldWriteImmediately(name: string): boolean {
   return IMMEDIATE_LOCAL_STORAGE_NAMES.has(baseLocalName(name));
 }
 
-function flushWrites() {
+async function flushWrites(): Promise<void> {
+  const jobs: Promise<unknown>[] = [];
   for (const [name, timer] of pendingWrites.entries()) {
     clearTimeout(timer);
     pendingWrites.delete(name);
     const value = lastValues.get(name);
-    if (value !== undefined) {
-      void doWrite(name, value);
-    }
+    if (value !== undefined) jobs.push(doWrite(name, value));
   }
+  await Promise.allSettled(jobs);
 }
 
-function flushLocalWrites() {
+async function flushLocalWrites(): Promise<void> {
+  const jobs: Promise<unknown>[] = [];
   for (const [name, timer] of pendingLocalWrites.entries()) {
     clearTimeout(timer);
     pendingLocalWrites.delete(name);
     const value = lastLocalValues.get(name);
     if (value !== undefined) {
       lastLocalWriteAt.set(name, Date.now());
-      void doLocalWrite(name, value);
+      jobs.push(doLocalWrite(name, value));
     }
   }
+  await Promise.allSettled(jobs);
 }
 
-function flushAllPending() {
-  flushWrites();
-  flushLocalWrites();
+/** 把 debounce 队列里的待写数据立刻落盘。登出与切账号前必须 await 它。 */
+export async function flushAllPending(): Promise<void> {
+  await Promise.allSettled([flushWrites(), flushLocalWrites()]);
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', flushAllPending);
+  window.addEventListener('pagehide', () => { void flushAllPending(); });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushAllPending();
+    if (document.visibilityState === 'hidden') void flushAllPending();
   });
 }
 
@@ -250,8 +259,8 @@ export const idbStorage: StateStorage = {
         // Fall through to local storage
       }
     }
-    if (!db) return memoryKv.get(name) ?? null;
-    const row = await db.kv.get(name);
+    if (!db) return memoryKv.get(idbKey(name)) ?? null;
+    const row = await db.kv.get(idbKey(name));
     return row?.value ?? null;
   },
   setItem: async (name: string, value: string) => {

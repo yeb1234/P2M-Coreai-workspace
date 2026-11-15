@@ -1,114 +1,94 @@
 import { create } from 'zustand';
 import {
-  loginUser,
-  registerUser,
+  clearSession,
   getMe,
-  migrateFromIDB,
+  hasSession,
+  loginUser,
+  logoutUser,
+  registerUser,
 } from '../lib/authApi';
-import {
-  addUser,
-  clearIDBData,
-  getAllIDBKvData,
-  getAllIDBUsers,
-  getUser,
-  hashPassword,
-  normalizeUsername,
-  restoreUser,
-  setCurrentUser,
-} from '../lib/idbStorage';
+import { flushAllPending, setCurrentUser } from '../lib/idbStorage';
 
 interface AuthState {
   currentUser: string | null;
+  /** 仅用于界面显示（是否露出管理入口）。权限判断始终在服务端。 */
+  role: string;
   initialized: boolean;
   error: string | null;
-  init: () => void;
+  init: () => Promise<void>;
   login: (username: string, password: string) => Promise<boolean>;
   register: (username: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   clearError: () => void;
+}
+
+const ROLE_KEY = 'p2m-role';
+
+function readRole(): string {
+  try {
+    return localStorage.getItem(ROLE_KEY) || 'member';
+  } catch {
+    return 'member';
+  }
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
   currentUser: null,
+  role: readRole(),
   initialized: false,
   error: null,
 
   init: async () => {
-    const token = localStorage.getItem('p2m-auth-token');
-    if (token) {
+    // 只有本地有会话标记时才去问后端，避免每次打开都打一次 /me
+    if (hasSession()) {
       try {
         const user = await getMe();
         const displayName = user.display_name || user.username;
         setCurrentUser(displayName);
-        set({ currentUser: displayName, initialized: true });
+        try {
+          localStorage.setItem(ROLE_KEY, user.role || 'member');
+        } catch {
+          /* 隐私模式 */
+        }
+        set({ currentUser: displayName, role: user.role || 'member', initialized: true });
         return;
       } catch {
-        localStorage.removeItem('p2m-auth-token');
+        // 会话已失效（过期 / 改密码 / 被停用）
+        clearSession();
       }
     }
-    const saved = restoreUser();
-    set({ currentUser: saved, initialized: true });
+    setCurrentUser(null);
+    set({ currentUser: null, role: 'member', initialized: true });
   },
 
   login: async (username, password) => {
-    const normalized = normalizeUsername(username);
+    const normalized = username.trim().toLowerCase();
     if (!normalized || !password) {
       set({ error: '请输入用户名和密码' });
       return false;
     }
-
     try {
       const result = await loginUser(normalized, password);
-      localStorage.setItem('p2m-auth-token', result.access_token);
-      const displayName = result.user.display_name || result.user.username;
-      setCurrentUser(displayName);
-      set({ currentUser: displayName, error: null });
-      return true;
-    } catch {
-      // Backend failed — try IndexedDB fallback + auto-migrate
-      const idbUser = await getUser(normalized);
-      if (!idbUser) {
-        set({ error: '用户不存在' });
-        return false;
-      }
-      const hash = await hashPassword(password);
-      if (idbUser.passwordHash !== hash) {
-        set({ error: '密码错误' });
-        return false;
-      }
-
+      setCurrentUser(result.user.display_name || result.user.username);
       try {
-        const kvData = await getAllIDBKvData(normalized);
-        const allUsers = await getAllIDBUsers();
-        await migrateFromIDB(
-          allUsers.map((u) => ({
-            username: u.username,
-            passwordHash: u.passwordHash,
-            displayName: u.displayName,
-          })),
-          kvData,
-        );
-        const result = await loginUser(normalized, password);
-        localStorage.setItem('p2m-auth-token', result.access_token);
-        await clearIDBData();
-        const displayName = result.user.display_name || result.user.username;
-        setCurrentUser(displayName);
-        set({ currentUser: displayName, error: null });
-        return true;
+        localStorage.setItem(ROLE_KEY, result.user.role || 'member');
       } catch {
-        // Migration also failed — use IndexedDB directly
-        const displayName = idbUser.displayName || idbUser.username;
-        setCurrentUser(displayName);
-        set({ currentUser: displayName, error: null });
-        return true;
+        /* ignore */
       }
+      // 必须整页重载：笔记、待办、番茄钟等 9 个 store 的内存状态都是上一个
+      // 账号的，只换 authStore 的字段会留下一大堆脏数据。
+      // 重载后 store 会按新的用户作用域重新水合。
+      window.location.reload();
+      return true;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : '登录失败，请稍后再试' });
+      return false;
     }
   },
 
   register: async (username, password) => {
     const trimmed = username.trim();
-    const normalized = normalizeUsername(username);
-    if (!normalized || !password) {
+    if (!trimmed || !password) {
       set({ error: '请输入用户名和密码' });
       return false;
     }
@@ -116,47 +96,52 @@ export const useAuthStore = create<AuthState>()((set) => ({
       set({ error: '用户名至少 2 个字符' });
       return false;
     }
-    if (password.length < 4) {
-      set({ error: '密码至少 4 个字符' });
+    if (password.length < 8) {
+      set({ error: '密码至少 8 位，且要同时包含字母和数字' });
       return false;
     }
-
     try {
       const result = await registerUser(trimmed, password);
-      localStorage.setItem('p2m-auth-token', result.access_token);
-      const displayName = result.user.display_name || result.user.username;
-      setCurrentUser(displayName);
-      set({ currentUser: displayName, error: null });
-      return true;
-    } catch {
-      // Fallback: register in IndexedDB
-      const existing = await getUser(normalized);
-      if (existing) {
-        set({ error: '用户名已存在，请直接登录' });
-        return false;
+      setCurrentUser(result.user.display_name || result.user.username);
+      try {
+        localStorage.setItem(ROLE_KEY, result.user.role || 'member');
+      } catch {
+        /* ignore */
       }
-      const hash = await hashPassword(password);
-      await addUser(trimmed, hash);
-      setCurrentUser(trimmed);
-      set({ currentUser: trimmed, error: null });
+      window.location.reload();
       return true;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : '注册失败，请稍后再试' });
+      return false;
     }
   },
 
-  logout: () => {
-    localStorage.removeItem('p2m-auth-token');
+  logout: async () => {
+    // 先把 debounce 队列里的编辑落盘（此时会话还有效），再清 Cookie。
+    // 顺序反了的话，最后 3 秒内的改动会被当成离线数据写进 IndexedDB。
+    try {
+      await flushAllPending();
+    } catch {
+      /* 落盘失败不阻塞登出 */
+    }
+    await logoutUser();
     setCurrentUser(null);
-    set({ currentUser: null, error: null });
+    try {
+      localStorage.removeItem(ROLE_KEY);
+    } catch {
+      /* ignore */
+    }
+    set({ currentUser: null, role: 'member', error: null, initialized: false });
+    window.location.reload();
   },
 
   clearError: () => set({ error: null }),
 }));
 
-// apiFetch 收到 401 时会广播这个事件（令牌过期，或因改密码被服务端撤销）。
-// 在这里统一把登录态清掉，避免每个调用点各写一遍。
+// 任何请求收到 401 都会广播这个事件（会话过期、改密码、被停用）
 if (typeof window !== 'undefined') {
   window.addEventListener('p2m:auth-expired', () => {
     setCurrentUser(null);
-    useAuthStore.setState({ currentUser: null, error: '登录已失效，请重新登录' });
+    useAuthStore.setState({ currentUser: null, role: 'member', error: '登录已失效，请重新登录' });
   });
 }

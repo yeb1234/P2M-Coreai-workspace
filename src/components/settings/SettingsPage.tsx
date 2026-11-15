@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save } from 'lucide-react';
+import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save, Users } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { usePomodoroStore, useUIStore, useAuthStore, useNotificationStore } from '../../stores';
-import { getUser, hashPassword, upsertUser } from '../../lib/idbStorage';
+import { usePomodoroStore, useUIStore, useNotificationStore, useAuthStore } from '../../stores';
+import { changePassword } from '../../lib/authApi';
 import type { PomodoroConfig } from '../../types';
 import { AISettings } from './AISettingsSection';
 import { TranscriptionSettings } from './TranscriptionSettingsSection';
+import { UserManagementSection } from './UserManagementSection';
 import { AppearanceSettings } from './AppearanceSettings';
 import { SettingsNav } from './SettingsNav';
 import { SettingsButton, SettingsFieldLabel, SettingsHint, SettingsPanelTitle, SettingsSectionTitle, SettingsTextInput, ToggleSwitch } from './SettingsPrimitives';
@@ -24,7 +25,10 @@ const SECTIONS = [
   { id: 'data', label: '数据', icon: <Database size={16} /> },
 ] as const;
 
-type SectionId = typeof SECTIONS[number]['id'];
+// 用户管理只对管理员显示，不放进公共 SECTIONS 里
+const ADMIN_SECTION = { id: 'users', label: '用户管理', icon: <Users size={16} /> } as const;
+
+type SectionId = (typeof SECTIONS)[number]['id'] | 'users';
 
 /* ─── Pomodoro ─── */
 type PomodoroSettingsForm = Pick<
@@ -150,7 +154,6 @@ function ProfileSettings() {
   const setDisplayName = useUIStore((s) => s.setDisplayName);
   const noteEnterBehavior = useUIStore((s) => s.noteEnterBehavior);
   const setNoteEnterBehavior = useUIStore((s) => s.setNoteEnterBehavior);
-  const currentUser = useAuthStore((s) => s.currentUser);
   const [name, setName] = useState(displayName);
   const [saved, setSaved] = useState(false);
   const [pwOld, setPwOld] = useState('');
@@ -170,17 +173,25 @@ function ProfileSettings() {
     setPwMsg('');
     setPwError(false);
     if (!pwOld || !pwNew) { setPwMsg('请填写所有字段'); setPwError(true); return; }
-    if (pwNew.length < 4) { setPwMsg('新密码至少4个字符'); setPwError(true); return; }
+    if (pwNew.length < 8) { setPwMsg('新密码至少 8 位，且要同时包含字母和数字'); setPwError(true); return; }
     if (pwNew !== pwConfirm) { setPwMsg('两次密码不一致'); setPwError(true); return; }
-    const oldHash = await hashPassword(pwOld);
-    const user = await getUser(currentUser!);
-    if (!user || user.passwordHash !== oldHash) { setPwMsg('原密码错误'); setPwError(true); return; }
-    const newHash = await hashPassword(pwNew);
-    await upsertUser(currentUser!, newHash);
-    playInteractionSound('success');
-    setPwMsg('密码已修改');
-    setPwError(false);
-    setPwOld(''); setPwNew(''); setPwConfirm('');
+    if (pwOld === pwNew) { setPwMsg('新密码不能与原密码相同'); setPwError(true); return; }
+
+    // 早期实现只改了浏览器 IndexedDB 里的哈希，后端根本不知道，
+    // 结果「改完密码下次还能用旧密码登录」。这里必须走后端。
+    try {
+      const message = await changePassword(pwOld, pwNew);
+      playInteractionSound('success');
+      setPwMsg(`${message}，即将返回登录页`);
+      setPwError(false);
+      setPwOld(''); setPwNew(''); setPwConfirm('');
+      // 服务端已经把 token_version +1 并清了 Cookie，当前会话必然失效
+      window.setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      playInteractionSound('error');
+      setPwMsg(err instanceof Error ? err.message : '修改失败，请稍后再试');
+      setPwError(true);
+    }
   };
 
   return (
@@ -298,6 +309,8 @@ function NotificationSettings() {
 /* ─── Main ─── */
 export const SettingsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionId>('pomodoro');
+  const role = useAuthStore((s) => s.role);
+  const visibleSections = role === 'admin' ? [...SECTIONS, ADMIN_SECTION] : [...SECTIONS];
 
   const renderSection = () => {
     switch (activeSection) {
@@ -319,6 +332,8 @@ export const SettingsPage: React.FC = () => {
         return <div><SettingsPanelTitle>隐私设置</SettingsPanelTitle><PrivacySettings /></div>;
       case 'data':
         return <div><SettingsPanelTitle>数据管理</SettingsPanelTitle><DataSettings /></div>;
+      case 'users':
+        return <div><SettingsPanelTitle>用户管理</SettingsPanelTitle><UserManagementSection /></div>;
     }
   };
 
@@ -330,7 +345,7 @@ export const SettingsPage: React.FC = () => {
         icon={<Settings size={22} />}
       />
       <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-        <SettingsNav sections={SECTIONS} activeSection={activeSection} onSelect={(id) => setActiveSection(id)} />
+        <SettingsNav sections={visibleSections} activeSection={activeSection} onSelect={(id) => setActiveSection(id as SectionId)} />
         <div className="flex-1 rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4 md:p-5">
           {renderSection()}
         </div>
