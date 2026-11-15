@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useUIStore, useTodoStore, usePomodoroStore, usePluginStore, useNotesStore, useNotificationStore, useTimeCenterStore, useTranscriptionStore } from '../stores';
+import { useUIStore, usePomodoroStore, usePluginStore, useNotesStore, useNotificationStore, useTimeCenterStore, useTranscriptionStore } from '../stores';
 
 const ALL_STORES = [
   useUIStore,
-  useTodoStore,
   usePomodoroStore,
   usePluginStore,
   useNotesStore,
@@ -31,8 +30,6 @@ export function useRehydrateStores(currentUser: string | null) {
       // 临时诊断：看 rehydrate 后 store 里到底有没有数据
       const dbg = (window as unknown as Record<string, unknown>).__p2mDebug as Record<string, unknown> | undefined;
       if (dbg) {
-        dbg.todoCount = Object.keys((useTodoStore.getState() as { todos: Record<string, unknown> }).todos || {}).length;
-        dbg.todoTitles = Object.values((useTodoStore.getState() as { todos: Record<string, { title: string }> }).todos || {}).map((t) => t.title);
         dbg.storeNames = ALL_STORES.map((s) => (s as unknown as { persist?: { getOptions?: () => { name?: string } } }).persist?.getOptions?.().name);
       }
       if (!cancelled) setReady(true);

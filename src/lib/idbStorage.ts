@@ -392,7 +392,7 @@ export async function bootstrapLocalToRemote(): Promise<{ pushed: number; skippe
 export async function rehydrateAllStores(): Promise<number> {
   const mod = await import('../stores');
   const candidates: unknown[] = [
-    mod.useUIStore, mod.useTodoStore, mod.useCalendarStore, mod.useScheduleStore,
+    mod.useUIStore, mod.useCalendarStore, mod.useScheduleStore,
     mod.usePomodoroStore, mod.usePluginStore, mod.useNotesStore, mod.useNotificationStore,
     mod.useVideoStore, mod.useTimeCenterStore, mod.useAIStore, mod.useTranscriptionStore,
   ];

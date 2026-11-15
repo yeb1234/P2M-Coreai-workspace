@@ -85,8 +85,12 @@ function PomodoroSettings() {
       <div className="auto-grid-panels">
         {numberFields.map(({ key, label, min, max }) => (
           <div key={key}>
-            <SettingsFieldLabel>{label}</SettingsFieldLabel>
+            {/* 用字段 key 生成稳定 id，label 和 input 才能真正配对。
+                之前这两个组件只是「视觉上挨着」，读屏软件念到数字输入框时
+                不会说是哪个字段。 */}
+            <SettingsFieldLabel htmlFor={`pomodoro-${key}`}>{label}</SettingsFieldLabel>
             <SettingsTextInput
+              id={`pomodoro-${key}`}
               type="number"
               min={min}
               max={max}
@@ -97,7 +101,7 @@ function PomodoroSettings() {
         ))}
       </div>
       <div>
-        <SettingsFieldLabel>背景音模式</SettingsFieldLabel>
+        <SettingsFieldLabel htmlFor="pomodoro-ambient">背景音模式</SettingsFieldLabel>
         <div className="auto-grid-compact">
           {[
             { value: 'manual' as const, label: '手动', desc: '背景音由番茄钟面板手动开关。' },

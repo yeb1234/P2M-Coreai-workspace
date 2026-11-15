@@ -1,3 +1,21 @@
+/**
+ * @deprecated 待办数据已统一到 scheduleStore（后端 schedule_items 表）。
+ *
+ * 这个 store 是本地 IndexedDB 时代的遗留物，曾经造成一个很麻烦的问题：
+ * 待办页写 scheduleStore，周历/统计/时间中心读 todoStore，
+ * 两边数据完全不互通 —— 在待办页加的东西，周历看不到。
+ *
+ * 逐步迁移的过程：
+ *   1. 周历、统计、隐私设置 → scheduleStore
+ *   2. 时间中心 → scheduleStore
+ *   3. 现在业务代码里已经没有 useTodoStore 引用了
+ *
+ * 保留文件的原因：__tests__/todoStore.test.ts 还在测它。
+ * 等测试一并迁到 scheduleStore 之后，这个文件和 p2m-todo-storage
+ * 这个持久化 key 可以一起删掉。
+ *
+ * 新代码不要再用。
+ */
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { idbStorage } from '../lib/idbStorage';
