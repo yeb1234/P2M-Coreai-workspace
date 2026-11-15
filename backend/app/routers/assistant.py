@@ -35,7 +35,7 @@ from app.schemas import (
     AssistantModelListCreate,
     AssistantModelListOut,
 )
-from app.services.assistant import run_assistant_chat
+from app.agents.chat_agent import AgentContext, run_chat
 from app.services.llm_client import OpenAICompatibleClient
 from app.services.memory import append_message, ensure_session, maybe_compress
 from app.services.quota import chat_quota_for, quota_exceeded_detail
@@ -68,19 +68,47 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
     if not ok:
         raise HTTPException(status_code=429, detail=quota_exceeded_detail(used, limit, "对话"))
 
-    result = run_assistant_chat(
-        message=payload.message,
-        page_context=payload.page_context,
-        system_prompt=payload.system_prompt,
-        session_id=payload.session_id,
+    # 走和流式完全相同的 Agent 路径。
+    # 原来这里调的是 services/assistant.py 里的模板 RAG 流程，
+    # 和流式接口是两套实现 —— 提示词只对一边生效，另一边会答非所问。
+    db = SessionLocal()
+    try:
+        session = ensure_session(
+            db, payload.session_id, video_id=payload.video_id, user_id=user.id
+        )
+        session_id = session.id
+        append_message(db, session_id, "user", payload.message)
+    finally:
+        db.close()
+
+    ctx = AgentContext(
+        session_id=session_id,
+        user_id=user.id,
         video_id=payload.video_id,
-        depth=payload.depth,
-        use_rag=payload.use_rag,
-        use_web_search=payload.use_web_search,
-        use_deep_research=payload.use_deep_research,
-        limit=payload.limit,
+        page_context=payload.page_context,
+        system_prompt_extra=payload.system_prompt,
     )
-    return AssistantChatOut(**result)
+
+    result = run_chat(ctx, payload.message)
+
+    if result.answer:
+        db2 = SessionLocal()
+        try:
+            append_message(db2, session_id, "assistant", result.answer)
+            maybe_compress(db2, session_id)
+        except Exception:
+            logger.exception("保存助手消息失败")
+        finally:
+            db2.close()
+
+    return AssistantChatOut(
+        session_id=session_id,
+        answer=result.answer,
+        mode="agent",
+        depth=payload.depth,
+        rag_enabled=True,
+        references=[],
+    )
 
 
 @router.post("/chat/stream")
