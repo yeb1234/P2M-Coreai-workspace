@@ -149,7 +149,53 @@ def main() -> int:
             r = c.get(f"{BASE}{path}")
             ck.check(f"{path} 需要登录", r.status_code in (401, 403), f"HTTP {r.status_code}")
 
-        print("\n[6] 共享知识库对所有用户可见")
+        print("\n[6] 笔记：私有隔离 + 共享可见")
+        r = c.post(
+            f"{BASE}/api/notes",
+            headers=ha,
+            json={"title": f"A 的私人笔记 {TAG}", "content": "只有 A 能看"},
+        )
+        ck.check("A 能建自己的笔记", r.status_code == 200, f"HTTP {r.status_code}")
+        note_id = r.json().get("id") if r.status_code == 200 else None
+        if note_id:
+            ck.check(
+                "新建笔记是 private",
+                r.json().get("scope") == "private",
+                f"scope={r.json().get('scope')}",
+            )
+            ck.check(
+                "笔记归属是 A",
+                bool(r.json().get("user_id")),
+                "user_id 为空",
+            )
+            # B 看不到、改不动、删不掉
+            r2 = c.get(f"{BASE}/api/notes", headers=hb)
+            b_notes = r2.json() if r2.status_code == 200 else []
+            ck.check(
+                "B 看不到 A 的私有笔记",
+                all(n.get("id") != note_id for n in b_notes),
+                "在 B 的列表里出现了",
+            )
+            r2 = c.put(f"{BASE}/api/notes/{note_id}", headers=hb, json={"content": "B 改"})
+            ck.check("B 改 A 的笔记被拒", r2.status_code == 404, f"HTTP {r2.status_code}")
+            r2 = c.delete(f"{BASE}/api/notes/{note_id}", headers=hb)
+            ck.check("B 删 A 的笔记被拒", r2.status_code == 404, f"HTTP {r2.status_code}")
+            # 共享笔记：两人都能看到
+            r2 = c.get(f"{BASE}/api/notes?scope=shared", headers=hb)
+            shared_b = r2.json() if r2.status_code == 200 else []
+            ck.check("B 能看到共享笔记", len(shared_b) > 0, f"看到 {len(shared_b)} 条")
+            if shared_b:
+                sid = shared_b[0]["id"]
+                r3 = c.put(f"{BASE}/api/notes/{sid}", headers=hb, json={"content": "B 改共享"})
+                ck.check("普通用户改共享笔记被拒", r3.status_code == 403, f"HTTP {r3.status_code}")
+
+        print("\n[7] 转写任务权限")
+        r = c.get(f"{BASE}/api/ai-jobs", headers=hb)
+        ck.check("普通用户不能列转写任务", r.status_code in (401, 403), f"HTTP {r.status_code}")
+        r = c.get(f"{BASE}/api/ai-jobs")
+        ck.check("匿名不能列转写任务", r.status_code in (401, 403), f"HTTP {r.status_code}")
+
+        print("\n[8] 共享知识库对所有用户可见")
         r = c.get(f"{BASE}/api/videos?limit=1", headers=hb)
         total = (r.json() or {}).get("total", 0) if r.status_code == 200 else 0
         ck.check("B 能看视频库", total > 0, f"total={total}")

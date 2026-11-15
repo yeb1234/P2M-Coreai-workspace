@@ -266,6 +266,10 @@ class AssistantRuntimeSettingsIn(BaseModel):
 class NoteOut(BaseModel):
     id: int
     video_id: Optional[int] = None
+    # 私有笔记的归属；共享笔记为 None
+    user_id: Optional[int] = None
+    # shared（AI 转写产物，系统共有）/ private（用户自己写的）
+    scope: str = "shared"
     title: str
     content: str
     source: str

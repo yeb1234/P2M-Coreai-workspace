@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 
-from app.auth import require_admin
+from app.auth import get_current_user, require_admin
 from app.database import get_db
 from app.models import AiJob, Note, SubtitleSegment, Video
 from app.schemas import AiJobBatchCreate, AiJobBatchOut, AiJobBatchSkippedItem, AiJobListItem, AiJobListOut, AiJobOut
@@ -51,6 +51,9 @@ def list_ai_jobs(
     status: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=999999),
     db: Session = Depends(get_db),
+    # 任务列表是运维视图：会暴露所有视频标题、失败原因、模型配置。
+    # 普通用户不需要看，原来这里**完全没有鉴权**，不登录就能翻。
+    _admin=Depends(require_admin),
 ):
     base_query = db.query(AiJob).outerjoin(Video)
     total_all = base_query.count()
@@ -248,7 +251,13 @@ def batch_ai_jobs(
 
 
 @router.get("/{job_id}", response_model=AiJobOut)
-def get_ai_job(job_id: str, db: Session = Depends(get_db)):
+def get_ai_job(
+    job_id: str,
+    db: Session = Depends(get_db),
+    # 前端转写进度轮询走这里，所以不要求 admin；但必须登录，
+    # 原来匿名就能查，等于把任务 id 当公开资源。
+    _user=Depends(get_current_user),
+):
     job = db.query(AiJob).filter(AiJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")

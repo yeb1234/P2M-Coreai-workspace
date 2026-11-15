@@ -137,10 +137,26 @@ class AppSetting(Base):
 
 
 class Note(Base):
+    """学习笔记。
+
+    scope 区分两种笔记，这是多用户下的核心概念：
+      shared  AI 转写视频时自动生成，属于系统共有内容，所有用户可见，
+              只有 admin 能改（因为它服务于共享视频库）
+      private 用户自己写的，只属于该用户，别人看不到
+
+    以前没有这个区分，所有笔记混在一起，导致两件事说不清：
+    成就墙的「手写笔记」把 8770 条 AI 产物也算成用户写的；
+    用户想写自己的笔记时，会和系统笔记混在一个列表里。
+    """
+
     __tablename__ = "notes"
 
     id = Column(Integer, primary_key=True, index=True)
     video_id = Column(Integer, ForeignKey("videos.id"), nullable=True)
+    # private 笔记的归属；shared 笔记为 NULL（属于所有人）
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    # shared / private
+    scope = Column(String, nullable=False, default="shared", index=True)
     title = Column(String, nullable=False)
     content = Column(Text, default="")
     source = Column(String, default="manual")

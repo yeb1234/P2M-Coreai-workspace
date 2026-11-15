@@ -159,18 +159,15 @@ def build_journey(db: Session, user_id: int) -> dict:
     notes_count = int(profile.notes_count or 0) if profile else 0
     active_days = int(profile.active_days_30d or 0) if profile else 0
 
-    # notes 表有两个坑：
-    # 1. 没有 user_id —— 笔记按视频关联，是全局数据
-    # 2. source='ai' 的是转写时自动生成的，每个有字幕的视频都有一条
+    # 只统计「这个人自己写的」笔记：
+    #   scope='private' 且 user_id=本人
+    # 排除两类：AI 转写自动生成的 shared 笔记（8770 条），以及别人的私有笔记。
     #
-    # 如果不过滤 source，demo 账号会显示「笔记 8770 篇」，
-    # 经验值直接冲到满级 —— 那些是系统产物，不是人写的。
-    # 所以这里只统计 source != 'ai' 的（用户手写的）。
-    # profile.py 那边仍然是全库计数，两处口径不同是有意的：
-    # 画像关心「库里有内容」，轨迹关心「这个人做了多少」。
+    # 之前的口径是「全库扣除 source='ai'」，在单用户下够用；
+    # 多用户下会把别人写的笔记算进你的成就墙，那就不叫成就了。
     live_notes = (
         db.query(func.count(Note.id))
-        .filter((Note.source.is_(None)) | (Note.source != "ai"))
+        .filter(Note.scope == "private", Note.user_id == user_id)
         .scalar()
         or 0
     )
