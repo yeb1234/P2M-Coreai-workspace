@@ -138,6 +138,11 @@ services:
       EXTERNAL_LLM_MODEL: ${EXTERNAL_LLM_MODEL:-deepseek-v4.1-flash-1017}
       EXTERNAL_LLM_THINKING: ${EXTERNAL_LLM_THINKING:-false}
       LLM_USAGE_POLICY: ${LLM_USAGE_POLICY:-external_first}
+      # ---- 检索 ----
+      # chunks = 语义块（565 字/块），segments = 逐句字幕（9 字/条）
+      # 切到 chunks 前必须确认 content_chunks 的向量覆盖率 > 95%，
+      # 否则部分块没有向量，会漏召回
+      RETRIEVAL_SOURCE: ${RETRIEVAL_SOURCE:-segments}
       # ---- 队列 ----
       REDIS_URL: redis://redis:6379/0
       # ---- 安全 ----
