@@ -319,6 +319,7 @@ export function VideoAiJobCenter({
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
+          aria-expanded={!collapsed}
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]"
           title={collapsed ? '展开 AI 任务中心' : '收起 AI 任务中心'}
           aria-label={collapsed ? '展开 AI 任务中心' : '收起 AI 任务中心'}

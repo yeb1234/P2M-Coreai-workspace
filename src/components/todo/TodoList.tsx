@@ -208,9 +208,14 @@ export const TodoList: React.FC = () => {
 
       {showTrash && (
         <div ref={trashRef} className="border border-[var(--border-light)] rounded-lg bg-[#f8f6f2] overflow-hidden">
-          <button onClick={() => setCollapsedTrash(!collapsedTrash)} className="w-full flex items-center justify-between px-3 py-2 border-b border-[var(--border-light)]">
+          <button
+            type="button"
+            onClick={() => setCollapsedTrash(!collapsedTrash)}
+            aria-expanded={!collapsedTrash}
+            className="flex w-full items-center justify-between border-b border-[var(--border-light)] px-3 py-2"
+          >
             <div className="flex items-center gap-2">
-              {collapsedTrash ? <ChevronRight size={14} className="text-[var(--danger)]" /> : <ChevronDown size={14} className="text-[var(--danger)]" />}
+              {collapsedTrash ? <ChevronRight size={14} aria-hidden="true" className="text-[var(--danger)]" /> : <ChevronDown size={14} aria-hidden="true" className="text-[var(--danger)]" />}
               <Trash2 size={14} className="text-[var(--danger)]" />
               <span className="text-sm font-medium text-[var(--text-primary)]">垃圾箱</span>
               <span className="text-xs text-[var(--text-muted)]">({trashedTodos.length})</span>

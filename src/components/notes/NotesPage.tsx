@@ -559,8 +559,10 @@ export const NotesPage: React.FC = () => {
       {showTrash && (
         <div className="border border-[var(--border-light)] rounded-lg bg-[#f8f6f2] overflow-hidden">
           <button
+            type="button"
             onClick={() => setCollapsedTrash((value) => !value)}
-            className="w-full flex items-center justify-between px-3 py-2 border-b border-[var(--border-light)]"
+            aria-expanded={!collapsedTrash}
+            className="flex w-full items-center justify-between border-b border-[var(--border-light)] px-3 py-2"
           >
             <div className="flex items-center gap-2">
               <Trash2 size={14} className="text-[var(--danger)]" />

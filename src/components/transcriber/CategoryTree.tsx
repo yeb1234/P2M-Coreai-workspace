@@ -47,14 +47,26 @@ const TreeNodeRow = memo(function TreeNodeRow({
         className="flex min-w-0 items-center gap-1.5 rounded-md py-1 pr-2 hover:bg-[var(--bg-accent)]"
         style={{ paddingLeft: `${level * 16 + 4}px` }}
       >
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] transition-colors ${hasChildren ? 'hover:text-[var(--accent)]' : 'opacity-0'}`}
-          disabled={!hasChildren}
-        >
-          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
+        {/* 没有子节点时不留按钮 —— 之前是 disabled + opacity-0，
+            屏幕阅读器仍然会念到一个「按钮」，用户以为可以展开。
+            改成纯占位元素，不参与无障碍树。 */}
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            aria-label={`${expanded ? '收起' : '展开'}分类 ${node.name}`}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] transition-colors hover:text-[var(--accent)]"
+          >
+            {expanded ? (
+              <ChevronDown size={14} aria-hidden="true" />
+            ) : (
+              <ChevronRight size={14} aria-hidden="true" />
+            )}
+          </button>
+        ) : (
+          <span aria-hidden="true" className="h-5 w-5 shrink-0" />
+        )}
         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5">
           <input
             type="checkbox"
@@ -65,7 +77,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
             onChange={() => onToggle(node)}
             className="h-3.5 w-3.5 shrink-0 accent-[var(--accent)]"
           />
-          {allChecked || someChecked ? <FolderOpen size={14} className="shrink-0 text-[var(--accent)]" /> : <Folder size={14} className="shrink-0 text-[var(--text-muted)]" />}
+          {allChecked || someChecked ? <FolderOpen size={14} aria-hidden="true" className="shrink-0 text-[var(--accent)]" /> : <Folder size={14} aria-hidden="true" className="shrink-0 text-[var(--text-muted)]" />}
           <span className="min-w-0 truncate text-xs text-[var(--text-primary)]" title={node.full_path}>
             {node.name}
           </span>
@@ -73,7 +85,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
         </label>
       </div>
       {hasChildren && expanded && (
-        <div>
+        <div role="group" aria-label={`${node.name} 的子分类`}>
           {(node.children as CategoryTreeWithVideos[]).map((child) => (
             <TreeNodeRow key={child.id} node={child} level={level + 1} selectedIds={selectedIds} onToggle={onToggle} />
           ))}
