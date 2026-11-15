@@ -333,7 +333,9 @@ describe('regression contracts', () => {
     const backendMain = readRepoFile('backend/app/main.py');
     const backendSprite = readRepoFile('backend/app/services/sprite.py');
 
-    expect(backendMain).toContain('expose_headers=["X-Sprite-Meta"]');
+    // 用正则而不是全字面量：expose_headers 后来追加了 X-Request-ID，
+    // 写死的 ["X-Sprite-Meta"] 已经不是子串了。
+    expect(backendMain).toMatch(/expose_headers=\[[^\]]*"X-Sprite-Meta"[^\]]*\]/);
     expect(backendSprite).toContain('settings.sprite_frame_width');
     expect(backendSprite).toContain('FRAME_WIDTH = max(160');
     expect(backendSprite).toContain('"jpeg_quality": JPEG_QUALITY');

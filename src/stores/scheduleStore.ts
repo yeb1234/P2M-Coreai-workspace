@@ -17,7 +17,9 @@ interface TrashedScheduleItem {
 }
 
 type UndoAction =
-  | { type: 'create'; id: string }
+  // create 必须带完整 item：undo 时会把条目从 items 里物理删掉，
+  // 只留 id 的话 redo 时没有数据可以写回（之前的 bug）
+  | { type: 'create'; id: string; item: ScheduleItem }
   | { type: 'delete'; item: ScheduleItem }
   | { type: 'restore'; id: string };
 
@@ -139,7 +141,7 @@ export const useScheduleStore = create<ScheduleState>()((set, get) => ({
     set((state) => ({
       items: { ...state.items, [id]: item },
       itemOrder: item.type === 'todo' ? [...state.itemOrder, id] : state.itemOrder,
-      undoStack: [...state.undoStack, { type: 'create' as const, id }].slice(-50),
+      undoStack: [...state.undoStack, { type: 'create' as const, id, item }].slice(-50),
       redoStack: [],
     }));
     persistCreate({
@@ -291,6 +293,14 @@ export const useScheduleStore = create<ScheduleState>()((set, get) => ({
     if (!action) return;
     set({ redoStack: state.redoStack.slice(0, -1), undoStack: [...state.undoStack, action] });
     if (action.type === 'create') {
+      // 把 undo 时删掉的条目写回来。本地状态立即恢复，
+      // 后端再异步重建 —— 和 addItem 的乐观更新保持同一套语义。
+      const { item } = action;
+      set((current) => ({
+        items: { ...current.items, [item.id]: item },
+        itemOrder: item.type === 'todo' ? [...current.itemOrder, item.id] : current.itemOrder,
+      }));
+      persistCreate(item, item.id);
       return;
     }
     if (action.type === 'delete') {
