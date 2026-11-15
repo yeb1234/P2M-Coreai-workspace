@@ -1808,3 +1808,47 @@ video::cue(backdrop) {
 [data-theme='scholar-paper'] button.bg-\[\#2c2a27\] {
   background-color: var(--accent);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   键盘可达性基线
+   300 个 button 里只有 1 个写了 focus-visible —— 键盘用户按 Tab
+   时光标在动，但屏幕上什么都看不见。这不是「优化项」，是缺陷。
+   用 :where() 零特异性，不会覆盖组件自己的样式。
+   ═══════════════════════════════════════════════════════════ */
+:where(button, a, [role='button'], summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 输入类控件用 ring 而不是 outline，避免和边框重叠看着脏 */
+:where(input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* 鼠标点击不显示焦点框，只有键盘触发才显示 —— 这条是 :focus-visible 的默认行为，
+   这里显式覆盖掉某些浏览器在 button 上的旧实现 */
+:where(button):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 尊重系统的「减少动效」设置。项目里大量 animate-pulse / transition，
+   对前庭敏感的用户是负担。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 触摸目标：移动端可点区域不低于 40px（WCAG 2.5.8 要求 24px，
+   但 iOS HIG 建议 44px，这里取中间值照顾密度） */
+@media (max-width: 640px) {
+  :where(button, [role='button'], a):not(.no-touch-min) {
+    min-height: 40px;
+  }
+}

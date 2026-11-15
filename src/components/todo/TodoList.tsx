@@ -5,7 +5,7 @@ import { TodoItem } from './TodoItem';
 import { TodoForm } from './TodoForm';
 import { TodoFilters } from './TodoFilters';
 import { InlineAddInput } from './InlineAddInput';
-import { Modal, EmptyState, PageTitle, ConfirmDialog } from '../shared';
+import { Modal, EmptyState, PageTitle, ConfirmDialog, LoadingAnnounce } from '../shared';
 import type { ScheduleItem } from '../../types';
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../types';
 import { playInteractionSound } from '../../lib/sounds';
@@ -31,6 +31,9 @@ export const TodoList: React.FC = () => {
   const updateItem = useScheduleStore((s) => s.updateItem);
   const pomodoroConfig = usePomodoroStore((s) => s.config);
 
+  // 加载中要单独处理：原来 loading 期间显示的就是「暂无待办事项」，
+  // 用户分不清「还在拉数据」和「真没有」，第一反应是去点刷新。
+  const loading = useScheduleStore((s) => s.loading);
   const [showForm, setShowForm] = useState(false);
   const [editingTodo, setEditingTodo] = useState<ScheduleItem | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -250,7 +253,17 @@ export const TodoList: React.FC = () => {
         </div>
       )}
 
-      {filteredTodos.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2">
+          <LoadingAnnounce />
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-3">
+              <div className="mb-2 h-3.5 w-2/5 animate-pulse rounded bg-[var(--bg-elevated)]" />
+              <div className="h-3 w-3/5 animate-pulse rounded bg-[var(--bg-elevated)]" />
+            </div>
+          ))}
+        </div>
+      ) : filteredTodos.length === 0 ? (
         <>
           <EmptyState icon={<ListTodo size={24} className="text-[var(--text-muted)]" />} title="暂无待办事项" description="在下面输入，回车即可添加" />
           {/* 空状态下也要有输入框。原来这里只有提示没有入口，
