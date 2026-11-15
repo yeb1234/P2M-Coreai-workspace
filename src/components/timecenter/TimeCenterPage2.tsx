@@ -341,7 +341,7 @@ function TaskCreator() {
 
   const { addCountdownPreset } = useTimeCenterStore();
   // 待办统一走 scheduleStore（后端 schedule_items 表）。
-  // 原来这里写的是 useTodoStore（本地 IndexedDB），
+  // 待办统一写这里：
   // 在时间中心建的待办不会出现在待办页 —— 两边数据不通。
   const addTodo = useScheduleStore((s) => s.addTodo);
 

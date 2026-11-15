@@ -210,7 +210,7 @@ function layoutWeekEvents(events: WeekEvent[]): LaidOutWeekEvent[] {
 
 export const Calendar2Page: React.FC = () => {
   // 待办数据统一从 scheduleStore 取（后端 schedule_items 表）。
-  // 原来这里读 useTodoStore（本地 IndexedDB），和待办页看到的不是同一批数据：
+  // 待办数据统一从这里取：
   // 待办页加了东西，日历2 看不到；日历2 改了，待办页也不知道。
   //
   // ScheduleItem 用 startAt/dueAt，Todo 用 startDate/dueDate，

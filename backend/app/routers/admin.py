@@ -6,11 +6,14 @@ from sqlalchemy import func
 from app.auth import hash_password, require_admin
 from app.database import SessionLocal
 from app.models import (
+    CalendarEvent,
     ChatMessage,
     ChatSession,
     LearningGoal,
     LearningPath,
     LearningPathStep,
+    MemoryItem,
+    Note,
     ScheduleItem,
     User,
     UserData,
@@ -371,6 +374,11 @@ def delete_user(user_id: int, admin: User = Depends(require_admin)):
         db.query(ChatSession).filter(ChatSession.user_id == user_id).delete(synchronize_session=False)
         db.query(UserData).filter(UserData.user_id == user_id).delete(synchronize_session=False)
         db.query(ScheduleItem).filter(ScheduleItem.user_id == user_id).delete(synchronize_session=False)
+        # 这三张表也有 user_id 外键，之前漏了 —— 只要用户有其中任一数据，
+        # 删除就会撞外键约束，接口直接 500。
+        db.query(CalendarEvent).filter(CalendarEvent.user_id == user_id).delete(synchronize_session=False)
+        db.query(MemoryItem).filter(MemoryItem.user_id == user_id).delete(synchronize_session=False)
+        db.query(Note).filter(Note.user_id == user_id).delete(synchronize_session=False)
         db.delete(user)
         db.commit()
         logger.info("管理员 %s 删除了用户 %s（id=%s）", admin.username, user.username, user_id)
