@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useVideoStore } from '../../stores/videoStore';
 
 const PENDING_RECOMMENDED_VIDEO_KEY = 'p2m_pending_recommended_video_id';
+const PENDING_SEEK_KEY = 'p2m_pending_seek_sec';
 
 export function useVideoSelection() {
   const currentVideo = useVideoStore((s) => s.currentVideo);
@@ -24,6 +25,10 @@ export function useVideoSelection() {
       const detail = (e as CustomEvent).detail;
       if (detail?.videoId) {
         localStorage.removeItem(PENDING_RECOMMENDED_VIDEO_KEY);
+        // 聊天引用里带时间点时，让播放器加载后直接跳到该位置
+        if (typeof detail.startSec === 'number' && detail.startSec > 0) {
+          localStorage.setItem(PENDING_SEEK_KEY, String(detail.startSec));
+        }
         void loadCurrentVideo(detail.videoId);
       }
     };

@@ -14,10 +14,24 @@ export interface PromptTemplate {
   content: string;
 }
 
+export interface ChatReference {
+  video_id: number;
+  video_title: string;
+  start_sec: number;
+  text: string;
+  score?: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /** 该回答引用的视频片段，点击可跳转到对应时间点 */
+  references?: ChatReference[];
+  /** Agent 实际调用过的工具名，让用户知道答案不是凭空编的 */
+  steps?: string[];
+  /** 流式输出中，用于显示光标 */
+  streaming?: boolean;
 }
 
 interface AIState {
@@ -29,6 +43,9 @@ interface AIState {
   chatOpen: boolean;
   chatWidth: number;
   messages: ChatMessage[];
+  /** 后端会话 id，刷新页面后仍能接着上次聊 */
+  sessionId: string;
+  setSessionId: (id: string) => void;
   setEndpoint: (endpoint: string) => void;
   setModel: (model: string) => void;
   setSystemPrompt: (prompt: string) => void;
@@ -81,6 +98,7 @@ export const useAIStore = create<AIState>()(
       chatOpen: false,
       chatWidth: 380,
       messages: [],
+      sessionId: '',
       setEndpoint: (endpoint) => set({ endpoint: normalizeEndpoint(endpoint) }),
       setModel: (model) => set({ model }),
       setSystemPrompt: (systemPrompt) => set({ systemPrompt }),
@@ -115,7 +133,8 @@ export const useAIStore = create<AIState>()(
       setChatOpen: (chatOpen) => set({ chatOpen }),
       setChatWidth: (chatWidth) => set({ chatWidth: clampChatWidth(chatWidth) }),
       addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
-      clearMessages: () => set({ messages: [] }),
+      clearMessages: () => set({ messages: [], sessionId: '' }),
+      setSessionId: (sessionId) => set({ sessionId }),
     }),
     {
       name: 'p2m-ai-storage',
@@ -146,6 +165,7 @@ export const useAIStore = create<AIState>()(
         chatOpen: state.chatOpen,
         chatWidth: state.chatWidth,
         messages: state.messages.slice(-50),
+        sessionId: state.sessionId,
       }),
     }
   )

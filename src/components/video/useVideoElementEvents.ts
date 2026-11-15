@@ -69,7 +69,20 @@ export function useVideoElementEvents({
     setIsMuted(video.muted);
     if (video.volume > 0) lastVolumeRef.current = video.volume;
 
-    if (!playAfterLoadRef.current && watchProgress && videoRef.current) {
+    // 优先跳转到聊天引用里指定的时间点，其次才是上次观看进度
+    const pendingSeekRaw = localStorage.getItem('p2m_pending_seek_sec');
+    let pendingSeek: number | null = null;
+    if (pendingSeekRaw) {
+      localStorage.removeItem('p2m_pending_seek_sec');
+      const parsed = Number(pendingSeekRaw);
+      if (Number.isFinite(parsed) && parsed > 0) pendingSeek = parsed;
+    }
+
+    if (pendingSeek !== null && videoRef.current) {
+      const target = detectedDuration ? Math.min(pendingSeek, detectedDuration - 1) : pendingSeek;
+      videoRef.current.currentTime = target;
+      setProgress(target);
+    } else if (!playAfterLoadRef.current && watchProgress && videoRef.current) {
       videoRef.current.currentTime = watchProgress;
       setProgress(watchProgress);
     }

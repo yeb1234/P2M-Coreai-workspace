@@ -393,6 +393,91 @@ export async function sendAssistantChat(
   });
 }
 
+export type ChatStreamEvent =
+  | { type: 'token'; text: string }
+  | { type: 'tool_start'; tool: string }
+  | { type: 'tool_end'; tool: string; ok: boolean | null }
+  | {
+      type: 'done';
+      run_id: string;
+      session_id?: string;
+      latency_ms: number;
+      steps: unknown[];
+      references?: Array<{
+        video_id: number;
+        video_title: string;
+        start_sec: number;
+        text: string;
+        score?: number;
+      }>;
+    }
+  | { type: 'error'; message: string };
+
+/**
+ * 流式对话（SSE over POST）。
+ * EventSource 不支持 POST，因此用 fetch + ReadableStream 手动解析。
+ * 每块格式：`data: {json}\n\n`
+ */
+export async function streamAssistantChat(
+  message: string,
+  options: {
+    sessionId?: string;
+    pageContext?: string;
+    systemPrompt?: string;
+    videoId?: number;
+    onEvent: (event: ChatStreamEvent) => void;
+    signal?: AbortSignal;
+  }
+): Promise<void> {
+  const response = await fetch(resolveApiPath('/api/assistant/chat/stream'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message,
+      page_context: options.pageContext ?? '',
+      system_prompt: options.systemPrompt ?? '',
+      session_id: options.sessionId || undefined,
+      video_id: options.videoId ?? undefined,
+    }),
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`对话请求失败 HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+  }
+  if (!response.body) throw new Error('当前浏览器不支持流式响应');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // 服务端以空行分隔事件块
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary !== -1) {
+      const raw = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf('\n\n');
+
+      for (const line of raw.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        try {
+          options.onEvent(JSON.parse(payload) as ChatStreamEvent);
+        } catch {
+          // 忽略无法解析的心跳或截断块
+        }
+      }
+    }
+  }
+}
+
 export async function fetchAssistantModels(baseUrl: string, apiKey = ''): Promise<string[]> {
   const data = await apiFetch<{ models: string[] }>('/api/assistant/models', {
     method: 'POST',

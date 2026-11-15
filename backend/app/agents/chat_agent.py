@@ -299,6 +299,27 @@ async def stream_chat(ctx: AgentContext, message: str):
         answer = "".join(collected).strip()
         latency_ms = round((time.perf_counter() - started) * 1000)
 
+        # 补一次轻量检索作为「引用卡片」数据源。
+        # 走工具轨迹解析太脆弱（返回的是给人读的格式化文本），
+        # 这里多花约 30ms 换前端可直接跳转的结构化片段。
+        references: list[dict] = []
+        try:
+            from app.services.hybrid_search import hybrid_search
+
+            ref_result = hybrid_search(message, top_k=5, candidate_k=15, use_rerank=False)
+            references = [
+                {
+                    "video_id": hit.video_id,
+                    "video_title": hit.video_title,
+                    "start_sec": round(hit.start_sec, 1),
+                    "text": hit.text[:200],
+                    "score": round(hit.vector_score or hit.lexical_score or 0, 3),
+                }
+                for hit in ref_result["hits"]
+            ]
+        except Exception as exc:
+            logger.warning("补充引用片段失败: %s", exc)
+
         db = SessionLocal()
         try:
             run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
@@ -311,7 +332,14 @@ async def stream_chat(ctx: AgentContext, message: str):
         finally:
             db.close()
 
-        yield {"type": "done", "run_id": run_id, "latency_ms": latency_ms, "steps": steps}
+        yield {
+            "type": "done",
+            "run_id": run_id,
+            "session_id": ctx.session_id,
+            "latency_ms": latency_ms,
+            "steps": steps,
+            "references": references,
+        }
     except Exception as exc:
         logger.exception("流式对话失败")
         db = SessionLocal()
