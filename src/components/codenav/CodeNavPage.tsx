@@ -49,9 +49,9 @@ export const CodeNavPage: React.FC = () => {
               <ExternalLink size={14} className="text-[var(--border-medium)] group-hover:text-[var(--text-secondary)] flex-shrink-0 mt-0.5" />
             </div>
             <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-              <span className="text-[10px] px-2 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded-full">{r.category}</span>
-              <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1"><Star size={10} className="text-[var(--warn)]" />{r.stars}</span>
-              <span className="text-[10px] text-[var(--text-muted)]">{r.url}</span>
+              <span className="text-xs px-2 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded-full">{r.category}</span>
+              <span className="text-xs text-[var(--text-muted)] flex items-center gap-1"><Star size={10} className="text-[var(--warn)]" />{r.stars}</span>
+              <span className="text-xs text-[var(--text-muted)]">{r.url}</span>
             </div>
           </div>
         ))}

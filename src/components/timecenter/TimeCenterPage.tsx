@@ -316,7 +316,7 @@ export const TimeCenterPage: React.FC = () => {
                     {clock.id === 'local' ? (
                       <>
                         <p className="truncate text-xs text-[var(--text-muted)]">{clock.label}</p>
-                        <p className="truncate text-[10px] text-[var(--text-muted)]">{clock.timeZone}</p>
+                        <p className="truncate text-xs text-[var(--text-muted)]">{clock.timeZone}</p>
                       </>
                     ) : (
                       <div className="grid gap-1">
@@ -332,7 +332,7 @@ export const TimeCenterPage: React.FC = () => {
                             const option = TIMEZONE_OPTIONS.find((item) => item.value === e.target.value);
                             updateWorldClock(clock.id, { timeZone: e.target.value, label: clock.label.trim() || option?.label || e.target.value });
                           }}
-                          className="min-w-0 rounded border border-transparent bg-transparent px-1 text-[10px] text-[var(--text-muted)] outline-none transition focus:border-[var(--border)] focus:bg-[var(--bg-card)]"
+                          className="min-w-0 rounded border border-transparent bg-transparent px-1 text-xs text-[var(--text-muted)] outline-none transition focus:border-[var(--border)] focus:bg-[var(--bg-card)]"
                           aria-label="选择时区"
                         >
                           {TIMEZONE_OPTIONS.map((item) => (

@@ -195,12 +195,12 @@ function WorldClocksWidget({ now }: { now: Date }) {
           <div key={clock.id} className="group relative flex flex-col items-center justify-center rounded-lg bg-[var(--bg-elevated)] px-3 py-2 border border-[var(--border-light)] flex-1 min-w-0 h-[56px]">
             {clock.id === 'local' ? (
               <>
-                <p className="truncate text-[10px] text-[var(--text-muted)] h-4 leading-4">{clock.label}</p>
+                <p className="truncate text-xs text-[var(--text-muted)] h-4 leading-4">{clock.label}</p>
                 <p className="font-mono text-sm leading-none text-[var(--accent)]">{formatTimeInZone(now, clock.timeZone)}</p>
               </>
             ) : (
               <>
-                <input value={clock.label} onChange={(e) => updateWorldClock(clock.id, { label: e.target.value })} className="text-center min-w-0 h-4 leading-4 p-0 m-0 rounded border border-transparent bg-transparent text-[10px] text-[var(--text-muted)] outline-none transition focus:border-[var(--border)] focus:bg-[var(--bg-card)] w-full" />
+                <input value={clock.label} onChange={(e) => updateWorldClock(clock.id, { label: e.target.value })} className="text-center min-w-0 h-4 leading-4 p-0 m-0 rounded border border-transparent bg-transparent text-xs text-[var(--text-muted)] outline-none transition focus:border-[var(--border)] focus:bg-[var(--bg-card)] w-full" />
                 <p className="font-mono text-sm leading-none text-[var(--text-primary)]">{formatTimeInZone(now, clock.timeZone)}</p>
                 <button onClick={() => removeWorldClock(clock.id)} className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded text-[var(--text-muted)] opacity-0 transition hover:bg-[var(--bg-card)] hover:text-[var(--danger)] group-hover:opacity-100">
                   <X size={10} />
@@ -272,8 +272,8 @@ function ActiveCountdownWidget({
               <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                 <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
               </div>
-              <button onClick={() => onPause(id)} className="shrink-0 px-2 py-0.5 rounded-md bg-blue-500 text-white text-[10px]">暂停</button>
-              <button onClick={() => onComplete(id)} className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--bg-card)] text-[var(--text-muted)] text-[10px] hover:text-[var(--danger)]">取消</button>
+              <button onClick={() => onPause(id)} className="shrink-0 px-2 py-0.5 rounded-md bg-blue-500 text-white text-xs">暂停</button>
+              <button onClick={() => onComplete(id)} className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--bg-card)] text-[var(--text-muted)] text-xs hover:text-[var(--danger)]">取消</button>
             </div>
           </div>
         );

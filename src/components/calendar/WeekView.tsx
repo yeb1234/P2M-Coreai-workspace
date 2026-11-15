@@ -49,10 +49,10 @@ export const WeekView: React.FC<WeekViewProps> = ({ onDayDoubleClick }) => {
               <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-all ${isToday ? 'bg-[var(--accent)] text-white' : isSelected ? 'text-[var(--accent)] font-bold ring-1 ring-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
                 {date.getDate()}
               </span>
-              <span className={`min-w-0 text-[11px] font-medium ${isToday ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
+              <span className={`min-w-0 text-xs font-medium ${isToday ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
                 {dayNames[idx]}
               </span>
-              <span className={`ml-auto text-[10px] ${totalItems > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
+              <span className={`ml-auto text-xs ${totalItems > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
                 {totalItems > 0 ? totalItems : ''}
               </span>
             </button>
@@ -86,9 +86,9 @@ export const WeekView: React.FC<WeekViewProps> = ({ onDayDoubleClick }) => {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[var(--text-primary)]">{dayNames[idx]}</p>
-                  <p className="text-[10px] text-[var(--text-muted)]">{dateStr}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{dateStr}</p>
                 </div>
-                <span className="text-[10px] text-[var(--text-muted)]">{events.length + dayTodos.length} 项</span>
+                <span className="text-xs text-[var(--text-muted)]">{events.length + dayTodos.length} 项</span>
               </div>
               {!hasItems ? (
                 <p className="rounded-lg bg-[var(--bg-secondary)] px-2 py-2 text-xs text-[var(--text-muted)]">当天无内容</p>
@@ -102,7 +102,7 @@ export const WeekView: React.FC<WeekViewProps> = ({ onDayDoubleClick }) => {
                   {dayTodos.map((todo) => (
                     <div key={todo.id} className="rounded-lg bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] px-2 py-1.5 text-xs">
                       <div className="truncate font-medium text-[var(--accent)]">{todo.priority === 'high' ? '! ' : ''}{todo.title}</div>
-                      {todo.pomodoroRounds > 0 && <div className="text-[10px] text-[var(--text-muted)]">{todo.pomodoroRounds} 轮</div>}
+                      {todo.pomodoroRounds > 0 && <div className="text-xs text-[var(--text-muted)]">{todo.pomodoroRounds} 轮</div>}
                     </div>
                   ))}
                 </div>
@@ -131,7 +131,7 @@ export const WeekView: React.FC<WeekViewProps> = ({ onDayDoubleClick }) => {
             }}
           >
             <div className="text-center py-2 border-b border-[var(--border-light)]">
-              <div className={`text-[10px] ${isToday ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-muted)]'}`}>{dayNames[idx]}</div>
+              <div className={`text-xs ${isToday ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-muted)]'}`}>{dayNames[idx]}</div>
               <span className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full ${isToday ? 'bg-[var(--accent)] text-white' : isSelected ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-primary)]'}`}>
                 {date.getDate()}
               </span>
@@ -139,17 +139,17 @@ export const WeekView: React.FC<WeekViewProps> = ({ onDayDoubleClick }) => {
             <div className="flex-1 space-y-1 min-h-[100px] p-1.5">
               {events.length === 0 && todos.length === 0 ? (
                 <div className="h-full flex items-center justify-center">
-                  <span className="text-[9px] text-[var(--text-muted)]">-</span>
+                  <span className="text-xs text-[var(--text-muted)]">-</span>
                 </div>
               ) : (
                 <>
                   {events.map((event) => (
-                    <div key={event.id} className="text-[11px] p-1.5 rounded" style={{ background: event.color }}>
+                    <div key={event.id} className="text-xs p-1.5 rounded" style={{ background: event.color }}>
                       <div className="font-medium text-white truncate">{event.title}</div>
                     </div>
                   ))}
                   {todos.slice(0, 3).map((todo) => (
-                    <div key={todo.id} className="text-[11px] p-1.5 rounded bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]">
+                    <div key={todo.id} className="text-xs p-1.5 rounded bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]">
                       <div className="font-medium text-[var(--accent)] truncate">{todo.priority === 'high' ? '!' : ''} {todo.title}</div>
                     </div>
                   ))}

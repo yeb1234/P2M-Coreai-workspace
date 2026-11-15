@@ -27,7 +27,7 @@ export const MobileHeader: React.FC = () => {
         >
           <Bell size={18} />
           {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--danger)] text-[9px] font-medium text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--danger)] text-xs font-medium text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}

@@ -34,17 +34,17 @@ export const HermesPage: React.FC = () => {
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <Workflow size={20} className="text-[var(--accent)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">5</p>
-          <p className="text-[10px] text-[var(--text-muted)]">工作流</p>
+          <p className="text-xs text-[var(--text-muted)]">工作流</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <CheckCircle size={20} className="text-[var(--success)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">127</p>
-          <p className="text-[10px] text-[var(--text-muted)]">成功执行</p>
+          <p className="text-xs text-[var(--text-muted)]">成功执行</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <Zap size={20} className="text-[var(--warn)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">3</p>
-          <p className="text-[10px] text-[var(--text-muted)]">本周触发</p>
+          <p className="text-xs text-[var(--text-muted)]">本周触发</p>
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export const HermesPage: React.FC = () => {
                   <h3 className="min-w-0 truncate text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{wf.name}</h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
                   <button className="p-1 text-[var(--text-muted)] hover:text-[var(--success)]">
                     {wf.status === 'active' ? <Pause size={14} /> : <Play size={14} />}
                   </button>
@@ -78,7 +78,7 @@ export const HermesPage: React.FC = () => {
               <div className="flex flex-wrap items-center gap-1 mt-3">
                 {Array.from({ length: wf.steps }).map((_, i) => (
                   <React.Fragment key={i}>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                       i < wf.steps - 1 ? 'bg-[var(--success)] text-white' : 'bg-[var(--border-light)] text-[var(--text-secondary)]'
                     }`}>
                       {i + 1}

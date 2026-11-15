@@ -77,7 +77,7 @@ export const EsportsPage: React.FC = () => {
                 }`}>
                   {match.score}
                 </span>
-                <span className="text-[10px] text-[var(--text-muted)] w-16 text-right">{match.time}</span>
+                <span className="text-xs text-[var(--text-muted)] w-16 text-right">{match.time}</span>
                 {match.status === 'live' && (
                   <span className="w-1.5 h-1.5 bg-[var(--danger)] rounded-full animate-pulse" />
                 )}
@@ -95,7 +95,7 @@ export const EsportsPage: React.FC = () => {
           <div className="divide-y divide-[var(--border-light)]">
             {MOCK_STANDINGS.map((s) => (
               <div key={s.team} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-accent)] transition-colors">
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
                   s.rank <= 3 ? 'bg-[var(--warn)] text-white' : 'bg-[var(--border-light)] text-[var(--text-secondary)]'
                 }`}>
                   {s.rank}
@@ -115,17 +115,17 @@ export const EsportsPage: React.FC = () => {
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <Trophy size={20} className="text-[var(--warn)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">156</p>
-          <p className="text-[10px] text-[var(--text-muted)]">本赛季总场次</p>
+          <p className="text-xs text-[var(--text-muted)]">本赛季总场次</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <TrendingUp size={20} className="text-[var(--success)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">62%</p>
-          <p className="text-[10px] text-[var(--text-muted)]">平均胜率</p>
+          <p className="text-xs text-[var(--text-muted)]">平均胜率</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <Clock size={20} className="text-[var(--info)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">32分钟</p>
-          <p className="text-[10px] text-[var(--text-muted)]">平均时长</p>
+          <p className="text-xs text-[var(--text-muted)]">平均时长</p>
         </div>
       </div>
     </div>

@@ -193,7 +193,7 @@ export const Sidebar: React.FC = () => {
             return (
               <React.Fragment key={id}>
               {showGroupHeader && (
-                <div className="px-2.5 pb-1 pt-2.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
+                <div className="px-2.5 pb-1 pt-2.5 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
                   {group}
                 </div>
               )}
@@ -219,9 +219,13 @@ export const Sidebar: React.FC = () => {
                   {meta.icon}
                 </span>
                 {sidebarOpen && (
-                  <span className="text-sm font-medium truncate">
-                    {meta.label}
-                    {meta.dev && <span className="ml-1 text-[10px] text-[var(--accent)] opacity-70">开发中</span>}
+                  <span className="flex min-w-0 items-center gap-1">
+                    <span className="truncate text-sm font-medium">{meta.label}</span>
+                    {/* 「开发中」是状态标识，不能跟着标题一起被截断。
+                        之前它嵌在 truncate 容器里，字号一上提就把三个字切掉了。 */}
+                    {meta.dev && (
+                      <span className="shrink-0 text-xs text-[var(--accent)] opacity-70">开发中</span>
+                    )}
                   </span>
                 )}
                 {id === 'pomodoro' && timerStatus === 'running' && (
@@ -261,9 +265,9 @@ export const Sidebar: React.FC = () => {
                 return (
                   <div key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--bg-elevated)] transition-colors">
                     <span className="text-[var(--text-muted)]">{meta.icon}</span>
-                    <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">
-                      {meta.label}
-                      {meta.dev && <span className="ml-1 text-[10px] opacity-70">开发中</span>}
+                    <span className="flex min-w-0 flex-1 items-center gap-1 text-xs text-[var(--text-secondary)]">
+                      <span className="truncate">{meta.label}</span>
+                      {meta.dev && <span className="shrink-0 opacity-70">开发中</span>}
                     </span>
                     <button
                       onClick={() => showNav(id)}

@@ -21,7 +21,7 @@ export const RecentNotesSummary: React.FC = () => {
             <StickyNote size={12} className="text-[var(--text-secondary)] flex-shrink-0" />
             <span className="text-xs font-medium text-[var(--text-primary)] truncate">{note.title}</span>
           </div>
-          <p className="text-[10px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed">{note.content || '空笔记'}</p>
+          <p className="text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed">{note.content || '空笔记'}</p>
         </div>
       ))}
     </div>

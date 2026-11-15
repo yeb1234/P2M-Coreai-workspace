@@ -33,22 +33,22 @@ export const LeetcodePage: React.FC = () => {
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[var(--success)] mb-2"><CheckCircle size={16} /><span className="text-xs font-medium">已解决</span></div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">128</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">/ 2500 题库</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">/ 2500 题库</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[var(--warn)] mb-2"><Flame size={16} /><span className="text-xs font-medium">连续打卡</span></div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">14 天</p>
-          <p className="text-[10px] text-[var(--success)] mt-1">保持势头!</p>
+          <p className="text-xs text-[var(--success)] mt-1">保持势头!</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[var(--info)] mb-2"><Target size={16} /><span className="text-xs font-medium">通过率</span></div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">72%</p>
-          <p className="text-[10px] text-[var(--success)] mt-1">+5% vs 上月</p>
+          <p className="text-xs text-[var(--success)] mt-1">+5% vs 上月</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#8b5cf6] mb-2"><TrendingUp size={16} /><span className="text-xs font-medium">本周刷题</span></div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">12</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">目标 15 题</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">目标 15 题</p>
         </div>
       </div>
 
@@ -56,7 +56,7 @@ export const LeetcodePage: React.FC = () => {
       <div className="auto-grid-compact">
         {['Easy', 'Medium', 'Hard'].map((d) => (
           <div key={d} className="flex-1 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 text-center">
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${DIFF_COLOR[d]}`}>{d}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DIFF_COLOR[d]}`}>{d}</span>
             <p className="text-lg font-bold text-[var(--text-primary)] mt-1">{d === 'Easy' ? 68 : d === 'Medium' ? 45 : 15}</p>
           </div>
         ))}
@@ -76,8 +76,8 @@ export const LeetcodePage: React.FC = () => {
               </span>
               <span className="text-xs font-mono text-[var(--text-muted)] w-8">{p.id}</span>
               <span className="min-w-[140px] flex-1 text-sm text-[var(--text-primary)]">{p.title}</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full ${DIFF_COLOR[p.difficulty]}`}>{p.difficulty}</span>
-              <span className="text-[10px] px-2 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded-full">{p.tag}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${DIFF_COLOR[p.difficulty]}`}>{p.difficulty}</span>
+              <span className="text-xs px-2 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded-full">{p.tag}</span>
               <span className="text-xs text-[var(--text-muted)] w-14 text-right">{p.time}</span>
             </div>
           ))}

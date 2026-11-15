@@ -108,7 +108,7 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
         <div className="px-4 py-1.5 md:hidden border-t border-[var(--border-light)]">
           <button
             onClick={handleNavigate}
-            className="w-full text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] text-center py-0.5 rounded hover:bg-[var(--accent-bg)] transition-all"
+            className="w-full text-xs text-[var(--text-muted)] hover:text-[var(--accent)] text-center py-0.5 rounded hover:bg-[var(--accent-bg)] transition-all"
           >
             打开 {plugin.metadata.name} →
           </button>

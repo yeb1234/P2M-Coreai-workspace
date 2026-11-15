@@ -71,7 +71,7 @@ export const TokensPage: React.FC = () => {
             <span className="text-xs font-medium">总花费</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">${totalCost.toFixed(2)}</p>
-          <p className="text-[10px] text-[var(--success)] mt-1 flex items-center gap-1">
+          <p className="text-xs text-[var(--success)] mt-1 flex items-center gap-1">
             <ArrowDownRight size={10} /> -12% vs 上周
           </p>
         </div>
@@ -81,7 +81,7 @@ export const TokensPage: React.FC = () => {
             <span className="text-xs font-medium">请求次数</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">{totalRequests.toLocaleString()}</p>
-          <p className="text-[10px] text-[var(--success)] mt-1 flex items-center gap-1">
+          <p className="text-xs text-[var(--success)] mt-1 flex items-center gap-1">
             <ArrowUpRight size={10} /> +8% vs 上周
           </p>
         </div>
@@ -91,7 +91,7 @@ export const TokensPage: React.FC = () => {
             <span className="text-xs font-medium">输入 Tokens</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">{formatTokens(totalInput)}</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">prompt 用量</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">prompt 用量</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#8b5cf6] mb-2">
@@ -99,7 +99,7 @@ export const TokensPage: React.FC = () => {
             <span className="text-xs font-medium">输出 Tokens</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">{formatTokens(totalOutput)}</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">completion 用量</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">completion 用量</p>
         </div>
       </div>
 
@@ -112,7 +112,7 @@ export const TokensPage: React.FC = () => {
         <div className="min-w-[300px] flex items-end gap-3 h-28">
           {WEEKLY_SPEND.map((d) => (
             <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-[9px] text-[var(--text-muted)]">${d.amount}</span>
+              <span className="text-xs text-[var(--text-muted)]">${d.amount}</span>
               <div className="w-full flex items-end justify-center" style={{ height: '80px' }}>
                 <div
                   className="w-full bg-gradient-to-t from-[var(--accent)] to-[var(--accent)] rounded-t-md transition-all"
@@ -138,7 +138,7 @@ export const TokensPage: React.FC = () => {
                 alert.level === 'warning' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' : 'bg-[var(--info-bg)] text-[var(--info)]'
               }`}>
                 <span className="flex-1">{alert.msg}</span>
-                <span className="text-[10px] opacity-60">{alert.time}</span>
+                <span className="text-xs opacity-60">{alert.time}</span>
               </div>
             ))}
           </div>

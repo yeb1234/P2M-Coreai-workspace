@@ -40,7 +40,7 @@ export const HealthPage: React.FC = () => {
           <div className="w-full bg-[var(--border-light)] rounded-full h-1 mt-2">
             <div className="bg-[var(--success)] h-1 rounded-full" style={{ width: `${(MOCK_HEALTH.steps.value / MOCK_HEALTH.steps.goal) * 100}%` }} />
           </div>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">目标 {MOCK_HEALTH.steps.goal.toLocaleString()} 步</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">目标 {MOCK_HEALTH.steps.goal.toLocaleString()} 步</p>
         </div>
 
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
@@ -52,7 +52,7 @@ export const HealthPage: React.FC = () => {
           <div className="w-full bg-[var(--border-light)] rounded-full h-1 mt-2">
             <div className="bg-[#8b5cf6] h-1 rounded-full" style={{ width: `${(MOCK_HEALTH.sleep.value / MOCK_HEALTH.sleep.goal) * 100}%` }} />
           </div>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">目标 {MOCK_HEALTH.sleep.goal} 小时</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">目标 {MOCK_HEALTH.sleep.goal} 小时</p>
         </div>
 
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
@@ -64,7 +64,7 @@ export const HealthPage: React.FC = () => {
           <div className="w-full bg-[var(--border-light)] rounded-full h-1 mt-2">
             <div className="bg-[#06b6d4] h-1 rounded-full" style={{ width: `${(MOCK_HEALTH.water.value / MOCK_HEALTH.water.goal) * 100}%` }} />
           </div>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">目标 {MOCK_HEALTH.water.goal} 杯</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">目标 {MOCK_HEALTH.water.goal} 杯</p>
         </div>
 
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
@@ -73,7 +73,7 @@ export const HealthPage: React.FC = () => {
             <span className="text-xs font-medium">体重</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">{MOCK_HEALTH.weight.value} kg</p>
-          <p className="text-[10px] text-[var(--success)] mt-2 flex items-center gap-1">
+          <p className="text-xs text-[var(--success)] mt-2 flex items-center gap-1">
             <TrendingDown size={10} />
             较昨日 {MOCK_HEALTH.weight.change} kg
           </p>
@@ -90,7 +90,7 @@ export const HealthPage: React.FC = () => {
             const pct = ((d.value - minW) / (maxW - minW)) * 100;
             return (
               <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-                <span className="text-[9px] text-[var(--text-muted)]">{d.value}</span>
+                <span className="text-xs text-[var(--text-muted)]">{d.value}</span>
                 <div className="w-full flex items-end justify-center" style={{ height: '80px' }}>
                   <div
                     className="w-full bg-gradient-to-t from-[#ec4899] to-[#f472b6] rounded-t-md"

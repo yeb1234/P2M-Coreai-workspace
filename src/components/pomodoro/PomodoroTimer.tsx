@@ -172,7 +172,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
     <div className="flex min-w-0 flex-col items-center rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-card))] p-4 shadow-sm md:p-6">
       {linkedTodo && (
         <div className="mb-3 md:mb-5 px-3 py-1.5 bg-[var(--bg-elevated)] rounded-lg">
-          <p className="text-[10px] text-[var(--text-muted)]">当前专注</p>
+          <p className="text-xs text-[var(--text-muted)]">当前专注</p>
           <p className="text-sm font-medium text-[var(--text-primary)]">{linkedTodo.title}</p>
         </div>
       )}
@@ -246,7 +246,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
         <div className="mx-auto flex w-full max-w-[380px] flex-col gap-2.5">
           <div className="flex min-w-0 items-center gap-2">
             {settingsControl}
-            <span className="shrink-0 text-[10px] text-[var(--text-muted)]">
+            <span className="shrink-0 text-xs text-[var(--text-muted)]">
               {ambientSound === 'none' ? '环境音' : `${AMBIENT_SOUNDS[ambientSound]?.name}${!isFocusAmbientActive ? ' · 待启动' : ''}`}
             </span>
             <div
@@ -273,7 +273,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
                 style={{ left: 'calc(6px + (100% - 12px) * var(--ambient-volume-ratio))' }}
               />
             </div>
-            <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-[var(--text-muted)]">{ambientVolume}%</span>
+            <span className="w-8 shrink-0 text-right text-xs tabular-nums text-[var(--text-muted)]">{ambientVolume}%</span>
           </div>
           <div className="grid grid-cols-4 gap-1.5">
             {(Object.keys(AMBIENT_SOUNDS) as Array<Exclude<AmbientSound, 'none'>>).map((sound) => (
@@ -293,7 +293,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
           </div>
         </div>
         {ambientError && (
-          <p className="mt-2 text-center text-[10px] text-[var(--danger)]">
+          <p className="mt-2 text-center text-xs text-[var(--danger)]">
             {ambientError}
           </p>
         )}

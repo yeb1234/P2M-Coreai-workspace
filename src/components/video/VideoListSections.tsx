@@ -25,7 +25,7 @@ const VideoCard = React.memo(function VideoCard({
     <div onClick={() => onPlay(video.id)} className="theme-card overflow-hidden rounded-lg transition-all hover:shadow-md cursor-pointer group">
       <VideoCardPreviewFrame video={video} enableSpritePreview={enableSpritePreview}>
         <VideoCardThumbnail video={video} />
-        <span className="absolute bottom-1 right-1 z-10 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] text-white">{formatVideoDuration(video.duration)}</span>
+        <span className="absolute bottom-1 right-1 z-10 rounded bg-black/70 px-1 py-0.5 font-mono text-xs text-white">{formatVideoDuration(video.duration)}</span>
         {onToggleFavorite && (
           <button
             type="button"
@@ -42,7 +42,7 @@ const VideoCard = React.memo(function VideoCard({
             <Star size={13} fill={video.is_favorite ? 'currentColor' : 'none'} />
           </button>
         )}
-        {video.completed && <span className="absolute left-1 top-1 z-10 rounded bg-[var(--success)] px-1 py-0.5 text-[9px] text-white">✓</span>}
+        {video.completed && <span className="absolute left-1 top-1 z-10 rounded bg-[var(--success)] px-1 py-0.5 text-xs text-white">✓</span>}
         {progressPercent !== null && !video.completed && (
           <div className="absolute bottom-0 left-0 right-0 z-10 h-0.5 bg-black/20">
             <div className="theme-progress-fill h-full" style={{ width: `${progressPercent}%` }} />
@@ -179,7 +179,7 @@ export function Pagination({ page, totalPages, onPageChange }: { page: number; t
       <button onClick={() => onPageChange(totalPages)} disabled={page >= totalPages} className="rounded-lg px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] disabled:cursor-not-allowed disabled:opacity-30 transition-colors" title="最后一页">»</button>
       {totalPages > 11 && (
         <div className="flex items-center gap-1 ml-2">
-          <span className="text-[10px] text-[var(--text-muted)]">跳至</span>
+          <span className="text-xs text-[var(--text-muted)]">跳至</span>
           <input
             type="text"
             value={jumpVal}
@@ -188,7 +188,7 @@ export function Pagination({ page, totalPages, onPageChange }: { page: number; t
             placeholder={`${page}`}
             className="w-12 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-1.5 py-1 text-center text-xs"
           />
-          <span className="text-[10px] text-[var(--text-muted)]">/ {totalPages}</span>
+          <span className="text-xs text-[var(--text-muted)]">/ {totalPages}</span>
           <button onClick={handleJump} className="rounded-lg bg-[var(--bg-accent)] px-2 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--border-light)]">GO</button>
         </div>
       )}
@@ -236,7 +236,7 @@ export const VideoNavigationCards = React.memo(function VideoNavigationCards({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-[var(--text-primary)]">视频导航</span>
-          <span className="text-[10px] text-[var(--text-muted)]">继续观看、历史记录与推荐</span>
+          <span className="text-xs text-[var(--text-muted)]">继续观看、历史记录与推荐</span>
         </div>
       </div>
       <div className="video-navigation-grid">
@@ -259,7 +259,7 @@ export const VideoNavigationCards = React.memo(function VideoNavigationCards({
               )}
             </div>
             <div className="min-w-0 flex-1 self-center">
-              <p className="text-[10px] font-medium text-[var(--accent)]">继续观看</p>
+              <p className="text-xs font-medium text-[var(--accent)]">继续观看</p>
               <p className="theme-text-primary truncate text-sm font-semibold">{continueVideo?.title || '暂无未看完的视频'}</p>
               <p className="theme-text-muted mt-1 line-clamp-2 text-xs leading-4">
                 {continueVideo ? `已看到 ${formatWatchProgress(continueVideo.watch_progress, continueVideo.duration)}` : '开始播放后会自动记录进度'}
@@ -296,11 +296,11 @@ export const VideoNavigationCards = React.memo(function VideoNavigationCards({
           <div className="mb-2 flex items-center gap-2">
             <Sparkles size={14} className="text-[var(--accent)]" />
             <span className="text-xs font-semibold text-[var(--text-primary)]">小助手推荐</span>
-            <span className="rounded-full bg-[var(--bg-base)] px-1.5 py-0.5 text-[9px] text-[var(--text-muted)]">占位</span>
+            <span className="rounded-full bg-[var(--bg-base)] px-1.5 py-0.5 text-xs text-[var(--text-muted)]">占位</span>
           </div>
           <div className="rounded-lg bg-[var(--bg-base)] px-3 py-4">
             <p className="text-xs font-medium text-[var(--text-primary)]">稍后根据观看历史推荐</p>
-            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">
+            <p className="mt-1 text-xs leading-4 text-[var(--text-muted)]">
               这里预留给灵境小助手：可按最近观看、字幕关键词、文件夹上下文推荐下一个视频。
             </p>
           </div>
@@ -364,7 +364,7 @@ function CompactVideoListCard({
               ))}
             </div>
           )}
-          <button onClick={onShow} disabled={videos.length === 0} className={`text-[10px] ${active ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)]'}`}>
+          <button onClick={onShow} disabled={videos.length === 0} className={`text-xs ${active ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)]'}`}>
             {videos.length === 0 ? '0 个' : `${videos.length} 个 查看`}
           </button>
         </div>
@@ -381,11 +381,11 @@ function CompactVideoListCard({
             </div>
             <div className="min-w-0 flex-1">
               <p className="theme-text-primary truncate text-xs font-medium">{video.title}</p>
-              <p className="theme-text-muted truncate text-[10px]">{meta(video)}</p>
+              <p className="theme-text-muted truncate text-xs">{meta(video)}</p>
             </div>
           </button>
         ))}
-        {footnote && <p className="theme-text-muted pt-1 text-[10px] leading-4">{footnote}</p>}
+        {footnote && <p className="theme-text-muted pt-1 text-xs leading-4">{footnote}</p>}
         {sortedVideos.length === 0 && <p className="rounded-lg border border-dashed border-[var(--border-light)] px-2 py-4 text-center text-xs text-[var(--text-muted)]">{emptyText}</p>}
       </div>
     </div>
@@ -481,7 +481,7 @@ export function VideoGridSection({
           <p className="text-xs text-[var(--text-muted)]">
             {isSearching ? '匹配的视频' : filesLabel || (!currentCategoryId ? `共 ${total} 个视频` : '')}
           </p>
-          <label className="flex items-center gap-1.5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
+          <label className="flex items-center gap-1.5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1 text-xs text-[var(--text-secondary)]">
             <Columns3 size={12} className="text-[var(--text-muted)]" />
             每行
             <select

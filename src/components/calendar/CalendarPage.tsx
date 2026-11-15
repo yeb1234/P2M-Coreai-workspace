@@ -115,7 +115,7 @@ const SelectedDateEvents: React.FC = () => {
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: todo.priority === 'high' ? '#e8a0a0' : todo.priority === 'medium' ? '#e8d4a0' : todo.priority === 'low' ? '#a0c4e8' : '#a0d4a0' }} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-[var(--text-primary)]">{todo.title}</p>
-                  {todo.pomodoroRounds > 0 && <p className="text-[10px] text-[var(--text-muted)]">{todo.pomodoroRounds} 个番茄</p>}
+                  {todo.pomodoroRounds > 0 && <p className="text-xs text-[var(--text-muted)]">{todo.pomodoroRounds} 个番茄</p>}
                 </div>
                 <button type="button" onClick={() => handleDelete(todo.id)} className="p-1.5 text-[var(--text-muted)] transition-colors hover:text-[var(--danger)]" title="移入垃圾箱">
                   <Trash2 size={14} />

@@ -117,7 +117,7 @@ export function BackendHealthSettings() {
                 <p className="text-sm font-medium text-[var(--text-primary)]">{check.name}</p>
                 <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{check.message}</p>
                 {Object.keys(check.details || {}).length > 0 && (
-                  <pre className="mt-2 max-h-24 overflow-auto rounded-lg bg-[var(--bg-card)] px-2 py-1.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+                  <pre className="mt-2 max-h-24 overflow-auto rounded-lg bg-[var(--bg-card)] px-2 py-1.5 text-xs leading-4 text-[var(--text-secondary)]">
                     {JSON.stringify(check.details, null, 2)}
                   </pre>
                 )}

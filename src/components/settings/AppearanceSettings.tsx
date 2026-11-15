@@ -88,7 +88,7 @@ export function AppearanceSettings() {
         <div className="h-3 w-3 rounded-full" style={{ background: t.vars['--accent'] }} />
         <span className="text-xs font-medium text-[var(--text-primary)]">{t.name}</span>
       </div>
-      <p className="text-[10px] leading-4 text-[var(--text-muted)]">{t.description}</p>
+      <p className="text-xs leading-4 text-[var(--text-muted)]">{t.description}</p>
     </button>
   );
 
@@ -132,7 +132,7 @@ export function AppearanceSettings() {
         <div className="mb-3 flex items-center justify-between">
           <label className="block text-xs font-medium text-[var(--text-secondary)]">主题风格</label>
           {themeScheduleEnabled && (
-            <span className="rounded-md bg-[var(--accent-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+            <span className="rounded-md bg-[var(--accent-bg)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
               自动调度中
             </span>
           )}
@@ -142,7 +142,7 @@ export function AppearanceSettings() {
             <section key={group.title} className="space-y-2">
               <div className="flex items-center gap-2">
                 <h4 className="text-xs font-semibold text-[var(--text-primary)]">{group.title}</h4>
-                <span className="text-[10px] text-[var(--text-muted)]">{group.items.length} 个</span>
+                <span className="text-xs text-[var(--text-muted)]">{group.items.length} 个</span>
               </div>
               <div className="auto-grid-cards">
                 {group.items.map(renderThemeButton)}
@@ -206,7 +206,7 @@ export function AppearanceSettings() {
                         </select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-[var(--text-muted)]">时间</span>
+                        <span className="text-xs text-[var(--text-muted)]">时间</span>
                         <input
                           type="time"
                           value={rule.startTime}
@@ -226,7 +226,7 @@ export function AppearanceSettings() {
                           <button
                             key={day}
                             onClick={() => toggleRuleWeekday(rule.id, day)}
-                            className={`h-6 w-6 rounded-md text-[10px] font-medium transition-colors ${
+                            className={`h-6 w-6 rounded-md text-xs font-medium transition-colors ${
                               rule.weekdays.includes(day)
                                 ? 'bg-[var(--accent)] text-white'
                                 : 'border border-[var(--border-light)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -239,13 +239,13 @@ export function AppearanceSettings() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleUpdateRule(rule.id, { enabled: !rule.enabled })}
-                          className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                          className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)]"
                         >
                           {rule.enabled ? '禁用' : '启用'}
                         </button>
                         <button
                           onClick={() => setEditingRuleId(null)}
-                          className="text-[10px] text-[var(--accent)] hover:underline"
+                          className="text-xs text-[var(--accent)] hover:underline"
                         >
                           完成
                         </button>
@@ -256,7 +256,7 @@ export function AppearanceSettings() {
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs font-medium text-[var(--text-primary)]">{rule.name}</span>
-                          <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                             <span className="flex items-center gap-1">
                               <CalendarDays size={10} />
                               {formatScheduleRuleWeekdays(rule)}
@@ -272,7 +272,7 @@ export function AppearanceSettings() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setEditingRuleId(rule.id)}
-                          className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                          className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)]"
                         >
                           编辑
                         </button>

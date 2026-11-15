@@ -329,17 +329,17 @@ export function VideoAiJobCenter({
         <div className="min-w-0 flex-1">
           <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="shrink-0 text-sm font-semibold leading-5 text-[var(--text-primary)]">AI 任务中心</h3>
-            <span className="text-[11px] leading-5 text-[var(--text-muted)]">
+            <span className="text-xs leading-5 text-[var(--text-muted)]">
               {totalActive > 0 ? `${jobs?.running ?? 0} 运行 / ${jobs?.queued ?? 0} 排队` : '队列空闲'}
             </span>
             {queuePaused && (
-              <span className="rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border-light))] bg-[var(--accent-bg)] px-2 py-0.5 text-[10px] text-[var(--accent)]">
+              <span className="rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border-light))] bg-[var(--accent-bg)] px-2 py-0.5 text-xs text-[var(--accent)]">
                 已暂停
               </span>
             )}
           </div>
           {!collapsed && batchProgress && (
-            <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
+            <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
               本轮 {batchProgress.completed}/{batchProgress.total}，运行 {batchProgress.running}，排队 {batchProgress.queued}，失败 {batchProgress.failed}
             </p>
           )}
@@ -351,7 +351,7 @@ export function VideoAiJobCenter({
               type="button"
               onClick={canToggleQueue ? onToggleQueue : undefined}
               disabled={!canToggleQueue}
-              className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+              className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                 queuePaused || queueStuck
                   ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
                   : 'border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
@@ -393,7 +393,7 @@ export function VideoAiJobCenter({
             <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-[var(--text-primary)]">批处理{batchScopeLabel}</p>
-                <p className="truncate text-[11px] text-[var(--text-muted)]">
+                <p className="truncate text-xs text-[var(--text-muted)]">
                   来源：{batchScopeLabel} {batchCount} 个视频，规则：{currentBatchMode.label}，预计新增 {previewEnqueueCount} 个任务
                 </p>
               </div>
@@ -402,7 +402,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onPreviewBatchFolder}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
                 >
                   <SearchCheck size={13} />
                   预览
@@ -411,7 +411,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onApplySettings}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
                   title="将左侧当前转写设置保存到后端并同步给排队中的任务"
                 >
                   <RefreshCw size={13} />
@@ -421,7 +421,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onBatchFolder}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-[11px] text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-xs text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
                 >
                   {batchLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                   入队
@@ -435,7 +435,7 @@ export function VideoAiJobCenter({
                   key={mode.value}
                   type="button"
                   onClick={() => onBatchModeChange?.(mode.value)}
-                  className={`min-w-0 truncate rounded-md border px-2 py-1.5 text-left text-[11px] transition-colors ${
+                  className={`min-w-0 truncate rounded-md border px-2 py-1.5 text-left text-xs transition-colors ${
                     batchMode === mode.value
                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                       : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
@@ -446,12 +446,12 @@ export function VideoAiJobCenter({
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-[11px] leading-5 text-[var(--text-muted)]">
+            <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
               {currentBatchMode.desc}
             </p>
 
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-[11px] text-[var(--text-secondary)]">
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-xs text-[var(--text-secondary)]">
                 <span className="shrink-0">最多新增入队</span>
                 <input
                   value={limitDraft}
@@ -464,7 +464,7 @@ export function VideoAiJobCenter({
                   className="min-w-0 flex-1 border-0 bg-transparent px-1 py-0 text-right text-xs text-[var(--text-primary)] outline-none"
                 />
               </label>
-              <label className="flex min-w-[145px] shrink-0 items-center justify-between gap-3 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-[11px] text-[var(--text-secondary)]">
+              <label className="flex min-w-[145px] shrink-0 items-center justify-between gap-3 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-xs text-[var(--text-secondary)]">
                 <span>同时校对字幕</span>
                 <input
                   type="checkbox"
@@ -476,7 +476,7 @@ export function VideoAiJobCenter({
             </div>
 
             {batchPreview && (
-              <div className="mt-2 min-w-0 rounded-md border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] leading-5 text-[var(--text-muted)]">
+              <div className="mt-2 min-w-0 rounded-md border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-xs leading-5 text-[var(--text-muted)]">
                 <p>
                   共 {batchPreview.requested}，可处理 {batchPreview.eligible}，本次入队 {batchPreview.enqueued || previewEnqueueCount}，跳过 {batchPreview.skipped}
                   {batchPreview.active ? `，活动中 ${batchPreview.active}` : ''}
@@ -506,14 +506,14 @@ export function VideoAiJobCenter({
                   key={filter.value ?? 'all'}
                   type="button"
                   onClick={() => onStatusChange(filter.value)}
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
                     selectedStatus === filter.value
                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                       : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
                   }`}
                 >
                   <span>{filter.label}</span>
-                  <span className="rounded-full bg-[var(--bg-accent)] px-1 text-[10px] tabular-nums text-[var(--text-muted)]">
+                  <span className="rounded-full bg-[var(--bg-accent)] px-1 text-xs tabular-nums text-[var(--text-muted)]">
                     {count}
                   </span>
                 </button>
@@ -546,7 +546,7 @@ export function VideoAiJobCenter({
                             {job.video_title || `视频 ${job.video_id}`}
                           </p>
                           {job.duration != null && (
-                            <span className="shrink-0 rounded bg-[var(--bg-accent)] px-1 py-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
+                            <span className="shrink-0 rounded bg-[var(--bg-accent)] px-1 py-0.5 text-xs tabular-nums text-[var(--text-muted)]">
                               {(() => {
                                 const sec = Math.round(job.duration);
                                 const h = Math.floor(sec / 3600);
@@ -557,9 +557,9 @@ export function VideoAiJobCenter({
                               })()}
                             </span>
                           )}
-                          <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{compactDate(job.updated_at)}</span>
+                          <span className="shrink-0 text-xs text-[var(--text-muted)]">{compactDate(job.updated_at)}</span>
                         </div>
-                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--text-muted)]">
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)]">
                           <span>{statusLabel(job.status)}</span>
                           <span>{stageLabel(job.stage)}</span>
                           <span className="min-w-0 truncate">{runtimeParts(job)}</span>
@@ -572,7 +572,7 @@ export function VideoAiJobCenter({
                               return (
                                 <span
                                   key={step.key}
-                                  className={`rounded-full border px-1.5 py-0.5 text-[9px] leading-none ${
+                                  className={`rounded-full border px-1.5 py-0.5 text-xs leading-none ${
                                     active
                                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                                       : done
@@ -587,10 +587,10 @@ export function VideoAiJobCenter({
                           </div>
                         )}
                         {message && (
-                          <div className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                          <div className="mt-1 flex items-center gap-1 text-xs text-[var(--text-secondary)]">
                             <span className="truncate" title={job.message}>{message}</span>
                             {job.status === 'completed' && job.duration != null && job.started_at != null && (
-                              <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] px-1.5 py-0.5 text-[9px] leading-none text-[var(--success)]">
+                              <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] px-1.5 py-0.5 text-xs leading-none text-[var(--success)]">
                                 {(() => {
                                   const started = new Date(job.started_at!).getTime();
                                   const ended = new Date(job.updated_at).getTime();
@@ -603,7 +603,7 @@ export function VideoAiJobCenter({
                           </div>
                         )}
                         {(job.error || job.summary_error) && (
-                          <p className="mt-1 line-clamp-2 text-[11px] text-[var(--danger)]" title={job.error || job.summary_error || undefined}>
+                          <p className="mt-1 line-clamp-2 text-xs text-[var(--danger)]" title={job.error || job.summary_error || undefined}>
                             {job.error || job.summary_error}
                           </p>
                         )}

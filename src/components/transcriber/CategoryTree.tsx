@@ -66,10 +66,10 @@ const TreeNodeRow = memo(function TreeNodeRow({
             className="h-3.5 w-3.5 shrink-0 accent-[var(--accent)]"
           />
           {allChecked || someChecked ? <FolderOpen size={14} className="shrink-0 text-[var(--accent)]" /> : <Folder size={14} className="shrink-0 text-[var(--text-muted)]" />}
-          <span className="min-w-0 truncate text-[12px] text-[var(--text-primary)]" title={node.full_path}>
+          <span className="min-w-0 truncate text-xs text-[var(--text-primary)]" title={node.full_path}>
             {node.name}
           </span>
-          <span className="shrink-0 text-[11px] text-[var(--text-muted)]">({node.video_count})</span>
+          <span className="shrink-0 text-xs text-[var(--text-muted)]">({node.video_count})</span>
         </label>
       </div>
       {hasChildren && expanded && (

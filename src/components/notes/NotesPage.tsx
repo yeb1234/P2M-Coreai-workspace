@@ -244,7 +244,7 @@ export const NotesPage: React.FC = () => {
                 type="text"
                 value={edit.tag}
                 onChange={(event) => setEdit((prev) => ({ ...prev, tag: event.target.value }))}
-                className="ml-2 text-[11px] px-2 py-1 bg-white/70 rounded-full outline-none w-24"
+                className="ml-2 text-xs px-2 py-1 bg-white/70 rounded-full outline-none w-24"
                 placeholder="标签"
               />
             </div>
@@ -332,14 +332,14 @@ export const NotesPage: React.FC = () => {
               <button
                 key={tag}
                 onClick={(event) => { event.stopPropagation(); setActiveTag(tag); }}
-                className="text-[10px] px-2 py-0.5 bg-white/65 text-[#4b5563] rounded-full hover:bg-white/90 transition-colors"
+                className="text-xs px-2 py-0.5 bg-white/65 text-[#4b5563] rounded-full hover:bg-white/90 transition-colors"
                 title={`筛选 #${tag}`}
               >
                 #{tag}
               </button>
             ))}
           </div>
-          <span className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1">
+          <span className="text-xs text-[var(--text-secondary)] flex items-center gap-1">
             <Clock size={10} />
             {timeAgo(note.updatedAt)}
           </span>
@@ -366,16 +366,16 @@ export const NotesPage: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <StickyNote size={16} className="text-[var(--warn)]" />
             <h2 className="text-sm font-bold text-[var(--text-primary)]">笔记</h2>
-            <span className="text-[10px] text-[var(--text-muted)]">({notes.length})</span>
+            <span className="text-xs text-[var(--text-muted)]">({notes.length})</span>
           </div>
           <div className="flex items-center gap-0.5">
-            <button onClick={() => setShowToolbar(!showToolbar)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] transition-colors ${showToolbar ? 'text-[var(--warn)] bg-[#fffbeb]' : 'text-[var(--text-muted)]'}`} title="筛选">
+            <button onClick={() => setShowToolbar(!showToolbar)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showToolbar ? 'text-[var(--warn)] bg-[#fffbeb]' : 'text-[var(--text-muted)]'}`} title="筛选">
               <SlidersHorizontal size={13} />
               <span>{activeColorLabel !== '全部' ? activeColorLabel : activeTagLabel !== '全部' ? `#${activeTagLabel}` : '全部'}</span>
             </button>
             <button onClick={() => setShowTrash(!showTrash)} className={`p-1.5 rounded-lg relative ${showTrash ? 'text-[var(--danger)] bg-[var(--danger-bg)]' : 'text-[var(--text-muted)]'}`} title="垃圾箱">
               <Trash2 size={14} />
-              {trashedNotes.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[var(--danger)] text-white text-[7px] rounded-full flex items-center justify-center">{trashedNotes.length}</span>}
+              {trashedNotes.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[var(--danger)] text-white text-xs rounded-full flex items-center justify-center">{trashedNotes.length}</span>}
             </button>
             <button onClick={startNew} className="p-1.5 rounded-lg text-[var(--warn)] bg-[#fffbeb]" title="新建笔记">
               <Plus size={14} />
@@ -390,7 +390,7 @@ export const NotesPage: React.FC = () => {
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => setActiveColor('all')}
-              className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${activeColor === 'all' ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
+              className={`px-2 py-0.5 text-xs rounded-full transition-colors ${activeColor === 'all' ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
             >
               全部
             </button>
@@ -398,7 +398,7 @@ export const NotesPage: React.FC = () => {
               <button
                 key={color.value}
                 onClick={() => setActiveColor(color.value)}
-                className={`px-2 py-0.5 text-[10px] rounded-full transition-colors flex items-center gap-1 ${activeColor === color.value ? 'text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
+                className={`px-2 py-0.5 text-xs rounded-full transition-colors flex items-center gap-1 ${activeColor === color.value ? 'text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
                 style={{ backgroundColor: activeColor === color.value ? color.dot : undefined }}
               >
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color.dot }} />
@@ -410,7 +410,7 @@ export const NotesPage: React.FC = () => {
             <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => setActiveTag('all')}
-                className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${activeTag === 'all' ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
+                className={`px-2 py-0.5 text-xs rounded-full transition-colors ${activeTag === 'all' ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
               >
                 全部标签
               </button>
@@ -418,7 +418,7 @@ export const NotesPage: React.FC = () => {
                 <button
                   key={tag.name}
                   onClick={() => setActiveTag(tag.name)}
-                  className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${activeTag === tag.name ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
+                  className={`px-2 py-0.5 text-xs rounded-full transition-colors ${activeTag === tag.name ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
                 >
                   #{tag.name}
                 </button>
@@ -426,7 +426,7 @@ export const NotesPage: React.FC = () => {
             </div>
           )}
           {(activeColor !== 'all' || activeTag !== 'all') && (
-            <button onClick={resetFilters} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--warn)] transition-colors">
+            <button onClick={resetFilters} className="text-xs text-[var(--text-muted)] hover:text-[var(--warn)] transition-colors">
               清除筛选
             </button>
           )}
@@ -448,7 +448,7 @@ export const NotesPage: React.FC = () => {
               >
                 <Trash2 size={16} />
                 {trashedNotes.length > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-[var(--danger)] text-white text-[9px] rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-[var(--danger)] text-white text-xs rounded-full flex items-center justify-center">
                     {trashedNotes.length}
                   </span>
                 )}
@@ -460,7 +460,7 @@ export const NotesPage: React.FC = () => {
               >
                 <StickyNote size={16} />
                 AI 今日笔记
-                <span className="text-[10px] font-normal text-[#8b5cf6]">施工中</span>
+                <span className="text-xs font-normal text-[#8b5cf6]">施工中</span>
               </button>
               <button onClick={startNew} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[var(--warn)] rounded-lg hover:bg-[#d97706] transition-colors">
                 <Plus size={16} />
@@ -588,7 +588,7 @@ export const NotesPage: React.FC = () => {
                     <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: COLOR_DOT[note.color] }} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-[var(--text-primary)] truncate block">{note.title}</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
+                      <span className="text-xs text-[var(--text-muted)]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
                     </div>
                     <button onClick={() => { restoreNote(note.id); playInteractionSound('restore'); }} className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--accent)] hover:bg-[var(--bg-accent)] rounded transition-colors">
                       <RotateCcw size={12} />

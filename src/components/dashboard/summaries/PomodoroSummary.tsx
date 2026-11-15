@@ -68,22 +68,22 @@ export const PomodoroSummary: React.FC = () => {
           <>
             <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
               <p className="text-xl font-bold text-[var(--accent)]">{todayStats.totalPomodoros}</p>
-              <p className="text-[10px] font-medium text-[#92400e]">番茄数</p>
+              <p className="text-xs font-medium text-[#92400e]">番茄数</p>
             </div>
             <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
               <p className="text-xl font-bold text-[#b06d20]">{formatDuration(todayStats.totalMinutes)}</p>
-              <p className="text-[10px] font-medium text-[#92400e]">专注时长</p>
+              <p className="text-xs font-medium text-[#92400e]">专注时长</p>
             </div>
           </>
         ) : (
           <>
             <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
               <p className="text-xl font-bold text-[var(--success)]">{todoStats.completed}/{todoStats.total}</p>
-              <p className="text-[10px] font-medium text-[#166534]">已完成</p>
+              <p className="text-xs font-medium text-[#166534]">已完成</p>
             </div>
             <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
               <p className="text-xl font-bold text-[var(--accent)]">{todoStats.inProgress}</p>
-              <p className="text-[10px] font-medium text-[#92400e]">进行中</p>
+              <p className="text-xs font-medium text-[#92400e]">进行中</p>
             </div>
           </>
         )}
@@ -92,7 +92,7 @@ export const PomodoroSummary: React.FC = () => {
       {/* Mode toggle */}
       <button
         onClick={toggleMode}
-        className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-accent)] rounded-lg transition-colors"
+        className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-accent)] rounded-lg transition-colors"
       >
         {mode === 'pomodoro' ? (
           <><ListTodo size={10} /> 切换到待办视图</>

@@ -317,12 +317,12 @@ export const MemorySettingsSection: React.FC = () => {
                 m.pinned ? 'border-[#c8b88a] bg-[#fdf9ed]' : 'border-[var(--border-light)] bg-white'
               }`}
             >
-              <span className="mt-0.5 shrink-0 rounded bg-[#f2efe9] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">
+              <span className="mt-0.5 shrink-0 rounded bg-[#f2efe9] px-1.5 py-0.5 text-xs text-[var(--text-secondary)]">
                 {KIND_LABELS[m.kind] ?? m.kind}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm text-[var(--text-primary)]">{m.content}</div>
-                <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[#b8b4ad]">
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-[#b8b4ad]">
                   <span>{m.source === 'manual' ? '手动' : m.source === 'inferred' ? '自动提取' : '对话'}</span>
                   <span>置信 {(m.confidence * 100).toFixed(0)}%</span>
                   {m.hit_count > 0 && <span>命中 {m.hit_count} 次</span>}

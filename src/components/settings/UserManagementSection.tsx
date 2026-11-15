@@ -197,11 +197,11 @@ export const UserManagementSection: React.FC = () => {
                     <tr key={user.id} className="border-t border-[#f0ede8]">
                       <td className="px-3 py-2">
                         <span className="font-medium text-[var(--text-primary)]">{user.username}</span>
-                        {isSelf && <span className="ml-1.5 text-[10px] text-[var(--text-muted)]">(你)</span>}
+                        {isSelf && <span className="ml-1.5 text-xs text-[var(--text-muted)]">(你)</span>}
                       </td>
                       <td className="px-3 py-2">
                         <span
-                          className={`rounded border px-1.5 py-0.5 text-[10px] ${
+                          className={`rounded border px-1.5 py-0.5 text-xs ${
                             user.role === 'admin'
                               ? 'border-[#f0dcc0] bg-[var(--bg-accent)] text-[var(--accent)]'
                               : 'border-[var(--border-light)] bg-[var(--bg-base)] text-[var(--text-secondary)]'

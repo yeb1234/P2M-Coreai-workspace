@@ -33,7 +33,7 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-[var(--text-primary)]">批量操作</p>
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-muted)]">
             已选 {selectedVideoCount} 个视频
           </p>
         </div>
@@ -42,7 +42,7 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
             type="button"
             onClick={onPreview}
             disabled={batchLoading || selectedVideoCount === 0}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
           >
             <SearchCheck size={13} />
             预览
@@ -51,7 +51,7 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
             type="button"
             onClick={onApplySettings}
             disabled={batchLoading}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
             title="将左侧当前转写设置保存到后端并同步给排队中的任务"
           >
             <RefreshCw size={13} />
@@ -61,7 +61,7 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
             type="button"
             onClick={onEnqueue}
             disabled={batchLoading || selectedVideoCount === 0}
-            className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-[11px] text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
+            className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-xs text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
           >
             {batchLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             入队
@@ -70,13 +70,13 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
       </div>
 
       {batchError && (
-        <div className="min-w-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] leading-5 text-red-700">
+        <div className="min-w-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
           {batchError}
         </div>
       )}
 
       {batchPreview && (
-        <div className="min-w-0 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-[11px] leading-5 text-[var(--text-muted)]">
+        <div className="min-w-0 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">
           <p>
             共 {batchPreview.requested}，可处理 {batchPreview.eligible}，本次入队 {batchPreview.enqueued || Math.min(batchPreview.eligible, batchPreview.max_enqueue)}，跳过 {batchPreview.skipped}
             {batchPreview.active ? `，活动中 ${batchPreview.active}` : ''}

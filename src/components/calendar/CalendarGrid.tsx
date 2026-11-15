@@ -86,19 +86,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) 
             )}
             {(pendingByDate[popupDate] || []).length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-medium text-[var(--accent)] mb-1.5 flex items-center gap-1"><ListTodo size={11} /> 待办</p>
+                <p className="text-xs font-medium text-[var(--accent)] mb-1.5 flex items-center gap-1"><ListTodo size={11} /> 待办</p>
                 {(pendingByDate[popupDate] || []).map((todo) => (
                   <div key={todo.id} className="flex items-center gap-2 py-1.5 border-b border-[var(--border-light)] last:border-0">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: todo.priority === 'high' ? '#e8a0a0' : todo.priority === 'medium' ? '#e8d4a0' : todo.priority === 'low' ? '#a0c4e8' : '#a0d4a0' }} />
                     <span className="text-xs text-[var(--text-primary)] truncate flex-1">{todo.title}</span>
-                    {todo.pomodoroRounds > 0 && <span className="text-[10px] text-[var(--text-muted)]">{todo.pomodoroRounds}轮</span>}
+                    {todo.pomodoroRounds > 0 && <span className="text-xs text-[var(--text-muted)]">{todo.pomodoroRounds}轮</span>}
                   </div>
                 ))}
               </div>
             )}
             {(eventsByDate[popupDate] || []).length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-medium text-[var(--text-secondary)] mb-1.5">日程</p>
+                <p className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">日程</p>
                 {(eventsByDate[popupDate] || []).map((event) => (
                   <div key={event.id} className="py-1.5 border-b border-[var(--border-light)] last:border-0">
                     <div className="rounded px-2 py-1 text-xs font-medium text-white truncate" style={{ background: event.color }}>
@@ -110,7 +110,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) 
             )}
             {(completedByDate[popupDate] || []).length > 0 && (
               <div>
-                <p className="text-[10px] font-medium text-[var(--success)] mb-1.5 flex items-center gap-1"><CheckCircle2 size={11} /> 已完成</p>
+                <p className="text-xs font-medium text-[var(--success)] mb-1.5 flex items-center gap-1"><CheckCircle2 size={11} /> 已完成</p>
                 {(completedByDate[popupDate] || []).slice(0, 5).map((todo) => (
                   <div key={todo.id} className="py-1 border-b border-[var(--border-light)] last:border-0">
                     <span className="text-xs text-[var(--text-muted)] line-through">{todo.title}</span>

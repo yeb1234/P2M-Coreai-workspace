@@ -38,7 +38,7 @@ export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children })
             <button
               key={item.value}
               onClick={() => setFilter({ status: item.value })}
-              className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${
+              className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
                 filter.status === item.value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'
               }`}
             >
@@ -51,7 +51,7 @@ export const TodoFilters: React.FC<TodoFiltersProps> = ({ collapsed, children })
             <button
               key={item.value || 'all'}
               onClick={() => setFilter({ priority: item.value })}
-              className={`px-2 py-0.5 text-[10px] rounded-full transition-colors flex items-center gap-1 ${
+              className={`px-2 py-0.5 text-xs rounded-full transition-colors flex items-center gap-1 ${
                 filter.priority === item.value ? 'text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'
               }`}
               style={{ backgroundColor: filter.priority === item.value ? (item.value ? PRIORITY_COLORS[item.value] : '#c87d2f') : undefined }}

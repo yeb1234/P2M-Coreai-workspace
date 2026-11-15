@@ -189,7 +189,7 @@ export function AISettings() {
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
-            <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{isLocal ? 'LM Studio / 本地 OpenAI 兼容服务。' : '网络 OpenAI 兼容服务，用于兜底或优先处理。'}</p>
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{isLocal ? 'LM Studio / 本地 OpenAI 兼容服务。' : '网络 OpenAI 兼容服务，用于兜底或优先处理。'}</p>
           </div>
           {!isLocal && (
             <button type="button" onClick={clearExternal} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--danger)] hover:bg-[var(--danger-bg)]" title="清空外部 LLM 设置">
@@ -240,8 +240,8 @@ export function AISettings() {
               {!form[modelKey] && <option value="">请选择模型</option>}
               {options.map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
-            {modelListUrl(form[baseKey]) && <p className="mt-1 text-[10px] text-[var(--text-muted)]">模型列表：<code>{modelListUrl(form[baseKey])}</code></p>}
-            {modelError[target] && <p className="mt-1 text-[10px] text-[var(--danger)]">{modelError[target]}</p>}
+            {modelListUrl(form[baseKey]) && <p className="mt-1 text-xs text-[var(--text-muted)]">模型列表：<code>{modelListUrl(form[baseKey])}</code></p>}
+            {modelError[target] && <p className="mt-1 text-xs text-[var(--danger)]">{modelError[target]}</p>}
           </div>
         </div>
       </div>
@@ -264,7 +264,7 @@ export function AISettings() {
         >
           {POLICY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
-        <p className="mt-1 text-[10px] text-[var(--text-muted)]">影响灵境小助手对话、视频总结和字幕校对。保存后新请求生效。</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">影响灵境小助手对话、视频总结和字幕校对。保存后新请求生效。</p>
       </div>
 
       <div>

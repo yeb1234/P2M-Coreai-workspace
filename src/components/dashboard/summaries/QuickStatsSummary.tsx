@@ -41,7 +41,7 @@ export const QuickStatsSummary: React.FC = () => {
           <span className="shrink-0" style={{ color: item.color }}>{item.icon}</span>
           <div className="min-w-0">
             <p className="text-sm font-bold text-[var(--text-primary)]">{item.value}</p>
-            <p className="text-[10px] text-[var(--text-muted)]">{item.label}</p>
+            <p className="text-xs text-[var(--text-muted)]">{item.label}</p>
           </div>
         </div>
       ))}

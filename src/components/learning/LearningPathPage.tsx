@@ -61,7 +61,7 @@ const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string; 
       <span className="text-xs font-medium">{label}</span>
     </div>
     <p className="text-2xl font-bold text-[var(--text-primary)]">{value}</p>
-    <p className="mt-1 text-[10px] text-[var(--text-muted)]">{hint}</p>
+    <p className="mt-1 text-xs text-[var(--text-muted)]">{hint}</p>
   </div>
 );
 
@@ -102,9 +102,9 @@ const StepRow: React.FC<{
         >
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-mono text-[var(--text-muted)]">STEP {index + 1}</span>
-              <span className={`rounded border px-1.5 py-0.5 text-[10px] ${meta.className}`}>{meta.label}</span>
-              <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+              <span className="text-xs font-mono text-[var(--text-muted)]">STEP {index + 1}</span>
+              <span className={`rounded border px-1.5 py-0.5 text-xs ${meta.className}`}>{meta.label}</span>
+              <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
                 <Clock size={11} /> {formatMinutes(step.est_minutes)}
               </span>
             </span>
@@ -129,7 +129,7 @@ const StepRow: React.FC<{
 
             {step.videos.length > 0 ? (
               <div className="space-y-1">
-                <p className="text-[10px] font-medium text-[var(--text-muted)]">配套视频（都来自你的视频库）</p>
+                <p className="text-xs font-medium text-[var(--text-muted)]">配套视频（都来自你的视频库）</p>
                 {step.videos.map((video) => (
                   <button
                     key={video.id}
@@ -142,13 +142,13 @@ const StepRow: React.FC<{
                       {video.title || `视频 ${video.id}`}
                     </span>
                     {video.duration ? (
-                      <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{formatClock(video.duration)}</span>
+                      <span className="shrink-0 text-xs text-[var(--text-muted)]">{formatClock(video.duration)}</span>
                     ) : null}
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="rounded-lg bg-[var(--bg-accent)] px-2 py-1.5 text-[11px] text-[var(--accent)]">
+              <p className="rounded-lg bg-[var(--bg-accent)] px-2 py-1.5 text-xs text-[var(--accent)]">
                 这一步在你的视频库里暂时没有匹配素材，需要自己找资料补充。
               </p>
             )}
@@ -160,7 +160,7 @@ const StepRow: React.FC<{
                     type="button"
                     disabled={busy}
                     onClick={() => onAdvance(step)}
-                    className="rounded-lg bg-[var(--success)] px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-[#15803d] disabled:opacity-50"
+                    className="rounded-lg bg-[var(--success)] px-2.5 py-1 text-xs font-medium text-white transition hover:bg-[#15803d] disabled:opacity-50"
                   >
                     {step.status === 'pending' ? '开始这一步' : '标记完成'}
                   </button>
@@ -168,7 +168,7 @@ const StepRow: React.FC<{
                     type="button"
                     disabled={busy}
                     onClick={() => onReopen(step)}
-                    className="rounded-lg border border-[var(--border-light)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] disabled:opacity-50"
+                    className="rounded-lg border border-[var(--border-light)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] disabled:opacity-50"
                   >
                     重置
                   </button>
@@ -178,7 +178,7 @@ const StepRow: React.FC<{
                   type="button"
                   disabled={busy}
                   onClick={() => onReopen(step)}
-                  className="rounded-lg border border-[var(--border-light)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] disabled:opacity-50"
+                  className="rounded-lg border border-[var(--border-light)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] disabled:opacity-50"
                 >
                   撤销完成
                 </button>
@@ -388,7 +388,7 @@ export const LearningPathPage: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">目标</span>
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">目标</span>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -398,7 +398,7 @@ export const LearningPathPage: React.FC = () => {
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">目标岗位</span>
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">目标岗位</span>
               <input
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
@@ -407,7 +407,7 @@ export const LearningPathPage: React.FC = () => {
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">期限（可空）</span>
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">期限（可空）</span>
               <input
                 type="date"
                 value={deadline}
@@ -416,7 +416,7 @@ export const LearningPathPage: React.FC = () => {
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">每周可投入（小时）</span>
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">每周可投入（小时）</span>
               <input
                 type="number"
                 min={1}
@@ -427,7 +427,7 @@ export const LearningPathPage: React.FC = () => {
               />
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">要覆盖的技能（逗号分隔）</span>
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">要覆盖的技能（逗号分隔）</span>
               <input
                 value={skills}
                 onChange={(e) => setSkills(e.target.value)}
@@ -438,7 +438,7 @@ export const LearningPathPage: React.FC = () => {
           </div>
 
           {genError && (
-            <p className="mt-3 flex items-start gap-1.5 text-[11px] text-[#dc2626]">
+            <p className="mt-3 flex items-start gap-1.5 text-xs text-[#dc2626]">
               <AlertCircle size={13} className="mt-0.5 shrink-0" />
               {genError}
             </p>
@@ -454,7 +454,7 @@ export const LearningPathPage: React.FC = () => {
               {generating ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
               {generating ? `正在规划… ${elapsed}s` : '生成路径'}
             </button>
-            <span className="text-[10px] text-[var(--text-muted)]">
+            <span className="text-xs text-[var(--text-muted)]">
               规划要 20–40 秒，会依次检索你库里的素材。
             </span>
           </div>
@@ -469,14 +469,14 @@ export const LearningPathPage: React.FC = () => {
               key={path.id}
               type="button"
               onClick={() => setActivePathId(path.id)}
-              className={`rounded-lg border px-2.5 py-1 text-[11px] transition ${
+              className={`rounded-lg border px-2.5 py-1 text-xs transition ${
                 path.id === activePathId
                   ? 'border-[var(--accent)] bg-[var(--bg-accent)] text-[var(--accent)]'
                   : 'border-[var(--border-light)] bg-white text-[var(--text-secondary)] hover:border-[var(--accent)]'
               }`}
             >
               {path.title.replace(' · 学习路径', '')}
-              <span className="ml-1.5 text-[10px] opacity-70">{path.progress.percent}%</span>
+              <span className="ml-1.5 text-xs opacity-70">{path.progress.percent}%</span>
             </button>
           ))}
         </div>
@@ -506,7 +506,7 @@ export const LearningPathPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void handleActivate(activePath)}
-                  className="shrink-0 rounded-lg border border-[var(--accent)] px-2.5 py-1 text-[11px] text-[var(--accent)] transition hover:bg-[var(--bg-accent)]"
+                  className="shrink-0 rounded-lg border border-[var(--accent)] px-2.5 py-1 text-xs text-[var(--accent)] transition hover:bg-[var(--bg-accent)]"
                 >
                   设为进行中
                 </button>
@@ -514,7 +514,7 @@ export const LearningPathPage: React.FC = () => {
             </div>
 
             <div className="mt-3">
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+              <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
                 <span>
                   {activePath.progress.done}/{activePath.progress.total} 步完成
                 </span>

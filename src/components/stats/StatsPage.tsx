@@ -125,7 +125,7 @@ export const StatsPage: React.FC = () => {
             <span className="text-xs font-medium">今日番茄</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">{todayStats.totalPomodoros}</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">
+          <p className="text-xs text-[var(--text-muted)] mt-1">
             {todayStats.totalMinutes >= 60
               ? `${(todayStats.totalMinutes / 60).toFixed(1)}h`
               : `${todayStats.totalMinutes}分钟`}
@@ -141,7 +141,7 @@ export const StatsPage: React.FC = () => {
               ? `${(totalWeekMinutes / 60).toFixed(1)}h`
               : `${totalWeekMinutes}m`}
           </p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">{totalWeekPomodoros} 个番茄</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">{totalWeekPomodoros} 个番茄</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[var(--success)] mb-2">
@@ -149,7 +149,7 @@ export const StatsPage: React.FC = () => {
             <span className="text-xs font-medium">待办统计</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">{completedTodos}</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">
+          <p className="text-xs text-[var(--text-muted)] mt-1">
             {inProgressTodos} 进行中 / {pendingTodos} 待处理
           </p>
         </div>
@@ -159,7 +159,7 @@ export const StatsPage: React.FC = () => {
             <span className="text-xs font-medium">连续天数</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">{streak}天</p>
-          <p className="text-[10px] text-[var(--warn)] mt-1">
+          <p className="text-xs text-[var(--warn)] mt-1">
             {streak >= 7 ? '保持势头!' : streak > 0 ? '继续加油' : '从今天开始'}
           </p>
         </div>
@@ -171,21 +171,21 @@ export const StatsPage: React.FC = () => {
           <StickyNote size={16} className="text-[var(--warn)]" />
           <div>
             <p className="text-lg font-bold text-[var(--text-primary)]">{notes.length}</p>
-            <p className="text-[10px] text-[var(--text-muted)]">笔记</p>
+            <p className="text-xs text-[var(--text-muted)]">笔记</p>
           </div>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
           <Calendar size={16} className="text-[#7c3aed]" />
           <div>
             <p className="text-lg font-bold text-[var(--text-primary)]">{eventCount}</p>
-            <p className="text-[10px] text-[var(--text-muted)]">日历事件</p>
+            <p className="text-xs text-[var(--text-muted)]">日历事件</p>
           </div>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
           <Target size={16} className="text-[var(--success)]" />
           <div>
             <p className="text-lg font-bold text-[var(--text-primary)]">{todoList.length}</p>
-            <p className="text-[10px] text-[var(--text-muted)]">全部待办</p>
+            <p className="text-xs text-[var(--text-muted)]">全部待办</p>
           </div>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
@@ -194,7 +194,7 @@ export const StatsPage: React.FC = () => {
             <p className="text-lg font-bold text-[var(--text-primary)]">
               {todoList.length > 0 ? Math.round((completedTodos / todoList.length) * 100) : 0}%
             </p>
-            <p className="text-[10px] text-[var(--text-muted)]">完成率</p>
+            <p className="text-xs text-[var(--text-muted)]">完成率</p>
           </div>
         </div>
       </div>
@@ -216,7 +216,7 @@ export const StatsPage: React.FC = () => {
 
               return (
                 <div key={date} className="flex-1 flex flex-col items-center gap-2">
-                  <span className="text-[10px] text-[var(--text-muted)]">
+                  <span className="text-xs text-[var(--text-muted)]">
                     {minutes > 0 ? `${minutes}分钟` : '-'}
                   </span>
                   <div className="w-full flex items-end justify-center" style={{ height: '120px' }}>
@@ -232,7 +232,7 @@ export const StatsPage: React.FC = () => {
                   <span className={`text-xs font-medium ${isToday ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}>
                     {DAY_LABELS[dayOfWeek]}
                     {pomodoros > 0 && (
-                      <span className="block text-[10px] text-[var(--text-muted)]">{pomodoros}个</span>
+                      <span className="block text-xs text-[var(--text-muted)]">{pomodoros}个</span>
                     )}
                   </span>
                 </div>
@@ -262,7 +262,7 @@ export const StatsPage: React.FC = () => {
               >
                 {badge.icon}
               </div>
-              <span className={`text-[10px] ${badge.unlocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]'}`}>
+              <span className={`text-xs ${badge.unlocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]'}`}>
                 {badge.label}
               </span>
             </div>

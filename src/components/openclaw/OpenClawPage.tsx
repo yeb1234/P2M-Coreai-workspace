@@ -32,7 +32,7 @@ export const OpenClawPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Package size={16} className="text-[var(--danger)]" />
                 <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--danger)] transition-colors">{pkg.name}</h3>
-                <span className="text-[10px] px-1.5 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded font-mono">v{pkg.version}</span>
+                <span className="text-xs px-1.5 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded font-mono">v{pkg.version}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--success)] hover:bg-[var(--success-bg)] rounded-md"><Download size={14} /></button>
@@ -41,9 +41,9 @@ export const OpenClawPage: React.FC = () => {
             </div>
             <p className="text-xs text-[var(--text-secondary)] mt-1.5">{pkg.desc}</p>
             <div className="flex items-center gap-4 mt-2">
-              <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1"><Star size={10} className="text-[var(--warn)]" />{(pkg.stars / 1000).toFixed(0)}k</span>
-              <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1"><Download size={10} />{pkg.downloads}</span>
-              <span className="text-[10px] px-1.5 py-0.5 bg-[var(--bg-accent)] text-[var(--accent)] rounded-full">{pkg.tag}</span>
+              <span className="text-xs text-[var(--text-muted)] flex items-center gap-1"><Star size={10} className="text-[var(--warn)]" />{(pkg.stars / 1000).toFixed(0)}k</span>
+              <span className="text-xs text-[var(--text-muted)] flex items-center gap-1"><Download size={10} />{pkg.downloads}</span>
+              <span className="text-xs px-1.5 py-0.5 bg-[var(--bg-accent)] text-[var(--accent)] rounded-full">{pkg.tag}</span>
             </div>
           </div>
         ))}

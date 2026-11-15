@@ -51,8 +51,8 @@ export const BookmarksPage: React.FC = () => {
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[#06b6d4] transition-colors truncate">{bm.title}</h3>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-[var(--text-muted)]">{bm.url}</span>
-                <span className="text-[10px] px-1.5 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded">{bm.folder}</span>
+                <span className="text-xs text-[var(--text-muted)]">{bm.url}</span>
+                <span className="text-xs px-1.5 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded">{bm.folder}</span>
               </div>
             </div>
             <ExternalLink size={12} className="text-[var(--border-medium)] group-hover:text-[var(--text-secondary)] flex-shrink-0" />

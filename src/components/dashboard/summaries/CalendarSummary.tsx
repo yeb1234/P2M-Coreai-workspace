@@ -20,7 +20,7 @@ export const CalendarSummary: React.FC = () => {
           <Calendar size={12} />
           <span>{formatDate(new Date(), 'MM月dd日')}</span>
         </div>
-        <span className="text-[10px] font-semibold text-[var(--accent)] bg-[var(--bg-accent)] px-1.5 py-0.5 rounded-md">{todayEvents.length}</span>
+        <span className="text-xs font-semibold text-[var(--accent)] bg-[var(--bg-accent)] px-1.5 py-0.5 rounded-md">{todayEvents.length}</span>
       </div>
 
       {todayEvents.length === 0 ? (
@@ -48,7 +48,7 @@ export const CalendarSummary: React.FC = () => {
                 ) : (
                   <>
                     <span className="truncate text-[var(--text-primary)] font-medium">{event.title}</span>
-                    <span className="text-[10px] text-[var(--text-muted)] ml-auto flex-shrink-0">{timePart(event.startAt)}</span>
+                    <span className="text-xs text-[var(--text-muted)] ml-auto flex-shrink-0">{timePart(event.startAt)}</span>
                   </>
                 )}
               </div>

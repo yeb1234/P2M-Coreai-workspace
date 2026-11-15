@@ -68,7 +68,7 @@ export const PomodoroStats: React.FC = () => {
           <div className="flex items-center gap-2 text-[var(--text-secondary)] mb-3">
             <TrendingUp size={14} />
             <span className="text-xs font-medium">本周趋势</span>
-            <div className="ml-auto flex items-center gap-3 pr-1 text-[10px]">
+            <div className="ml-auto flex items-center gap-3 pr-1 text-xs">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'var(--accent)' }} />
                 专注
@@ -86,7 +86,7 @@ export const PomodoroStats: React.FC = () => {
                 const pct = ((h + 6 - TIMELINE_START) / TIMELINE_HOURS) * 100;
                 if (pct < 0 || pct > 100) return null;
                 return (
-                  <span key={h} className="absolute text-[8px] text-[var(--text-muted)]" style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}>
+                  <span key={h} className="absolute text-xs text-[var(--text-muted)]" style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}>
                     {String(h + 6).padStart(2, '0')}:00
                   </span>
                 );
@@ -103,8 +103,8 @@ export const PomodoroStats: React.FC = () => {
               return (
                 <div key={date} className="flex items-center gap-2 pr-2">
                   <div className={`w-8 text-right flex-shrink-0 ${isToday ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-muted)]'}`}>
-                    <div className="text-[10px] leading-tight">{dayName}</div>
-                    <div className="text-[9px] leading-tight">{dayNum}</div>
+                    <div className="text-xs leading-tight">{dayName}</div>
+                    <div className="text-xs leading-tight">{dayNum}</div>
                   </div>
                   <div className="flex-1 h-5 rounded-md relative overflow-hidden bg-[var(--bg-elevated)]">
                     {sessions.map((session) => {
@@ -127,7 +127,7 @@ export const PomodoroStats: React.FC = () => {
                     })}
                     {sessions.length === 0 && (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[8px] text-[var(--text-muted)]">-</span>
+                        <span className="text-xs text-[var(--text-muted)]">-</span>
                       </div>
                     )}
                   </div>

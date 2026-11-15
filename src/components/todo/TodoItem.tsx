@@ -208,7 +208,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
 
           {todo.description && <p className="text-[13px] md:text-sm text-[var(--text-muted)] truncate mb-0.5 md:mb-2">{todo.description}</p>}
 
-          <div className="flex items-center gap-3 md:gap-4 text-[12px] md:text-xs text-[var(--text-muted)]">
+          <div className="flex items-center gap-3 md:gap-4 text-xs md:text-xs text-[var(--text-muted)]">
             {hasTimeRange ? (
               <>
                 <span className="flex items-center gap-1">
@@ -241,9 +241,9 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
                     }}
                   />
                 </div>
-                <span className="text-[9px] md:text-[10px] text-[var(--text-muted)] flex-shrink-0">{todo.pomodoroCount}/{totalPomodoros}</span>
+                <span className="text-xs md:text-xs text-[var(--text-muted)] flex-shrink-0">{todo.pomodoroCount}/{totalPomodoros}</span>
               </div>
-              <div className="text-[9px] md:text-[10px] text-[var(--text-muted)] mt-0.5">
+              <div className="text-xs md:text-xs text-[var(--text-muted)] mt-0.5">
                 预计 {formatDuration(plannedMinutes)}
                 {todo.pomodoroCount > 0 && ` · 已用 ${formatDuration(completedMinutes)}`}
               </div>

@@ -32,7 +32,7 @@ export const ShopPage: React.FC = () => {
             <span className="text-xs font-medium">今日收入</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">¥12,580</p>
-          <p className="text-[10px] text-[var(--success)] mt-1 flex items-center gap-1">
+          <p className="text-xs text-[var(--success)] mt-1 flex items-center gap-1">
             <ArrowUpRight size={10} /> +15% vs 昨日
           </p>
         </div>
@@ -42,7 +42,7 @@ export const ShopPage: React.FC = () => {
             <span className="text-xs font-medium">今日支出</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">¥3,200</p>
-          <p className="text-[10px] text-[var(--danger)] mt-1 flex items-center gap-1">
+          <p className="text-xs text-[var(--danger)] mt-1 flex items-center gap-1">
             <ArrowDownRight size={10} /> -5% vs 昨日
           </p>
         </div>
@@ -52,7 +52,7 @@ export const ShopPage: React.FC = () => {
             <span className="text-xs font-medium">待发货</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">8 单</p>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">需尽快处理</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">需尽快处理</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[var(--warn)] mb-2">
@@ -60,7 +60,7 @@ export const ShopPage: React.FC = () => {
             <span className="text-xs font-medium">售后处理</span>
           </div>
           <p className="text-2xl font-bold text-[var(--text-primary)]">3 件</p>
-          <p className="text-[10px] text-[var(--danger)] mt-1">1 件退款待审</p>
+          <p className="text-xs text-[var(--danger)] mt-1">1 件退款待审</p>
         </div>
       </div>
 
@@ -78,7 +78,7 @@ export const ShopPage: React.FC = () => {
               'bg-[var(--info-bg)] text-[var(--info)]'
             }`}>
               <span className="flex-1">{alert.msg}</span>
-              <span className="text-[10px] opacity-60">{alert.time}</span>
+              <span className="text-xs opacity-60">{alert.time}</span>
             </div>
           ))}
         </div>
@@ -112,7 +112,7 @@ export const ShopPage: React.FC = () => {
                   <td className="px-4 py-2.5 text-[var(--text-primary)]">{order.product}</td>
                   <td className="px-4 py-2.5 text-right font-medium text-[var(--text-primary)]">¥{order.amount}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${
                       order.status === '已发货' ? 'bg-[var(--info-bg)] text-[var(--info)]' :
                       order.status === '待发货' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' :
                       order.status === '已签收' ? 'bg-[var(--success-bg)] text-[var(--success)]' :

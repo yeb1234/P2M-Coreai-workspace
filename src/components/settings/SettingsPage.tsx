@@ -114,7 +114,7 @@ function PomodoroSettings() {
               }`}
             >
               <p className="text-sm font-medium">{item.label}</p>
-              <p className="mt-1 text-[10px] leading-4">{item.desc}</p>
+              <p className="mt-1 text-xs leading-4">{item.desc}</p>
             </button>
           ))}
         </div>
@@ -206,7 +206,7 @@ function ProfileSettings() {
           onChange={(e) => setName(e.target.value)}
           placeholder="输入你的昵称"
         />
-        <p className="mt-1 text-[10px] text-[var(--text-muted)]">将显示在侧边栏和工作台中</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">将显示在侧边栏和工作台中</p>
       </div>
       <div>
         <SettingsFieldLabel>语言</SettingsFieldLabel>

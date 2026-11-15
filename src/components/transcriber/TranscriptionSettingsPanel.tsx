@@ -183,8 +183,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
       {/* Presets */}
       <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] p-2">
         <div className="mb-1.5 flex items-center justify-between">
-          <p className="text-[11px] font-semibold text-[var(--text-primary)]">模式预设</p>
-          <p className="text-[10px] text-[var(--text-muted)]">先选预设，再微调</p>
+          <p className="text-xs font-semibold text-[var(--text-primary)]">模式预设</p>
+          <p className="text-xs text-[var(--text-muted)]">先选预设，再微调</p>
         </div>
         <div className="grid grid-cols-4 gap-1.5">
           <button
@@ -197,8 +197,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             }`}
             title="3070Ti（8G显存）推荐：faster-whisper + large-v3-turbo + int8_float16"
           >
-            <p className="text-[11px] font-medium">3070Ti（8G显存）推荐</p>
-            <p className="mt-0.5 text-[10px] leading-3 text-[var(--text-muted)]">large-v3-turbo</p>
+            <p className="text-xs font-medium">3070Ti（8G显存）推荐</p>
+            <p className="mt-0.5 text-xs leading-3 text-[var(--text-muted)]">large-v3-turbo</p>
           </button>
           <button
             type="button"
@@ -210,8 +210,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             }`}
             title="faster-whisper CPU，参数保守，适合后台慢慢跑"
           >
-            <p className="text-[11px] font-medium">CPU 低占用</p>
-            <p className="mt-0.5 text-[10px] leading-3 text-[var(--text-muted)]">faster-whisper</p>
+            <p className="text-xs font-medium">CPU 低占用</p>
+            <p className="mt-0.5 text-xs leading-3 text-[var(--text-muted)]">faster-whisper</p>
           </button>
           <button
             type="button"
@@ -223,8 +223,8 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             }`}
             title="whisper.cpp + large-v3，适合 GPU/Vulkan/HIP 转写"
           >
-            <p className="text-[11px] font-medium">Whisper.cpp</p>
-            <p className="mt-0.5 text-[10px] leading-3 text-[var(--text-muted)]">外部引擎</p>
+            <p className="text-xs font-medium">Whisper.cpp</p>
+            <p className="mt-0.5 text-xs leading-3 text-[var(--text-muted)]">外部引擎</p>
           </button>
           <button
             type="button"
@@ -232,19 +232,19 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             className="rounded-md border border-[var(--border-light)] bg-[var(--theme-surface,white)] px-2 py-1.5 text-left transition-colors hover:border-[var(--accent)]"
             title="恢复系统默认参数"
           >
-            <p className="text-[11px] font-medium text-[var(--text-primary)]">恢复默认</p>
-            <p className="mt-0.5 text-[10px] leading-3 text-[var(--text-muted)]">系统默认</p>
+            <p className="text-xs font-medium text-[var(--text-primary)]">恢复默认</p>
+            <p className="mt-0.5 text-xs leading-3 text-[var(--text-muted)]">系统默认</p>
           </button>
         </div>
       </div>
 
       {/* Engine */}
       <div>
-        <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">转写引擎</label>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">转写引擎</label>
         <select
           value={settings.whisperEngine}
           onChange={(e) => handleEngineChange(e.target.value)}
-          className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+          className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
         >
           <option value="faster-whisper">faster-whisper CPU（稳定默认）</option>
           <option value="whisper.cpp">whisper.cpp 外部引擎（可接 Vulkan/HIP）</option>
@@ -252,11 +252,11 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
       </div>
 
       <div>
-        <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">模型尺寸</label>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">模型尺寸</label>
         <select
           value={settings.whisperModel}
           onChange={(e) => onChange({ whisperModel: e.target.value })}
-          className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+          className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
         >
           {modelOptions.map((m) => {
             const installed = !whisperModels || installedModels.has(m.id);
@@ -281,11 +281,11 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           })}
         </select>
         {modelInvalid && (
-          <p className="mt-1 text-[10px] text-amber-600">
+          <p className="mt-1 text-xs text-amber-600">
             当前模型与所选引擎不兼容，请重新选择。
           </p>
         )}
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--text-muted)]">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
           {whisperModels && <span>模型目录：{whisperModels.model_dir}</span>}
           <button type="button" onClick={() => void fetchWhisperModels().then((m) => setWhisperModels(m)).catch(() => setWhisperModels(null))} className="text-[var(--accent)] hover:underline">
             重新扫描
@@ -339,7 +339,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           {(() => {
             const s = downloadStates[settings.whisperModel];
             if (s?.status === 'failed' && s?.error) {
-              return <span className="text-[10px] text-amber-600">{s.error}</span>;
+              return <span className="text-xs text-amber-600">{s.error}</span>;
             }
             return null;
           })()}
@@ -347,14 +347,14 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
       </div>
 
       <div>
-        <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">运行设备</label>
+        <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">运行设备</label>
         <div className="flex gap-2">
           {(['auto', 'cuda', 'cpu'] as const).map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => handleDeviceChange(d)}
-              className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
+              className={`flex-1 rounded-md border px-2 py-1.5 text-xs transition-colors ${
                 settings.deviceType === d
                   ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                   : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)]'
@@ -364,36 +364,36 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             </button>
           ))}
         </div>
-        <p className="mt-1 text-[10px] text-[var(--text-muted)]">只对 faster-whisper 生效。whisper.cpp 取决于 whisper-cli.exe 编译参数。</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">只对 faster-whisper 生效。whisper.cpp 取决于 whisper-cli.exe 编译参数。</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">语言</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">语言</label>
           <input
             value={settings.language}
             onChange={(e) => onChange({ language: e.target.value })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">计算精度</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">计算精度</label>
           <select
             value={settings.computeType}
             onChange={(e) => onChange({ computeType: e.target.value })}
             disabled={isWhisperCpp}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
+            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
           >
             {computeOptions.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
           {computeTypeInvalid ? (
-            <p className="mt-1 text-[10px] text-amber-600">
+            <p className="mt-1 text-xs text-amber-600">
               {settings.deviceType === 'cpu' ? 'CPU 不支持 float16/bfloat16 系列，会自动回退到 int8。' : '当前 compute_type 与设备不兼容，请重选。'}
             </p>
           ) : (
-            <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
               {isWhisperCpp ? 'whisper.cpp 忽略此项' : settings.deviceType === 'cuda' ? 'CUDA: float16 速度最快，int8_float16 显存最省' : 'CPU: int8 最快、float32 最准'}
             </p>
           )}
@@ -402,29 +402,29 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
 
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">beam_size</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">beam_size</label>
           <input
             type="number"
             min={1}
             max={10}
             value={settings.beamSize}
             onChange={(e) => onChange({ beamSize: Number(e.target.value) })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">best_of</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">best_of</label>
           <input
             type="number"
             min={1}
             max={10}
             value={settings.bestOf}
             onChange={(e) => onChange({ bestOf: Number(e.target.value) })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">温度</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">温度</label>
           <input
             type="number"
             min={0}
@@ -432,48 +432,48 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
             step={0.1}
             value={settings.temperature}
             onChange={(e) => onChange({ temperature: Number(e.target.value) })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         {isWhisperCpp ? (
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] leading-4 text-blue-700">
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs leading-4 text-blue-700">
             GPU 转写模式：CPU 线程对 whisper.cpp 无效，由 whisper-cli.exe 自行决定。
           </div>
         ) : isCuda ? (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[10px] leading-4 text-emerald-700">
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs leading-4 text-emerald-700">
             CUDA 模式：转写在 GPU 上跑，CPU 线程仅影响 ffmpeg 音频提取。
           </div>
         ) : (
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">CPU 转写线程</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">CPU 转写线程</label>
             <input
               type="number"
               min={1}
               max={128}
               value={settings.cpuThreads}
               onChange={(e) => onChange({ cpuThreads: Number(e.target.value) })}
-              className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+              className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
             />
           </div>
         )}
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">总结字数</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">总结字数</label>
           <input
             type="number"
             min={50}
             max={2000}
             value={settings.wordLimit}
             onChange={(e) => onChange({ wordLimit: Number(e.target.value) })}
-            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            className="w-full rounded-md border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <input
             type="checkbox"
             checked={settings.doSummary}
@@ -482,7 +482,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           />
           生成总结
         </label>
-        <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <input
             type="checkbox"
             checked={settings.vadFilter}
@@ -491,7 +491,7 @@ export function TranscriptionSettingsPanel({ settings, onChange }: Transcription
           />
           VAD 过滤
         </label>
-        <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <input
             type="checkbox"
             checked={settings.subtitleCorrectionEnabled}

@@ -293,13 +293,13 @@ export const AIChatPanel: React.FC = () => {
         <Bot size={17} className="text-[var(--accent)]" />
         <div className="min-w-0">
           <p className="text-sm font-semibold text-[var(--text-primary)]">灵境小助手</p>
-          <p className="truncate text-[10px] text-[var(--text-muted)]" title={runtimeModelLabel || model}>
+          <p className="truncate text-xs text-[var(--text-muted)]" title={runtimeModelLabel || model}>
             {runtimeModelLabel || model}
           </p>
         </div>
         {sessionId && (
           <span
-            className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--accent-bg)] text-[var(--accent)]"
+            className="text-xs px-1.5 py-0.5 rounded-full bg-[var(--accent-bg)] text-[var(--accent)]"
             title={`会话 ${sessionId}`}
           >
             续聊中
@@ -322,7 +322,7 @@ export const AIChatPanel: React.FC = () => {
       </div>
 
       <div className="px-3 py-2 border-b border-[var(--border-light)] bg-[var(--bg-elevated)]">
-        <p className="text-[10px] text-[var(--text-muted)]">当前模板</p>
+        <p className="text-xs text-[var(--text-muted)]">当前模板</p>
         <p className="text-xs font-medium text-[var(--text-primary)] truncate">{activeTemplate?.name ?? '默认模板'}</p>
       </div>
 
@@ -347,7 +347,7 @@ export const AIChatPanel: React.FC = () => {
                 <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-[var(--accent)] align-middle" />
               )}
               {message.role === 'assistant' && message.steps && message.steps.length > 0 && (
-                <p className="mt-1.5 flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+                <p className="mt-1.5 flex items-center gap-1 text-xs text-[var(--text-muted)]">
                   <Wrench size={10} />
                   调用了 {message.steps.length} 次工具
                 </p>
@@ -356,7 +356,7 @@ export const AIChatPanel: React.FC = () => {
           </div>
         ))}
         {toolHint && (
-          <div className="flex items-center gap-2 text-[10px] text-[var(--accent)]">
+          <div className="flex items-center gap-2 text-xs text-[var(--accent)]">
             <Loader2 size={11} className="animate-spin" />
             {toolHint}…
           </div>
@@ -371,7 +371,7 @@ export const AIChatPanel: React.FC = () => {
         <div ref={messagesEndRef} />
         {visibleReferences.length > 0 && !loading && (
           <div className="space-y-1.5">
-            <p className="text-[10px] font-medium text-[var(--text-muted)]">相关片段（点击跳转）</p>
+            <p className="text-xs font-medium text-[var(--text-muted)]">相关片段（点击跳转）</p>
             {visibleReferences.map((item) => (
               <button
                 key={`${item.video_id}-${item.start_sec}`}
@@ -384,8 +384,8 @@ export const AIChatPanel: React.FC = () => {
                   <p className="text-xs font-medium text-[var(--text-primary)] truncate">
                     {item.video_title || `视频 ${item.video_id}`}
                   </p>
-                  <p className="text-[10px] text-[var(--accent)]">{formatTimestamp(item.start_sec)}</p>
-                  <p className="text-[10px] text-[var(--text-muted)] line-clamp-2">{item.text}</p>
+                  <p className="text-xs text-[var(--accent)]">{formatTimestamp(item.start_sec)}</p>
+                  <p className="text-xs text-[var(--text-muted)] line-clamp-2">{item.text}</p>
                 </div>
               </button>
             ))}

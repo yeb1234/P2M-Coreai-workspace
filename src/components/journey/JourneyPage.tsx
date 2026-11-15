@@ -260,12 +260,12 @@ export const JourneyPage: React.FC = () => {
           ].map((s) => (
             <div key={s.label}>
               <div className="text-sm font-medium text-[var(--text-primary)]">{s.value}</div>
-              <div className="mt-0.5 text-[11px] text-[var(--text-muted)]">{s.label}</div>
+              <div className="mt-0.5 text-xs text-[var(--text-muted)]">{s.label}</div>
             </div>
           ))}
         </div>
         {sources.pomodoro_total > 0 && (
-          <div className="mt-2 text-[11px] text-[var(--text-muted)]">
+          <div className="mt-2 text-xs text-[var(--text-muted)]">
             番茄钟记录 {sources.pomodoro_total} 次，完成 {sources.pomodoro_done} 次
           </div>
         )}
@@ -292,7 +292,7 @@ export const JourneyPage: React.FC = () => {
               >
                 {m.unlocked ? ICONS[m.icon] ?? <Trophy size={18} /> : <Lock size={16} />}
               </div>
-              <div className={`mt-1.5 text-[11px] font-medium ${m.unlocked ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
+              <div className={`mt-1.5 text-xs font-medium ${m.unlocked ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
                 {m.title}
               </div>
               {!m.unlocked && (
@@ -300,7 +300,7 @@ export const JourneyPage: React.FC = () => {
                   <div className="h-1 overflow-hidden rounded-full bg-[#efece8]">
                     <div className="h-full bg-[#c4c0b9]" style={{ width: `${m.progress * 100}%` }} />
                   </div>
-                  <div className="mt-0.5 text-[10px] text-[#b8b4ad]">
+                  <div className="mt-0.5 text-xs text-[#b8b4ad]">
                     {m.current} / {m.target}
                   </div>
                 </div>
@@ -314,7 +314,7 @@ export const JourneyPage: React.FC = () => {
       <div className="rounded-xl border border-[var(--border-light)] bg-white p-4">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-medium text-[var(--text-secondary)]">近 90 天</h2>
-          <div className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
             少
             {['bg-[#efece8]', 'bg-[#d9e8d4]', 'bg-[#a8d3a0]', 'bg-[#6fb865]', 'bg-[#3f8f3a]'].map((c) => (
               <span key={c} className={`h-3 w-3 rounded-sm ${c}`} />

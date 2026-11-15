@@ -408,7 +408,7 @@ export function TranscriberPage() {
                 <button
                   type="button"
                   onClick={() => { setSelectedIds(new Set()); }}
-                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-accent)] hover:text-[var(--danger)]"
+                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-accent)] hover:text-[var(--danger)]"
                 >
                   <X size={12} />
                   清空
@@ -417,21 +417,21 @@ export function TranscriberPage() {
             </div>
             <div className="min-h-0 flex-1 overflow-auto space-y-1 pr-1">
               {videosLoading ? (
-                <div className="py-2 text-center text-[11px] text-[var(--text-muted)]">加载视频列表...</div>
+                <div className="py-2 text-center text-xs text-[var(--text-muted)]">加载视频列表...</div>
               ) : selectedVideos.length === 0 ? (
-                <div className="py-2 text-center text-[11px] text-[var(--text-muted)]">
+                <div className="py-2 text-center text-xs text-[var(--text-muted)]">
                   {selectedIds.size === 0 ? '在左侧目录中勾选文件夹以选择视频' : '所选文件夹下暂无视频'}
                 </div>
               ) : (
                 selectedVideos.map((video) => (
                   <div
                     key={video.id}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] hover:bg-[var(--bg-elevated)]"
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-[var(--bg-elevated)]"
                     title={video.title}
                   >
                     <PlayCircle size={13} className="shrink-0 text-[var(--accent)]" />
                     <span className="min-w-0 flex-1 truncate text-[var(--text-primary)]">{video.title}</span>
-                    <span className={`shrink-0 rounded px-1 py-0.5 text-[10px] ${
+                    <span className={`shrink-0 rounded px-1 py-0.5 text-xs ${
                       video.ai_status === 'completed' ? 'bg-green-500/10 text-green-600' :
                       video.ai_status === 'running' ? 'bg-blue-500/10 text-blue-600' :
                       video.ai_status === 'queued' ? 'bg-amber-500/10 text-amber-600' :

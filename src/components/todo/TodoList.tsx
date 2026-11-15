@@ -138,16 +138,16 @@ export const TodoList: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <CheckSquare size={16} className="text-[var(--accent)]" />
             <h2 className="text-sm font-bold text-[var(--text-primary)]">待办</h2>
-            <span className="text-[10px] text-[var(--text-muted)]">({activeTodos.length + completedTodos.length})</span>
+            <span className="text-xs text-[var(--text-muted)]">({activeTodos.length + completedTodos.length})</span>
           </div>
           <div className="flex items-center gap-0.5">
-            <button onClick={() => setShowToolbar(!showToolbar)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] transition-colors ${showToolbar ? 'text-[var(--accent)] bg-[var(--bg-accent)]' : 'text-[var(--text-muted)]'}`} title="筛选">
+            <button onClick={() => setShowToolbar(!showToolbar)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showToolbar ? 'text-[var(--accent)] bg-[var(--bg-accent)]' : 'text-[var(--text-muted)]'}`} title="筛选">
               <SlidersHorizontal size={13} />
               <span>{activeFilterSummary}</span>
             </button>
             <button onClick={() => setShowTrash(!showTrash)} className={`p-1.5 rounded-lg relative ${showTrash ? 'text-[var(--danger)] bg-[var(--danger-bg)]' : 'text-[var(--text-muted)]'}`} title="垃圾箱">
               <Trash2 size={14} />
-              {trashedTodos.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[var(--danger)] text-white text-[7px] rounded-full flex items-center justify-center">{trashedTodos.length}</span>}
+              {trashedTodos.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[var(--danger)] text-white text-xs rounded-full flex items-center justify-center">{trashedTodos.length}</span>}
             </button>
           </div>
         </div>
@@ -171,7 +171,7 @@ export const TodoList: React.FC = () => {
               </button>
               <button onClick={() => setShowTrash(!showTrash)} className={`p-2 rounded-lg transition-colors relative ${showTrash ? 'text-[var(--danger)] bg-[var(--danger-bg)]' : 'text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-bg)]'}`} title="垃圾箱">
                 <Trash2 size={16} />
-                {trashedTodos.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--danger)] text-white text-[9px] rounded-full flex items-center justify-center">{trashedTodos.length}</span>}
+                {trashedTodos.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--danger)] text-white text-xs rounded-full flex items-center justify-center">{trashedTodos.length}</span>}
               </button>
               <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors">
                 <Plus size={16} />
@@ -233,7 +233,7 @@ export const TodoList: React.FC = () => {
                     <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: PRIORITY_COLORS[item.priority] }} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-[var(--text-primary)] truncate block">{item.title}</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
+                      <span className="text-xs text-[var(--text-muted)]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
                     </div>
                     <button onClick={() => { restoreItem(item.id); playInteractionSound('restore'); }} className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--accent)] hover:bg-[var(--bg-accent)] rounded transition-colors">
                       <RotateCcw size={12} />

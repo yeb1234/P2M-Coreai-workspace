@@ -49,7 +49,7 @@ export const ComparePage: React.FC = () => {
                   }`}
                 >
                   {idx === 0 && (
-                    <span className="text-[10px] px-2 py-0.5 bg-[var(--bg-accent)] text-[var(--accent)] rounded-full font-medium">推荐</span>
+                    <span className="text-xs px-2 py-0.5 bg-[var(--bg-accent)] text-[var(--accent)] rounded-full font-medium">推荐</span>
                   )}
                   <div className="flex items-center justify-between mt-2 mb-3">
                     <h4 className="text-base font-semibold text-[var(--text-primary)]">{item.name}</h4>

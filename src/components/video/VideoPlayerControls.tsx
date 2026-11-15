@@ -126,7 +126,7 @@ export function VideoPlayerControls({
                 style={{ left: Math.max(SPRITE_PREVIEW_HALF_WIDTH, Math.min(hoverX, playerWidth - SPRITE_PREVIEW_HALF_WIDTH)), transform: 'translateX(-50%)' }}
               >
                 <SpritePreview videoId={videoId} time={hoverTime} />
-                <div className="text-center text-[10px] text-white mt-1 font-mono bg-black/70 rounded px-1">{formatTime(hoverTime)}</div>
+                <div className="text-center text-xs text-white mt-1 font-mono bg-black/70 rounded px-1">{formatTime(hoverTime)}</div>
               </div>
             )}
           </div>
@@ -154,7 +154,7 @@ export function VideoPlayerControls({
             </div>
           )}
 
-          <span className={`${isMobile ? 'text-[9px] ml-1' : 'text-[11px] ml-2'} text-white/70 font-mono select-none`}>{formatTime(progress)} / {formatTime(videoDuration)}</span>
+          <span className={`${isMobile ? 'text-xs ml-1' : 'text-xs ml-2'} text-white/70 font-mono select-none`}>{formatTime(progress)} / {formatTime(videoDuration)}</span>
           <div className="flex-1" />
 
           {hasSubtitle && (
@@ -166,21 +166,21 @@ export function VideoPlayerControls({
                 <div data-subtitle-menu className="absolute bottom-full right-0 mb-2 bg-black/90 backdrop-blur-sm rounded-lg p-3 min-w-[180px] space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-white/70">字幕</span>
-                    <button onClick={() => { onToggleSubtitles(); playInteractionSound('tap'); }} className={`rounded px-2 py-0.5 text-[10px] ${showSubtitles ? 'bg-[var(--accent)] text-white' : 'bg-white/10 text-white/60'}`}>
+                    <button onClick={() => { onToggleSubtitles(); playInteractionSound('tap'); }} className={`rounded px-2 py-0.5 text-xs ${showSubtitles ? 'bg-[var(--accent)] text-white' : 'bg-white/10 text-white/60'}`}>
                       {showSubtitles ? '开' : '关'}
                     </button>
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-white/50">透明度</span>
-                      <span className="text-[10px] text-white/70">{Math.round(subtitleOpacity * 100)}%</span>
+                      <span className="text-xs text-white/50">透明度</span>
+                      <span className="text-xs text-white/70">{Math.round(subtitleOpacity * 100)}%</span>
                     </div>
                     <Slider value={subtitleOpacity} min={0} max={1} step={0.05} onChange={onSubtitleOpacityChange} className="w-full" dark />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-white/50">字号</span>
-                      <span className="text-[10px] text-white/70">{subtitleSize}%</span>
+                      <span className="text-xs text-white/50">字号</span>
+                      <span className="text-xs text-white/70">{subtitleSize}%</span>
                     </div>
                     <Slider value={subtitleSize} min={50} max={200} step={10} onChange={onSubtitleSizeChange} className="w-full" />
                   </div>
@@ -190,7 +190,7 @@ export function VideoPlayerControls({
           )}
 
           <div className="relative">
-            <button data-speed-btn onClick={() => { onToggleSpeedMenu(); playInteractionSound('tap'); }} className={`${isMobile ? 'px-1.5 py-1 text-[10px]' : 'px-1.5 py-1 text-[11px]'} text-white/80 hover:text-white transition-colors font-medium`} title="倍速">
+            <button data-speed-btn onClick={() => { onToggleSpeedMenu(); playInteractionSound('tap'); }} className={`${isMobile ? 'px-1.5 py-1 text-xs' : 'px-1.5 py-1 text-xs'} text-white/80 hover:text-white transition-colors font-medium`} title="倍速">
               {playbackRate === 1 ? '倍速' : `${playbackRate.toFixed(1)}x`}
             </button>
             {showSpeedMenu && (
@@ -200,7 +200,7 @@ export function VideoPlayerControls({
                   <span className="text-xs text-white/90 font-mono">{playbackRate.toFixed(1)}x</span>
                 </div>
                 <Slider value={playbackRate} min={PLAYER_SPEED_MIN} max={PLAYER_SPEED_MAX} step={PLAYER_SPEED_STEP} onChange={(next) => onPlaybackRateChange(clampPlaybackRate(next))} className="w-full" dark />
-                <div className="flex items-center justify-between text-[10px] text-white/45 font-mono">
+                <div className="flex items-center justify-between text-xs text-white/45 font-mono">
                   <span>0.5x</span>
                   <span>2.0x</span>
                 </div>

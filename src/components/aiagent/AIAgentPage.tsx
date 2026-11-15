@@ -98,7 +98,7 @@ export const AIAgentPage: React.FC = () => {
         <div className="p-3 border-b border-[var(--border-light)] flex items-center gap-2">
           <Bot size={14} className="text-[var(--accent)]" />
           <span className="text-xs font-medium text-[var(--text-primary)]">灵境小助手入口</span>
-          <span className="text-[10px] px-1.5 py-0.5 bg-[var(--accent-bg)] text-[var(--accent)] rounded-full ml-auto">LM Studio</span>
+          <span className="text-xs px-1.5 py-0.5 bg-[var(--accent-bg)] text-[var(--accent)] rounded-full ml-auto">LM Studio</span>
         </div>
         <div className="p-4 text-xs text-[var(--text-muted)]">
           点击下面按钮会打开右侧灵境小助手对话栏，直接连接当前配置的模型服务。

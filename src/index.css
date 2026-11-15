@@ -633,6 +633,15 @@ button.primary:hover,
   gap: 0.75rem;
 }
 
+/* 手机屏上 110px 只够放两列，三个统计卡会变成「2+1」的不对称排布。
+   把最小列宽压到 88px，326px 的可用宽度就能放下三列。 */
+@media (max-width: 640px) {
+  .auto-grid-compact {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 88px), 1fr));
+    gap: 0.5rem;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════
    Theme Overrides — each theme transforms the entire UI
    ═══════════════════════════════════════════════════════ */

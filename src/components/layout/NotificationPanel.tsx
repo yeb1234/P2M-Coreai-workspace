@@ -159,7 +159,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{n.title}</p>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">{n.message}</p>
-                <p className="text-[10px] text-[var(--text-muted)] mt-1">{formatNotificationTimeAgo(n.createdAt)}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">{formatNotificationTimeAgo(n.createdAt)}</p>
               </div>
               {!n.read && (
                 <div className="w-2 h-2 bg-[var(--accent)] rounded-full flex-shrink-0 mt-2" />

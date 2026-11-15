@@ -237,7 +237,7 @@ export function TranscriptionSettings() {
         <div className="mb-2 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[var(--text-primary)]">模式预设</p>
-            <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">先选预设，再按需微调参数，最后点保存转写设置。</p>
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">先选预设，再按需微调参数，最后点保存转写设置。</p>
           </div>
         </div>
         <div className="auto-grid-panels">
@@ -264,7 +264,7 @@ export function TranscriptionSettings() {
             }`}
           >
             <p className="text-sm font-medium">Faster-Whisper路线</p>
-            <p className={`mt-1 text-[11px] leading-4 ${form.whisperEngine === 'faster-whisper' ? 'text-[var(--accent-hover)]/70' : 'text-[var(--text-secondary)]'}`}>CPU/CUDA路线，参数保守，适合后台慢慢跑。</p>
+            <p className={`mt-1 text-xs leading-4 ${form.whisperEngine === 'faster-whisper' ? 'text-[var(--accent-hover)]/70' : 'text-[var(--text-secondary)]'}`}>CPU/CUDA路线，参数保守，适合后台慢慢跑。</p>
           </button>
           <button
             onClick={() => {
@@ -290,7 +290,7 @@ export function TranscriptionSettings() {
             }`}
           >
             <p className="text-sm font-medium">Whisper.cpp路线</p>
-            <p className={`mt-1 text-[11px] leading-4 ${form.whisperEngine === 'whisper.cpp' ? 'text-[var(--accent-hover)]/70' : 'text-[var(--text-secondary)]'}`}>whisper.cpp 外部引擎，适合 GPU 转写。</p>
+            <p className={`mt-1 text-xs leading-4 ${form.whisperEngine === 'whisper.cpp' ? 'text-[var(--accent-hover)]/70' : 'text-[var(--text-secondary)]'}`}>whisper.cpp 外部引擎，适合 GPU 转写。</p>
           </button>
           <button
             onClick={() => {
@@ -301,7 +301,7 @@ export function TranscriptionSettings() {
             className="rounded-lg border border-[var(--border-light)] bg-white px-3 py-2 text-left transition-colors hover:border-[#1a1a1a]/30 hover:bg-[var(--bg-base)]"
           >
             <p className="text-sm font-medium text-[var(--text-primary)]">恢复默认</p>
-            <p className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">回到系统默认参数，不会立刻保存。</p>
+            <p className="mt-1 text-xs leading-4 text-[var(--text-secondary)]">回到系统默认参数，不会立刻保存。</p>
           </button>
         </div>
       </div>
@@ -316,7 +316,7 @@ export function TranscriptionSettings() {
           <option value="faster-whisper">faster-whisper CPU（稳定默认）</option>
           <option value="whisper.cpp">whisper.cpp 外部引擎（可接 Vulkan/HIP）</option>
         </select>
-        <p className="text-[10px] text-[var(--text-muted)] mt-1">7800 XT 路线建议先用 whisper.cpp 的 Vulkan/HIP 版本单独验证，再在后端 .env 配置可执行文件和模型路径。</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">7800 XT 路线建议先用 whisper.cpp 的 Vulkan/HIP 版本单独验证，再在后端 .env 配置可执行文件和模型路径。</p>
       </div>
 
       <div>
@@ -327,7 +327,7 @@ export function TranscriptionSettings() {
               key={d}
               type="button"
               onClick={() => updateForm({ deviceType: d })}
-              className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
+              className={`flex-1 rounded-md border px-2 py-1.5 text-xs transition-colors ${
                 form.deviceType === d
                   ? 'border-[var(--accent)] bg-[var(--warn-bg)] text-[var(--accent-hover)]'
                   : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)]/50'
@@ -337,7 +337,7 @@ export function TranscriptionSettings() {
             </button>
           ))}
         </div>
-        <p className="text-[10px] text-[var(--text-muted)] mt-1">只对 faster-whisper 生效。whisper.cpp 外部引擎的设备选择取决于 whisper-cli.exe 的编译参数和 .env 配置。</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">只对 faster-whisper 生效。whisper.cpp 外部引擎的设备选择取决于 whisper-cli.exe 的编译参数和 .env 配置。</p>
       </div>
 
       <div>
@@ -370,7 +370,7 @@ export function TranscriptionSettings() {
             );
           })}
         </select>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--text-muted)]">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
           <span>常用推荐：`medium` 或 `large-v3`。越大越准，越慢，越吃内存。</span>
           {whisperModels && <span>模型目录：{whisperModels.model_dir}</span>}
           {modelsError && <span className="text-[var(--danger)]">{modelsError}</span>}
@@ -431,7 +431,7 @@ export function TranscriptionSettings() {
           {(() => {
             const s = downloadStates[form.whisperModel];
             if (s?.status === 'failed' && s?.error) {
-              return <span className="text-[10px] text-[var(--danger)]">{s.error}</span>;
+              return <span className="text-xs text-[var(--danger)]">{s.error}</span>;
             }
             return null;
           })()}
@@ -458,7 +458,7 @@ export function TranscriptionSettings() {
               onKeyDown={handleNumberKeyDown}
               className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
             />
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">只影响 AI 总结正文长度，不影响字幕长度；保存后新任务生效。</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">只影响 AI 总结正文长度，不影响字幕长度；保存后新任务生效。</p>
           </div>
           {!isWhisperCppEngine && (
             <div>
@@ -471,13 +471,13 @@ export function TranscriptionSettings() {
                 onKeyDown={handleNumberKeyDown}
                 className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
               />
-              <p className="text-[10px] text-[var(--text-muted)] mt-1">{threadHint}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">{threadHint}</p>
             </div>
           )}
           {isWhisperCppEngine && (
             <div className="rounded-lg border border-[#dbeafe] bg-[var(--info-bg)] px-3 py-2">
               <p className="text-xs font-medium text-[#1d4ed8]">GPU 转写模式</p>
-              <p className="mt-1 text-[10px] leading-4 text-[var(--info)]">当前新任务会走 whisper.cpp 外部引擎，CPU 转写线程不会保存到任务，也不会传给转写命令。若仍主要跑 CPU，通常是 whisper-cli.exe 本身未启用 Vulkan/HIP 或缺少对应参数；ffmpeg 提取音频仍会短暂使用 CPU。</p>
+              <p className="mt-1 text-xs leading-4 text-[var(--info)]">当前新任务会走 whisper.cpp 外部引擎，CPU 转写线程不会保存到任务，也不会传给转写命令。若仍主要跑 CPU，通常是 whisper-cli.exe 本身未启用 Vulkan/HIP 或缺少对应参数；ffmpeg 提取音频仍会短暂使用 CPU。</p>
             </div>
           )}
           <div>
@@ -491,7 +491,7 @@ export function TranscriptionSettings() {
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
-            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">只影响 faster-whisper CPU 路线；whisper.cpp 外部引擎忽略这里。</p>
+            <p className="mt-1 text-xs leading-4 text-[var(--text-muted)]">只影响 faster-whisper CPU 路线；whisper.cpp 外部引擎忽略这里。</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">beam_size</label>
@@ -503,7 +503,7 @@ export function TranscriptionSettings() {
               onKeyDown={handleNumberKeyDown}
               className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
             />
-            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">候选搜索宽度。越大越稳但更慢，课程字幕一般 3-5。</p>
+            <p className="mt-1 text-xs leading-4 text-[var(--text-muted)]">候选搜索宽度。越大越稳但更慢，课程字幕一般 3-5。</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">best_of</label>
@@ -515,7 +515,7 @@ export function TranscriptionSettings() {
               onKeyDown={handleNumberKeyDown}
               className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
             />
-            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">多采样后择优。temperature 为 0 时影响很小。</p>
+            <p className="mt-1 text-xs leading-4 text-[var(--text-muted)]">多采样后择优。temperature 为 0 时影响很小。</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">temperature</label>
@@ -527,7 +527,7 @@ export function TranscriptionSettings() {
               onKeyDown={handleNumberKeyDown}
               className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm"
             />
-            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">随机度。0 最稳定，适合字幕；调高可能更灵活但更容易误识别。</p>
+            <p className="mt-1 text-xs leading-4 text-[var(--text-muted)]">随机度。0 最稳定，适合字幕；调高可能更灵活但更容易误识别。</p>
           </div>
           <div className="flex items-center justify-between py-2 sm:col-span-2">
             <div className="min-w-0">
@@ -576,11 +576,11 @@ export function TranscriptionSettings() {
                   }`}
                 >
                   <p className="text-sm font-medium">{item.label}</p>
-                  <p className="mt-1 text-[10px] leading-4">{item.desc}</p>
+                  <p className="mt-1 text-xs leading-4">{item.desc}</p>
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-[10px] text-[var(--text-muted)]">影响新的视频总结、字幕校对和右侧灵境小助手。保存后生效。</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">影响新的视频总结、字幕校对和右侧灵境小助手。保存后生效。</p>
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">字幕校对提示词模板</label>
@@ -591,7 +591,7 @@ export function TranscriptionSettings() {
               className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm leading-6 outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10"
               placeholder="写入课程上下文、专有名词、常见误识别修正规则。保存后新任务生效。"
             />
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--text-muted)]">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
               <span>这里只影响字幕校对阶段，不会改时间轴，不会合并或拆分字幕。</span>
               <button
                 type="button"
@@ -606,13 +606,13 @@ export function TranscriptionSettings() {
         <aside className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-3 xl:sticky xl:top-4">
           <div className="mb-3">
             <p className="text-sm font-semibold text-[var(--text-primary)]">参数说明</p>
-            <p className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">这些参数只影响新建的转写/校对任务，已经完成的字幕不会自动重跑。</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">这些参数只影响新建的转写/校对任务，已经完成的字幕不会自动重跑。</p>
           </div>
           <div className="space-y-3">
             {TRANSCRIPTION_PARAM_HELP.map((item) => (
               <div key={item.name} className="border-t border-[var(--border-light)] pt-2 first:border-t-0 first:pt-0">
                 <p className="text-xs font-semibold text-[var(--accent)]">{item.name}</p>
-                <p className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">{item.desc}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -652,7 +652,7 @@ export function TranscriptionSettings() {
               {check.ok ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[var(--success)]" /> : <XCircle size={14} className="mt-0.5 shrink-0 text-[var(--danger)]" />}
               <div className="min-w-0">
                 <p className="text-xs font-medium text-[var(--text-primary)]">{check.name}</p>
-                <p className="text-[11px] text-[var(--text-secondary)]">{check.message}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{check.message}</p>
               </div>
             </div>
           ))}

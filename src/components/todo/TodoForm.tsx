@@ -326,7 +326,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
             className="w-28 px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           />
         </div>
-        <p className="mt-1 text-[10px] md:text-xs text-[var(--text-muted)]">开始和截止时间会按分钟写入数据库。</p>
+        <p className="mt-1 text-xs md:text-xs text-[var(--text-muted)]">开始和截止时间会按分钟写入数据库。</p>
       </div>
 
       <div>
@@ -349,7 +349,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
             预计 {getPlannedMinutesForRounds(pomodoroCount, pomodoroConfig)} 分钟
           </span>
         </div>
-        <p className="mt-1 text-[10px] md:text-xs text-[var(--text-muted)]">
+        <p className="mt-1 text-xs md:text-xs text-[var(--text-muted)]">
           修改数量会自动调整截止时间，修改截止时间也会反推数量。
         </p>
       </div>

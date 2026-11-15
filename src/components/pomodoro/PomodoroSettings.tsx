@@ -65,7 +65,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
 
       {/* Work duration */}
       <div className="grid grid-cols-[64px_1fr] items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <Clock3 size={12} />
           专注
         </label>
@@ -88,7 +88,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
 
       {/* Short break duration */}
       <div className="grid grid-cols-[64px_1fr] items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <Coffee size={12} />
           短休
         </label>
@@ -111,7 +111,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
 
       {/* Long break duration */}
       <div className="grid grid-cols-[64px_1fr] items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <TimerReset size={12} />
           长休
         </label>
@@ -134,7 +134,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
 
       {/* Long break interval */}
       <div className="grid grid-cols-[64px_1fr] items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <Repeat2 size={12} />
           间隔
         </label>
@@ -156,7 +156,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
       </div>
 
       <div>
-        <label className="mb-1 flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+        <label className="mb-1 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <Volume2 size={12} />
           环境音策略
         </label>
@@ -176,7 +176,7 @@ export const PomodoroSettings: React.FC<PomodoroSettingsProps> = ({ open, onOpen
               }`}
             >
               <p className="text-xs font-medium">{item.label}</p>
-              <p className="mt-0.5 text-[10px] leading-4">{item.desc}</p>
+              <p className="mt-0.5 text-xs leading-4">{item.desc}</p>
             </button>
           ))}
         </div>

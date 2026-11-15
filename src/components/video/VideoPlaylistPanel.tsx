@@ -62,7 +62,7 @@ function PlaylistRow({ item, currentVideo, isPlaying, onSelectItem }: PlaylistRo
         <p className={`truncate text-xs ${isCurrent ? 'font-medium text-[var(--accent)]' : 'theme-text-primary'}`}>
           {item.title}
         </p>
-        {item.completed && <span className="text-[9px] text-[var(--success)]">已看完</span>}
+        {item.completed && <span className="text-xs text-[var(--success)]">已看完</span>}
         {progressPercent !== null && !item.completed && (
           <div className="theme-progress-track mt-1 h-0.5 overflow-hidden rounded-full">
             <div className="theme-progress-fill h-full rounded-full" style={{ width: `${progressPercent}%` }} />
@@ -142,7 +142,7 @@ export function VideoPlaylistPanel({
             </div>
           )}
         </div>
-        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-[var(--text-muted)]">
           <span className={`rounded-full border px-1.5 py-0.5 ${
             aiCompletion.complete
               ? 'border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] text-[var(--success)]'
@@ -162,7 +162,7 @@ export function VideoPlaylistPanel({
         <span className="theme-text-primary truncate text-xs font-medium">
           {playlistScope === 'descendants' ? '全部视频' : '当前文件夹'}
         </span>
-        <span className="theme-text-muted shrink-0 text-[10px]">{playlist.length} 个</span>
+        <span className="theme-text-muted shrink-0 text-xs">{playlist.length} 个</span>
         <button
           onClick={onToggleScope}
           className={`ml-1 rounded p-1 transition-colors ${playlistScope === 'descendants' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:bg-[var(--accent-bg)] hover:text-[var(--accent)]'}`}
@@ -170,7 +170,7 @@ export function VideoPlaylistPanel({
         >
           <FolderTree size={13} />
         </button>
-        <label className="theme-text-secondary ml-auto mr-2 flex shrink-0 cursor-pointer items-center gap-1.5 text-[10px]" title="播放结束后自动播放下一个视频">
+        <label className="theme-text-secondary ml-auto mr-2 flex shrink-0 cursor-pointer items-center gap-1.5 text-xs" title="播放结束后自动播放下一个视频">
           <input
             type="checkbox"
             checked={autoPlay}

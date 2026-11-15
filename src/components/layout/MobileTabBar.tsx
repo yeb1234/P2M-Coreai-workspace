@@ -43,7 +43,7 @@ export const MobileTabBar: React.FC = () => {
             }`}
           >
             <span className="[&_svg]:h-[21px] [&_svg]:w-[21px]">{tab.icon}</span>
-            <span className="text-[10px] font-medium leading-tight">{tab.label}</span>
+            <span className="text-xs font-medium leading-tight">{tab.label}</span>
           </button>
         );
       })}

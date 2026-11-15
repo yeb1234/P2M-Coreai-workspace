@@ -29,17 +29,17 @@ export const InterviewPage: React.FC = () => {
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <BookOpen size={20} className="text-[var(--info)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">156</p>
-          <p className="text-[10px] text-[var(--text-muted)]">总题数</p>
+          <p className="text-xs text-[var(--text-muted)]">总题数</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <CheckCircle size={20} className="text-[var(--success)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">89</p>
-          <p className="text-[10px] text-[var(--text-muted)]">已掌握</p>
+          <p className="text-xs text-[var(--text-muted)]">已掌握</p>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4 text-center">
           <Star size={20} className="text-[var(--warn)] mx-auto mb-2" />
           <p className="text-xl font-bold text-[var(--text-primary)]">23</p>
-          <p className="text-[10px] text-[var(--text-muted)]">收藏</p>
+          <p className="text-xs text-[var(--text-muted)]">收藏</p>
         </div>
       </div>
 
@@ -63,8 +63,8 @@ export const InterviewPage: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{item.q}</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] px-1.5 py-0.5 bg-[var(--info-bg)] text-[var(--info)] rounded">{item.category}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${item.difficulty === '高频' ? 'bg-[var(--danger-bg)] text-[var(--danger)]' : item.difficulty === '中频' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' : 'bg-[var(--bg-base)] text-[var(--text-muted)]'}`}>
+                  <span className="text-xs px-1.5 py-0.5 bg-[var(--info-bg)] text-[var(--info)] rounded">{item.category}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${item.difficulty === '高频' ? 'bg-[var(--danger-bg)] text-[var(--danger)]' : item.difficulty === '中频' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' : 'bg-[var(--bg-base)] text-[var(--text-muted)]'}`}>
                     {item.difficulty}
                   </span>
                 </div>

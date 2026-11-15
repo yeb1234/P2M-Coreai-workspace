@@ -36,7 +36,7 @@ export const SnippetsPage: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-[var(--text-primary)]">{s.title}</h3>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] px-2 py-0.5 bg-[#f3e8ff] text-[#8b5cf6] rounded-full">{s.lang}</span>
+                <span className="text-xs px-2 py-0.5 bg-[#f3e8ff] text-[#8b5cf6] rounded-full">{s.lang}</span>
                 <button className="p-1 text-[var(--text-muted)] hover:text-[#8b5cf6]"><Copy size={14} /></button>
               </div>
             </div>
@@ -45,7 +45,7 @@ export const SnippetsPage: React.FC = () => {
             </pre>
             <div className="mt-2 flex items-center gap-1">
               <Tag size={10} className="text-[var(--text-muted)]" />
-              <span className="text-[10px] text-[var(--text-muted)]">{s.tag}</span>
+              <span className="text-xs text-[var(--text-muted)]">{s.tag}</span>
             </div>
           </div>
         ))}

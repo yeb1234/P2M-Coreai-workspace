@@ -51,7 +51,7 @@ export const ReaderPage: React.FC = () => {
                   <Clock size={10} />
                   {article.readTime}
                 </span>
-                <span className="text-[10px] px-2 py-0.5 bg-[var(--info-bg)] text-[var(--info)] rounded-full">{article.tag}</span>
+                <span className="text-xs px-2 py-0.5 bg-[var(--info-bg)] text-[var(--info)] rounded-full">{article.tag}</span>
               </div>
             </div>
             <ExternalLink size={14} className="text-[var(--border-medium)] group-hover:text-[var(--text-secondary)] flex-shrink-0" />
