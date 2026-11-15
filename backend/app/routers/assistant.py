@@ -50,8 +50,16 @@ def _load_session_for_user(db, session_id: str, user: User) -> ChatSession:
     session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
-    # 归属不符按不存在处理，避免通过状态码差异探测别人的会话 id
-    if session.user_id is not None and session.user_id != user.id and (user.role or "") != "admin":
+    # 归属不符按不存在处理，避免通过状态码差异探测别人的会话 id。
+    #
+    # 注意 user_id 为 NULL 的情况：迁移前的历史会话没有归属，原来这里直接放行，
+    # 等于**任何登录用户都能读 87 个老会话的 162 条消息**。
+    # 现在收紧为「无主会话只有 admin 可读」，并且数据侧已经把老会话归给了最早的 admin。
+    is_admin = (user.role or "") == "admin"
+    if session.user_id is None:
+        if not is_admin:
+            raise HTTPException(status_code=404, detail="会话不存在")
+    elif session.user_id != user.id and not is_admin:
         raise HTTPException(status_code=404, detail="会话不存在")
     return session
 
