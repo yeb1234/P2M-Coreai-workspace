@@ -72,7 +72,16 @@ services:
     image: docker.m.daocloud.io/library/redis:7-alpine
     container_name: siteyeb-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    # RQ 队列不能淘汰任务：内存满时宁可写入失败，也不能悄悄丢掉待处理任务。
+    # 之前没设上限（maxmemory 0 = 不限），队列堆积时会把宿主机内存吃光。
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - "256mb"
+      - --maxmemory-policy
+      - noeviction
     ports:
       # Redis 没有密码，绝不能暴露到 0.0.0.0
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"

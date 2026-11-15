@@ -114,6 +114,29 @@ def upgrade_postgres(engine) -> None:
         conn.execute(
             text("CREATE INDEX IF NOT EXISTS ix_chat_sessions_user ON chat_sessions (user_id, updated_at DESC)")
         )
+
+        # 大表让 autovacuum 更积极地更新统计信息。
+        # 实测踩过：subtitle_segments 有 359 万行，但 last_analyze 一直是 NULL，
+        # n_live_tup 显示 0 —— 规划器以为这是张空表，会选错连接方式。
+        # 默认阈值是 0.1 × 行数，批量导入 359 万行要再改 36 万次才触发一次分析。
+        # 修完手动 ANALYZE 只花 274ms，说明成本极低，没必要省。
+        for table, analyze_scale in (
+            ("subtitle_segments", 0.02),
+            ("segment_embeddings", 0.02),
+            ("videos", 0.05),
+        ):
+            try:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE {table} SET ("
+                        f"autovacuum_analyze_scale_factor = {analyze_scale}, "
+                        f"autovacuum_analyze_threshold = 1000, "
+                        f"autovacuum_vacuum_scale_factor = {analyze_scale * 2})"
+                    )
+                )
+            except Exception as exc:
+                logger.debug("设置 %s 的 autovacuum 参数失败（表可能尚不存在）: %s", table, exc)
+
         _claim_legacy_ownership(conn)
 
     dim = _safe_dim()
