@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { usePomodoroStore, useScheduleStore, useTodoStore } from '../../stores';
+import { usePomodoroStore, useScheduleStore } from '../../stores';
 import { toISODateString, formatDate } from '../../lib/date';
 import { playInteractionSound } from '../../lib/sounds';
 import { PRIORITY_COLORS, type ScheduleItem, type TodoPriority, type TodoStatus } from '../../types';
@@ -209,7 +209,25 @@ function layoutWeekEvents(events: WeekEvent[]): LaidOutWeekEvent[] {
 }
 
 export const Calendar2Page: React.FC = () => {
-  const todos = useTodoStore((s) => s.todos);
+  // 待办数据统一从 scheduleStore 取（后端 schedule_items 表）。
+  // 原来这里读 useTodoStore（本地 IndexedDB），和待办页看到的不是同一批数据：
+  // 待办页加了东西，日历2 看不到；日历2 改了，待办页也不知道。
+  //
+  // ScheduleItem 用 startAt/dueAt，Todo 用 startDate/dueDate，
+  // 这里做字段映射，后面的渲染逻辑不用动。
+  const scheduleItems = useScheduleStore((s) => s.items);
+  const todos = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(scheduleItems)
+          .filter(([, item]) => item.type === 'todo' && !item.deletedAt)
+          .map(([id, item]) => [
+            id,
+            { ...item, startDate: item.startAt, dueDate: item.dueAt, tags: [] as string[] },
+          ]),
+      ),
+    [scheduleItems],
+  );
   const items = useScheduleStore((s) => s.items);
   const addTodo = useScheduleStore((s) => s.addTodo);
   const addEvent = useScheduleStore((s) => s.addEvent);

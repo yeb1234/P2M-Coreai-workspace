@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BarChart3, TrendingUp, Clock, Target, Calendar, Flame, StickyNote, ListTodo, Trophy } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { useTodoStore, usePomodoroStore, useCalendarStore, useNotesStore } from '../../stores';
+import type { ScheduleItem } from '../../types/schedule';
+import { usePomodoroStore, useCalendarStore, useNotesStore, useScheduleStore } from '../../stores';
 import { toLocalDateString } from '../../lib/date';
 
 const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
@@ -37,14 +38,21 @@ function getStreakDays(sessions: Record<string, { completed: boolean; startTime:
 }
 
 export const StatsPage: React.FC = () => {
-  const todos = useTodoStore((s) => s.todos);
+  // 统计口径对齐待办页：用 scheduleStore 而不是 todoStore，
+  // 否则「统计里说 5 条待办」和「待办页显示 3 条」对不上。
+  const scheduleItems = useScheduleStore((s) => s.items);
+  // 这里只需要「待办条目列表」本身，不需要 key-value 结构，
+  // 所以直接用数组，避免 Object.fromEntries 把类型退化成 unknown。
+  const todoList = useMemo<ScheduleItem[]>(
+    () => Object.values(scheduleItems).filter((i) => i.type === 'todo' && !i.deletedAt),
+    [scheduleItems],
+  );
   const getTodayStats = usePomodoroStore((s) => s.getTodayStats);
   const getWeekStats = usePomodoroStore((s) => s.getWeekStats);
   const sessions = usePomodoroStore((s) => s.sessions);
   const notes = useNotesStore((s) => s.notes);
   const calendarEvents = useCalendarStore((s) => s.events);
 
-  const todoList = Object.values(todos);
   const completedTodos = todoList.filter((t) => t.status === 'completed').length;
   const pendingTodos = todoList.filter((t) => t.status === 'pending').length;
   const inProgressTodos = todoList.filter((t) => t.status === 'in_progress').length;

@@ -31,6 +31,8 @@ export function hasAuthToken(): boolean {
 }
 
 export function markSession(userId: number): void {
+  // 新会话开始，重置 401 去重标记
+  authExpiredHandled = false;
   try {
     localStorage.setItem(SESSION_USER_KEY, String(userId));
     // 升级前把令牌存在 localStorage 的，必须清掉：
@@ -50,6 +52,16 @@ export function clearSession(): void {
   }
 }
 
+// 401 只处理一次。
+//
+// 为什么要这个 flag：登录后 useRehydrateStores 会并发重载 8 个 store，
+// 每个都发一次 getUserData。如果 cookie 恰好失效，8 个请求同时 401，
+// 原来每个都调 clearSession() + dispatch 事件 —— 变成 8 次连锁清理，
+// 用户看到的是「突然被踢回登录页 + 一堆报错弹窗」。
+//
+// 现在只认第一次，后面的静默忽略。登录成功时重置。
+let authExpiredHandled = false;
+
 export async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(resolveApiPath(path), {
     ...init,
@@ -59,11 +71,17 @@ export async function authFetch(path: string, init?: RequestInit): Promise<Respo
       ...init?.headers,
     },
   });
-  if (res.status === 401) {
+  if (res.status === 401 && !authExpiredHandled) {
+    authExpiredHandled = true;
     clearSession();
     window.dispatchEvent(new CustomEvent('p2m:auth-expired'));
   }
   return res;
+}
+
+/** 登录成功后调用，重置 401 去重标记。 */
+export function resetAuthExpiredFlag(): void {
+  authExpiredHandled = false;
 }
 
 export interface AuthUser {

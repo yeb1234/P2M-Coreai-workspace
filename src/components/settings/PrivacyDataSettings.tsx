@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Download, RefreshCw, Upload, XCircle } from 'lucide-react';
-import { useCalendarStore, useNotesStore, useNotificationStore, usePomodoroStore, useTodoStore } from '../../stores';
+import { useCalendarStore, useNotesStore, useNotificationStore, usePomodoroStore, useScheduleStore } from '../../stores';
 import { fetchBackendHealth, type BackendHealthOut } from '../../lib/videoApi';
 import { idbStorage } from '../../lib/idbStorage';
 import { STORAGE_KEYS } from './types';
@@ -135,7 +135,11 @@ export function DataSettings() {
   const [exported, setExported] = useState(false);
   const [imported, setImported] = useState(false);
 
-  const todos = useTodoStore((s) => s.todos);
+  // 同上：用真实的待办来源（后端表）统计，否则「清空待办」清的是本地残留数据。
+  const scheduleItems = useScheduleStore((s) => s.items);
+  const todos = Object.fromEntries(
+    Object.entries(scheduleItems).filter(([, i]) => i.type === 'todo' && !i.deletedAt),
+  );
   const notes = useNotesStore((s) => s.notes);
   const events = useCalendarStore((s) => s.events);
   const sessions = usePomodoroStore((s) => s.sessions);
