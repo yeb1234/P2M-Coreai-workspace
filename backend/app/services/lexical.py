@@ -57,6 +57,17 @@ def lexical_search(
     if not query:
         return []
 
+    # 语义块模式下换表。两块表的列名一致（id/text/video_id/start_sec/end_sec），
+    # 所以 SQL 结构可以完全复用。
+    use_chunks = settings.retrieval_source == "chunks"
+    source_table = "content_chunks" if use_chunks else "subtitle_segments"
+    if use_chunks:
+        # 块至少 30 字，长度过滤没有意义；短句过滤是给碎片模式用的补丁
+        min_text_len = 0
+        # 565 字的文本和短 query 做 trigram 相似度天然偏低，
+        # 沿用木片时代的 0.12 会把绝大部分块挡在外面
+        similarity_threshold = min(similarity_threshold, 0.04)
+
     filters: list[str] = []
     params: dict = {
         "q": query,
@@ -107,7 +118,7 @@ def lexical_search(
             v.title         AS video_title,
             v.category_id   AS category_id,
             similarity(s.text, :q) AS sim
-        FROM subtitle_segments s
+        FROM {source_table} s
         JOIN videos v ON v.id = s.video_id
         WHERE {where_clause}{filter_sql}
           AND (length(s.text) >= :min_len OR s.text ILIKE :q_like)

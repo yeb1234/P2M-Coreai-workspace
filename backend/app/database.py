@@ -122,6 +122,12 @@ class Settings(BaseSettings):
     # 生产必须是 true（只走 HTTPS）。本地 http 调试要设 false，否则浏览器不发送
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
+    # 检索数据源：
+    #   chunks   = 语义块（约 565 字/块），检索质量明显更好，默认
+    #   segments = 逐句字幕（约 9 字/条），历史实现，保留用于 A/B 对比
+    # 切换后不需要重启，但两边向量必须都已回填，否则会漏召回
+    retrieval_source: str = "chunks"
+
     # ---- 多用户每日配额（防单账号跑光外部 LLM 额度）----
     quota_chat_daily: int = 200
     quota_plan_daily: int = 20

@@ -116,6 +116,63 @@ def upsert_embeddings(
     return total
 
 
+def _search_chunks(
+    query_vector: np.ndarray,
+    *,
+    top_k: int,
+    category_ids: list[int] | None,
+    video_ids: list[int] | None,
+    ef_search: int,
+) -> list[VectorHit]:
+    """在语义块上做近邻检索。
+
+    返回字段仍叫 segment_id（值是 chunk id），这样上层和前端都不用改。
+    块表本身没有 category_id（分类挂在 videos 上），所以要多一次 JOIN ——
+    换来的是一次命中就是 565 字的完整上下文，而不是 9 个字的碎片。
+    """
+    where_parts: list[str] = []
+    params: dict = {
+        "qvec": query_vector,
+        "top_k": top_k,
+        "ef": max(ef_search, top_k * 4),
+    }
+    if category_ids:
+        where_parts.append("v.category_id = ANY(%(category_ids)s)")
+        params["category_ids"] = list(category_ids)
+    if video_ids:
+        where_parts.append("c.video_id = ANY(%(video_ids)s)")
+        params["video_ids"] = list(video_ids)
+    where_parts.append("c.embedding IS NOT NULL")
+    where_sql = "WHERE " + " AND ".join(where_parts)
+
+    sql = f"""
+        SELECT c.id, c.video_id, 1 - (c.embedding <=> %(qvec)s) AS score
+        FROM content_chunks c
+        JOIN videos v ON v.id = c.video_id
+        {where_sql}
+        ORDER BY c.embedding <=> %(qvec)s
+        LIMIT %(top_k)s
+    """
+
+    raw = engine.raw_connection()
+    conn = raw.driver_connection
+    try:
+        _register(conn)
+        with conn.cursor() as cur:
+            cur.execute(f"SET LOCAL hnsw.ef_search = {int(params['ef'])}")
+            if where_sql != "WHERE c.embedding IS NOT NULL":
+                # 带过滤时用 relaxed_order，否则「先取 top-k 再过滤」会让召回枯竭
+                cur.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
+                cur.execute("SET LOCAL hnsw.max_scan_tuples = 200000")
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+    finally:
+        conn.rollback()
+        raw.close()
+
+    return [VectorHit(segment_id=r[0], video_id=r[1], score=float(r[2])) for r in rows]
+
+
 def search(
     query_vector: np.ndarray,
     *,
@@ -124,8 +181,21 @@ def search(
     video_ids: list[int] | None = None,
     ef_search: int = 100,
 ) -> list[VectorHit]:
-    """余弦近邻检索。过滤条件下启用 iterative_scan 保证召回。"""
+    """余弦近邻检索。过滤条件下启用 iterative_scan 保证召回。
+
+    retrieval_source=chunks 时查语义块表（默认），=segments 时走历史实现。
+    两者返回结构一致，上层无感。
+    """
     _require_postgres()
+
+    if settings.retrieval_source == "chunks":
+        return _search_chunks(
+            query_vector,
+            top_k=top_k,
+            category_ids=category_ids,
+            video_ids=video_ids,
+            ef_search=ef_search,
+        )
 
     where_parts: list[str] = []
     params: dict = {

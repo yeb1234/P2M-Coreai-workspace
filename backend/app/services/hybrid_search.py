@@ -71,17 +71,24 @@ class Hit:
 
 
 def fetch_segments(segment_ids: list[int]) -> dict[int, dict]:
-    """批量补齐片段元信息，避免逐条查询造成 N+1。"""
+    """批量补齐片段元信息，避免逐条查询造成 N+1。
+
+    注意：必须跟着 retrieval_source 换表。
+    chunk 的 id 和 subtitle_segments 的 id 空间是重叠的（都从 1 开始），
+    用 chunk id 去查字幕表不会报错，只会静默返回**另一个东西的文本** ——
+    表现为「检索结果莫名其妙」，极难定位。这个坑实际踩过一次。
+    """
     if not segment_ids:
         return {}
+    table = "content_chunks" if settings.retrieval_source == "chunks" else "subtitle_segments"
     with engine.connect() as conn:
         rows = conn.execute(
             text(
-                """
+                f"""
                 SELECT s.id, s.video_id, s.start_sec, s.end_sec, s.text,
                        v.title AS video_title, v.category_id,
                        c.name AS category_name
-                FROM subtitle_segments s
+                FROM {table} s
                 JOIN videos v ON v.id = s.video_id
                 LEFT JOIN categories c ON c.id = v.category_id
                 WHERE s.id = ANY(:ids)
@@ -443,14 +450,16 @@ def hybrid_search(
     else:
         final = candidates[:top_k]
 
-    # 命中的是 9 个字的碎片，直接给模型没有意义。
-    # 按时间窗拼成段落再返回，时间戳同步扩展（前端跳转仍准）。
-    final = expand_hit_context(final)
-
-    # 扩展之后必须再去一次重。
-    # 去重放在扩展前是不够的：单条字幕只有 2 秒，时间上不重叠，
-    # 但扩展成 90 秒的段落后，相邻命中会大面积重合 ——
-    # 用户看到的就是「三条一样的答案」。
-    final = dedupe_overlapping(final, max_per_video=2)
+    if settings.retrieval_source == "chunks":
+        # 块本身就是 565 字的完整上下文，不需要再扩展。
+        # 反过来，在块上做扩展会把相邻块拼进来，制造冗余。
+        final = dedupe_overlapping(final, max_per_video=2, overlap_ratio=0.3)
+    else:
+        # 碎片模式：命中的是 9 个字的字幕，必须按时间窗拼成段落，
+        # 否则模型拿到的是「那我们就来看一下」这种没有信息量的句子。
+        final = expand_hit_context(final)
+        # 扩展之后必须再去一次重：单条字幕只有 2 秒，时间上不重叠，
+        # 但扩成 90 秒段落后相邻命中会大面积重合
+        final = dedupe_overlapping(final, max_per_video=2)
 
     return {"hits": final, "timings": timings, "degraded": degraded}
