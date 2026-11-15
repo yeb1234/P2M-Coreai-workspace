@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import json
 import logging
 import time
@@ -108,6 +110,38 @@ class AgentResult:
     tokens_in: int = 0
     tokens_out: int = 0
     latency_ms: int = 0
+
+
+_MEMORY_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mem-extract")
+
+
+def _schedule_memory_extract(ctx: AgentContext, user_message: str, answer: str) -> None:
+    """对话结束后异步提取记忆。
+
+    为什么异步：同步会让每轮多 2-3 秒，而记忆收益是长期的。
+    为什么单线程池：提取是 LLM 调用，并发没意义，还会抢显存。
+
+    失败一律吞掉 —— 记忆提取失败不能影响对话本身。
+    """
+
+    def _work() -> None:
+        db = SessionLocal()
+        try:
+            from app.services.memory_extract import extract_memories
+
+            convo = f"用户：{user_message}\n助手：{answer}"
+            result = extract_memories(db, ctx.user_id, convo)
+            if result.get("added") or result.get("superseded"):
+                logger.info("记忆提取: %s", result)
+        except Exception as exc:
+            logger.warning("记忆提取异常（不影响对话）: %s", type(exc).__name__)
+        finally:
+            db.close()
+
+    try:
+        _MEMORY_POOL.submit(_work)
+    except Exception:
+        pass
 
 
 def build_system_prompt(ctx: AgentContext) -> str:
@@ -298,6 +332,9 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
             run.tokens_out = tokens_out
             run.latency_ms = latency_ms
             db.commit()
+
+        if answer and ctx.user_id is not None:
+            _schedule_memory_extract(ctx, message, answer)
 
         return AgentResult(
             answer=answer or "（模型没有返回内容，请重试）",
