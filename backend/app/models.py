@@ -449,6 +449,14 @@ class MemoryItem(Base):
     hit_count = Column(Integer, nullable=False, default=0)
     last_hit_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
+    # ---- 记忆治理相关 ----
+    # 置顶：用户手动锁定，自动提取永远不能改、不能删。这是防止
+    # 「用户改过的记忆被 LLM 冲回去」的最后一道闸。
+    pinned = Column(Boolean, nullable=False, default=False)
+    # 置信度：user_stated 通常 0.9+，inferred 0.5-0.7
+    confidence = Column(Float, nullable=False, default=0.8)
+    # 软删除：被哪条替代了。不物理删，保留「用户改主意」的历史
+    superseded_by = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 

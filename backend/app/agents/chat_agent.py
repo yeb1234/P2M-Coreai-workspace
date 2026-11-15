@@ -125,6 +125,41 @@ def build_system_prompt(ctx: AgentContext) -> str:
         except Exception as exc:
             logger.warning("画像读取失败: %s", exc)
 
+        # 档案和助手设定放在画像和记忆之前 —— 它们定义「这个人是谁」「我该怎么说话」，
+        # 后面的数据都是在这个前提下解读的。
+        try:
+            from app.services.memory import read_user_settings
+
+            profile_kv, persona_kv = read_user_settings(db, ctx.user_id)
+            if profile_kv:
+                lines = []
+                if profile_kv.get("nickname"):
+                    lines.append(f"- 称呼：{profile_kv['nickname']}")
+                if profile_kv.get("occupation"):
+                    lines.append(f"- 职业/身份：{profile_kv['occupation']}")
+                if profile_kv.get("goal"):
+                    lines.append(f"- 当前目标：{profile_kv['goal']}")
+                if profile_kv.get("weekly_hours"):
+                    lines.append(f"- 每周可投入：约 {profile_kv['weekly_hours']} 小时")
+                if profile_kv.get("timezone"):
+                    lines.append(f"- 时区：{profile_kv['timezone']}")
+                if lines:
+                    parts.append("## 用户档案（用户自己填的，以此为准）\n" + "\n".join(lines))
+            if persona_kv:
+                lines = []
+                if persona_kv.get("tone"):
+                    lines.append(f"- 语气：{persona_kv['tone']}")
+                if persona_kv.get("proactivity"):
+                    lines.append(f"- 主动程度：{persona_kv['proactivity']}")
+                if persona_kv.get("cite_sources"):
+                    lines.append("- 引用检索到的视频时要说清来源")
+                if persona_kv.get("freeform"):
+                    lines.append(f"- 用户额外要求：{persona_kv['freeform']}")
+                if lines:
+                    parts.append("## 助手设定（用户指定，优先级高于默认风格）\n" + "\n".join(lines))
+        except Exception as exc:
+            logger.warning("档案/助手设定读取失败: %s", exc)
+
         try:
             memories = memory_text(db, ctx.user_id, limit=10)
             if memories:

@@ -17,7 +17,7 @@ from app.core.errors import register_exception_handlers
 from app.core.observability import RequestContextMiddleware, configure_logging
 from app.database import Base, SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
-from app.routers import admin, ai_jobs, assistant, auth, calendar_events, categories, learning, notes, schedule_items, search, user_data, videos, watch_events
+from app.routers import admin, ai_jobs, assistant, auth, calendar_events, categories, learning, memory_admin, notes, schedule_items, search, user_data, videos, watch_events
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
 
@@ -218,6 +218,7 @@ app.include_router(categories.router)
 app.include_router(ai_jobs.router)
 app.include_router(assistant.router)
 app.include_router(search.router)
+app.include_router(memory_admin.router)
 app.include_router(learning.router)
 app.include_router(watch_events.router)
 app.include_router(notes.router)

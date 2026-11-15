@@ -228,9 +228,14 @@ def recall_memories(
     kinds: list[str] | None = None,
     limit: int = 12,
 ) -> list[MemoryItem]:
-    """按重要度 + 新鲜度召回长期记忆。过期的自动忽略。"""
+    """按重要度 + 新鲜度召回长期记忆。过期和被替代的自动忽略。
+
+    必须过滤 superseded_by：软删除和「被新记忆替代」的条目如果还能被召回，
+    用户删掉的记忆就等于没删 —— 这是最伤信任的失败模式。
+    """
     query = db.query(MemoryItem).filter(
-        (MemoryItem.expires_at.is_(None)) | (MemoryItem.expires_at > datetime.now())
+        (MemoryItem.expires_at.is_(None)) | (MemoryItem.expires_at > datetime.now()),
+        MemoryItem.superseded_by.is_(None),
     )
     if user_id is not None:
         query = query.filter(MemoryItem.user_id == user_id)
@@ -238,7 +243,12 @@ def recall_memories(
         query = query.filter(MemoryItem.kind.in_(kinds))
 
     items = (
-        query.order_by(MemoryItem.importance.desc(), MemoryItem.updated_at.desc())
+        query.order_by(
+            # 用户置顶的排最前，其次是重要度，最后看新鲜度
+            MemoryItem.pinned.desc(),
+            MemoryItem.importance.desc(),
+            MemoryItem.updated_at.desc(),
+        )
         .limit(limit)
         .all()
     )
@@ -262,3 +272,38 @@ def memory_text(db: Session, user_id: int | None = None, limit: int = 10) -> str
         "ability": "能力",
     }
     return "\n".join(f"- [{labels.get(i.kind, i.kind)}] {i.content}" for i in items)
+
+
+# ---------------- 档案 / 助手设定 ----------------
+# 存在 user_data 的 key-value 里，和番茄钟一样，不动表结构。
+# 读取方有两处：chat_agent 拼 prompt、memory_admin 提供编辑接口。
+
+PROFILE_STORE_KEY = "p2m-profile-v1"
+PERSONA_STORE_KEY = "p2m-persona-v1"
+
+
+def read_user_settings(db: Session, user_id: int | None) -> tuple[dict, dict]:
+    """返回 (档案, 助手设定)。任何一侧取不到都返回空 dict，不影响对话。"""
+    if user_id is None:
+        return {}, {}
+    try:
+        from app.models import UserData
+    except Exception:  # pragma: no cover
+        return {}, {}
+
+    rows = (
+        db.query(UserData)
+        .filter(
+            UserData.user_id == user_id,
+            UserData.store_key.in_([PROFILE_STORE_KEY, PERSONA_STORE_KEY]),
+        )
+        .all()
+    )
+    found: dict[str, dict] = {}
+    for row in rows:
+        try:
+            data = json.loads(row.value or "{}")
+            found[row.store_key] = data if isinstance(data, dict) else {}
+        except (TypeError, ValueError):
+            logger.warning("用户设定解析失败 key=%s user=%s", row.store_key, user_id)
+    return found.get(PROFILE_STORE_KEY, {}), found.get(PERSONA_STORE_KEY, {})
