@@ -152,8 +152,8 @@ export const JourneyPage: React.FC = () => {
   const weekUp = this_week.delta >= 0;
 
   return (
-    <div className="p-6">
-      <div className="mb-5 flex items-baseline justify-between">
+    <div className="p-4 sm:p-6">
+      <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-[#2c2a27]">学习轨迹</h1>
           <p className="mt-1 text-sm text-[#9ca3af]">
@@ -162,7 +162,7 @@ export const JourneyPage: React.FC = () => {
         </div>
         <button
           onClick={() => void load()}
-          className="rounded-lg border border-[#e5e2dd] bg-white px-3 py-1.5 text-xs text-[#6b7280] hover:bg-[#f5f3f0]"
+          className="shrink-0 whitespace-nowrap rounded-lg border border-[#e5e2dd] bg-white px-3 py-1.5 text-xs text-[#6b7280] hover:bg-[#f5f3f0]"
         >
           刷新
         </button>
@@ -205,12 +205,12 @@ export const JourneyPage: React.FC = () => {
       </div>
 
       {/* 本周 + 连续 + 成就 */}
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
         <div className="rounded-xl border border-[#e5e2dd] bg-white p-4">
           <div className="flex items-center gap-1.5 text-xs text-[#9ca3af]">
             <Clock size={14} /> 本周学习
           </div>
-          <div className="mt-1.5 text-xl font-semibold text-[#2c2a27]">
+          <div className="mt-1.5 text-lg font-semibold text-[#2c2a27] sm:text-xl">
             {fmtMinutes(this_week.minutes)}
           </div>
           <div className={`mt-1 flex items-center gap-1 text-xs ${weekUp ? 'text-[#3f8f3a]' : 'text-[#c0392b]'}`}>
@@ -224,7 +224,7 @@ export const JourneyPage: React.FC = () => {
           <div className="flex items-center gap-1.5 text-xs text-[#9ca3af]">
             <Flame size={14} /> 连续学习
           </div>
-          <div className="mt-1.5 text-xl font-semibold text-[#2c2a27]">
+          <div className="mt-1.5 text-lg font-semibold text-[#2c2a27] sm:text-xl">
             {sources.streak_days} <span className="text-sm font-normal text-[#9ca3af]">天</span>
           </div>
           <div className="mt-1 text-xs text-[#9ca3af]">
@@ -236,7 +236,7 @@ export const JourneyPage: React.FC = () => {
           <div className="flex items-center gap-1.5 text-xs text-[#9ca3af]">
             <Trophy size={14} /> 成就
           </div>
-          <div className="mt-1.5 text-xl font-semibold text-[#2c2a27]">
+          <div className="mt-1.5 text-lg font-semibold text-[#2c2a27] sm:text-xl">
             {unlocked} <span className="text-sm font-normal text-[#9ca3af]">/ {total_milestones}</span>
           </div>
           <div className="mt-1 text-xs text-[#9ca3af]">
@@ -250,7 +250,7 @@ export const JourneyPage: React.FC = () => {
         <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[#6b7280]">
           <Sparkles size={13} /> 这份轨迹串了五个数据源
         </div>
-        <div className="grid grid-cols-5 gap-3 text-center">
+        <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-5">
           {[
             { label: '观看', value: fmtMinutes(sources.watch_minutes) },
             { label: '专注', value: sources.focus_minutes > 0 ? fmtMinutes(sources.focus_minutes) : '—' },
@@ -274,7 +274,7 @@ export const JourneyPage: React.FC = () => {
       {/* 成就墙 */}
       <div className="mb-4">
         <h2 className="mb-2 text-sm font-medium text-[#6b7280]">成就墙</h2>
-        <div className="grid grid-cols-6 gap-2">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           {milestones.map((m) => (
             <div
               key={m.id}

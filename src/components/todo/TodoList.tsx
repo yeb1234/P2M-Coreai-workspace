@@ -251,7 +251,14 @@ export const TodoList: React.FC = () => {
       )}
 
       {filteredTodos.length === 0 ? (
-        <EmptyState icon={<ListTodo size={24} className="text-[#9ca3af]" />} title="暂无待办事项" description="点击下方输入框快速添加待办" />
+        <>
+          <EmptyState icon={<ListTodo size={24} className="text-[#9ca3af]" />} title="暂无待办事项" description="在下面输入，回车即可添加" />
+          {/* 空状态下也要有输入框。原来这里只有提示没有入口，
+              文案写着「点击下方输入框」但那个框在 else 分支里，自相矛盾。 */}
+          <div className="mt-3 rounded-xl border border-[#e5e2dd] bg-white py-2">
+            <InlineAddInput />
+          </div>
+        </>
       ) : (
         <>
           <div className="space-y-2">
