@@ -17,6 +17,12 @@ const PENDING_RECOMMENDED_VIDEO_KEY = 'p2m_pending_recommended_video_id';
 const PENDING_SEEK_KEY = 'p2m_pending_seek_sec';
 const ASSISTANT_SETTINGS_CHANGED_EVENT = 'p2m:assistant-settings-changed';
 
+/** 正文里提到的视频：text 是回答原文里的书名号片段，video_id 用于跳转 */
+interface MentionedVideo {
+  text: string;
+  video_id: number;
+}
+
 interface ReferenceItem {
   video_id: number;
   video_title: string;
@@ -81,6 +87,52 @@ function openVideoAt(videoId: number, startSec?: number) {
   playInteractionSound('start');
 }
 
+/**
+ * 把回答正文里的《视频标题》渲染成可点按钮。
+ *
+ * 后端在 done 阶段做了反向匹配：从回答里提取书名号 → 去掉尾部时长 →
+ * 回视频表模糊匹配 → 返回 { text, video_id } 映射。
+ * 工具返回给模型的文本里没有 video_id，模型不可能凭空输出链接，
+ * 所以只能在回答生成完之后补这一层。
+ *
+ * 没命中的书名号原样输出 —— 模型有时会写「《某某理论》」这种不是视频的引用。
+ */
+function renderWithVideoLinks(text: string, links: MentionedVideo[]): React.ReactNode {
+  if (!links.length) return text;
+  const map = new Map(links.map((item) => [item.text, item.video_id]));
+  const pattern = /《[^》]{2,120}》/g;
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  let match: RegExpExecArray | null = pattern.exec(text);
+  while (match !== null) {
+    const raw = match[0];
+    const videoId = map.get(raw);
+    if (match.index > cursor) nodes.push(text.slice(cursor, match.index));
+    if (videoId) {
+      nodes.push(
+        <button
+          key={`${videoId}-${match.index}`}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            openVideoAt(videoId);
+          }}
+          title="打开这个视频"
+          className="text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:decoration-solid"
+        >
+          {raw}
+        </button>
+      );
+    } else {
+      nodes.push(raw);
+    }
+    cursor = match.index + raw.length;
+    match = pattern.exec(text);
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return nodes;
+}
+
 export const AIChatPanel: React.FC = () => {
   const {
     chatOpen, setChatOpen, model, systemPrompt, promptTemplates, activeTemplateId,
@@ -101,6 +153,7 @@ export const AIChatPanel: React.FC = () => {
   // 本轮没检索到片段时，保留上一轮的引用但标记出来 —— 直接清空的话
   // 用户会以为「推荐的东西没了」，而留着不标记又会让人误当成这轮的依据。
   const [referencesStale, setReferencesStale] = useState(false);
+  const [mentionedVideos, setMentionedVideos] = useState<MentionedVideo[]>([]);
   const [, setPageContext] = useAssistantPageContext(chatOpen);
   const [runtimeModelLabel, setRuntimeModelLabel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -242,6 +295,9 @@ export const AIChatPanel: React.FC = () => {
               if (event.session_id && event.session_id !== sessionId) {
                 setSessionId(event.session_id);
               }
+              if (event.mentioned_videos?.length) {
+                setMentionedVideos(event.mentioned_videos);
+              }
               if (event.references?.length) {
                 setReferences(event.references);
                 setReferencesStale(false);
@@ -378,7 +434,11 @@ export const AIChatPanel: React.FC = () => {
                   : 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-light)]'
               }`}
             >
-              {message.content || (message.streaming ? '…' : '')}
+              {message.content
+                ? (message.role === 'assistant'
+                    ? renderWithVideoLinks(message.content, mentionedVideos)
+                    : message.content)
+                : (message.streaming ? '…' : '')}
               {message.streaming && message.content && (
                 <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-[var(--accent)] align-middle" />
               )}

@@ -416,8 +416,14 @@ export type ChatStreamEvent =
         video_id: number;
         video_title: string;
         start_sec: number;
+        end_sec?: number;
         text: string;
         score?: number;
+      }>;
+      /** 回答正文里提到的视频（书名号片段 → video_id），用于渲染可点跳转 */
+      mentioned_videos?: Array<{
+        text: string;
+        video_id: number;
       }>;
     }
   | { type: 'error'; message: string };

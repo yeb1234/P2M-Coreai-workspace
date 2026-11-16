@@ -24,7 +24,7 @@ from langgraph.prebuilt import create_react_agent
 
 from app.agents.tools import ALL_TOOLS, set_tool_user
 from app.database import SessionLocal
-from app.models import AgentRun
+from app.models import AgentRun, Video
 from app.services.learning_context import active_path_text
 from app.services.llm import build_chat_model
 from app.services.memory import load_conversation, memory_text
@@ -438,7 +438,16 @@ async def stream_chat(ctx: AgentContext, message: str):
         try:
             from app.services.hybrid_search import hybrid_search
 
-            ref_result = hybrid_search(message, top_k=6, candidate_k=15, use_rerank=False)
+            # 参数必须和 search_videos 工具（tools.py:65）一致，否则会出现
+            # 「AI 回答引用了正确的课，下面相关片段却是另外三个不相关的」——
+            # 因为这两批结果来自**两次不同的检索**：
+            #   工具：  candidate_k=30, use_rerank=True   ← AI 实际依据
+            #   卡片：  candidate_k=15, use_rerank=False  ← 用户看到的
+            # 候选池小一半、还不重排，质量自然差一截。
+            #
+            # 代价是多一次 rerank API 调用（约 200-500ms），
+            # 但比"答得对、引用却不相干"值。
+            ref_result = hybrid_search(message, top_k=6, candidate_k=30, use_rerank=True)
             # 只保留真正相关的片段：低于 0.5 的多是「词面沾边」，点了也是浪费时间
             strong = [h for h in ref_result["hits"] if (h.vector_score or 0) >= 0.5]
             picked = strong[:5] if strong else ref_result["hits"][:3]
@@ -473,6 +482,52 @@ async def stream_chat(ctx: AgentContext, message: str):
         except Exception as exc:
             logger.warning("补充引用片段失败: %s", exc)
 
+        # ── 正文里提到的视频 → 可点跳转 ──
+        # 回答里会写《01、01-【基础认知】AI产品经理岗位及就业规划 194:47》这种，
+        # 但工具返回给模型的文本里**没有 video_id**，模型也不可能凭空输出链接。
+        # 所以在这里做一次反向匹配：从回答里提取所有书名号内容，
+        # 去掉尾部的时长，回视频表做模糊匹配，命中的给前端一份映射，
+        # 前端把对应的书名号片段渲染成可点按钮。
+        mentioned_videos: list[dict] = []
+        try:
+            import re as _re
+
+            raw_titles = _re.findall(r"《([^》]{2,120})》", answer or "")
+            if raw_titles:
+                db_lookup = SessionLocal()
+                try:
+                    seen_ids: set[int] = set()
+                    for raw in raw_titles:
+                        # 「标题 194:47」「标题 3:28-03:47」→ 去掉尾部时长
+                        candidate = _re.sub(
+                            r"\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*-\s*\d{1,2}:\d{2}(?::\d{2})?)?\s*$",
+                            "",
+                            raw,
+                        ).strip()
+                        if len(candidate) < 2:
+                            continue
+                        matches = (
+                            db_lookup.query(Video.id, Video.title)
+                            .filter(Video.title.ilike(f"%{candidate}%"))
+                            .limit(3)
+                            .all()
+                        )
+                        # 多个命中时取标题最短的那个：候选串通常是标题的一部分，
+                        # 最短标题最接近「AI 想指的那一个」。
+                        matches.sort(key=lambda row: len(row[1] or ""))
+                        for vid, _title in matches:
+                            if vid in seen_ids:
+                                break
+                            seen_ids.add(vid)
+                            mentioned_videos.append(
+                                {"text": f"《{raw}》", "video_id": int(vid)}
+                            )
+                            break
+                finally:
+                    db_lookup.close()
+        except Exception as exc:
+            logger.warning("匹配正文视频链接失败: %s", exc)
+
         db = SessionLocal()
         try:
             run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
@@ -492,6 +547,7 @@ async def stream_chat(ctx: AgentContext, message: str):
             "latency_ms": latency_ms,
             "steps": steps,
             "references": references,
+            "mentioned_videos": mentioned_videos,
         }
     except Exception as exc:
         logger.exception("流式对话失败")
