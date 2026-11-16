@@ -255,10 +255,12 @@
   修法：按 `fallback_order(policy)` 依次尝试 —— 方向由设置页的「兜底方案」决定
   （`external_first` → external→local，`local_first` → local→external，
   `external_only` / `local_only` 只有一个、不降级），不是固定的「外部失败退本地」；
-  同一 provider 内只对 429 / 5xx / 超时做指数退避（1s、2s、4s，单次封顶 8s，
-  默认 3 次；上游给 `Retry-After` 就听它的），401 / 403 / 404 立刻换下一个；
+  同一 provider 内只对 429 / 5xx / 超时做指数退避（1s、2s、4s，默认 3 次；
+  退避间隔上限 `max_delay_s=8s`；上游给 `Retry-After` 就听它的），
+  401 / 403 / 404 立刻换下一个；
   同时加 provider 级节流：外部通道两次调用至少隔 0.3s，撞到限流/上游故障后
-  整个通道冷却（单次最多 10s）；本地通道串行，避免并发把单模型进程打爆。
+  整个通道冷却（冷却等待上限 `_max_sleep_s=10s` —— 这与上面的退避间隔上限
+  是两个参数，不要混成一个）；本地通道串行，避免并发把单模型进程打爆。
   用 `CallMeta` 记录「是否降级、从哪降、试了几次、花了多久」，
   降级提示写进总结任务的消息（`已从 external 降级到 local（原因）`）；
   对话的 `provider` / `degraded_from` 随流式 done 事件返回，界面提示尚未接入。
