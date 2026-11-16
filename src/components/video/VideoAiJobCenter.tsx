@@ -315,7 +315,9 @@ export function VideoAiJobCenter({
 
   return (
     <div className="theme-surface min-w-0 overflow-hidden rounded-xl border px-5 py-4">
-      <div className="flex min-w-0 items-center gap-2">
+      {/* 三行布局：右侧栏只有 200px 左右，一行塞不下「折叠+标题+5个按钮+统计」。
+          原来全挤在同一行，统计被按钮组压成「0 运」「本」这种残缺文字。 */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
@@ -327,27 +329,10 @@ export function VideoAiJobCenter({
           {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
         </button>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="shrink-0 text-sm font-semibold leading-5 text-[var(--text-primary)]">AI 任务中心</h3>
-            <span className="text-xs leading-5 text-[var(--text-muted)]">
-              {totalActive > 0 ? `${jobs?.running ?? 0} 运行 / ${jobs?.queued ?? 0} 排队` : '队列空闲'}
-            </span>
-            {queuePaused && (
-              <span className="rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border-light))] bg-[var(--accent-bg)] px-2 py-0.5 text-xs text-[var(--accent)]">
-                已暂停
-              </span>
-            )}
-          </div>
-          {!collapsed && batchProgress && (
-            <p className="mt-1 truncate text-xs text-[var(--text-muted)]">
-              本轮 {batchProgress.completed}/{batchProgress.total}，运行 {batchProgress.running}，排队 {batchProgress.queued}，失败 {batchProgress.failed}
-            </p>
-          )}
-        </div>
+        <h3 className="shrink-0 text-sm font-semibold leading-5 text-[var(--text-primary)]">AI 任务中心</h3>
 
         {!collapsed && (
-          <div className="flex shrink-0 flex-nowrap items-center gap-1 pl-1">
+          <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1">
             <button
               type="button"
               onClick={canToggleQueue ? onToggleQueue : undefined}
@@ -386,6 +371,28 @@ export function VideoAiJobCenter({
             </IconButton>
           </div>
         )}
+
+        {/* 统计独占整行：w-full 强制换行，pl-10 和标题左边缘对齐（折叠按钮 32px + gap 8px） */}
+        <div className="w-full min-w-0 space-y-0.5 pl-10">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="whitespace-nowrap text-xs leading-5 text-[var(--text-muted)]">
+              {totalActive > 0 ? `${jobs?.running ?? 0} 运行 / ${jobs?.queued ?? 0} 排队` : '队列空闲'}
+            </span>
+            {queuePaused && (
+              <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border-light))] bg-[var(--accent-bg)] px-2 py-0.5 text-xs text-[var(--accent)]">
+                已暂停
+              </span>
+            )}
+          </div>
+          {!collapsed && batchProgress && (
+            <p
+              className="truncate text-xs text-[var(--text-muted)]"
+              title={`本轮 ${batchProgress.completed}/${batchProgress.total}，运行 ${batchProgress.running}，排队 ${batchProgress.queued}，失败 ${batchProgress.failed}`}
+            >
+              本轮 {batchProgress.completed}/{batchProgress.total}，运行 {batchProgress.running}，排队 {batchProgress.queued}，失败 {batchProgress.failed}
+            </p>
+          )}
+        </div>
       </div>
 
       {!collapsed && (
