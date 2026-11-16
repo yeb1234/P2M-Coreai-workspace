@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 
 from sqlalchemy import text
@@ -16,6 +17,37 @@ from app.database import engine
 from app.tables import CONTENT_CHUNKS
 
 logger = logging.getLogger(__name__)
+
+# ─── 元数据检索通道（路径/标题）的阈值 ───
+#
+# 这两个数字是「文档频率」闸门，作用是防止泛词把通道灌满。依据是实测 df
+# （14,327 个视频，2026-11）：
+#
+#   黑马前端 6230  ← 太泛，等于「所有前端课」，必须丢
+#   产品经理 2000+ ← 同上
+#   算法      810  ← 泛，单靠它召回没有区分度
+#   面试      758  ← 泛
+#   第五章    524  ← 可用（课程内的章节名）
+#   jQuery    117
+#   组件通信   47
+#   闭包       40
+#   GC算法      1
+#
+# 规则：词的 df > META_MAX_DF 直接丢弃；剩下的词里至少要有一个
+# df <= META_MIN_SPECIFIC_DF，否则说明整条查询都是泛词，不该由路径来决策。
+META_MAX_DF = 2000
+META_MIN_SPECIFIC_DF = 600
+
+# 元数据得分下限（归一化到 0-1）。命中「查询里有没有这个视频」靠的是覆盖面：
+#   路径同时命中 2 个词 ≈ 0.85 以上；只命中 1 个词 ≈ 0.5-0.6；
+#   只在「什么是 X」这种泛句式上撞到 1 个词 ≈ 0.15。
+# 0.15 那批必须丢掉：RRF 只看排名不看分数，第 2 名照样能压过向量的第 1 名。
+META_MIN_SCORE = 0.30
+
+# 文档频率缓存：term -> (df, 记录时间)。只在进程内，重启即清空。
+# 生命周期取 10 分钟：新增视频会让 df 变大，但变化量对闸门判断没有影响。
+_DF_CACHE: dict[str, tuple[int, float]] = {}
+_DF_TTL_SECONDS = 600.0
 
 # 英文字母/数字/下划线/点号组成的技术 token，长度 >= 2
 CODE_TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]{1,}")
@@ -233,3 +265,227 @@ def title_search(query: str, *, limit: int = 10) -> list[dict]:
         }
         for row in rows
     ]
+
+
+def _document_frequency(terms: list[str]) -> dict[str, int]:
+    """一条 SQL 统计每个词在「标题 + 路径」里命中了多少个视频。
+
+    为什么用 `count(*) FILTER (...)` 一次算完：每个词单独跑一条
+    `filepath ILIKE '%x%'` 要走一次 14k 行的顺序扫描（实测约 35ms/词），
+    4 个词就是 140ms，比整次检索还贵。合并成一条只扫一遍，约 40-70ms。
+
+    带一层进程内缓存：热门词（vue / 闭包 / 面试）会在连续查询里反复出现，
+    实测第二次同样三个词是 69ms，缓存后直接 0。items 有上限，不会涨。
+    """
+    if not terms:
+        return {}
+
+    import time
+
+    now = time.monotonic()
+    cached: dict[str, int] = {}
+    missing: list[str] = []
+    for term in terms:
+        hit = _DF_CACHE.get(term)
+        if hit and now - hit[1] < _DF_TTL_SECONDS:
+            cached[term] = hit[0]
+        else:
+            missing.append(term)
+    if not missing:
+        return cached
+
+    columns = []
+    params: dict = {}
+    for index, term in enumerate(missing):
+        key = f"df{index}"
+        params[key] = f"%{term}%"
+        columns.append(
+            f"count(*) FILTER (WHERE title ILIKE :{key} OR filepath ILIKE :{key}) AS {key}"
+        )
+
+    sql = "SELECT " + ", ".join(columns) + " FROM videos"
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text(sql), params).first()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("元数据文档频率统计失败，跳过元数据通道: %s", exc)
+        return {}
+
+    if row is None:
+        return {}
+
+    result = dict(cached)
+    for index, term in enumerate(missing):
+        value = int(row[index] or 0)
+        result[term] = value
+        if len(_DF_CACHE) < 512:
+            _DF_CACHE[term] = (value, now)
+    return result
+
+
+def meta_search(
+    query: str,
+    *,
+    limit: int = 30,
+    category_ids: list[int] | None = None,
+    video_ids: list[int] | None = None,
+    max_df: int = META_MAX_DF,
+    min_specific_df: int = META_MIN_SPECIFIC_DF,
+) -> list[dict]:
+    """元数据通道：用「课程名 / 章节名 / 课时名」召回，每个视频只出一条。
+
+    ## 为什么必须单独一路，而不是把路径拼进每个块的向量
+
+    路径是**视频级**信号。如果把它拼进每个 chunk 的向量，同一个视频的
+    所有块会共享同一段前缀，向量互相靠拢 —— 视频越长（库里最多 422 块）
+    字幕内容的区分度被稀释得越厉害。所以路径只作为「视频级先验」参与
+    RRF 融合，一个视频最多贡献一条候选，不会挤占内容召回的名额。
+
+    ## 每个视频取哪一块
+
+    不用固定的 chunk_index = 0：课程的第 0 块经常是「课程介绍 / 环境准备」，
+    拿它当命中点，用户点进去听到的不是想问的内容。这里取
+    **「该视频内第一次提到查询词的块」，没有就用第 0 块** —— 既是路径命中，
+    又落在真正讲到这个东西的位置。
+
+    ## 闸门（防止泛词灌满通道）
+
+    - df > max_df 的词直接丢（"黑马前端" 6230 个视频，等于没筛）
+    - 剩下的词里至少要有一个 df <= min_specific_df，否则整条查询都是泛词，
+      交回给内容通道处理。具体数值见文件头注释里的实测 df 表。
+
+    异常一律返回空列表：这只是第三路召回，挂了不能拖垮主检索。
+    """
+    from app.services import retrieval_meta
+
+    if not retrieval_meta.CHANNEL_ENABLED:
+        return []
+
+    query = (query or "").strip()
+    if not query:
+        return []
+
+    terms = retrieval_meta.meta_terms(query)
+    if not terms:
+        return []
+
+    df = _document_frequency(terms)
+    kept = [term for term in terms if 0 < df.get(term, 0) <= max_df]
+    if not kept:
+        return []
+    if min(df[term] for term in kept) > min_specific_df:
+        logger.debug("元数据通道跳过（全是泛词）: %s", kept)
+        return []
+
+    # 词权重：df 越小越有区分度。log 压缩一下，避免 1 个词的视频
+    # （GC算法 df=1）把其它词完全压死。
+    weights = {term: 1.0 / math.log2(2 + df[term]) for term in kept}
+    top = max(weights.values())
+    weights = {term: round(value / top, 3) for term, value in weights.items()}
+    # 归一化分母：命中「几个词」比「命中哪个词」更重要。
+    # 不归一化时，只命中 1 个词的视频（Python 课的《jQuery_动画(一)》）
+    # 会和命中 2 个词的视频（《第五章 jQuery / 02-获取位置》）同分，
+    # 多词共现的优势就消失了 —— 而共现恰恰是「路径能救回来」的原因。
+    total_weight = sum(weights.values()) or 1.0
+
+    params: dict = {"limit": limit}
+    score_cases: list[str] = []
+    like_conditions: list[str] = []
+    text_conditions: list[str] = []
+    for index, term in enumerate(kept):
+        key = f"m{index}"
+        params[key] = f"%{term}%"
+        weight = weights[term]
+        # 命中位置的权重只做「同分时的先后」，不做主导：
+        # 先比命中几个词（覆盖率），再看命中的是标题还是路径。
+        # 早期版本给路径 0.5，结果「路径同时命中 jQuery + 第五章」的视频
+        # （0.85 分）反而输给「只有标题里有 jQuery」的视频（1.0 分）——
+        # 这正是要靠路径救回来的那类查询。
+        score_cases.append(
+            f"CASE WHEN v.title ILIKE :{key} THEN {weight}"
+            f" WHEN v.filename ILIKE :{key} THEN {round(weight * 0.95, 3)}"
+            f" WHEN v.filepath ILIKE :{key} THEN {round(weight * 0.85, 3)}"
+            f" ELSE 0 END"
+        )
+        like_conditions.append(f"v.title ILIKE :{key} OR v.filepath ILIKE :{key}")
+        text_conditions.append(f"s2.text ILIKE :{key}")
+
+    filters: list[str] = []
+    if category_ids:
+        filters.append("v.category_id = ANY(:category_ids)")
+        params["category_ids"] = list(category_ids)
+    if video_ids:
+        filters.append("v.id = ANY(:video_ids)")
+        params["video_ids"] = list(video_ids)
+    filter_sql = (" AND " + " AND ".join(filters)) if filters else ""
+
+    score_sql = f"({' + '.join(score_cases)}) / {round(total_weight, 3)}"
+    like_sql = " OR ".join(f"({c})" for c in like_conditions)
+    text_sql = " OR ".join(f"({c})" for c in text_conditions)
+
+    sql = f"""
+        WITH cand AS (
+            SELECT v.id, v.title, v.filepath, v.category_id,
+                   ({score_sql}) AS meta_score
+            FROM videos v
+            WHERE ({like_sql}){filter_sql}
+            -- 先把视频级候选截断，再回块表取具体片段。
+            -- 不截断的话，泛词（vue df=1520）会让下面的相关子查询
+            -- 对上千个视频各算一次，单次查询从 60ms 涨到 500ms+。
+            ORDER BY meta_score DESC
+            LIMIT :cand_limit
+        )
+        SELECT
+            s.id            AS segment_id,
+            s.video_id      AS video_id,
+            s.start_sec     AS start_sec,
+            s.end_sec       AS end_sec,
+            s.text          AS text,
+            c.title         AS video_title,
+            c.filepath      AS filepath,
+            c.category_id   AS category_id,
+            c.meta_score    AS meta_score
+        FROM cand c
+        JOIN {CONTENT_CHUNKS.name} s ON s.video_id = c.id
+        WHERE s.chunk_index = COALESCE(
+                (SELECT min(s2.chunk_index)
+                   FROM {CONTENT_CHUNKS.name} s2
+                  WHERE s2.video_id = c.id AND ({text_sql})),
+                0)
+          AND s.end_sec > s.start_sec
+        ORDER BY c.meta_score DESC, s.start_sec ASC
+        LIMIT :limit
+    """
+
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(sql), {**params, "cand_limit": limit * 2}
+            ).fetchall()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("元数据检索失败，跳过该通道: %s", exc)
+        return []
+
+    out: list[dict] = []
+    for row in rows:
+        score = round(float(row.meta_score or 0.0), 4)
+        if score < META_MIN_SCORE:
+            continue
+        meta = retrieval_meta.build_meta(row.filepath, row.video_title)
+        out.append(
+            {
+                "segment_id": row.segment_id,
+                "video_id": row.video_id,
+                "start_sec": row.start_sec,
+                "end_sec": row.end_sec,
+                "text": row.text,
+                "video_title": row.video_title,
+                "filepath": row.filepath,
+                "category_id": row.category_id,
+                "meta_score": score,
+                "meta_text": meta.meta_text,
+            }
+        )
+        if len(out) >= limit:
+            break
+    return out

@@ -22,8 +22,9 @@ from app.utils.textclean import looks_like_promo
 from app.database import engine, settings
 from app.models import Category, Video
 from app.tables import CONTENT_CHUNKS
+from app.services import retrieval_meta
 from app.services.embeddings import EmbeddingError, get_embedding_client
-from app.services.lexical import lexical_search
+from app.services.lexical import lexical_search, meta_search
 from app.services.llm import build_chat_model
 from app.services.vector_store import VectorStoreError, search as vector_search
 
@@ -55,6 +56,14 @@ class Hit:
     # 必须放在所有无默认值的字段之后，否则 dataclass 构造会报
     # "non-default argument follows default argument"
     filepath: str | None = None
+    # 元数据通道的分数：路径/标题命中的加权和（见 lexical.meta_search）。
+    # 只有来自 meta 通道的候选才有值 —— 它表达的是「整个视频在讲这个」，
+    # 和 lexical_score（正文片段像不像）不是一回事。
+    meta_score: float | None = None
+    # 路径线索：课程 / 章 / 课时 / 第 N 节 / 上一节 / 下一节。
+    # 由 retrieval_meta.build_meta + attach_sequence 在最终结果上补齐，
+    # 不参与排序，只给前端和模型当上下文。
+    meta: dict | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -74,6 +83,8 @@ class Hit:
             "sources": self.sources,
             "raw_text": self.raw_text,
             "segment_count": self.segment_count,
+            "meta_score": self.meta_score,
+            "meta": self.meta,
         }
 
 
@@ -163,7 +174,15 @@ def _llm_rerank(query: str, hits: list[Hit], keep: int) -> list[Hit]:
     lines = []
     for index, hit in enumerate(candidates):
         snippet = (hit.text or "").replace("\n", " ")[:180]
-        lines.append(f"[{index}] {hit.video_title} @{int(hit.start_sec)}s :: {snippet}")
+        # 课程/章名只在路径里。少了这段，"02-获取位置" 这种短标题
+        # 在模型眼里就是一句没头没尾的话，"jQuery 动画" 这类查询直接判不相关。
+        # 只在开了元数据能力时拼，关掉即回到只给标题的原始 prompt。
+        where = ""
+        if retrieval_meta.ENABLED:
+            display = retrieval_meta.build_meta(hit.filepath, hit.video_title).display
+            if display:
+                where = f"[{display}] "
+        lines.append(f"[{index}] {hit.video_title} {where}@{int(hit.start_sec)}s :: {snippet}")
 
     prompt = (
         "你是学习资料检索的排序器。根据用户问题，从候选视频片段中选出最相关的若干条。\n"
@@ -291,7 +310,20 @@ def _api_rerank(query: str, hits: list[Hit], keep: int) -> list[Hit] | None:
     if not pool:
         return None
 
-    ranked = rerank(query, [h.text for h in pool], top_n=len(pool))
+    # 送进 cross-encoder 的文档要带上路径线索，否则会出现「检索靠路径找对了、
+    # 重排却把它删掉」：
+    #   Q「什么是 GC 算法」→ 正确的《3、什么是GC算法》，但 ASR 把 GC 听成了 JC
+    #   （正文写的是"什么是JC算法"），只看正文的 reranker 判为不相关直接过滤。
+    # 路径/标题里写的是对的关键词，把它拼在正文前面，重排才有判据。
+    docs = []
+    for hit in pool:
+        if retrieval_meta.ENABLED:
+            meta_text = retrieval_meta.build_meta(hit.filepath, hit.video_title).meta_text
+            docs.append(f"{meta_text}。{hit.text}" if meta_text else hit.text)
+        else:
+            docs.append(hit.text)
+
+    ranked = rerank(query, docs, top_n=len(pool))
     if ranked is None:
         return None
 
@@ -324,6 +356,20 @@ def hybrid_search(
     if not query:
         return {"hits": [], "timings": {}, "degraded": []}
 
+    # 查询改写：剥掉口语（那个啥/帮我找一下/怎么弄来着）+ 术语中英扩展。
+    # 三路召回（词法/元数据/向量）都吃改写后的 query —— 原始口语会同时
+    # 稀释向量、污染词法匹配。
+    # 失败/关闭时退回原 query，不影响检索可用性。
+    try:
+        from app.services.query_rewrite import rewrite_query
+
+        rewritten = rewrite_query(query)
+        if rewritten and rewritten != query:
+            logger.debug("查询改写: %r → %r", query, rewritten)
+            query = rewritten
+    except Exception:
+        logger.warning("查询改写失败，使用原始 query", exc_info=True)
+
     import time
 
     timings: dict[str, float] = {}
@@ -334,6 +380,22 @@ def hybrid_search(
         query, limit=candidate_k, category_ids=category_ids, video_ids=video_ids
     )
     timings["lexical_ms"] = round((time.perf_counter() - started) * 1000, 1)
+
+    # 元数据通道：课程名 / 章名 / 课时名。
+    # 它解决的是「查某类课程」——这类查询的答案只存在于路径里，字幕正文
+    # 里没有「这是第五章 jQuery」这种话。每个视频最多贡献一条候选，
+    # 所以不会挤占内容召回的名额。失败/关闭时返回空，不影响另外两路。
+    meta_rows: list[dict] = []
+    started = time.perf_counter()
+    if retrieval_meta.CHANNEL_ENABLED:
+        try:
+            meta_rows = meta_search(
+                query, limit=candidate_k, category_ids=category_ids, video_ids=video_ids
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("元数据通道异常，跳过: %s", exc)
+            meta_rows = []
+    timings["meta_ms"] = round((time.perf_counter() - started) * 1000, 1)
 
     vector_rows: list = []
     started = time.perf_counter()
@@ -370,6 +432,27 @@ def hybrid_search(
             sources=["lexical"],
         )
 
+    for row in meta_rows:
+        segment_id = row["segment_id"]
+        existing = pool.get(segment_id)
+        if existing is not None:
+            existing.meta_score = row.get("meta_score")
+            if "meta" not in existing.sources:
+                existing.sources.append("meta")
+            continue
+        pool[segment_id] = Hit(
+            segment_id=segment_id,
+            video_id=row["video_id"],
+            video_title=row["video_title"],
+            filepath=row.get("filepath"),
+            category_id=row.get("category_id"),
+            start_sec=row["start_sec"],
+            end_sec=row["end_sec"],
+            text=row["text"],
+            meta_score=row.get("meta_score"),
+            sources=["meta"],
+        )
+
     missing_ids = [row.segment_id for row in vector_rows if row.segment_id not in pool]
     details = fetch_segments(missing_ids)
     for row in vector_rows:
@@ -399,7 +482,9 @@ def hybrid_search(
         pool = {
             sid: hit
             for sid, hit in pool.items()
-            if (hit.vector_score or 0) >= min_vector_score or "lexical" in hit.sources
+            if (hit.vector_score or 0) >= min_vector_score
+            or "lexical" in hit.sources
+            or "meta" in hit.sources
         }
 
     if not pool:
@@ -408,16 +493,25 @@ def hybrid_search(
     rankings: dict[str, list[int]] = {
         "lexical": [row["segment_id"] for row in lexical_rows if row["segment_id"] in pool],
         "vector": [row.segment_id for row in vector_rows if row.segment_id in pool],
+        "meta": [row["segment_id"] for row in meta_rows if row["segment_id"] in pool],
     }
-    fused = rrf_fuse(rankings, weights={"lexical": 0.8, "vector": 1.2})
+    # meta 权重略高于 vector：它是「整个视频在讲这个」的强证据，
+    # 而且每个视频只出一条候选（不会像内容通道那样同一视频占满名额）。
+    # 但也不能给太高 —— 路径只能证明「课程对」，不能证明「这一段对」，
+    # 所以仍要留出 rerank 用正文纠正的空间。
+    fused = rrf_fuse(
+        rankings, weights={"lexical": 0.8, "vector": 1.2, "meta": 1.5}
+    )
 
     for source, ids in rankings.items():
         for rank, segment_id in enumerate(ids, start=1):
             if segment_id in pool:
                 if source == "lexical":
                     pool[segment_id].lexical_rank = rank
-                else:
+                elif source == "vector":
                     pool[segment_id].vector_rank = rank
+                # meta 不记 rank：它的排序含义是视频间相关性，
+                # 和片段级 rank 混在一起会让人误读。meta_score 已经带上了。
 
     ordered = sorted(fused.items(), key=lambda item: item[1], reverse=True)
     candidates = []
@@ -461,6 +555,21 @@ def hybrid_search(
     # segment_embeddings 一起删除 —— 它解决的是「9 个字一条」的问题，
     # 而检索单位已经不是碎片了。
     final = dedupe_overlapping(final, max_per_video=2, overlap_ratio=0.3)
+
+    # 路径线索只在最终结果上补（≤ top_k 条，纯字符串运算 + 一次同目录查询）。
+    # 不参与排序：它回答的是「这条属于哪门课、第几节、下一节是什么」，
+    # 不是「有多相关」。排序职责留给 RRF 和 rerank。
+    if retrieval_meta.ENABLED and final:
+        started = time.perf_counter()
+        try:
+            for hit in final:
+                base = retrieval_meta.build_meta(hit.filepath, hit.video_title).as_dict()
+                hit.meta = {**(hit.meta or {}), **base}
+            retrieval_meta.attach_sequence(final)
+        except Exception as exc:  # noqa: BLE001
+            # 元数据只是锦上添花，失败不能让整次检索 500
+            logger.warning("补充路径元数据失败: %s", exc)
+        timings["meta_seq_ms"] = round((time.perf_counter() - started) * 1000, 1)
 
     # rerank_mode 不能放进 timings —— 那里是 dict[str, float]，
     # 塞字符串会让 Pydantic 校验失败，整个检索 500。踩过。

@@ -575,6 +575,12 @@ class HybridSearchHit(BaseModel):
     # 也没法在高亮时区分「命中的是这一句」还是「展开的整段」。
     raw_text: str | None = None
     segment_count: int = 1
+    # 路径线索（视频级）。命中来自「元数据通道」时才有 meta_score；
+    # meta 里带 display（资料库/课程/章）、lesson_no、position/total、prev/next。
+    # 之前不加这两个字段，hybrid_search 算出来的东西会被 Pydantic 静默丢掉，
+    # 前端拿不到「这条属于哪门课、第几节」。
+    meta: Optional[dict] = None
+    meta_score: Optional[float] = None
 
 
 class HybridSearchOut(BaseModel):
