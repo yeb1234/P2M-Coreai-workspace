@@ -438,6 +438,7 @@ async def stream_chat(ctx: AgentContext, message: str):
         try:
             from app.services.hybrid_search import hybrid_search
             from app.utils.textclean import clean_promo_text
+            from app.utils.paths import display_folder_path
 
             # 参数必须和 search_videos 工具（tools.py:65）一致，否则会出现
             # 「AI 回答引用了正确的课，下面相关片段却是另外三个不相关的」——
@@ -470,6 +471,8 @@ async def stream_chat(ctx: AgentContext, message: str):
                 {
                     "video_id": hit.video_id,
                     "video_title": hit.video_title,
+                    # 只给相对文件夹层级，不给磁盘路径（安全 + 可读性）
+                    "folder_path": display_folder_path(getattr(hit, "filepath", None)),
                     "start_sec": round(hit.start_sec, 1),
                     # 带上结束时间：块平均跨 114 秒（最长 7000+ 秒），
                     # 前端只显示起点会让用户以为「就这一秒的内容」，

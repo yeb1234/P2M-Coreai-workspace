@@ -51,6 +51,10 @@ class Hit:
     # 扩展上下文后：text 是合并出的段落，raw_text 保留命中的原始字幕
     raw_text: str | None = None
     segment_count: int = 1
+    # 磁盘原始路径，只在后端内部流转；展示用 display_folder_path()
+    # 必须放在所有无默认值的字段之后，否则 dataclass 构造会报
+    # "non-default argument follows default argument"
+    filepath: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -98,6 +102,7 @@ def fetch_segments(segment_ids: list[int]) -> dict[int, dict]:
             seg.c.end_sec,
             seg.c.text,
             video.c.title.label("video_title"),
+            video.c.filepath.label("filepath"),
             video.c.category_id,
             category.c.name.label("category_name"),
         )
@@ -118,6 +123,8 @@ def fetch_segments(segment_ids: list[int]) -> dict[int, dict]:
             "end_sec": row.end_sec,
             "text": row.text,
             "video_title": row.video_title,
+            # 磁盘原始路径只在后端内部流转，给前端的是清洗后的层级（见 chat_agent）
+            "filepath": row.filepath,
             "category_id": row.category_id,
             "category_name": row.category_name,
         }
@@ -354,6 +361,7 @@ def hybrid_search(
             segment_id=row["segment_id"],
             video_id=row["video_id"],
             video_title=row["video_title"],
+            filepath=row.get("filepath"),
             category_id=row.get("category_id"),
             start_sec=row["start_sec"],
             end_sec=row["end_sec"],
@@ -377,6 +385,7 @@ def hybrid_search(
             segment_id=row.segment_id,
             video_id=meta["video_id"],
             video_title=meta["video_title"],
+            filepath=meta.get("filepath"),
             category_id=meta["category_id"],
             start_sec=meta["start_sec"],
             end_sec=meta["end_sec"],

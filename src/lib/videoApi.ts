@@ -415,6 +415,7 @@ export type ChatStreamEvent =
       references?: Array<{
         video_id: number;
         video_title: string;
+        folder_path?: string;
         start_sec: number;
         end_sec?: number;
         text: string;

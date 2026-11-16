@@ -31,6 +31,8 @@ interface MentionedVideo {
 interface ReferenceItem {
   video_id: number;
   video_title: string;
+  /** 相对文件夹层级，如「产品经理 / Y亚慧ai产品经理课」。不含系统路径 */
+  folder_path?: string;
   start_sec: number;
   /** 块的结束时间。块平均跨 114 秒，只显示起点会让人以为时间戳错了。 */
   end_sec?: number;
@@ -624,6 +626,14 @@ export const AIChatPanel: React.FC = () => {
               >
                 <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
                 <div className="min-w-0">
+                  {item.folder_path && (
+                    <p
+                      className="truncate text-[10px] text-[var(--text-muted)]"
+                      title={item.folder_path}
+                    >
+                      {item.folder_path}
+                    </p>
+                  )}
                   <p className="text-xs font-medium text-[var(--text-primary)] truncate">
                     {item.video_title || `视频 ${item.video_id}`}
                   </p>

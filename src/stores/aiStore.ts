@@ -17,6 +17,8 @@ export interface PromptTemplate {
 export interface ChatReference {
   video_id: number;
   video_title: string;
+  /** 相对文件夹层级（后端已清洗，不含系统路径） */
+  folder_path?: string;
   start_sec: number;
   text: string;
   score?: number;
