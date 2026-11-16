@@ -6,6 +6,9 @@ aiofiles==24.1.0
 
 # ---- 数据层：PostgreSQL + pgvector ----
 sqlalchemy==2.0.36
+# 版本化迁移。之前只有手写 migrations.py（create_all + ALTER IF NOT EXISTS），
+# 幂等但没有版本记录、不可回滚、看不出线上是第几版。
+alembic==1.13.3
 psycopg[binary]>=3.2
 pgvector>=0.3
 pydantic==2.9.2

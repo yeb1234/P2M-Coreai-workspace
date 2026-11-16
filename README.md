@@ -88,40 +88,63 @@ SiteYeb 最开始是为个人学习、看视频、做笔记、跑番茄钟、管
 
 ## 运行方式
 
-### 日常使用
+**全部跑在 Docker 里。** 不再是「本机 uvicorn + npm run dev」——
+pgvector、Redis、ffmpeg 三件硬依赖只有容器里有。
+细节和排障见 [docs/run.md](docs/run.md)。
 
-后端监听 80 端口，局域网内可以直接用机器 IP 访问：
+### 启动
 
 ```bash
-cd backend
-.venv311/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+# Windows：双击 start.bat，选 [1] 或 [2]
+# 命令行：
+./start.sh            # 完整（含 AI worker）
+./start.sh web        # 只要页面，不起 worker
+./start.sh stop       # 全停（数据卷保留）
 ```
 
-- 本机访问：http://localhost
-- 局域网访问：`http://你的电脑IP`
+或者直接用 compose：
 
-如果只改前端生产包，执行 `npm run build` 后刷新浏览器即可。
+```bash
+docker compose up -d                              # 完整
+docker compose up -d postgres redis backend frontend   # 不用 AI 助手
+```
 
-### 前端开发
+访问 http://localhost
 
-前端测试和开发使用 5002 端口，支持 Vite 热更新：
+### 服务与依赖
+
+| 容器 | 作用 | 不用 AI 助手时 |
+|---|---|---|
+| `siteyeb-pg` | PostgreSQL + pgvector | 必须 |
+| `siteyeb-backend` | FastAPI + 缩略图/文件监听 | 必须 |
+| `siteyeb-frontend` | nginx（静态页 + 反向代理） | 必须 |
+| `siteyeb-redis` | RQ 队列 | 可不起，但 backend 依赖它，留着只占几 MB |
+| `siteyeb-worker` | 转写 / 建块 / 向量化 | **可以不起** |
+
+不起 worker 时：浏览、播放、搜索、笔记、待办、路径查看全部正常；
+新发起的转写和向量化会堆在队列里没人消费。
+
+### 前端开发（改 UI 时）
+
+Vite 热更新仍然可用，只是后端跑在容器里：
 
 ```bash
 npm install
-npm run dev
+npm run dev        # http://localhost:5002，API 代理到 http://127.0.0.1:80
 ```
-
-- 前端开发地址：http://localhost:5002
-- API 会代理到 80 端口后端
 
 ## 端口说明
 
 | 端口 | 用途 | 说明 |
 | --- | --- | --- |
-| 80 | 后端 / 生产入口 | FastAPI，同时可提供构建后的前端；局域网直接访问这个端口 |
-| 5002 | 前端开发 | Vite 热更新，适合调 UI |
-| 1234 | 本地 LLM | LM Studio / OpenAI-compatible 常用端口 |
-| 11434 | Ollama | Ollama 默认端口 |
+| 80 | 全部入口 | nginx：静态页面 + `/api` 反代到 backend |
+| 5002 | 前端开发 | Vite 热更新，只在 `npm run dev` 时占用 |
+| 5432 | PostgreSQL | 只绑 127.0.0.1，不对外 |
+| 6379 | Redis | 只绑 127.0.0.1，不对外 |
+| 1234 / 1235 | 嵌入模型 | 宿主机 LM Studio。容器内用 `host.docker.internal:1235` |
+| 11434 | Ollama | 备选本地 LLM |
+
+`backend` 和 `worker` **不暴露端口**，全部经 nginx 转发。
 
 ## 视频转录说明
 
@@ -212,6 +235,8 @@ bash scripts/logq.sh stats --since 24h   # 按级别/logger/状态码聚合
 
 - [开发工作法（怎么在这个项目上安全改动）](docs/maintainability.md) ← 动手前先看
 - [日志方案（落盘/轮转/查询/升级时机）](docs/logging.md)
+- [怎么把服务跑起来（容器组合 / 端口 / 数据卷）](docs/run.md)
+- [数据库迁移（Alembic 工作流、怎么加一版）](docs/migrations.md)
 - [可迁移的经验（哪些 bug 不报错）](docs/lessons.md)
 - [后台任务与重启续跑](docs/background-tasks.md)
 - [存储与跨设备同步审计](docs/storage-sync-audit.md)

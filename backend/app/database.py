@@ -389,9 +389,81 @@ def check_transactions() -> dict:
     }
 
 
+# 第一个迁移的 revision id。老库（有表、没有 alembic_version）要 stamp 到它，
+# 表示「结构已经处于 baseline」，这样 0002 及之后的增量才会执行。
+#
+# 写死 id 是刻意的：baseline 一旦发布就凝固，id 不会再变。
+BASELINE_REVISION = "ed9ec716c9b0"
+
+
+def _run_alembic_migrations() -> None:
+    """跑 alembic upgrade head。三种库分别处理。
+
+    | 库的状态 | 动作 |
+    |---|---|
+    | 空库 | upgrade head（baseline 建全部表） |
+    | 有表、无 alembic_version（老部署） | stamp 到 baseline，再 upgrade head |
+    | 有 alembic_version | 直接 upgrade head |
+
+    第三种是正常态。第二种是这次引入 Alembic 时的一次性过渡：
+    线上库已经有 21 张表了，直接 upgrade 会撞 "relation already exists"。
+
+    失败不抛异常：迁移挂了不代表服务不能跑（结构可能已经是对的），
+    但必须大声记日志 —— 静默跳过是上次「任务底座从未投递成功」的同款问题。
+    """
+    try:
+        from alembic import command
+        from alembic.config import Config
+    except ImportError:
+        logger.warning("alembic 未安装，跳过迁移（结构由 create_all 负责）")
+        return
+
+    backend_dir = Path(__file__).resolve().parent.parent
+    cfg = Config(str(backend_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_dir / "alembic"))
+    # ConfigParser 会把 % 当插值符，密码里含 % 会炸
+    cfg.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+
+    try:
+        with engine.connect() as conn:
+            has_version = conn.execute(
+                text("SELECT to_regclass('public.alembic_version')")
+            ).scalar()
+            has_tables = conn.execute(
+                text("SELECT to_regclass('public.videos')")
+            ).scalar()
+
+        if not has_version and has_tables:
+            logger.info(
+                "检测到已有结构但没有 alembic_version，stamp 到 baseline=%s", BASELINE_REVISION
+            )
+            command.stamp(cfg, BASELINE_REVISION)
+
+        command.upgrade(cfg, "head")
+        logger.info("数据库迁移完成（alembic head）")
+    except Exception:  # noqa: BLE001
+        logger.exception("alembic 迁移失败，继续启动但结构可能不是最新")
+
+
 def ensure_runtime_schema() -> None:
-    """建表与索引（幂等）。PostgreSQL 走 pgvector + pg_trgm，SQLite 仅保留最小结构。"""
+    """建表与索引（幂等）。
+
+    PostgreSQL 分两步：
+      1. alembic upgrade head —— 版本化的结构变更，有记录、可回滚
+      2. upgrade_postgres     —— create_all + 幂等 ALTER + content_chunks DDL
+
+    为什么第 2 步还留着：`content_chunks` 的 DDL 要用运行时的
+    embedding_dim 拼 halfvec(N)，而迁移文件里必须写死（迁移要能重放）。
+    两者分工：Alembic 管版本，upgrade_postgres 管「按当前配置补齐」。
+
+    历史上这两件事都塞在 upgrade_postgres 里，没有版本记录、
+    不可回滚，也看不出线上到底是第几版 —— 这次补上前者，后者保留兜底。
+
+    SQLite 只跑最小结构（Alembic 的 DDL 有 PG 专有语法，跑不了）。
+    """
     if settings.is_postgres:
+        _run_alembic_migrations()
+
         from app.migrations import upgrade_postgres
 
         upgrade_postgres(engine)
