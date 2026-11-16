@@ -95,6 +95,18 @@ export function preloadPage(id: ActiveView): void {
   void PAGE_LOADERS[id]?.();
 }
 
+/**
+ * dev: true = 这个页面还没有真实功能（静态示例数据 / 只有布局）。
+ *
+ * 侧边栏据此显示施工中标记，AppLayout 据此在页面顶部渲染施工中横幅。
+ *
+ * 2026-11 复核时把两项去掉了：
+ *   aiagent  灵境小助手 —— 能真的发消息、走 SSE 流式、带页面上下文（6 处交互）
+ *   stats    数据中心   —— 展示的是 store 里的真实待办/番茄/笔记统计，只读但可用
+ *
+ * 其余 15 项确认是静态占位：交互元素为 0，或者数据是 MOCK_*（如 tokens 页的
+ * MOCK_MODELS / WEEKLY_SPEND，三个「交互」只是切换 today/week/month 标签）。
+ */
 export const PAGES: PageEntry[] = [
   { id: 'dashboard', path: '', component: DashboardPage, label: '工作台', icon: <LayoutDashboard size={20} />, color: 'text-[var(--accent)]' },
   { id: 'todo', path: 'todo', component: TodoPage, label: '待办事项', icon: <ListTodo size={20} />, color: 'text-[var(--info)]' },
@@ -113,7 +125,7 @@ export const PAGES: PageEntry[] = [
   { id: 'compare', path: 'compare', component: ComparePage, label: '产品对比', icon: <GitCompare size={20} />, color: 'text-[#06b6d4]', dev: true },
   { id: 'shop', path: 'shop', component: ShopPage, label: '电商中心', icon: <ShoppingCart size={20} />, color: 'text-[var(--warn)]', dev: true },
   { id: 'esports', path: 'esports', component: EsportsPage, label: '赛事数据', icon: <Trophy size={20} />, color: 'text-[var(--warn)]', dev: true },
-  { id: 'stats', path: 'stats', component: StatsPage, label: '数据中心', icon: <BarChart3 size={20} />, color: 'text-[#06b6d4]', dev: true },
+  { id: 'stats', path: 'stats', component: StatsPage, label: '数据中心', icon: <BarChart3 size={20} />, color: 'text-[#06b6d4]' },
   { id: 'reader', path: 'reader', component: ReaderPage, label: '阅读器', icon: <BookOpen size={20} />, color: 'text-[var(--info)]', dev: true },
   { id: 'snippets', path: 'snippets', component: SnippetsPage, label: '代码片段', icon: <Code2 size={20} />, color: 'text-[#8b5cf6]', dev: true },
   { id: 'habits', path: 'habits', component: HabitsPage, label: '习惯追踪', icon: <Target size={20} />, color: 'text-[var(--success)]', dev: true },
@@ -123,7 +135,7 @@ export const PAGES: PageEntry[] = [
   { id: 'leetcode', path: 'leetcode', component: LeetcodePage, label: 'LeetCode', icon: <Code2 size={20} />, color: 'text-[var(--warn)]', dev: true },
   { id: 'interview', path: 'interview', component: InterviewPage, label: '面试题库', icon: <MessageSquare size={20} />, color: 'text-[#ec4899]', dev: true },
   { id: 'codenav', path: 'codenav', component: CodeNavPage, label: '编程导航', icon: <Compass size={20} />, color: 'text-[var(--info)]', dev: true },
-  { id: 'aiagent', path: 'aiagent', component: AIAgentPage, label: '灵境小助手', icon: <Bot size={20} />, color: 'text-[#8b5cf6]', dev: true },
+  { id: 'aiagent', path: 'aiagent', component: AIAgentPage, label: '灵境小助手', icon: <Bot size={20} />, color: 'text-[#8b5cf6]' },
   { id: 'openclaw', path: 'openclaw', component: OpenClawPage, label: 'OpenClaw', icon: <Package size={20} />, color: 'text-[var(--danger)]', dev: true },
   { id: 'hermes', path: 'hermes', component: HermesPage, label: 'Hermes', icon: <Workflow size={20} />, color: 'text-[var(--accent)]', dev: true },
   { id: 'settings', path: 'settings', component: SettingsPage, label: '设置', icon: <Settings size={20} />, color: 'text-[var(--text-secondary)]' },

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, Eye, RefreshCw, X, GripVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Eye, RefreshCw, X, GripVertical, Construction } from 'lucide-react';
 import { useUIStore, usePomodoroStore } from '../../stores';
 import { PAGE_MAP, preloadPage } from '../../config/pageRegistry';
 import type { ActiveView } from '../../stores/uiStore';
@@ -193,8 +193,17 @@ export const Sidebar: React.FC = () => {
             return (
               <React.Fragment key={id}>
               {showGroupHeader && (
-                <div className="px-2.5 pb-1 pt-2.5 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
-                  {group}
+                <div className="flex items-center gap-1.5 px-2.5 pb-1 pt-2.5 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
+                  <span>{group}</span>
+                  {/* 「工具」这一组 13 项里有 11 项还是静态占位（另外两项是
+                      灵境小助手和数据中心，已从 dev 标记里摘掉）。
+                      在组标题上标一次，比在 11 个菜单项上各挂一个标签清楚。 */}
+                  {group === '工具' && (
+                    <span className="flex items-center gap-1 normal-case tracking-normal">
+                      <Construction size={11} className="text-[var(--warn)]" aria-hidden="true" />
+                      <span className="text-[10px] font-normal text-[var(--warn)]">施工中</span>
+                    </span>
+                  )}
                 </div>
               )}
               <div
@@ -221,15 +230,19 @@ export const Sidebar: React.FC = () => {
                 {sidebarOpen && (
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate text-sm font-medium">{meta.label}</span>
-                    {/* 24 个菜单里 13 个带「开发中」，这个标签已经不传递信息了，
-                        还把标题挤成「闪卡记...」。改成状态点：标题完整优先，
-                        状态用 1.5px 的点表示，hover 时 title 给出说明。 */}
+                    {/* 施工中标记：栅栏图标（和页面顶部横幅、分组标题同一套）。
+                        2026-11 复核后只剩 15 个真占位页面带这个标记 ——
+                        灵境小助手和数据中心有真实功能，已经摘掉。
+                        用图标不用文字：菜单项宽度就这么点，加「施工中」三个字
+                        会把「闪卡记忆」挤成「闪卡记...」。 */}
                     {meta.dev && (
                       <span
-                        title="功能开发中"
-                        aria-label="功能开发中"
-                        className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)] opacity-50"
-                      />
+                        title="施工中：这个页面还没有真实功能"
+                        aria-label="施工中"
+                        className="shrink-0"
+                      >
+                        <Construction size={12} className="text-[var(--warn)]" aria-hidden="true" />
+                      </span>
                     )}
                   </span>
                 )}
