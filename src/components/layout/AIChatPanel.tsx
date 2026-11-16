@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal, Plus, History } from 'lucide-react';
+import { AlertCircle, Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal, Plus, History } from 'lucide-react';
 import { useAIStore } from '../../stores';
 import { authFetch } from '../../lib/authApi';
 import {
@@ -37,6 +37,22 @@ interface ReferenceItem {
   start_sec: number;
   /** 块的结束时间。块平均跨 114 秒，只显示起点会让人以为时间戳错了。 */
   end_sec?: number;
+  /**
+   * 元数据线索：课程 / 章 / 课时 / 第 N 节 / 上一节 / 下一节。
+   * 由后端 retrieval_meta 从磁盘路径解析，不含系统路径。
+   */
+  meta?: {
+    course?: string;
+    lesson?: string;
+    lesson_no?: number | string | null;
+    display?: string;
+    meta_text?: string;
+    chain?: string[];
+    position?: number;
+    total?: number;
+    prev?: string | null;
+    next?: string | null;
+  } | null;
   text: string;
   score?: number;
 }
@@ -170,11 +186,21 @@ const ReferenceCard: React.FC<{ item: ReferenceItem }> = ({ item }) => (
   >
     <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
     <div className="min-w-0">
-      {item.folder_path && (
-        <p className="truncate text-[10px] text-[var(--text-muted)]" title={item.folder_path}>
-          {item.folder_path}
-        </p>
-      )}
+      {(() => {
+        // 优先用 meta.display（含章，如「前端 / 黑马前端V7.6 / 5-5 jQuery动画」），
+        // 退回到 folder_path（只有前 2 层）。两者都没有就不显示这一行。
+        const path = item.meta?.display || item.folder_path;
+        const pos = item.meta?.position && item.meta?.total
+          ? `第 ${item.meta.position}/${item.meta.total} 节`
+          : '';
+        if (!path && !pos) return null;
+        return (
+          <p className="truncate text-[10px] text-[var(--text-muted)]" title={item.meta?.meta_text || path || ''}>
+            {path}
+            {pos && <span className="ml-1 text-[var(--accent)]">{pos}</span>}
+          </p>
+        );
+      })()}
       <p className="truncate text-xs font-medium text-[var(--text-primary)]">
         {item.video_title || `视频 ${item.video_id}`}
       </p>
@@ -496,6 +522,11 @@ export const AIChatPanel: React.FC = () => {
                 setReferences(event.references);
                 updateMessage(assistantId, { references: event.references });
               }
+              if (event.degraded_from) {
+                // 主通道挂了、是备用救回来的。不提示的话用户只会觉得
+                // 「这次回答怎么这么慢 / 质量不一样」，不知道发生了什么。
+                updateMessage(assistantId, { degraded_from: event.degraded_from });
+              }
               if (detected) {
                 updateMessage(assistantId, { intent: detected });
               }
@@ -805,6 +836,15 @@ export const AIChatPanel: React.FC = () => {
                 <p className="mt-1.5 flex items-center gap-1 text-xs text-[var(--text-muted)]">
                   <Wrench size={10} />
                   调用了 {message.steps.length} 次工具
+                </p>
+              )}
+              {message.role === 'assistant' && message.degraded_from && (
+                <p
+                  className="mt-1 flex items-center gap-1 text-[11px] text-[var(--warn)]"
+                  title={`主通道 ${message.degraded_from} 调用失败，这条回答由备用模型生成`}
+                >
+                  <AlertCircle size={10} />
+                  已从 {message.degraded_from === 'external' ? '外部' : '本地'} 降级
                 </p>
               )}
             </div>

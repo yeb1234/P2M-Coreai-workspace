@@ -450,8 +450,12 @@ export type ChatStreamEvent =
         text: string;
         video_id: number;
       }>;
+      /** 实际用的 LLM 通道（local / external） */
+      provider?: string;
+      /** 主通道失败、切到备用时，这里是失败的那家。空/缺省表示没降级。 */
+      degraded_from?: string;
     }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; provider?: string; degraded_from?: string };
 
 /**
  * 流式对话（SSE over POST）。

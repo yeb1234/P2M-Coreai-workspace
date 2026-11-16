@@ -584,6 +584,13 @@ async def stream_chat(ctx: AgentContext, message: str):
                         "video_title": hit.video_title,
                         # 只给相对文件夹层级，不给磁盘路径（安全 + 可读性）
                         "folder_path": display_folder_path(getattr(hit, "filepath", None)),
+                        # 课程 / 章 / 课时 + 序号（第 N/M 节、上一节、下一节）。
+                        #
+                        # folder_path 只到前 2 层，对「黑马前端V7.6 / 5-5 jQuery动画」
+                        # 这种已经在第 4、5 层的课，看不出是第几章哪一节。
+                        # meta 是元数据通道算好的结构化线索，直接给前端渲染。
+                        # 取不到就是 None，前端去掉这一行即可。
+                        "meta": getattr(hit, "meta", None),
                         "start_sec": round(hit.start_sec, 1),
                         # 带上结束时间：块平均跨 114 秒（最长 7000+ 秒），
                         # 前端只显示起点会让用户以为「就这一秒的内容」，

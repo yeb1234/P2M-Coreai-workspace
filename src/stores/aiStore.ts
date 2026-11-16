@@ -39,6 +39,8 @@ export interface ChatMessage {
   steps?: string[];
   /** 正文里提到的视频：《标题》→ video_id，渲染成可点链接 */
   mentioned_videos?: ChatMentionedVideo[];
+  /** 这条回答是降级到备用 LLM 产出的（主通道挂了）。有值就显示提示。 */
+  degraded_from?: string;
   /** 这条回答用的意图模板 id —— 存消息上，刷新后还能看出当时的策略 */
   intent?: string;
   /** 流式输出中，用于显示光标 */
