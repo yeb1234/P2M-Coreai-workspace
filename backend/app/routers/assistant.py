@@ -11,6 +11,14 @@
 
 现在改成：仅管理员可用 + 只允许 http/https。
 管理员本身就有配置模型地址的权限，允许内网是必要的（本地 LM Studio 就在内网）。
+
+错误约定
+--------
+这两个端点原来把 requests 的异常直接抛出去，被全局兜底处理器接成
+500「服务内部错误，请附带 request_id 反馈」——用户在设置页只能看到这句话，
+不知道是 key 错了、地址少了 /v1、还是模型服务没启动。
+现在统一在端点内捕获，用 services/llm.py 的分类器翻成人话后以 **502** 返回。
+注意不能用 401/403：前端 apiFetch 见到 401 会当成会话失效直接踢回登录页。
 """
 
 from __future__ import annotations
@@ -36,6 +44,14 @@ from app.schemas import (
     AssistantModelListOut,
 )
 from app.agents.chat_agent import AgentContext, run_chat
+from app.services.admin_settings import load_assistant_runtime_settings
+from app.services.llm import (
+    ERR_UNKNOWN,
+    call_with_retry,
+    classify_llm_error,
+    describe_llm_error,
+    llm_health,
+)
 from app.services.llm_client import OpenAICompatibleClient
 from app.services.memory import append_message, decode_references, ensure_session, maybe_compress
 from app.services.quota import chat_quota_for, quota_exceeded_detail
@@ -44,6 +60,10 @@ from app.services.rate_limit import chat_limiter
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
+
+# 和 admin.py 里的掩码占位保持一致：GET 设置接口返回它代替真实密钥，
+# 前端原样回传时表示「这一项没改」，这里也要认。
+MASKED_SECRET = "__MASKED__"
 
 
 def _load_session_for_user(db, session_id: str, user: User) -> ChatSession:
@@ -98,7 +118,18 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
         intent=payload.intent,
     )
 
-    result = run_chat(ctx, payload.message)
+    try:
+        result = run_chat(ctx, payload.message)
+    except Exception as exc:  # noqa: BLE001
+        # run_chat 内部已按兜底方案试过两套模型，走到这里说明都没救。
+        # 别让全局兜底处理器把它变成「服务内部错误，请附带 request_id 反馈」。
+        if classify_llm_error(exc) == ERR_UNKNOWN:
+            logger.exception("同步对话失败")
+            raise HTTPException(status_code=502, detail="对话生成失败，请稍后重试") from exc
+        raise HTTPException(
+            status_code=502,
+            detail=f"对话生成失败：{describe_llm_error(exc)}",
+        ) from exc
 
     if result.answer:
         db2 = SessionLocal()
@@ -284,17 +315,115 @@ def _validate_outbound_url(value: str) -> str:
     return normalized
 
 
+def _which_provider(base_url: str) -> str:
+    """按 base_url 判断用户点的是本地还是外部，只用于挑提示文案。"""
+    normalized = normalize_openai_base_url(base_url)
+    try:
+        runtime = load_assistant_runtime_settings()
+    except Exception:  # noqa: BLE001
+        return ""
+    for provider in ("local", "external"):
+        stored = normalize_openai_base_url(str(runtime.get(f"{provider}_base_url") or ""))
+        if stored and stored == normalized:
+            return provider
+    return ""
+
+
+def _resolve_api_key(base_url: str, api_key: str) -> str:
+    """决定这次出站用哪个 key。
+
+    设置页 GET 拿到的 key 是掩码占位（库里存的是真值），如果原样当 Bearer 发出去，
+    扫模型必然 401。所以：
+    - 用户填了新 key → 用新的
+    - 空 / 掩码 → 按 base_url 去库里找对应通道的真值
+    """
+    candidate = (api_key or "").strip()
+    if candidate and candidate != MASKED_SECRET:
+        return candidate
+
+    normalized = normalize_openai_base_url(base_url)
+    try:
+        runtime = load_assistant_runtime_settings()
+    except Exception:  # noqa: BLE001
+        return "" if candidate == MASKED_SECRET else candidate
+
+    for provider in ("local", "external"):
+        stored_url = normalize_openai_base_url(str(runtime.get(f"{provider}_base_url") or ""))
+        if stored_url and stored_url == normalized:
+            return str(runtime.get(f"{provider}_api_key") or "")
+    return "" if candidate == MASKED_SECRET else candidate
+
+
+def _raise_llm_error(exc: Exception, *, base_url: str, action: str) -> None:
+    """把上游异常翻成 502 + 人话。request_id 由全局处理器自动带上。"""
+    message = describe_llm_error(exc, base_url=base_url)
+    logger.warning(
+        "%s失败",
+        action,
+        extra={
+            "extra_fields": {
+                "llm_action": action,
+                "llm_base_url": base_url,
+                "llm_error_kind": type(exc).__name__,
+                "llm_error": " ".join(str(exc).split())[:300],
+            }
+        },
+        exc_info=True,
+    )
+    # 500 会让用户看到「服务内部错误」；502 才是「上游模型服务出问题」的语义。
+    raise HTTPException(status_code=502, detail=message) from exc
+
+
+@router.get("/llm-health")
+def assistant_llm_health(_admin: User = Depends(require_admin)):
+    """当前**实际生效**的 LLM 配置（不含密钥）。
+
+    设置页用它做保存后的自检：看到这里变了，才算真的生效。
+    """
+    runtime = load_assistant_runtime_settings()
+    return {
+        "policy": runtime.get("llm_usage_policy"),
+        "external": llm_health(),
+        "local": {
+            "base_url": runtime.get("local_base_url") or "",
+            "model": runtime.get("local_model") or "",
+            "configured": bool(
+                runtime.get("local_base_url") and runtime.get("local_model")
+            ),
+        },
+    }
+
+
 @router.post("/models", response_model=AssistantModelListOut)
 def assistant_models(
     payload: AssistantModelListCreate,
     _admin: User = Depends(require_admin),
 ):
-    client = OpenAICompatibleClient(
-        base_url=_validate_outbound_url(payload.base_url),
-        api_key=payload.api_key,
-        timeout_s=30,
-    )
-    return AssistantModelListOut(models=client.list_models())
+    base_url = _validate_outbound_url(payload.base_url)
+    api_key = _resolve_api_key(base_url, payload.api_key)
+    client = OpenAICompatibleClient(base_url=base_url, api_key=api_key, timeout_s=15)
+
+    # 扫描是「一次 30 秒内的同步请求」，重试两次 + 25 秒预算，别把前端拖超时。
+    try:
+        models = call_with_retry(
+            client.list_models,
+            provider=_which_provider(base_url) or "external",
+            max_attempts=2,
+            base_delay_s=0.8,
+            budget_s=25,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _raise_llm_error(exc, base_url=base_url, action="扫描模型")
+
+    if not models:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                f"{base_url}/models 返回成功，但里面没有可用模型。"
+                "本地服务一般是模型还没加载完，加载好再扫一次。"
+            ),
+        )
+    return AssistantModelListOut(models=models)
 
 
 @router.post("/connection-test", response_model=AssistantConnectionTestOut)
@@ -302,19 +431,37 @@ def assistant_connection_test(
     payload: AssistantConnectionTestCreate,
     _admin: User = Depends(require_admin),
 ):
-    client = OpenAICompatibleClient(
-        base_url=_validate_outbound_url(payload.base_url),
-        api_key=payload.api_key,
-        timeout_s=120,
-    )
-    answer = client.chat_completion(
-        model=payload.model,
-        messages=[
-            {"role": "system", "content": payload.system_prompt or "必须始终使用简体中文回答，禁止用英文回答。"},
-            {"role": "user", "content": payload.message},
-        ],
-        temperature=payload.temperature,
-    )
+    base_url = _validate_outbound_url(payload.base_url)
+    if not (payload.model or "").strip():
+        raise HTTPException(status_code=422, detail="请先选择模型名，或点「扫描模型」拉取列表")
+    api_key = _resolve_api_key(base_url, payload.api_key)
+    provider = _which_provider(base_url) or "external"
+    client = OpenAICompatibleClient(base_url=base_url, api_key=api_key, timeout_s=120)
+
+    def run() -> str:
+        return client.chat_completion(
+            model=payload.model,
+            messages=[
+                {"role": "system", "content": payload.system_prompt or "必须始终使用简体中文回答，禁止用英文回答。"},
+                {"role": "user", "content": payload.message},
+            ],
+            temperature=payload.temperature,
+        )
+
+    # 连通性测试要的是「现在到底通不通」：429 值得再试一次，
+    # 但一次已经跑了 120 秒就不再重试（预算卡住），免得用户干等。
+    try:
+        answer = call_with_retry(
+            run,
+            provider=provider,
+            model=payload.model,
+            max_attempts=2,
+            base_delay_s=1.0,
+            budget_s=100,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _raise_llm_error(exc, base_url=base_url, action="连通性测试")
+
     return AssistantConnectionTestOut(
         status="HTTP 200",
         answer=answer,

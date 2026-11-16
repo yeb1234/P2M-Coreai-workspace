@@ -6,21 +6,44 @@ type ApiFetchInit = RequestInit & { timeoutMs?: number };
 // 会话凭证在 httpOnly Cookie 里，JS 读不到；这里只负责带上 Cookie
 const CREDENTIAL_MODE: RequestCredentials = API_BASE ? 'include' : 'same-origin';
 
-/** 把后端的结构化错误解析成人话，而不是把 JSON 原样丢给用户。 */
-function extractErrorMessage(status: number, raw: string): string {
+/** 后端的密钥掩码占位：GET 返回它，PUT 原样回传表示「这一项没改」。 */
+export const MASKED_SECRET = '__MASKED__';
+
+/** 结构化接口错误：把 status / code / request_id 一起带出来，方便页面分类展示。 */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  requestId?: string;
+
+  constructor(message: string, options: { status: number; code?: string; requestId?: string }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = options.status;
+    this.code = options.code;
+    this.requestId = options.requestId;
+  }
+}
+
+/**
+ * 把后端的结构化错误解析成人话，而不是把 JSON 原样丢给用户。
+ * 保留 request_id：排查时要它，但不占主位（页面放小字里）。
+ */
+function extractErrorMessage(status: number, raw: string): { message: string; code?: string; requestId?: string } {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
       const detail = parsed?.error?.message ?? parsed?.detail;
-      if (typeof detail === 'string' && detail) return detail;
+      const code = typeof parsed?.error?.code === 'string' ? parsed.error.code : undefined;
+      const requestId = typeof parsed?.error?.request_id === 'string' ? parsed.error.request_id : undefined;
+      if (typeof detail === 'string' && detail) return { message: detail, code, requestId };
     } catch {
       /* 非 JSON，走下面的截断 */
     }
   }
-  if (status === 403) return '没有权限执行这个操作';
-  if (status === 404) return '接口不存在，可能是版本不匹配';
-  if (status >= 500) return '服务端出错了，请稍后重试';
-  return raw ? raw.slice(0, 200) : `请求失败（HTTP ${status}）`;
+  if (status === 403) return { message: '没有权限执行这个操作' };
+  if (status === 404) return { message: '接口不存在，可能是版本不匹配' };
+  if (status >= 500) return { message: '服务端出错了，请稍后重试' };
+  return { message: raw ? raw.slice(0, 200) : `请求失败（HTTP ${status}）` };
 }
 
 export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
@@ -46,7 +69,7 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
       signal: controller.signal,
     });
   } catch (err) {
-    if (controller.signal.aborted) throw new Error(`API timeout: ${path}`, { cause: err });
+    if (controller.signal.aborted) throw new Error(`请求超时（${Math.round(timeoutMs / 1000)}s）：${path}`, { cause: err });
     throw err;
   } finally {
     window.clearTimeout(timeout);
@@ -56,12 +79,13 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
     // 会话过期或已被撤销（改密码 / 管理员踢下线），统一回到登录态
     clearSession();
     window.dispatchEvent(new CustomEvent('p2m:auth-expired'));
-    throw new Error('登录已失效，请重新登录');
+    throw new ApiError('登录已失效，请重新登录', { status: 401 });
   }
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(extractErrorMessage(res.status, text));
+    const parsed = extractErrorMessage(res.status, text);
+    throw new ApiError(parsed.message, { status: res.status, code: parsed.code, requestId: parsed.requestId });
   }
   return res.json();
 }
@@ -501,8 +525,21 @@ export async function fetchAssistantModels(baseUrl: string, apiKey = ''): Promis
   const data = await apiFetch<{ models: string[] }>('/api/assistant/models', {
     method: 'POST',
     body: JSON.stringify({ base_url: baseUrl, api_key: apiKey }),
+    // 后端扫模型是一次 15s 超时 + 最多 25s 预算的同步请求
+    timeoutMs: 45000,
   });
   return data.models;
+}
+
+/** 当前实际生效的 LLM 配置（不含密钥），用于保存后自检。 */
+export interface AssistantLlmHealth {
+  policy: LlmUsagePolicy;
+  external: { base_url: string; model: string; configured: boolean };
+  local: { base_url: string; model: string; configured: boolean };
+}
+
+export async function fetchAssistantLlmHealth(): Promise<AssistantLlmHealth> {
+  return apiFetch<AssistantLlmHealth>('/api/assistant/llm-health');
 }
 
 export async function testAssistantConnection(options: {
@@ -523,6 +560,8 @@ export async function testAssistantConnection(options: {
       system_prompt: options.systemPrompt ?? '',
       temperature: options.temperature ?? 0.2,
     }),
+    // 后端单个请求就是 120s 超时，前端至少得比它长，否则本地大模型永远「超时」
+    timeoutMs: 150000,
   });
 }
 

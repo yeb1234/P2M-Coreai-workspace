@@ -263,6 +263,17 @@ def save_assistant_runtime_settings(payload: AssistantRuntimeSettingsIn):
         if key in updates:
             updates[key] = _unmask(updates[key], current.get(key) or "")
 
+    # 地址填错（比如少写 http://）在保存时就拦下来，
+    # 而不是等用户点「扫描模型」才收到一句看不懂的上游报错。
+    for key in ("local_base_url", "external_base_url"):
+        raw = (updates.get(key) or "").strip()
+        if raw and not raw.startswith(("http://", "https://")):
+            label = "本地" if key == "local_base_url" else "外部"
+            raise HTTPException(
+                status_code=422,
+                detail=f"{label} LLM 接口地址必须以 http:// 或 https:// 开头（当前是 {raw[:80]}）",
+            )
+
     next_settings = persist_assistant_runtime_settings({**current, **updates})
     if "llm_usage_policy" in updates:
         transcription = load_transcription_settings()
