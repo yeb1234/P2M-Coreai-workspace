@@ -24,6 +24,11 @@ export interface ChatReference {
   score?: number;
 }
 
+export interface ChatMentionedVideo {
+  text: string;
+  video_id: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -32,6 +37,10 @@ export interface ChatMessage {
   references?: ChatReference[];
   /** Agent 实际调用过的工具名，让用户知道答案不是凭空编的 */
   steps?: string[];
+  /** 正文里提到的视频：《标题》→ video_id，渲染成可点链接 */
+  mentioned_videos?: ChatMentionedVideo[];
+  /** 这条回答用的意图模板 id —— 存消息上，刷新后还能看出当时的策略 */
+  intent?: string;
   /** 流式输出中，用于显示光标 */
   streaming?: boolean;
 }
@@ -59,6 +68,8 @@ interface AIState {
   setChatOpen: (open: boolean) => void;
   setChatWidth: (width: number) => void;
   addMessage: (message: ChatMessage) => void;
+  updateMessage: (id: string, updates: Partial<ChatMessage>) => void;
+  setMessages: (messages: ChatMessage[]) => void;
   clearMessages: () => void;
 }
 
@@ -143,6 +154,15 @@ export const useAIStore = create<AIState>()(
       setChatOpen: (chatOpen) => set({ chatOpen }),
       setChatWidth: (chatWidth) => set({ chatWidth: clampChatWidth(chatWidth) }),
       addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+      // 流式结束后把富内容补写回消息本身。
+      // 原来这些只存在 AIChatPanel 的 useState 里 —— 刷新/换页面就全丢，
+      // 只剩纯文字历史，链接和视频推荐框都没了。
+      updateMessage: (id, updates) =>
+        set((state) => ({
+          messages: state.messages.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+        })),
+      // 切换历史会话时整批替换（不是追加）
+      setMessages: (messages) => set({ messages }),
       clearMessages: () => set({ messages: [], sessionId: '' }),
       setSessionId: (sessionId) => set({ sessionId }),
     }),

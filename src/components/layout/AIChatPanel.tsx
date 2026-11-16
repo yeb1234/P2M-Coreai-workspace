@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal } from 'lucide-react';
+import { Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal, Plus, History } from 'lucide-react';
 import { useAIStore } from '../../stores';
+import { authFetch } from '../../lib/authApi';
 import {
   fetchAssistantRuntimeSettings,
   streamAssistantChat,
@@ -144,7 +145,7 @@ export const AIChatPanel: React.FC = () => {
   const {
     chatOpen, setChatOpen, model, systemPrompt, setSystemPrompt,
     promptTemplates, activeTemplateId, updateTemplate,
-    chatWidth, setChatWidth, messages, addMessage, clearMessages, sessionId, setSessionId,
+    chatWidth, setChatWidth, messages, addMessage, updateMessage, setMessages, clearMessages, sessionId, setSessionId,
   } = useAIStore();
   const { width: liveChatWidth, startResize } = useDragResize({
     initialWidth: chatWidth,
@@ -161,10 +162,75 @@ export const AIChatPanel: React.FC = () => {
   // 本轮没检索到片段时，保留上一轮的引用但标记出来 —— 直接清空的话
   // 用户会以为「推荐的东西没了」，而留着不标记又会让人误当成这轮的依据。
   const [referencesStale, setReferencesStale] = useState(false);
-  const [mentionedVideos, setMentionedVideos] = useState<MentionedVideo[]>([]);
   // 最后一次自动识别到的意图（模板 id）。显示出来让用户知道 AI 拿什么策略在答 ——
   // 原来顶部只有手动选的「学习总结」，用户问课程推荐时也显示这个，很困惑。
   const [lastIntent, setLastIntent] = useState<string | null>(null);
+
+  /* ── 会话管理 ──
+   * 原来顶部那个「续聊中」只是个状态标签，说明不了「我现在在哪条会话」，
+   * 也回不去以前聊过的东西。换成「新建对话」和「历史」两个真按钮。
+   */
+  interface SessionMeta {
+    id: string;
+    title: string | null;
+    message_count: number;
+    updated_at: string | null;
+  }
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+
+  const startNewChat = () => {
+    clearMessages();
+    setReferences([]);
+    setLastIntent(null);
+    setReferencesStale(false);
+    setHistoryOpen(false);
+  };
+
+  const loadSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const res = await authFetch('/api/assistant/sessions?limit=12');
+      if (res.ok) setSessions((await res.json()) as SessionMeta[]);
+    } catch {
+      // 历史拉取失败不影响当前对话
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const toggleHistory = () => {
+    const next = !historyOpen;
+    setHistoryOpen(next);
+    if (next) void loadSessions();
+  };
+
+  const openSession = async (id: string) => {
+    const res = await authFetch(`/api/assistant/sessions/${encodeURIComponent(id)}/messages?limit=50`);
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      messages: Array<{
+        id: string;
+        role: 'user' | 'assistant';
+        content: string;
+        references?: ReferenceItem[];
+        created_at?: string | null;
+      }>;
+    };
+    setSessionId(id);
+    setMessages(
+      data.messages.map((m) => ({
+        id: m.id || makeId(),
+        role: m.role,
+        content: m.content,
+        references: m.references ?? [],
+      }))
+    );
+    setReferences([]);
+    setLastIntent(null);
+    setHistoryOpen(false);
+  };
 
   // 提示词编辑器：用户要能直接看到「这次用的是什么提示词」并当场改。
   // 原来得跳到灵境小助手页去改，对话中完全看不到，出了问题没法定位。
@@ -222,9 +288,19 @@ export const AIChatPanel: React.FC = () => {
   );
 
   // 同一视频只保留相关度最高的一条，避免刷屏
+  // 优先从消息里读：富内容在 done 时已经写回 message 并持久化，
+  // 刷新/重开页面后视频推荐框还在。组件 state 只作为流式过程中的即时来源。
+  const persistedReferences = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = messages[i];
+      if (m.role === 'assistant' && m.references?.length) return m.references;
+    }
+    return [];
+  }, [messages]);
+
   const visibleReferences = useMemo(() => {
     const best = new Map<number, ReferenceItem>();
-    for (const item of references) {
+    for (const item of (persistedReferences.length ? persistedReferences : references)) {
       const existing = best.get(item.video_id);
       if (!existing || (item.score ?? 0) > (existing.score ?? 0)) best.set(item.video_id, item);
     }
@@ -240,7 +316,7 @@ export const AIChatPanel: React.FC = () => {
     return [...best.values()]
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, 5);
-  }, [references]);
+  }, [references, persistedReferences]);
 
   useEffect(() => {
     if (!chatOpen) return;
@@ -353,14 +429,19 @@ export const AIChatPanel: React.FC = () => {
                 setSessionId(event.session_id);
               }
               if (event.mentioned_videos?.length) {
-                setMentionedVideos(event.mentioned_videos);
+                    // 写回消息本身：刷新/重开页面后链接还在
+                updateMessage(assistantId, { mentioned_videos: event.mentioned_videos });
               }
               if (event.references?.length) {
                 setReferences(event.references);
                 setReferencesStale(false);
+                updateMessage(assistantId, { references: event.references });
               } else {
                 // 这轮没检索到东西：保留上一轮，但标记为「上一轮」
                 setReferencesStale(true);
+              }
+              if (detected) {
+                updateMessage(assistantId, { intent: detected });
               }
               break;
             case 'error':
@@ -431,24 +512,39 @@ export const AIChatPanel: React.FC = () => {
             {runtimeModelLabel || model}
           </p>
         </div>
-        {sessionId && (
-          <span
-            className="text-xs px-1.5 py-0.5 rounded-full bg-[var(--accent-bg)] text-[var(--accent)]"
-            title={`会话 ${sessionId}`}
-          >
-            续聊中
-          </span>
-        )}
+        {/* 原来这里是「续聊中」状态标签：只能看不能用。
+            换成两个真按钮 —— 回历史、开新对话。 */}
+        <button
+          type="button"
+          onClick={toggleHistory}
+          className={`rounded-lg p-1.5 transition-colors ${
+            historyOpen
+              ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
+              : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
+          }`}
+          title="聊天历史"
+          aria-label="聊天历史"
+        >
+          <History size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={startNewChat}
+          className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]"
+          title="新建对话"
+          aria-label="新建对话"
+        >
+          <Plus size={14} />
+        </button>
         <button
           onClick={() => {
             clearMessages();
             setReferences([]);
             setReferencesStale(false);
-            setMentionedVideos([]);
-            setLastIntent(null);
+                    setLastIntent(null);
             playInteractionSound('delete');
           }}
-          className="ml-auto p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
+          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
           title="清空对话（同时开启新会话）"
         >
           <Trash2 size={14} />
@@ -461,6 +557,51 @@ export const AIChatPanel: React.FC = () => {
           <X size={15} />
         </button>
       </div>
+
+      {/* 聊天历史弹层：贴在 header 下方，不挤压消息区 */}
+      {historyOpen && (
+        <div className="absolute left-2 right-2 top-14 z-40 overflow-hidden rounded-[var(--r-2)] border border-[var(--border-medium)] bg-[var(--bg-card)] shadow-[var(--shadow-2)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-light)] px-3 py-2">
+            <span className="text-xs font-semibold text-[var(--text-primary)]">聊天历史</span>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(false)}
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              aria-label="关闭历史"
+            >
+              <X size={13} />
+            </button>
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {loadingSessions ? (
+              <p className="px-3 py-4 text-center text-xs text-[var(--text-muted)]">加载中…</p>
+            ) : sessions.length === 0 ? (
+              <p className="px-3 py-4 text-center text-xs text-[var(--text-muted)]">还没有历史对话</p>
+            ) : (
+              sessions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => void openSession(item.id)}
+                  className={`w-full border-b border-[var(--border-light)] px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-[var(--bg-elevated)] ${
+                    item.id === sessionId ? 'bg-[var(--accent-bg)]' : ''
+                  }`}
+                >
+                  <p className="truncate text-xs font-medium text-[var(--text-primary)]">
+                    {item.title || '未命名对话'}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                    {item.message_count} 条
+                    {item.updated_at
+                      ? ` · ${new Date(item.updated_at).toLocaleDateString('zh-CN')}`
+                      : ''}
+                  </p>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 border-b border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-1.5">
         <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
@@ -583,7 +724,7 @@ export const AIChatPanel: React.FC = () => {
             >
               {message.content
                 ? (message.role === 'assistant'
-                    ? renderWithVideoLinks(message.content, mentionedVideos)
+                    ? renderWithVideoLinks(message.content, message.mentioned_videos ?? [])
                     : message.content)
                 : (message.streaming ? '…' : '')}
               {message.streaming && message.content && (
