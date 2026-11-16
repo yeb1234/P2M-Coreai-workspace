@@ -442,6 +442,20 @@ async def stream_chat(ctx: AgentContext, message: str):
             # 只保留真正相关的片段：低于 0.5 的多是「词面沾边」，点了也是浪费时间
             strong = [h for h in ref_result["hits"] if (h.vector_score or 0) >= 0.5]
             picked = strong[:5] if strong else ref_result["hits"][:3]
+            # 显式按相关度降序，不依赖上游顺序。
+            #
+            # 前端「相关片段」是按数组顺序从上往下渲染的，用户扫这个列表
+            # 是从上往下读 —— 所以最相关的必须排第一。
+            # 这和聊天消息相反（消息是时间序，最新的在底部），
+            # 两套排法混在一起就容易反。上游改了排序策略也不会影响这里。
+            #
+            # 用 vector_score 排而不是 rrf score：UI 上展示的分数就是
+            # vector_score，排序键和显示值必须一致，否则看起来是乱的。
+            picked = sorted(
+                picked,
+                key=lambda h: (h.vector_score or 0, h.score or 0),
+                reverse=True,
+            )
             references = [
                 {
                     "video_id": hit.video_id,

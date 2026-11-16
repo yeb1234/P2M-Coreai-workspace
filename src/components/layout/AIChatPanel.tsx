@@ -124,7 +124,18 @@ export const AIChatPanel: React.FC = () => {
       const existing = best.get(item.video_id);
       if (!existing || (item.score ?? 0) > (existing.score ?? 0)) best.set(item.video_id, item);
     }
-    return [...best.values()].slice(0, 5);
+    // 同一视频只留最高分那条，然后**再排一次降序**。
+    //
+    // Map 只保证「首次插入」的顺序：如果某个视频的第 1 条分数低、
+    // 第 3 条分数高，值会被换成高分的，但位置还停在第 1 条的位置上 ——
+    // 结果就是位置和分值对不上。这里按最终的 score 重排，
+    // 让最相关的稳定排在第一（用户从上往下读）。
+    //
+    // 聊天消息是时间序（最新的在底部），相关片段是相关度序（最相关的在顶部），
+    // 两套排法不能混。
+    return [...best.values()]
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, 5);
   }, [references]);
 
   useEffect(() => {
