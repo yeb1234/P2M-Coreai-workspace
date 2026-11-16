@@ -67,7 +67,8 @@ ENABLED = os.getenv("RETRIEVAL_QUERY_REWRITE", "1").strip().lower() not in {
 #    第四轮删「怎么弄来着」→「垃圾回收」
 # 所以循环到不再变化为止（最多 8 轮，防死循环）。
 _LEADING_FILLERS = [
-    r"^(?:那个|这个|呃|嗯|啊)",
+    r"^(?:那个|这个|那|这|呃|嗯|啊)",
+    r"^(?:如果|要是|假如|假设)",
     r"^(?:啥|什么)[，,、\s]*",
     r"^(?:就是|也就是说|就是说|其实是)",
     r"^(?:我想|我要|我想问|想问一下|想请教|请教一下|问一下|问下)",
@@ -223,3 +224,99 @@ def rewrite_query(query: str) -> str:
         return raw
 
     return _expand_terms(cleaned)
+
+
+# ─── 3. 指代消解（对话上下文）───
+#
+# 用户截图里的真实问题：「那如果我想学 Java 呢」
+#
+# 单看这句，检索只能拿到「学 Java」，完全不知道：
+#   - 「那」是在接上文（上一轮可能聊的是 Python 工程规范）
+#   - 「也/还/呢」表示「同样的问题，换个对象」
+#
+# 结果就是推到四条前端课 —— 和上文毫无关系。
+#
+# 规则层能做的是**补全**：把上一条用户消息拼进来当检索 query。
+# 不做指代替换（那需要理解句法），只做「上下文扩充」——
+# 宁可多带一点上文，也不要让检索完全失去锚点。
+_ANAPHORA_LEAD_RE = re.compile(r"^(?:那|那么|这|这个|它|他|她)")
+_ANAPHORA_TAIL_RE = re.compile(r"(?:呢|吧|啊|的话)?[？?。.\s]*$")
+_CONTINUATION_RE = re.compile(r"(?:也|还|再|另外|同样|换成|改成)")
+_PRONOUN_RE = re.compile(r"(?:它|这个|那个|上面|刚才|前面|那个东西)")
+
+# 短句阈值：超过这个长度，认为是独立提问，不需要补上文
+_SHORT_QUERY_CHARS = 16
+
+
+def needs_context(message: str) -> bool:
+    """这句话是否**真的**依赖上文才能检索。
+
+    ⚠️ 这个判断必须保守。实测负优化案例：
+
+        上文「Python 工程规范与异常处理怎么学」
+        当前「那如果我想学Java呢」
+
+      只看「以『那』开头」就拼上文，检索结果全变成「异常处理」——
+      上一条 60 字把当前 8 个字彻底淹没，Java 一个字都没进 top3。
+      而原句单独检索虽然不准，至少还沾着「课程总结」这类边。
+
+    所以判定顺序改成「先看这句话自己够不够用」：
+      1. 有英文/数字实体（Java / GC / HTTP2）→ 独立提问，不补
+      2. 剥完关键词够长（>=6 字）→ 独立提问，不补
+      3. 剩下的才是真指代：「那它呢」「这个怎么用」「那闭包呢」
+    """
+    text = (message or "").strip()
+    if not text:
+        return False
+
+    keywords = extract_keywords(text)
+    if not keywords:
+        return False
+
+    # ① 明确的英文/数字实体，说明用户已经指名道姓
+    if re.search(r"[A-Za-z]{2,}|\d", keywords):
+        return False
+    # ② 代词必须排在「长度」之前判断。
+    #    「它是什么原理」6 个字看着够长，但主语是「它」——
+    #    不知道「它」指什么，检索只会全库乱撞。
+    if _PRONOUN_RE.search(keywords) or re.match(r"^它", keywords):
+        return True
+    # ③ 没有代词、并且够长 → 自带上下文
+    if len(keywords) >= 6:
+        return False
+    # ④ 明显的延续语气（也/还/换成）
+    if _CONTINUATION_RE.search(text):
+        return True
+    # ⑤ 「那 X 呢」这种省略式：以『那/这』开头且很短
+    if _ANAPHORA_LEAD_RE.match(text) and len(keywords) <= 4:
+        return True
+    return False
+
+
+def resolve_anaphora(message: str, previous_user_message: str | None) -> str:
+    """把「依赖上文」的短问题补全成可检索的 query。
+
+    没有上文 / 不需要补全时，原样返回。
+
+    注意：只用于**检索**，不用于意图判断，也不进 LLM 的 prompt ——
+    LLM 本来就拿到完整 history，我们再塞一遍会重复。
+    """
+    if not previous_user_message or not needs_context(message):
+        return message
+
+    # 两边都先剥成关键词再拼：
+    #   当前问题在前（它是这次检索的真正意图）
+    #   上文在后（提供"换个对象"的锚点）
+    #
+    # 直接拼原句会带进「那」「如果」「呢」这类词，它们既稀释向量
+    # 又会让 tail 剥离规则失效（不在句尾）。
+    cur_kw = extract_keywords(message)
+    prev_kw = extract_keywords(previous_user_message)
+    if not prev_kw:
+        return message
+    if not cur_kw:
+        return prev_kw
+    # 上文截短，避免它主导向量
+    if len(prev_kw) > 40:
+        prev_kw = prev_kw[:40]
+    return f"{cur_kw} {prev_kw}".strip()

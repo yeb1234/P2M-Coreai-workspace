@@ -560,7 +560,22 @@ async def stream_chat(ctx: AgentContext, message: str):
                 #
                 # 代价是多一次 rerank API 调用（约 200-500ms），
                 # 但比"答得对、引用却不相干"值。
-                ref_result = hybrid_search(message, top_k=6, candidate_k=30, use_rerank=True)
+                # 指代消解：「那如果我想学 Java 呢」这种短句单看没有锚点，
+                # 检索会完全飘走（实测推回四条前端课，和上文毫无关系）。
+                # 把上一条用户消息的关键词拼进来当检索 query。
+                #
+                # 只影响检索，不影响意图判断（用原话更准）和 LLM（它本来
+                # 就有完整 history，再塞一遍是重复）。
+                from app.services.query_rewrite import resolve_anaphora
+
+                prev_user: str | None = None
+                for _m in reversed(history):
+                    if _m.get("role") == "user" and (_m.get("content") or "").strip() != message.strip():
+                        prev_user = _m.get("content")
+                        break
+                retrieval_query = resolve_anaphora(message, prev_user)
+
+                ref_result = hybrid_search(retrieval_query, top_k=6, candidate_k=30, use_rerank=True)
                 # 只保留真正相关的片段：低于 0.5 的多是「词面沾边」，点了也是浪费时间
                 strong = [h for h in ref_result["hits"] if (h.vector_score or 0) >= 0.5]
                 picked = strong[:5] if strong else ref_result["hits"][:3]

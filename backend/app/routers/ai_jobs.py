@@ -235,7 +235,11 @@ def batch_ai_jobs(
         db.commit()
         if not _is_queue_paused():
             try:
-                enqueue_ai_jobs(job_ids)
+                # 单视频手动触发插队到最前；批量按提交顺序排。
+                # 这是「多用户同时提交」下唯一能保交互体验的手段 ——
+                # AiJob 表没有 user_id，做不了用户级配额，
+                # 但可以让「有人在等的那个」优先。
+                enqueue_ai_jobs(job_ids, at_front=payload.at_front)
             except Exception:
                 logging.getLogger(__name__).exception("Failed to enqueue jobs to RQ")
         else:

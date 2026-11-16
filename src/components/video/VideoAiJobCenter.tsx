@@ -626,8 +626,22 @@ export function VideoAiJobCenter({
                             <RotateCcw size={13} />
                           </IconButton>
                         )}
+                        {/* running 现在可以取消了 —— 后端走优雅取消：
+                            设 Redis flag，转写循环每处理一个字幕段就检查一次
+                            （实测 5 秒内从 transcribing 变 cancelled）。
+                            原来的 disabled 是「后端不支持所以前端禁掉」，
+                            后端上一轮已经支持，按钮忘了放开。 */}
                         {job.status === 'running' && (
-                          <IconButton title="运行中不可停止" disabled>
+                          <IconButton
+                            title="停止这个任务（当前步骤结束后退出，通常几秒内）"
+                            onClick={() => onCancelJob?.(job.id)}
+                            danger
+                          >
+                            <X size={13} />
+                          </IconButton>
+                        )}
+                        {job.status === 'cancelling' && (
+                          <IconButton title="正在取消，等待当前步骤结束" disabled>
                             <X size={13} className="opacity-45" />
                           </IconButton>
                         )}

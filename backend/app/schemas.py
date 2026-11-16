@@ -182,6 +182,10 @@ class AiJobBatchCreate(AiJobCreate):
     mode: str = "missing_subtitles"
     max_enqueue: int = Field(default=20, ge=1, le=999999)
     dry_run: bool = True
+    # 插队到队首。前端「点开某个视频手动生成」时传 true ——
+    # 用户正盯着这个视频等结果，不该排在 10 个批量任务后面等两小时。
+    # 批量处理（选中一批）保持 false，按提交顺序排队。
+    at_front: bool = False
 
 
 class AiJobBatchSkippedItem(BaseModel):

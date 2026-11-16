@@ -595,9 +595,19 @@ def reconcile_stuck_ai_jobs(db, limit: int = 20) -> int:
 
     try:
         queue = ai_jobs_queue()
+        # queued 和 running 都要扫。
+        #
+        # 原来只扫 queued，漏了一类真实故障：worker 重启后 RQ 会把旧的
+        # started job 移到 failed（AbandonedJobError），但那是**延迟发生**的 ——
+        # worker 启动时 requeue_interrupted_ai_jobs 已经把 DB 的 running
+        # 改成 queued 了，可如果 RQ 标记发生在之后，DB 会停在 running，
+        # 而这个函数只扫 queued，于是永远没人管它，前端一直显示「正在转写」。
+        #
+        # 判定仍然靠 RQ 的真实状态：started 说明确实在跑，不动；
+        # 只有 RQ 里找不到或已 failed 的才重投。
         stuck = (
             db.query(AiJob)
-            .filter(AiJob.status == "queued")
+            .filter(AiJob.status.in_(("queued", "running")))
             .order_by(AiJob.created_at.asc())
             .limit(limit)
             .all()
@@ -629,6 +639,11 @@ def reconcile_stuck_ai_jobs(db, limit: int = 20) -> int:
                     video.ai_status = "queued"
                     video.ai_stage = "queued"
                     video.ai_error = None
+                # job 自身状态也要复位。原来是 running 的话，
+                # 重投后 DB 还写着 running，前端会显示「正在转写」但实际在排队。
+                if job.status == "running":
+                    job.status = "queued"
+                    job.stage = "queued"
                 job.message = "Requeued after stale state detected"
                 recovered += 1
             except Exception:
