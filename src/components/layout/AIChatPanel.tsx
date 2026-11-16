@@ -141,6 +141,68 @@ function renderWithVideoLinks(text: string, links: MentionedVideo[]): React.Reac
   return nodes;
 }
 
+/**
+ * 一条回答对应的相关片段。
+ *
+ * 原来整个面板只有一个「相关片段」区块，挂在所有消息之后 ——
+ * 结果它永远出现在**最新提问的下方**，看起来像是回答新问题用的，
+ * 实际属于上一条回答。用户会误以为「问 Java 却推前端课」。
+ *
+ * 现在每条 assistant 消息渲染自己的 references，跟着回答走。
+ */
+function dedupeReferences(items: ReferenceItem[] | undefined): ReferenceItem[] {
+  if (!items || !items.length) return [];
+  const best = new Map<number, ReferenceItem>();
+  for (const item of items) {
+    const existing = best.get(item.video_id);
+    if (!existing || (item.score ?? 0) > (existing.score ?? 0)) best.set(item.video_id, item);
+  }
+  return [...best.values()]
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, 5);
+}
+
+const ReferenceCard: React.FC<{ item: ReferenceItem }> = ({ item }) => (
+  <button
+    type="button"
+    onClick={() => openVideoAt(item.video_id, item.start_sec)}
+    className="flex w-full items-start gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-2.5 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
+  >
+    <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+    <div className="min-w-0">
+      {item.folder_path && (
+        <p className="truncate text-[10px] text-[var(--text-muted)]" title={item.folder_path}>
+          {item.folder_path}
+        </p>
+      )}
+      <p className="truncate text-xs font-medium text-[var(--text-primary)]">
+        {item.video_title || `视频 ${item.video_id}`}
+      </p>
+      <p className="text-xs text-[var(--accent)]">
+        {formatTimestamp(item.start_sec)}
+        {item.end_sec && item.end_sec > item.start_sec + 5
+          ? ` – ${formatTimestamp(item.end_sec)}`
+          : ''}
+      </p>
+      <p className="text-xs text-[var(--text-muted)] line-clamp-2">{item.text}</p>
+    </div>
+  </button>
+);
+
+const ReferenceBlock: React.FC<{ items: ReferenceItem[]; label?: string }> = ({ items, label }) => {
+  if (!items.length) return null;
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      <p className="text-[11px] font-medium text-[var(--text-muted)]">
+        {label ?? '相关片段（点击跳转）'}
+      </p>
+      {items.map((item) => (
+        <ReferenceCard key={`${item.video_id}-${item.start_sec}`} item={item} />
+      ))}
+    </div>
+  );
+};
+
 export const AIChatPanel: React.FC = () => {
   const {
     chatOpen, setChatOpen, model, systemPrompt, setSystemPrompt,
@@ -161,10 +223,13 @@ export const AIChatPanel: React.FC = () => {
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   // 本轮没检索到片段时，保留上一轮的引用但标记出来 —— 直接清空的话
   // 用户会以为「推荐的东西没了」，而留着不标记又会让人误当成这轮的依据。
-  const [referencesStale, setReferencesStale] = useState(false);
   // 最后一次自动识别到的意图（模板 id）。显示出来让用户知道 AI 拿什么策略在答 ——
   // 原来顶部只有手动选的「学习总结」，用户问课程推荐时也显示这个，很困惑。
   const [lastIntent, setLastIntent] = useState<string | null>(null);
+  // 输入框里的实时意图。detectIntent 是几条正则，每次击键跑开销可以忽略。
+  // 用户说「突然查了 Java，又想要学习路线，又想查学习状态」——意图一直在变，
+  // 只在发送时算一次的话，顶部标签永远滞后一轮，用户不知道现在会用什么策略。
+  const [liveIntent, setLiveIntent] = useState<string | null>(null);
 
   /* ── 会话管理 ──
    * 原来顶部那个「续聊中」只是个状态标签，说明不了「我现在在哪条会话」，
@@ -184,7 +249,6 @@ export const AIChatPanel: React.FC = () => {
     clearMessages();
     setReferences([]);
     setLastIntent(null);
-    setReferencesStale(false);
     setHistoryOpen(false);
   };
 
@@ -248,7 +312,7 @@ export const AIChatPanel: React.FC = () => {
   const [draftTemplate, setDraftTemplate] = useState('');
 
   // 当前生效的模板：自动识别优先，认不出来用手动选的
-  const effectiveTemplateId = lastIntent ?? activeTemplateId;
+  const effectiveTemplateId = liveIntent ?? lastIntent ?? activeTemplateId;
   const editableTemplate =
     promptTemplates.find((t) => t.id === effectiveTemplateId)
     ?? DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === effectiveTemplateId);
@@ -295,37 +359,6 @@ export const AIChatPanel: React.FC = () => {
     () => promptTemplates.find((template) => template.id === activeTemplateId) ?? promptTemplates[0],
     [activeTemplateId, promptTemplates]
   );
-
-  // 同一视频只保留相关度最高的一条，避免刷屏
-  // 优先从消息里读：富内容在 done 时已经写回 message 并持久化，
-  // 刷新/重开页面后视频推荐框还在。组件 state 只作为流式过程中的即时来源。
-  const persistedReferences = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const m = messages[i];
-      if (m.role === 'assistant' && m.references?.length) return m.references;
-    }
-    return [];
-  }, [messages]);
-
-  const visibleReferences = useMemo(() => {
-    const best = new Map<number, ReferenceItem>();
-    for (const item of (persistedReferences.length ? persistedReferences : references)) {
-      const existing = best.get(item.video_id);
-      if (!existing || (item.score ?? 0) > (existing.score ?? 0)) best.set(item.video_id, item);
-    }
-    // 同一视频只留最高分那条，然后**再排一次降序**。
-    //
-    // Map 只保证「首次插入」的顺序：如果某个视频的第 1 条分数低、
-    // 第 3 条分数高，值会被换成高分的，但位置还停在第 1 条的位置上 ——
-    // 结果就是位置和分值对不上。这里按最终的 score 重排，
-    // 让最相关的稳定排在第一（用户从上往下读）。
-    //
-    // 聊天消息是时间序（最新的在底部），相关片段是相关度序（最相关的在顶部），
-    // 两套排法不能混。
-    return [...best.values()]
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      .slice(0, 5);
-  }, [references, persistedReferences]);
 
   useEffect(() => {
     if (!chatOpen) return;
@@ -384,6 +417,7 @@ export const AIChatPanel: React.FC = () => {
     if (!text || loading) return;
     setError('');
     setInput('');
+    setLiveIntent(null);
     setToolHint('');
 
     addMessage({ id: makeId(), role: 'user', content: text });
@@ -398,6 +432,20 @@ export const AIChatPanel: React.FC = () => {
     abortRef.current = controller;
     const usedTools: string[] = [];
     let streamError = '';
+
+    /* 静默看门狗：流式请求本身没有超时，模型卡住时前端会永远转「正在思考」。
+       用户截图里就卡在这个状态，只能手动关面板。
+       规则：90 秒内没有收到任何事件（token / tool_start / tool_end）就主动中止。
+       收到事件就重新计时，所以长回答只要在持续输出就不会被误杀。 */
+    const watchdog = { timer: null as number | null, fired: false };
+    const rearmWatchdog = () => {
+      if (watchdog.timer) window.clearTimeout(watchdog.timer);
+      watchdog.timer = window.setTimeout(() => {
+        watchdog.fired = true;
+        controller.abort();
+      }, 90_000);
+    };
+    rearmWatchdog();
 
     try {
       const context = getAssistantPageContext();
@@ -422,6 +470,7 @@ export const AIChatPanel: React.FC = () => {
         // 把识别出的意图一起存库，历史会话加载后才能还原「当时用的策略」
         intent: detected,
         onEvent: (event) => {
+          rearmWatchdog();
           switch (event.type) {
             case 'token':
               bufferRef.current += event.text;
@@ -445,11 +494,7 @@ export const AIChatPanel: React.FC = () => {
               }
               if (event.references?.length) {
                 setReferences(event.references);
-                setReferencesStale(false);
                 updateMessage(assistantId, { references: event.references });
-              } else {
-                // 这轮没检索到东西：保留上一轮，但标记为「上一轮」
-                setReferencesStale(true);
               }
               if (detected) {
                 updateMessage(assistantId, { intent: detected });
@@ -476,12 +521,18 @@ export const AIChatPanel: React.FC = () => {
       if (finalText) setError('');
     } catch (err) {
       const aborted = err instanceof DOMException && err.name === 'AbortError';
-      const message = aborted
-        ? '已停止生成'
-        : err instanceof Error
-          ? err.message
-          : '对话请求失败';
-      if (!aborted) {
+      const message = watchdog.fired
+        ? '模型 90 秒没有返回任何内容，已自动停止'
+        : aborted
+          ? '已停止生成'
+          : err instanceof Error
+            ? err.message
+            : '对话请求失败';
+      if (watchdog.fired) {
+        // 中止是我们主动发的，但这不是「用户停止」，要给可操作的建议
+        setError('模型长时间无响应，已自动停止。可以重试，或在设置里换成更快的模型。');
+        playInteractionSound('error');
+      } else if (!aborted) {
         setError(
           /Failed to fetch|NetworkError/i.test(message)
             ? '连不上后端，请确认服务是否已启动'
@@ -494,6 +545,7 @@ export const AIChatPanel: React.FC = () => {
         streaming: false,
       });
     } finally {
+      if (watchdog.timer) window.clearTimeout(watchdog.timer);
       abortRef.current = null;
       setLoading(false);
       setToolHint('');
@@ -551,7 +603,6 @@ export const AIChatPanel: React.FC = () => {
           onClick={() => {
             clearMessages();
             setReferences([]);
-            setReferencesStale(false);
                     setLastIntent(null);
             playInteractionSound('delete');
           }}
@@ -615,19 +666,28 @@ export const AIChatPanel: React.FC = () => {
       )}
 
       <div className="flex items-center gap-2 border-b border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-1.5">
+        {/* 当前生效的意图：正在打字时取实时识别结果，空闲时取上一轮实际用过的。
+            两者都为空才退回手动选的模板。 */}
         <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
-          {lastIntent ? '识别意图' : '模板'}
+          {liveIntent ? '当前意图' : lastIntent ? '上轮意图' : '模板'}
         </span>
         <span className="truncate text-xs font-medium text-[var(--text-primary)]">
-          {lastIntent
-            ? promptTemplates.find((t) => t.id === lastIntent)?.name
-              ?? DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === lastIntent)?.name
-              ?? lastIntent
-            : activeTemplate?.name ?? '默认模板'}
+          {(() => {
+            const effective = liveIntent ?? lastIntent;
+            if (!effective) return activeTemplate?.name ?? '默认模板';
+            return (
+              promptTemplates.find((t) => t.id === effective)?.name
+              ?? DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === effective)?.name
+              ?? effective
+            );
+          })()}
         </span>
-        {lastIntent && (
-          <span className="shrink-0 text-[10px] text-[var(--text-muted)]" title="根据你上一句问题自动选择">
-            自动
+        {(liveIntent || lastIntent) && (
+          <span
+            className="shrink-0 text-[10px] text-[var(--text-muted)]"
+            title={liveIntent ? '根据你正在输入的内容实时识别' : '根据你上一句问题自动选择'}
+          >
+            {liveIntent ? '实时' : '自动'}
           </span>
         )}
         <button
@@ -725,7 +785,7 @@ export const AIChatPanel: React.FC = () => {
           </div>
         )}
         {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={message.id} className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div
               className={`max-w-[88%] rounded-xl px-3 py-2 text-xs leading-6 whitespace-pre-wrap ${
                 message.role === 'user'
@@ -748,6 +808,12 @@ export const AIChatPanel: React.FC = () => {
                 </p>
               )}
             </div>
+            {/* 相关片段挂在这条回答下面，而不是整个对话的最底部 */}
+            {message.role === 'assistant' && !message.streaming && (
+              <div className="w-full max-w-[88%]">
+                <ReferenceBlock items={dedupeReferences(message.references)} />
+              </div>
+            )}
           </div>
         ))}
         {toolHint && (
@@ -764,41 +830,12 @@ export const AIChatPanel: React.FC = () => {
         )}
         {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
         <div ref={messagesEndRef} />
-        {visibleReferences.length > 0 && !loading && (
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-[var(--text-muted)]">
-              {referencesStale ? '相关片段（上一轮，本轮未检索到）' : '相关片段（点击跳转）'}
-            </p>
-            {visibleReferences.map((item) => (
-              <button
-                key={`${item.video_id}-${item.start_sec}`}
-                type="button"
-                onClick={() => openVideoAt(item.video_id, item.start_sec)}
-                className="flex w-full items-start gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2.5 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
-              >
-                <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
-                <div className="min-w-0">
-                  {item.folder_path && (
-                    <p
-                      className="truncate text-[10px] text-[var(--text-muted)]"
-                      title={item.folder_path}
-                    >
-                      {item.folder_path}
-                    </p>
-                  )}
-                  <p className="text-xs font-medium text-[var(--text-primary)] truncate">
-                    {item.video_title || `视频 ${item.video_id}`}
-                  </p>
-                  <p className="text-xs text-[var(--accent)]">
-                    {formatTimestamp(item.start_sec)}
-                    {item.end_sec && item.end_sec > item.start_sec + 5
-                      ? ` – ${formatTimestamp(item.end_sec)}`
-                      : ''}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)] line-clamp-2">{item.text}</p>
-                </div>
-              </button>
-            ))}
+        {/* 流式过程中的临时引用。
+            消息生成完会把 references 写回 message，之后由每条回答自己渲染；
+            这里只负责「回答还在流、但检索已经先回来了」这段空窗期。 */}
+        {loading && dedupeReferences(references).length > 0 && (
+          <div className="w-full">
+            <ReferenceBlock items={dedupeReferences(references)} label="检索到的片段（回答生成中）" />
           </div>
         )}
       </div>
@@ -807,7 +844,11 @@ export const AIChatPanel: React.FC = () => {
         <div className="flex gap-2">
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setInput(next);
+              setLiveIntent(detectIntent(next));
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

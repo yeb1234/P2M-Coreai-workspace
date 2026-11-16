@@ -91,6 +91,7 @@ function applyCurrentVideo(set: (partial: Partial<VideoState>) => void, video: V
     activeJobId: video.active_job_id || null,
     jobStatus: video.ai_status || 'idle',
     jobStage: video.ai_stage || null,
+    jobError: video.ai_error || null,
   });
 }
 
@@ -110,6 +111,8 @@ interface VideoState {
   activeJobId: string | null;
   jobStatus: string | null;
   jobStage: string | null;
+  /** 失败原因（后端已翻译成人话）。之前一直没透传，用户只看到「失败」两个字。 */
+  jobError: string | null;
 
   // Category browsing
   categoryTree: CategoryTree[];
@@ -169,6 +172,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   activeJobId: null,
   jobStatus: null,
   jobStage: null,
+  jobError: null,
 
   categoryTree: [],
   currentCategoryId: null,
@@ -226,6 +230,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
       activeJobId: null,
       jobStatus: null,
       jobStage: null,
+      jobError: null,
     });
   },
 
@@ -286,7 +291,12 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         });
         // Update local state; polling is handled by useAiJobCenter
         if (get().currentVideo?.id === videoId) {
-          set({ activeJobId: res.job_id, jobStatus: res.status, jobStage: res.stage });
+          set({
+            activeJobId: res.job_id,
+            jobStatus: res.status,
+            jobStage: res.stage,
+            jobError: null,
+          });
         }
       } catch (e: unknown) {
         set({ error: e instanceof Error ? e.message : String(e) });
@@ -304,6 +314,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         activeJobId: fresh.active_job_id || null,
         jobStatus: fresh.ai_status || 'idle',
         jobStage: fresh.ai_stage || null,
+        jobError: fresh.ai_error || null,
       });
       // also refresh list
       const { page, searchQuery, currentCategoryId } = get();

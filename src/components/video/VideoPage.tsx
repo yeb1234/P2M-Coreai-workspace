@@ -27,7 +27,7 @@ import { useWatchTelemetry } from './useWatchTelemetry';
 import { useIsMobile, useWindowWidth } from '../../hooks/useMediaQuery';
 
 function VideoPlayerView() {
-  const { currentVideo, currentSegments, jobStatus, jobStage, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
+  const { currentVideo, currentSegments, jobStatus, jobStage, jobError, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   // 播放行为埋点：心跳每 15 秒上报一次，用于算真实观看时长与学习画像
@@ -127,7 +127,9 @@ function VideoPlayerView() {
   // AI Job Center - all logic extracted to hook
   const { triggerSingleVideo, triggerCorrection, ...aiJobCenterProps } = useAiJobCenter(playlist, playlistScope, currentVideoId, loadCurrentVideo);
 
-  const isProcessing = jobStatus === 'running' || jobStatus === 'queued';
+  // cancelling 也算「处理中」：任务在优雅退出，还没真正结束。
+  // 不算的话取消瞬间界面会闪一下「还没有总结」，看着像任务被丢掉了。
+  const isProcessing = jobStatus === 'running' || jobStatus === 'queued' || jobStatus === 'cancelling';
   const progressPct = videoDuration > 0 ? (progress / videoDuration) * 100 : 0;
   const {
     progressBarRef,
@@ -394,6 +396,8 @@ function VideoPlayerView() {
             isProcessing={isProcessing}
             jobStatus={jobStatus}
             jobStage={jobStage}
+            jobError={jobError}
+            onRetry={() => triggerSingleVideo(currentVideo.id)}
           />
         </div>
 

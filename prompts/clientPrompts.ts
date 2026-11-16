@@ -86,8 +86,67 @@ export const DEFAULT_SUBTITLE_CORRECTION_PROMPT =
  * 所以特殊模式必须排在通用模式前面。
  * 宁可认不出来（退回手动模板），也不要认错 —— 认错的代价比不认大。
  */
+/**
+ * 剥掉口语，只留下关键词 —— 意图判断吃这一版，不吃原始口语。
+ *
+ * 为什么：用户原话「查询改写第一步就是用正则把句子里口气、没用的地方
+ * 截取掉，然后截取关键词来做意图判断」。
+ *
+ * 原始口语会直接污染意图判断：
+ *   「那个啥，就是垃圾回收怎么弄来着」—— detectIntent 看到「怎么」，
+ *   会判成知识问答（该走"找内容"而不是"问概念"）
+ *   「帮我找一下有没有讲依赖注入的视频」—— 看到「有没有…视频」才判成
+ *   课程推荐，但开头那串「帮我找一下」会干扰别的模式匹配
+ *
+ * 后端 backend/app/services/query_rewrite.py 有一份同源规则（用于检索）。
+ * 两份必须保持一致 —— 改了这边记得同步那边，反之亦然。
+ */
+const LEADING_FILLERS: RegExp[] = [
+  /^(?:那个|这个|呃|嗯|啊)/,
+  /^(?:啥|什么)[，,、\s]*/,
+  /^(?:就是|也就是说|就是说|其实是)/,
+  /^(?:我想|我要|我想问|想问一下|想请教|请教一下|问一下|问下)/,
+  /^(?:帮我|帮忙|麻烦)/,
+  /^(?:找|查|搜|看看|看下|找找)[一下]*/,
+  /^(?:一下|下)/,
+  /^(?:有没有|有吗|能不能|可不可以)/,
+  /^(?:好的?|那么|然后|所以)/,
+  /^是(?=[^的吗呢])/,
+];
+
+const TAIL_FILLERS: RegExp[] = [
+  /(?:怎么弄|怎么办|怎么搞|怎么用|咋整|咋办)(?:来着|呢|啊)?$/,
+  /(?:是什么|是啥|什么意思|啥意思)(?:呢|啊)?$/,
+  /(?:的东西|那种东西|之类的|什么的|啥的)$/,
+  /(?:是啥|是啥来着|是什么来着|来着)$/,
+  /[吧呢啊呀嘛哈喽]+$/,
+  /[？?！!。.，,\s]+$/,
+];
+
+const MID_DEMONSTRATIVE = /(?:那个|这个)(?=[\u4e00-\u9fa5A-Za-z])/;
+const PARTICLE = /[吧呢啊呀嘛哈喽]/;
+
+export function extractIntentKeywords(input: string): string {
+  let out = (input || '').trim();
+  if (!out) return '';
+  // 迭代剥离：链式口语一次删不干净（「那个啥，就是…」要剥三轮）
+  for (let i = 0; i < 8; i += 1) {
+    const before = out;
+    for (const re of LEADING_FILLERS) out = out.replace(re, '').trim();
+    for (const re of TAIL_FILLERS) out = out.replace(re, '').trim();
+    out = out.replace(MID_DEMONSTRATIVE, '');
+    out = out.replace(PARTICLE, '');
+    out = out.replace(/^[，,、；;\s]+/, '').replace(/[，,、；;\s]+$/, '');
+    out = out.replace(/\s{2,}/g, ' ');
+    if (out === before) break;
+  }
+  return out.trim();
+}
+
 export function detectIntent(input: string): string | null {
-  const text = (input || '').trim();
+  // 先用剥完口语的关键词判断；剥空了（「那个是啥来着」）退回原文
+  const keywords = extractIntentKeywords(input);
+  const text = keywords || (input || '').trim();
   if (!text) return null;
 
   // 课程推荐：有没有/推荐/找/适合 + 课/视频/教程
