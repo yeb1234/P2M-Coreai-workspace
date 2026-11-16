@@ -84,7 +84,15 @@ function sanitizeTemplates(templates: unknown): PromptTemplate[] {
     const t = item as Partial<PromptTemplate>;
     return !!t.id && !!t.name && !!t.content && !hasCorruptText(t.name) && !hasCorruptText(t.content);
   });
-  return clean.length > 0 ? clean : DEFAULT_PROMPT_TEMPLATES;
+  if (clean.length === 0) return DEFAULT_PROMPT_TEMPLATES;
+
+  // 合并新增的默认模板。老用户 localStorage 里只有原来那 3 个
+  // （学习总结 / 代码助手 / 任务拆解），不补的话自动识别到
+  // course-recommend 时找不到模板，UI 只能显示 id 字符串。
+  // 用户自己改过的同名模板不动，也不删除用户自建的模板。
+  const existingIds = new Set(clean.map((t) => t.id));
+  const missing = DEFAULT_PROMPT_TEMPLATES.filter((t) => !existingIds.has(t.id));
+  return [...clean, ...missing];
 }
 
 export const useAIStore = create<AIState>()(

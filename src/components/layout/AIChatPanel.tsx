@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench } from 'lucide-react';
+import { Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal } from 'lucide-react';
 import { useAIStore } from '../../stores';
 import {
   fetchAssistantRuntimeSettings,
@@ -8,7 +8,12 @@ import {
 } from '../../lib/videoApi';
 import { useDragResize } from '../../hooks/useDragResize';
 import { getAssistantPageContext } from '../../lib/assistantPageContext';
-import { buildAIRequestSystemPrompt, detectIntent } from '../../lib/aiPromptDefaults';
+import {
+  DEFAULT_PROMPT_TEMPLATES,
+  DEFAULT_SYSTEM_PROMPT,
+  buildAIRequestSystemPrompt,
+  detectIntent,
+} from '../../lib/aiPromptDefaults';
 import { playInteractionSound } from '../../lib/sounds';
 import { useAssistantPageContext } from '../../hooks/useAssistantPageContext';
 
@@ -135,7 +140,8 @@ function renderWithVideoLinks(text: string, links: MentionedVideo[]): React.Reac
 
 export const AIChatPanel: React.FC = () => {
   const {
-    chatOpen, setChatOpen, model, systemPrompt, promptTemplates, activeTemplateId,
+    chatOpen, setChatOpen, model, systemPrompt, setSystemPrompt,
+    promptTemplates, activeTemplateId, updateTemplate,
     chatWidth, setChatWidth, messages, addMessage, clearMessages, sessionId, setSessionId,
   } = useAIStore();
   const { width: liveChatWidth, startResize } = useDragResize({
@@ -157,6 +163,41 @@ export const AIChatPanel: React.FC = () => {
   // 最后一次自动识别到的意图（模板 id）。显示出来让用户知道 AI 拿什么策略在答 ——
   // 原来顶部只有手动选的「学习总结」，用户问课程推荐时也显示这个，很困惑。
   const [lastIntent, setLastIntent] = useState<string | null>(null);
+
+  // 提示词编辑器：用户要能直接看到「这次用的是什么提示词」并当场改。
+  // 原来得跳到灵境小助手页去改，对话中完全看不到，出了问题没法定位。
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [draftSystem, setDraftSystem] = useState('');
+  const [draftTemplate, setDraftTemplate] = useState('');
+
+  // 当前生效的模板：自动识别优先，认不出来用手动选的
+  const effectiveTemplateId = lastIntent ?? activeTemplateId;
+  const editableTemplate =
+    promptTemplates.find((t) => t.id === effectiveTemplateId)
+    ?? DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === effectiveTemplateId);
+
+  const togglePromptEditor = () => {
+    if (!promptExpanded) {
+      // 打开时把当前生效值灌进草稿，取消就是丢弃改动
+      setDraftSystem(systemPrompt);
+      setDraftTemplate(editableTemplate?.content ?? '');
+    }
+    setPromptExpanded((v) => !v);
+  };
+
+  const savePromptEditor = () => {
+    setSystemPrompt(draftSystem);
+    if (effectiveTemplateId) {
+      updateTemplate(effectiveTemplateId, { content: draftTemplate });
+    }
+    setPromptExpanded(false);
+  };
+
+  const resetPromptEditor = () => {
+    setDraftSystem(DEFAULT_SYSTEM_PROMPT);
+    const def = DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === effectiveTemplateId);
+    if (def) setDraftTemplate(def.content);
+  };
   const [, setPageContext] = useAssistantPageContext(chatOpen);
   const [runtimeModelLabel, setRuntimeModelLabel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -425,15 +466,87 @@ export const AIChatPanel: React.FC = () => {
         </span>
         <span className="truncate text-xs font-medium text-[var(--text-primary)]">
           {lastIntent
-            ? promptTemplates.find((t) => t.id === lastIntent)?.name ?? lastIntent
+            ? promptTemplates.find((t) => t.id === lastIntent)?.name
+              ?? DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === lastIntent)?.name
+              ?? lastIntent
             : activeTemplate?.name ?? '默认模板'}
         </span>
         {lastIntent && (
-          <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]" title="根据你上一句问题自动选择">
+          <span className="shrink-0 text-[10px] text-[var(--text-muted)]" title="根据你上一句问题自动选择">
             自动
           </span>
         )}
+        <button
+          type="button"
+          onClick={togglePromptEditor}
+          title="查看 / 修改提示词"
+          aria-label="查看或修改提示词"
+          className={`ml-auto shrink-0 rounded p-1 transition-colors ${
+            promptExpanded
+              ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
+              : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          <SlidersHorizontal size={13} />
+        </button>
       </div>
+
+      {/* 提示词编辑器。原来提示词藏在设置页里，对话中出了问题完全看不到，
+          用户不知道 AI 是拿什么策略在答。现在直接摊开在对话上方。 */}
+      {promptExpanded && (
+        <div className="space-y-2.5 border-b border-[var(--border-light)] bg-[var(--bg-base)] px-3 py-2.5">
+          <div>
+            <p className="mb-1 text-[11px] font-medium text-[var(--text-secondary)]">
+              系统提示词
+              <span className="ml-1 font-normal text-[var(--text-muted)]">· 所有对话共用</span>
+            </p>
+            <textarea
+              value={draftSystem}
+              onChange={(e) => setDraftSystem(e.target.value)}
+              rows={4}
+              className="w-full resize-y rounded-[var(--r-1)] border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] leading-4 text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-[11px] font-medium text-[var(--text-secondary)]">
+              模板提示词 · {editableTemplate?.name ?? '默认'}
+              <span className="ml-1 font-normal text-[var(--text-muted)]">· 仅此意图使用</span>
+            </p>
+            <textarea
+              value={draftTemplate}
+              onChange={(e) => setDraftTemplate(e.target.value)}
+              rows={3}
+              className="w-full resize-y rounded-[var(--r-1)] border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] leading-4 text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={savePromptEditor}
+              className="rounded-[var(--r-1)] bg-[var(--accent)] px-2.5 py-1 text-[11px] text-white transition-colors hover:bg-[var(--accent-hover)]"
+            >
+              保存
+            </button>
+            <button
+              type="button"
+              onClick={resetPromptEditor}
+              className="rounded-[var(--r-1)] border border-[var(--border-light)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-elevated)]"
+            >
+              恢复默认
+            </button>
+            <button
+              type="button"
+              onClick={() => setPromptExpanded(false)}
+              className="ml-auto px-1.5 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            >
+              取消
+            </button>
+          </div>
+          <p className="text-[10px] leading-4 text-[var(--text-muted)]">
+            保存后下一次提问生效，不影响已经发出的消息。
+          </p>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (

@@ -132,8 +132,18 @@ def main() -> None:
         db2.close()
 
     print("\n=== A5: 观看进度按用户隔离 ===")
-    st, anon_video = call("GET", "/api/videos/1")
-    check("匿名读视频详情不报错", st == 200, f"HTTP {st}")
+    # 不要硬编码 video_id=1：去重后那条重复记录被删了，id=1 直接 404，
+    # 验证的是「测试脚本用了不存在的 id」而不是接口行为。
+    st_list, listing = call("GET", "/api/videos?limit=1")
+    items = listing.get("items") or [] if st_list == 200 else []
+    first_id = items[0].get("id") if items else None
+    if first_id is None:
+        check("匿名读视频详情不报错", False, "视频列表为空")
+        anon_video = {}
+        st = st_list
+    else:
+        st, anon_video = call("GET", f"/api/videos/{first_id}")
+        check("匿名读视频详情不报错", st == 200, f"HTTP {st} id={first_id}")
     if st == 200:
         check(
             "匿名看不到别人的进度",
