@@ -67,22 +67,22 @@ export const PomodoroSummary: React.FC = () => {
       <div className="grid grid-cols-2 gap-2">
         {mode === 'pomodoro' ? (
           <>
-            <div className="rounded-lg bg-[var(--bg-base)] p-2.5 text-center">
+            <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5 text-center">
               <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{todayStats.totalPomodoros}</p>
               <p className="text-xs font-medium text-[var(--text-muted)]">番茄数</p>
             </div>
-            <div className="rounded-lg bg-[var(--bg-base)] p-2.5 text-center">
+            <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5 text-center">
               <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{formatDuration(todayStats.totalMinutes)}</p>
               <p className="text-xs font-medium text-[var(--text-muted)]">专注时长</p>
             </div>
           </>
         ) : (
           <>
-            <div className="rounded-lg bg-[var(--bg-base)] p-2.5 text-center">
+            <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5 text-center">
               <p className="text-xl font-bold tabular-nums text-[var(--success)]">{todoStats.completed}/{todoStats.total}</p>
               <p className="text-xs font-medium text-[var(--text-muted)]">已完成</p>
             </div>
-            <div className="rounded-lg bg-[var(--bg-base)] p-2.5 text-center">
+            <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5 text-center">
               <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{todoStats.inProgress}</p>
               <p className="text-xs font-medium text-[var(--text-muted)]">进行中</p>
             </div>

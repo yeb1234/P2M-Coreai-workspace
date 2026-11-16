@@ -31,17 +31,17 @@ export const TodoSummary: React.FC = () => {
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="flex flex-1 flex-col gap-3">
+    <div className="flex flex-1 flex-col gap-2">
       <div className="auto-grid-compact text-center">
-        <div className="rounded-lg bg-[var(--bg-base)] p-2">
+        <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5">
           <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{pending}</p>
           <p className="text-xs font-medium text-[var(--text-muted)]">待处理</p>
         </div>
-        <div className="rounded-lg bg-[var(--bg-base)] p-2">
+        <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5">
           <p className="text-xl font-bold tabular-nums text-[var(--info)]">{inProgress}</p>
           <p className="text-xs font-medium text-[var(--text-muted)]">进行中</p>
         </div>
-        <div className="rounded-lg bg-[var(--bg-base)] p-2">
+        <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5">
           <p className="text-xl font-bold tabular-nums text-[var(--success)]">{completed}</p>
           <p className="text-xs font-medium text-[var(--text-muted)]">已完成</p>
         </div>

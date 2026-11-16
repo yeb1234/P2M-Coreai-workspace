@@ -24,7 +24,7 @@ export const SummaryEmpty: React.FC<{
   onClick?: () => void;
 }> = ({ icon, title, hint, onClick }) => {
   const base =
-    'flex flex-1 flex-col items-center justify-center gap-2 rounded-[var(--r-1)] px-3 py-6 text-center';
+    'flex flex-1 flex-col items-center justify-center gap-1.5 rounded-[var(--r-1)] px-3 py-4 text-center';
 
   const inner = (
     <>

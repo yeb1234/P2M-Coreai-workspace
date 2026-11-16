@@ -12,10 +12,12 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: 'todo', label: '待办', icon: <ListTodo size={24} /> },
-  { id: 'calendar', label: '日历看板', icon: <Calendar size={24} /> },
+  // 标签统一控制在 2-3 字。「日历看板」四个字在 78px 宽的 tab 里
+  // 挤得图标和文字不成比例，和「待办」「笔记」的视觉重量也对不上。
+  { id: 'calendar', label: '日历', icon: <Calendar size={24} /> },
   { id: 'notes', label: '笔记', icon: <StickyNote size={24} /> },
   { id: 'pomodoro', label: '番茄钟', icon: <Timer size={24} /> },
-  { id: 'video', label: 'IT视频站', icon: <PlayCircle size={24} /> },
+  { id: 'video', label: '视频', icon: <PlayCircle size={24} /> },
 ];
 
 export const MobileTabBar: React.FC = () => {
