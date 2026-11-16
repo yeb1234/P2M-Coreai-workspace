@@ -22,8 +22,10 @@ from app.services.ai_jobs import (
     _step_transcribe,
     _step_write_outputs,
     _video_has_transcription_outputs,
+    write_markdown_output,
 )
 from app.services.rq_client import clear_job_cancelled, is_job_cancelled
+from app.utils.serialization import load_segments
 
 logger = logging.getLogger(__name__)
 
@@ -74,19 +76,58 @@ def run_ai_job_task(job_id: str) -> None:
             _mark_failed(db, job, "Video file does not exist")
             return
 
-        # 如果视频已经有完整的转录结果，直接标记完成，避免重复处理
+        # 如果视频已经有完整的转录结果，跳过「提取音频 + 转写」这两步，
+        # 但仍要检查总结 —— 有字幕无总结时用户点「生成」，以前这里直接
+        # 标记完成，summary 永远是空的，用户看到「缺总结」却怎么都补不上。
         if _video_has_transcription_outputs(video):
+            summary = video.summary
+            summary_error = None
+            if job.do_summary and not (summary and summary.strip()):
+                # 字幕已在库里，直接拿转录文本补一次总结，不重跑 whisper
+                job.status = "running"
+                job.stage = "summarizing"
+                db.commit()
+                summary, summary_error = _step_summarize(
+                    db, job, video, video.transcription or ""
+                )
+                if summary:
+                    video.summary = summary
+                    # markdown 里也补上总结段，保持笔记文件与库一致
+                    try:
+                        from pathlib import Path
+
+                        md_path = Path(video.markdown_path) if video.markdown_path else None
+                        if md_path and md_path.exists():
+                            write_markdown_output(
+                                md_path=md_path,
+                                source_filename=video.filename,
+                                transcript=video.transcription or "",
+                                transcript_segments=load_segments(video.transcript_segments),
+                                summary=summary,
+                                word_limit=job.word_limit,
+                                whisper_model=job.whisper_model,
+                                language=job.language,
+                                subtitle_filename=Path(video.subtitle_path).name if video.subtitle_path else "",
+                                summary_error=summary_error,
+                            )
+                    except Exception as exc:
+                        logger.warning("补写总结到 markdown 失败 video=%s: %s", video.id, exc)
+
             job.status = "completed"
             job.stage = "completed"
-            job.message = "Skipped — video already has transcription"
+            job.message = (
+                "Skipped transcription; summary generated from existing transcript"
+                if summary else "Skipped — video already has transcription"
+            )
             job.transcript = video.transcription
             job.transcript_segments = video.transcript_segments
-            job.summary = video.summary
+            job.summary = summary
+            job.summary_error = summary_error
             job.markdown_path = video.markdown_path
             job.subtitle_path = video.subtitle_path
             video.ai_status = "completed"
             video.ai_stage = "completed"
-            video.ai_error = None
+            video.ai_error = summary_error if summary_error and not summary else None
             db.commit()
             # 已有转写说明早就有字幕了，但可能从没建过块（历史遗留）
             _enqueue_chunk_index(video.id)

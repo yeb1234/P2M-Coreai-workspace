@@ -429,7 +429,26 @@ def sync_db_queue_to_rq() -> int:
                     continue
 
                 rq_job = queue.fetch_job(job.id)
-                if rq_job is None:
+                # fetch_job 会从 failed/finished registry 里也找到同名 job，
+                # 光判断 is None 不够：worker 被强杀后，RQ 把任务标成
+                # abandoned→failed，而 DB 侧还停在 queued。于是这里看到
+                # 「job 已存在」就跳过，DB 永远 queued，前端一直显示
+                # 「处理中」，用户反复重试都没用。
+                #
+                # 只有 RQ 里确实还活着（queued / started）才算已入队。
+                # 其它状态一律清掉旧记录重新投递。
+                from rq.job import JobStatus
+
+                alive = rq_job is not None and rq_job.get_status() in (
+                    JobStatus.QUEUED,
+                    JobStatus.STARTED,
+                )
+                if rq_job is not None and not alive:
+                    try:
+                        rq_job.delete()
+                    except Exception:
+                        pass
+                if not alive:
                     queue.enqueue(
                         "app.services.ai_job_tasks.run_ai_job_task",
                         args=(job.id,),
@@ -450,3 +469,73 @@ def sync_db_queue_to_rq() -> int:
         return enqueued
     finally:
         db.close()
+
+
+def reconcile_stuck_ai_jobs(db, limit: int = 20) -> int:
+    """把「DB 说 queued、但 RQ 里已经不在队列」的任务重新投递。
+
+    为什么需要：worker 被强制重启（Docker restart / OOM kill）时，
+    RQ 会把正在跑或排队中的 job 标成 abandoned→failed，但进程被杀，
+    _handle_job_failure 没机会执行 —— DB 侧仍是 queued，Video 上也是
+    queued。前端轮询看到的就是「处理中 / 1 排队」，可 Redis 里根本没有
+    这个任务，永远不会有人执行它。用户只能反复点重试，而重试只是刷新
+    同一个 DB 行的 created_at，问题依旧。
+
+    worker 启动时会跑 sync_db_queue_to_rq，但那是「一次性」的；
+    运行期再发生 worker 重启就没有人校对了。所以挂在前端每 3 秒轮询的
+    AI 任务列表 API 上，页面开着就能自愈。
+
+    只处理 queued：running 的 job 可能真的在 worker 里执行（RQ started），
+    贸然重投会造成同一任务双跑。started 状态视为活跃，不动。
+    """
+    from rq.job import JobStatus
+
+    try:
+        queue = ai_jobs_queue()
+        stuck = (
+            db.query(AiJob)
+            .filter(AiJob.status == "queued")
+            .order_by(AiJob.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+        recovered = 0
+        for job in stuck:
+            try:
+                rq_job = queue.fetch_job(job.id)
+                alive = rq_job is not None and rq_job.get_status() in (
+                    JobStatus.QUEUED,
+                    JobStatus.STARTED,
+                )
+                if alive:
+                    continue
+                if rq_job is not None:
+                    try:
+                        rq_job.delete()
+                    except Exception:
+                        pass
+                queue.enqueue(
+                    "app.services.ai_job_tasks.run_ai_job_task",
+                    args=(job.id,),
+                    job_id=job.id,
+                    job_timeout=AI_JOB_TIMEOUT_SECONDS,
+                    result_ttl=AI_JOB_RESULT_TTL_SECONDS,
+                )
+                video = db.query(Video).filter(Video.id == job.video_id).first()
+                if video is not None:
+                    video.ai_status = "queued"
+                    video.ai_stage = "queued"
+                    video.ai_error = None
+                job.message = "Requeued after stale state detected"
+                recovered += 1
+            except Exception:
+                # 单个任务恢复失败不影响其它任务，也不影响列表展示
+                logger = logging.getLogger(__name__)
+                logger.exception("校对 AI job 状态失败 job=%s", job.id)
+        if recovered:
+            db.commit()
+        return recovered
+    except Exception:
+        # Redis 不可用时什么都不做：列表照常展示，下次轮询再试
+        logging.getLogger(__name__).exception("AI job 状态校对失败")
+        return 0
