@@ -15,7 +15,10 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
-  const [createTodo, setCreateTodo] = useState(false);
+  // 默认勾上，和周历保持一致。
+  // 原来这里是 false 而周历是 true —— 用户在日历里新建了东西、
+  // 以为会进待办页，结果「有时行有时不行」，其实取决于在哪个页面建的。
+  const [createTodo, setCreateTodo] = useState(true);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -98,6 +101,9 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
         <label htmlFor="createTodo" className="text-sm text-[var(--text-secondary)]">
           保存为待办事项
         </label>
+        <span className="text-[11px] text-[var(--text-muted)]">
+          {createTodo ? '会出现在待办事项' : '只是日程，不进待办'}
+        </span>
       </div>
 
       <div className="flex justify-end gap-3 pt-2">
