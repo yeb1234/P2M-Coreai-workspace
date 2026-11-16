@@ -34,7 +34,7 @@ services:
     # 就走这里。并行查询（work_mem 64MB × 2 worker）会直接把它撑爆，
     # 报 "could not resize shared memory segment ... No space left on device"，
     # 看着像磁盘满，其实是共享内存不够。
-    shm_size: 1gb
+    shm_size: 3gb  # HNSW 建索引实测要 2.14GB（60431 条 halfvec(1024)）
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-p2learning}
       POSTGRES_USER: ${POSTGRES_USER:-p2user}

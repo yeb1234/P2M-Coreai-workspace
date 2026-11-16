@@ -6,4 +6,5 @@ export {
   DEFAULT_SYSTEM_PROMPT,
   LOCAL_CORRECTION_PROMPT,
   buildAIRequestSystemPrompt,
+  detectIntent,
 } from '../../prompts/clientPrompts';

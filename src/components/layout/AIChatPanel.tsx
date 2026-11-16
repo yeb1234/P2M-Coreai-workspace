@@ -8,7 +8,7 @@ import {
 } from '../../lib/videoApi';
 import { useDragResize } from '../../hooks/useDragResize';
 import { getAssistantPageContext } from '../../lib/assistantPageContext';
-import { buildAIRequestSystemPrompt } from '../../lib/aiPromptDefaults';
+import { buildAIRequestSystemPrompt, detectIntent } from '../../lib/aiPromptDefaults';
 import { playInteractionSound } from '../../lib/sounds';
 import { useAssistantPageContext } from '../../hooks/useAssistantPageContext';
 
@@ -154,6 +154,9 @@ export const AIChatPanel: React.FC = () => {
   // 用户会以为「推荐的东西没了」，而留着不标记又会让人误当成这轮的依据。
   const [referencesStale, setReferencesStale] = useState(false);
   const [mentionedVideos, setMentionedVideos] = useState<MentionedVideo[]>([]);
+  // 最后一次自动识别到的意图（模板 id）。显示出来让用户知道 AI 拿什么策略在答 ——
+  // 原来顶部只有手动选的「学习总结」，用户问课程推荐时也显示这个，很困惑。
+  const [lastIntent, setLastIntent] = useState<string | null>(null);
   const [, setPageContext] = useAssistantPageContext(chatOpen);
   const [runtimeModelLabel, setRuntimeModelLabel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -271,7 +274,18 @@ export const AIChatPanel: React.FC = () => {
     try {
       const context = getAssistantPageContext();
       setPageContext(context);
-      const requestSystemPrompt = buildAIRequestSystemPrompt(systemPrompt, activeTemplate?.content ?? '');
+
+      // 按用户这次的问题自动选意图模板。认不出来就退回手动选的模板 ——
+      // 宁可不认，也不要认错（认错会让 AI 用完全错误的策略回答）。
+      const detected = detectIntent(text);
+      setLastIntent(detected);
+      const effectiveTemplate = detected
+        ? promptTemplates.find((t) => t.id === detected) ?? activeTemplate
+        : activeTemplate;
+      const requestSystemPrompt = buildAIRequestSystemPrompt(
+        systemPrompt,
+        effectiveTemplate?.content ?? ''
+      );
 
       await streamAssistantChat(text, {
         sessionId,
@@ -383,7 +397,14 @@ export const AIChatPanel: React.FC = () => {
           </span>
         )}
         <button
-          onClick={() => { clearMessages(); setReferences([]); setReferencesStale(false); playInteractionSound('delete'); }}
+          onClick={() => {
+            clearMessages();
+            setReferences([]);
+            setReferencesStale(false);
+            setMentionedVideos([]);
+            setLastIntent(null);
+            playInteractionSound('delete');
+          }}
           className="ml-auto p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
           title="清空对话（同时开启新会话）"
         >
@@ -399,8 +420,19 @@ export const AIChatPanel: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2 border-b border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-1.5">
-        <span className="shrink-0 text-[11px] text-[var(--text-muted)]">模板</span>
-        <span className="truncate text-xs font-medium text-[var(--text-primary)]">{activeTemplate?.name ?? '默认模板'}</span>
+        <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
+          {lastIntent ? '识别意图' : '模板'}
+        </span>
+        <span className="truncate text-xs font-medium text-[var(--text-primary)]">
+          {lastIntent
+            ? promptTemplates.find((t) => t.id === lastIntent)?.name ?? lastIntent
+            : activeTemplate?.name ?? '默认模板'}
+        </span>
+        {lastIntent && (
+          <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]" title="根据你上一句问题自动选择">
+            自动
+          </span>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">

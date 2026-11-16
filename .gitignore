@@ -67,3 +67,4 @@ data/
 # demo 视频副本（1.3GB+，源头在 D:/ITJC）
 /demo/
 shots/
+backup-*.sql

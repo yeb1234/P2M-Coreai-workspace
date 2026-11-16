@@ -55,23 +55,34 @@ MIGRATE_ALWAYS = ("watch_history", "watch_events", "notes", "chat_sessions", "ai
 MIGRATE_IF_EMPTY = ("content_chunks", "subtitle_segments")
 
 
-def load_duplicate_groups(db) -> dict[str, list[dict]]:
+def relative_key(filepath: str | None) -> str:
+    """把两种根路径归一成同一个相对路径。
+
+        旧：D:\\ITJC\\前端\\...\\day-03\\00-回顾.avi
+        新：/videos/前端/.../day-03/00-回顾.avi
+    两者都 → 前端/.../day-03/00-回顾.avi
+
+    **绝不能按 title 分组**：不同章节常叫同一个名字（day-03/00-回顾.avi、
+    day-05/00-回顾.avi、day-06/00-回顾.avi），按标题会把它们当重复删掉。
+    这个错误实际发生过，已靠备份回滚。
+    """
+    s = str(filepath or "").replace("\\", "/").lower()
+    for prefix in ("/videos/", "d:/itjc/", "/itjc/"):
+        if s.startswith(prefix):
+            s = s[len(prefix) :]
+            break
+    return s
+
+
+def load_duplicate_groups(db) -> dict[tuple[str, int | None], list[dict]]:
     rows = db.execute(
-        text(
-            """
-            SELECT id, title, filepath
-            FROM videos
-            WHERE title IN (
-                SELECT title FROM videos GROUP BY title HAVING count(*) > 1
-            )
-            ORDER BY title, id
-            """
-        )
+        text("SELECT id, title, filepath, file_size FROM videos ORDER BY filepath, id")
     ).mappings().all()
 
-    groups: dict[str, list[dict]] = defaultdict(list)
+    groups: dict[tuple[str, int | None], list[dict]] = defaultdict(list)
     for row in rows:
-        groups[row["title"]].append(dict(row))
+        # 相对路径相同 + 大小相同 = 同一个文件的两条记录
+        groups[(relative_key(row["filepath"]), row["file_size"])].append(dict(row))
     return groups
 
 
@@ -194,7 +205,7 @@ def apply_plan(db, plan_rows, batch_size: int = 500) -> None:
             WHERE a.video_id = b.video_id
               AND a.user_id  = b.user_id
               AND a.id <> b.id
-              AND (a.updated_at, a.id) < (b.updated_at, b.id)
+              AND (a.watched_at, a.id) < (b.watched_at, b.id)
             """
         )
     )
