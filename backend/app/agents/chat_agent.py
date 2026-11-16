@@ -461,6 +461,10 @@ async def stream_chat(ctx: AgentContext, message: str):
                     "video_id": hit.video_id,
                     "video_title": hit.video_title,
                     "start_sec": round(hit.start_sec, 1),
+                    # 带上结束时间：块平均跨 114 秒（最长 7000+ 秒），
+                    # 前端只显示起点会让用户以为「就这一秒的内容」，
+                    # 点进去发现要听两分钟，像是时间戳错了。
+                    "end_sec": round(getattr(hit, "end_sec", None) or hit.start_sec, 1),
                     "text": hit.text[:200],
                     "score": round(hit.vector_score or hit.lexical_score or 0, 3),
                 }

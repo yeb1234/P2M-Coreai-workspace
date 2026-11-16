@@ -21,6 +21,8 @@ interface ReferenceItem {
   video_id: number;
   video_title: string;
   start_sec: number;
+  /** 块的结束时间。块平均跨 114 秒，只显示起点会让人以为时间戳错了。 */
+  end_sec?: number;
   text: string;
   score?: number;
 }
@@ -96,6 +98,9 @@ export const AIChatPanel: React.FC = () => {
   const [error, setError] = useState('');
   const [toolHint, setToolHint] = useState('');
   const [references, setReferences] = useState<ReferenceItem[]>([]);
+  // 本轮没检索到片段时，保留上一轮的引用但标记出来 —— 直接清空的话
+  // 用户会以为「推荐的东西没了」，而留着不标记又会让人误当成这轮的依据。
+  const [referencesStale, setReferencesStale] = useState(false);
   const [, setPageContext] = useAssistantPageContext(chatOpen);
   const [runtimeModelLabel, setRuntimeModelLabel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -195,7 +200,6 @@ export const AIChatPanel: React.FC = () => {
     if (!text || loading) return;
     setError('');
     setInput('');
-    setReferences([]);
     setToolHint('');
 
     addMessage({ id: makeId(), role: 'user', content: text });
@@ -238,7 +242,13 @@ export const AIChatPanel: React.FC = () => {
               if (event.session_id && event.session_id !== sessionId) {
                 setSessionId(event.session_id);
               }
-              if (event.references?.length) setReferences(event.references);
+              if (event.references?.length) {
+                setReferences(event.references);
+                setReferencesStale(false);
+              } else {
+                // 这轮没检索到东西：保留上一轮，但标记为「上一轮」
+                setReferencesStale(true);
+              }
               break;
             case 'error':
               streamError = event.message;
@@ -317,7 +327,7 @@ export const AIChatPanel: React.FC = () => {
           </span>
         )}
         <button
-          onClick={() => { clearMessages(); setReferences([]); playInteractionSound('delete'); }}
+          onClick={() => { clearMessages(); setReferences([]); setReferencesStale(false); playInteractionSound('delete'); }}
           className="ml-auto p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
           title="清空对话（同时开启新会话）"
         >
@@ -397,7 +407,9 @@ export const AIChatPanel: React.FC = () => {
         <div ref={messagesEndRef} />
         {visibleReferences.length > 0 && !loading && (
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-[var(--text-muted)]">相关片段（点击跳转）</p>
+            <p className="text-xs font-medium text-[var(--text-muted)]">
+              {referencesStale ? '相关片段（上一轮，本轮未检索到）' : '相关片段（点击跳转）'}
+            </p>
             {visibleReferences.map((item) => (
               <button
                 key={`${item.video_id}-${item.start_sec}`}
@@ -410,7 +422,12 @@ export const AIChatPanel: React.FC = () => {
                   <p className="text-xs font-medium text-[var(--text-primary)] truncate">
                     {item.video_title || `视频 ${item.video_id}`}
                   </p>
-                  <p className="text-xs text-[var(--accent)]">{formatTimestamp(item.start_sec)}</p>
+                  <p className="text-xs text-[var(--accent)]">
+                    {formatTimestamp(item.start_sec)}
+                    {item.end_sec && item.end_sec > item.start_sec + 5
+                      ? ` – ${formatTimestamp(item.end_sec)}`
+                      : ''}
+                  </p>
                   <p className="text-xs text-[var(--text-muted)] line-clamp-2">{item.text}</p>
                 </div>
               </button>
