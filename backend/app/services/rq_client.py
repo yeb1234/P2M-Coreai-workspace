@@ -51,8 +51,14 @@ def is_job_cancelled(job_id: str) -> bool:
 
 
 def cancel_job(job_id: str) -> None:
-    """Mark a job as cancelled in Redis (graceful cancellation signal)."""
-    get_redis_connection().setex(f"ai_job:cancelled:{job_id}", 3600, "1")
+    """Mark a job as cancelled in Redis (graceful cancellation signal).
+
+    TTL 必须长于 AI_JOB_TIMEOUT_SECONDS（4h），否则超长任务跑到一半时
+    取消标记过期，worker 检查不到，用户以为取消了其实还在跑。
+    多留 1 小时缓冲，覆盖「排队很久才开始执行」的情况。
+    """
+    ttl = AI_JOB_TIMEOUT_SECONDS + 3600
+    get_redis_connection().setex(f"ai_job:cancelled:{job_id}", ttl, "1")
 
 
 def clear_job_cancelled(job_id: str) -> None:

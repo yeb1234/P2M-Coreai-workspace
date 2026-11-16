@@ -363,7 +363,13 @@ def requeue_interrupted_ai_jobs() -> int:
         running_jobs = db.query(AiJob).filter(AiJob.status == "running").all()
         cancelling_jobs = db.query(AiJob).filter(AiJob.status == "cancelling").all()
         affected_video_ids = {job.video_id for job in running_jobs} | {job.video_id for job in cancelling_jobs}
+        # running 的任务重启后要重新跑。清掉可能残留的取消 flag ——
+        # 用户主动取消的 job 状态会是 cancelling（走下面的分支），
+        # 留在 running 的说明是 worker 意外死亡，不该带着 flag 重启。
+        from app.services.rq_client import clear_job_cancelled
+
         for job in running_jobs:
+            clear_job_cancelled(job.id)
             job.status = "queued"
             job.stage = "queued"
             job.message = "Requeued after worker restart"

@@ -15,7 +15,12 @@ from app.models import AiJob, Video
 import sys
 
 from app.services.admin_settings import load_transcription_settings
-from app.services.ai_jobs import _video_has_transcription_outputs
+from app.services.ai_jobs import (
+    _step_summarize,
+    _video_has_transcription_outputs,
+    write_markdown_output,
+)
+from app.utils.serialization import load_segments
 from app.services.rq_client import (
     AI_JOB_RESULT_TTL_SECONDS,
     AI_JOB_TIMEOUT_SECONDS,
@@ -163,10 +168,24 @@ def cancel_ai_job(job_id: str) -> dict:
         video = db.query(Video).filter(Video.id == job.video_id).first()
         queue = ai_jobs_queue()
         if job.status in ("running", "cancelling"):
-            # Running jobs cannot be stopped mid-flight on Windows
-            # (SimpleWorker runs in-process). They must finish the
-            # current step and then exit gracefully.
-            return {"cancelled": False, "reason": "running_not_cancellable"}
+            # 优雅取消：设 Redis flag，worker 在下一个步骤边界检查
+            # is_job_cancelled() 后抛 "Job cancelled"，由 _handle_job_failure
+            # 统一收尾成 cancelled（见 ai_jobs.py）。
+            #
+            # 原来这里直接返回 running_not_cancellable，但项目里其实
+            # 早就有一整套取消信号机制（rq_client.cancel_job + whisper 内部
+            # 每步检查 + clear_active_ai_jobs 的批量取消），只是单个取消
+            # 没接上 —— 用户点取消没反应，只能等它跑完。
+            cancel_job(job.id)
+            job.status = "cancelling"
+            job.stage = "cancelling"
+            job.message = "Cancelling — will stop after current step"
+            job.error = None
+            if video:
+                video.ai_status = "cancelling"
+                video.ai_stage = "cancelling"
+            db.commit()
+            return {"cancelled": True, "status": job.status, "graceful": True}
         else:
             rq_job = queue.fetch_job(job_id)
             if rq_job:
@@ -202,20 +221,59 @@ def resume_ai_job(job_id: str) -> dict:
         if not video:
             return {"resumed": False, "reason": "missing_video"}
 
-        # 如果视频已经有完整转录结果，直接标记完成而不是恢复为 queued
+        # 清掉上次取消时留下的 Redis flag。
+        # 不清的话，续写出来的新任务在第一个步骤边界检查 is_job_cancelled()
+        # 就会立刻又「被取消」—— 用户点了续写，任务瞬间又停，看起来像坏了。
+        clear_job_cancelled(job_id)
+
+        # 如果视频已经有完整转录结果，跳过转写，但仍要检查总结。
+        # 原来这里直接标记 completed，有字幕无总结的视频「续写」后
+        # summary 还是空的 —— 和 run_ai_job_task 的跳过分支同一个 bug。
         if _video_has_transcription_outputs(video):
+            summary = video.summary
+            summary_error = None
+            if job.do_summary and not (summary and summary.strip()):
+                summary, summary_error = _step_summarize(
+                    db, job, video, video.transcription or ""
+                )
+                if summary:
+                    video.summary = summary
+                    try:
+                        from pathlib import Path
+
+                        md_path = Path(video.markdown_path) if video.markdown_path else None
+                        if md_path and md_path.exists():
+                            write_markdown_output(
+                                md_path=md_path,
+                                source_filename=video.filename,
+                                transcript=video.transcription or "",
+                                transcript_segments=load_segments(video.transcript_segments),
+                                summary=summary,
+                                word_limit=job.word_limit,
+                                whisper_model=job.whisper_model,
+                                language=job.language,
+                                subtitle_filename=Path(video.subtitle_path).name if video.subtitle_path else None,
+                                summary_error=summary_error,
+                            )
+                    except Exception as exc:
+                        logger = logging.getLogger(__name__)
+                        logger.warning("续写补总结到 markdown 失败 video=%s: %s", video.id, exc)
+
             job.status = "completed"
             job.stage = "completed"
-            job.message = "Skipped — video already has transcription"
+            job.message = (
+                "Resumed — summary generated from existing transcript"
+                if summary else "Skipped — video already has transcription"
+            )
             job.error = None
             job.transcript = video.transcription
             job.transcript_segments = video.transcript_segments
-            job.summary = video.summary
+            job.summary = summary
             job.markdown_path = video.markdown_path
             job.subtitle_path = video.subtitle_path
             video.ai_status = "completed"
             video.ai_stage = "completed"
-            video.ai_error = None
+            video.ai_error = summary_error if summary_error and not summary else None
             db.commit()
             return {"resumed": True, "job_id": job.id}
 
@@ -229,6 +287,15 @@ def resume_ai_job(job_id: str) -> dict:
         db.commit()
         if not _is_queue_paused():
             queue = ai_jobs_queue()
+            # 清掉上次取消/失败留下的 RQ job，否则同名 job_id 会被
+            # RQ 当成「已存在」拒绝入队，续写后 DB 是 queued 但
+            # Redis 里没有任务，又变成假「处理中」。
+            old = queue.fetch_job(job_id)
+            if old is not None:
+                try:
+                    old.delete()
+                except Exception:
+                    pass
             queue.enqueue(
                 "app.services.ai_job_tasks.run_ai_job_task",
                 args=(job_id,),
@@ -298,13 +365,16 @@ def clear_active_ai_jobs() -> dict:
         queued_jobs = db.query(AiJob).filter(AiJob.status == "queued").all()
         queue = ai_jobs_queue()
         for job in running_jobs:
+            # 只设 Redis 取消 flag，让这个任务在下一个步骤边界自行退出。
+            #
+            # 原来还会 send_kill_to_worker() 杀掉整个 worker 进程 ——
+            # 单并发时勉强能用，并发=2 后会连带杀死另一个无关的运行中任务，
+            # 而且 worker 重启又要走一整套恢复流程，代价极大。
+            # whisper 内部本来就每步检查 flag，优雅取消就够了。
             cancel_job(job.id)
-            rq_job = queue.fetch_job(job.id)
-            if rq_job and rq_job.get_status() == "started":
-                send_kill_to_worker(rq_job.worker_name)
             job.status = "cancelling"
             job.stage = "cancelling"
-            job.message = "Stopping worker (will finalize after current step)"
+            job.message = "Cancelling — will stop after current step"
             job.error = None
         for job in queued_jobs:
             rq_job = queue.fetch_job(job.id)
