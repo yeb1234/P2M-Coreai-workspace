@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -274,9 +275,18 @@ def migrate(
         else:
             # 旧数据里的 passwordHash 是裸 SHA-256，保持原样以便原密码仍能登录，
             # 首次登录时会自动升级为 PBKDF2
+            # 注意：不要写成 u.get("passwordHash", hash_password(""))。
+            # Python 会在调用 dict.get **之前**求值默认参数，而
+            # hash_password("") 第一行就 raise ValueError，
+            # 于是即使 passwordHash 存在，每个新用户也必抛异常 → 整个接口 500。
+            raw_hash = u.get("passwordHash")
+            if not raw_hash:
+                # 没有旧哈希就生成一个随机密码占位：用户必须走「找回密码」，
+                # 但绝不能因此让整批迁移失败。
+                raw_hash = hash_password(secrets.token_urlsafe(24))
             user = User(
                 username=normalized,
-                password_hash=u.get("passwordHash", hash_password("")),
+                password_hash=raw_hash,
                 display_name=u.get("displayName") or normalized,
                 role="member",
             )

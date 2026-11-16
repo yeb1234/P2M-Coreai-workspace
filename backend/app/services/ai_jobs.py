@@ -301,9 +301,21 @@ def update_job_state(db, job: AiJob, video: Video, **values) -> None:
 
 
 def ensure_video_note(db, video: Video) -> Note:
+    """取该视频的**共享**笔记，没有就建一条。
+
+    scope 过滤不是可有可无的：
+
+    1. 用户可以在同一视频下写私有笔记（notes.py 的 create_note 会写
+       video_id + user_id + scope=private）。如果不限定 shared，
+       这里会按 updated_at 降序拿到那条私有笔记，然后
+       _step_write_outputs 会用 AI 正文覆盖它的 content / title /
+       markdown_path —— 用户的笔记被静默吃掉。
+    2. GET /api/videos/{id}/notes 历史上不带鉴权，也会走这个函数，
+       于是匿名请求能直接读到别人的私有笔记正文。
+    """
     note = (
         db.query(Note)
-        .filter(Note.video_id == video.id)
+        .filter(Note.video_id == video.id, Note.scope == "shared")
         .order_by(Note.updated_at.desc())
         .first()
     )
@@ -316,6 +328,7 @@ def ensure_video_note(db, video: Video) -> Note:
         title=f"{video.title} 学习笔记",
         content="",
         source="manual",
+        scope="shared",
         markdown_path=str(note_path),
     )
     db.add(note)

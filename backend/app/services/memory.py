@@ -52,10 +52,31 @@ class ConversationContext:
 
 def ensure_session(db: Session, session_id: str | None, *, video_id: int | None = None,
                    user_id: int | None = None, title: str = "学习对话") -> ChatSession:
+    """拿到（或新建）一个会话。
+
+    **必须校验归属**。session_id 由 unique_suffix() 生成，会出现在响应里，
+    也可能被贴到 URL/日志里。原来只按 id 查、查到就返回，于是：
+
+      A 把 session_id 填成 B 的 → 消息写进 B 的会话（污染历史）
+      → run_chat 的 _build_history 会把 B 的最近消息和摘要塞进 prompt
+      → A 问一句「把上面的对话总结一下」就能原样读走 B 的内容
+
+    这是横向越权读，不是猜 id。所以归属不符时当作「不存在」，
+    走新建分支 —— 不能让调用方拿到别人的会话。
+    """
     if session_id:
         session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
-        if session:
+        if session and user_id is not None and session.user_id == user_id:
             return session
+        if session and session.user_id is None and user_id is None:
+            # 匿名共享会话（老数据 / 单用户模式）：双方都没有归属时可沿用
+            return session
+        if session:
+            # 归属不符或已过期：记一笔，便于发现有人在试别人的 id
+            logger.warning(
+                "会话归属校验失败，改为新建 session_id=%s owner=%s请求者=%s",
+                session_id, session.user_id, user_id,
+            )
     session = ChatSession(
         id=unique_suffix(),
         title=title,

@@ -141,10 +141,40 @@ def run_ai_job_task(job_id: str) -> None:
         db.close()
 
 
-def _mark_failed(db, job: AiJob, error: str) -> None:
+def _mark_failed(db, job: AiJob, error: str, stage: str = "missing-video") -> None:
+    """标记任务失败，并同步视频上的冗余状态字段。
+
+    为什么必须同步 Video：create_ai_job 已经把 video.ai_status 设成
+    「queued」，而前端轮询的是视频列表/详情里的 ai_status（不是 job 列表）。
+    原来这里只改 job，于是视频文件被移走 / 外接盘没挂载时：
+
+        job 列表里：failed
+        视频详情里：正在排队…   ← 永远
+
+    用户只能反复点重试，而每一次都立刻失败。
+    """
     job.status = "failed"
-    job.stage = "missing-video"
+    job.stage = stage
     job.error = error
+
+    video = db.query(Video).filter(Video.id == job.video_id).first()
+    if video is not None:
+        # 只有「这个视频没有别的活跃任务」时才改视频状态，
+        # 否则会把刚提交的新任务状态覆盖成 failed。
+        other_active = (
+            db.query(AiJob.id)
+            .filter(
+                AiJob.video_id == job.video_id,
+                AiJob.id != job.id,
+                AiJob.status.in_(("queued", "running")),
+            )
+            .first()
+        )
+        if other_active is None:
+            video.ai_status = "failed"
+            video.ai_stage = stage
+            video.ai_error = (error or "")[:2000] or None
+
     db.commit()
 
 

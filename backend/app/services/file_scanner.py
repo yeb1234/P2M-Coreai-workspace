@@ -7,6 +7,8 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+from sqlalchemy import or_
+
 from app.database import SessionLocal, settings
 from app.models import Category, Video
 from app.services.sprite import has_sprite, generate_sprite
@@ -158,11 +160,18 @@ def upsert_video(db, file_path: Path) -> bool:
         existing.sort_key = natural_sort_value(file_path.name)
         existing.file_size = stat.st_size
         existing.category_id = category_id
-        if not existing.duration:
+        need_probe = not existing.duration
+        # 先落盘并结束事务，再跑 ffprobe。
+        #
+        # get_video_duration 是 subprocess.run(timeout=30)，在事务里跑就等于
+        # 给 videos 表挂一个最长 30 秒的 ACCESS SHARE —— 文件监听线程和
+        # 启动扫描都会走这里，正好撞上迁移的 ALTER TABLE 就会卡住启动。
+        db.commit()
+        if need_probe:
             dur = get_video_duration(str(file_path))
             if dur:
                 existing.duration = dur
-        db.commit()
+                db.commit()
         return False
 
     duration = get_video_duration(str(file_path))
@@ -182,53 +191,90 @@ def upsert_video(db, file_path: Path) -> bool:
 
 
 def generate_missing_thumbnails(limit: int = 3) -> int:
+    """给缺缩略图的视频补几张（rescan 时用）。
+
+    三段式：短事务读 → 无事务跑 ffmpeg → 短事务写。
+    原来把 generate_thumbnail 夹在查询和 commit 之间，ffmpeg 跑多久
+    videos 的读锁就持多久 —— 和把后端启动卡死 12 分钟那次是同一模式。
+
+    另外原实现直接拿 video.filepath 喂 ffmpeg。库里存的是宿主机路径
+    （D://ITJC//...），容器里必然 FileNotFoundError，所以一张也生成不出来。
+    必须走 resolve_media_path。
+    """
+    # ① 短事务：只取 id 和路径
     db = SessionLocal()
-    generated = 0
     try:
-        videos = (
-            db.query(Video)
-            .filter(Video.thumbnail.is_(None))
+        rows = (
+            db.query(Video.id, Video.filepath)
+            .filter(or_(Video.thumbnail.is_(None), Video.thumbnail == ""))
             .order_by(Video.sort_key, Video.id)
             .limit(limit)
             .all()
         )
-        for video in videos:
-            if not os.path.exists(video.filepath):
-                continue
-            thumbnail = generate_thumbnail(video.filepath, video.id)
-            if thumbnail:
-                video.thumbnail = thumbnail
-                generated += 1
-                db.commit()
-        return generated
     finally:
         db.close()
+
+    generated = 0
+    for row in rows:
+        # ② 无事务
+        source = resolve_media_path(row.filepath)
+        if not source.exists():
+            continue
+        thumbnail = generate_thumbnail(str(source), row.id)
+        if not thumbnail:
+            continue
+
+        # ③ 短事务写
+        db = SessionLocal()
+        try:
+            db.query(Video).filter(Video.id == row.id).update(
+                {"thumbnail": thumbnail, "thumbnail_attempts": 0, "thumbnail_failed_at": None},
+                synchronize_session=False,
+            )
+            db.commit()
+            generated += 1
+        finally:
+            db.close()
+    return generated
 
 
 def generate_missing_sprites(limit: int = 3) -> int:
+    """给缺雪碧图的视频补几张。
+
+    两个问题都修了：
+
+    1. **原来 `.all()` 把全表 1.4 万条视频（含几十 MB 的 transcript）
+       全实例化进内存**，只为了挑出 3 条候选。现在投影成两列并加 SQL LIMIT。
+    2. **ffmpeg 抽帧在事务里跑**（每张要抽几十帧，几秒到十几秒）。
+       改成三段式，事务不跨越子进程。
+
+    取候选时多查一些（limit*40）：has_sprite 是文件系统判断，SQL 里
+    表达不了，所以要多取一批再做 Python 过滤。
+    """
     db = SessionLocal()
-    generated = 0
     try:
-        videos = (
-            db.query(Video)
+        rows = (
+            db.query(Video.id, Video.filepath)
             .filter(Video.duration.isnot(None))
             .order_by(Video.sort_key, Video.id)
+            .limit(max(limit * 40, 200))
             .all()
         )
-        count = 0
-        for video in videos:
-            if count >= limit:
-                break
-            if has_sprite(video.id):
-                continue
-            if not os.path.exists(video.filepath):
-                continue
-            if generate_sprite(video.filepath, video.id):
-                generated += 1
-                count += 1
-        return generated
     finally:
         db.close()
+
+    generated = 0
+    for row in rows:
+        if generated >= limit:
+            break
+        if has_sprite(row.id):
+            continue
+        source = resolve_media_path(row.filepath)
+        if not source.exists():
+            continue
+        if generate_sprite(str(source), row.id):
+            generated += 1
+    return generated
 
 
 def remove_missing_videos(db, existing_files: set[str]) -> int:

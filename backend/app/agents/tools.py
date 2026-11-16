@@ -13,7 +13,7 @@ from contextvars import ContextVar
 from datetime import datetime, timedelta
 
 from langchain_core.tools import tool
-from sqlalchemy import desc, func, text
+from sqlalchemy import and_, desc, func, or_, text
 
 from app.database import SessionLocal
 from app.models import LearningGoal, LearningPath, Note, Video, WatchEvent, WatchHistory
@@ -383,8 +383,21 @@ def search_notes(query: str, limit: int = 5) -> str:
     db = SessionLocal()
     try:
         pattern = f"%{query}%"
+        uid = _uid()
+        # 可见性必须和 notes.py 的规则一致：shared 人人可看，
+        # private 只有本人可看。原来这里没有任何 user 过滤，
+        # 于是问一句「帮我查下我以前记过什么」就能把别人的私有笔记
+        # 标题和正文前 200 字读出来（LLM 会原样回吐给用户）。
+        if uid is None:
+            visibility = Note.scope == "shared"
+        else:
+            visibility = or_(
+                Note.scope == "shared",
+                and_(Note.scope == "private", Note.user_id == uid),
+            )
         notes = (
             db.query(Note)
+            .filter(visibility)
             .filter((Note.title.ilike(pattern)) | (Note.content.ilike(pattern)))
             .order_by(desc(Note.updated_at))
             .limit(max(1, min(int(limit or 5), 10)))

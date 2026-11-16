@@ -467,6 +467,15 @@ def update_step(
         if payload.reflection:
             step.reflection = payload.reflection[:2000]
 
+        # 必须先 flush。
+        #
+        # sessionmaker 配了 autoflush=False（database.py），所以上面那行
+        # 只改了内存里的对象，数据库里仍是旧状态。紧接着的 COUNT 走的是
+        # 数据库，看不到这次修改 —— 把最后一步改成 done 时 siblings 仍然是 1，
+        # `siblings == 0` 永远不成立，「全部完成后自动收口」从未生效过，
+        # 路径永远停在 active（前端进度 100% 但状态不是 completed）。
+        db.flush()
+
         # 全部完成时自动收口，否则路径会永远停在 active
         siblings = (
             db.query(func.count(LearningPathStep.id))

@@ -11,9 +11,9 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user, require_admin
+from app.auth import get_current_user, get_optional_user, require_admin
 from app.database import get_db
-from app.models import AiJob, Category, SubtitleSegment, User, Video, WatchHistory
+from app.models import AiJob, Category, Note, SubtitleSegment, User, Video, WatchHistory
 from app.utils.files import resolve_media_path
 from app.schemas import (
     AiJobCreate,
@@ -27,7 +27,7 @@ from app.schemas import (
     WatchHistoryIn,
 )
 from app.services.admin_ai_queue import _is_queue_paused, enqueue_ai_jobs
-from app.services.ai_jobs import create_ai_job_from_payload, ensure_video_note
+from app.services.ai_jobs import create_ai_job_from_payload
 from app.services.sprite import get_or_generate_sprite, get_sprite_meta_path, get_sprite_path, has_sprite
 from app.services.subtitle_writer import update_vtt_segment_text
 from app.services.video_serialization import serialize_video
@@ -71,13 +71,34 @@ def active_job_map(db: Session, video_ids: list[int]) -> dict[int, AiJob]:
     return result
 
 
-def latest_watch_map(db: Session, video_ids: list[int]) -> dict[int, WatchHistory]:
-    if not video_ids:
+def _uid(user: User | None) -> int | None:
+    """取用户 id；匿名返回 None（表示「不查个人进度」而不是「查所有人」）。"""
+    return user.id if user is not None else None
+
+
+def latest_watch_map(
+    db: Session, video_ids: list[int], user_id: int | None
+) -> dict[int, WatchHistory]:
+    """每个视频「当前用户」的最新一条观看记录。
+
+    user_id 必须传，且必须用于过滤 —— 原来没有这个参数，SQL 里也没有
+    user_id 条件，于是：
+
+      B 看到第 42 分钟 → A 打开首页，「继续观看」直接从 42 分钟开始
+      列表里每个视频的完成状态显示的是「最后一个看它的人」
+
+    save_watch_history 写入时是带 user_id 的，说明设计上进度本来就
+    按用户隔离，只是读侧漏了。匿名用户（user_id=None）不查进度。
+    """
+    if not video_ids or user_id is None:
         return {}
 
     latest_rows = (
         db.query(WatchHistory.video_id, func.max(WatchHistory.watched_at).label("max_watched_at"))
-        .filter(WatchHistory.video_id.in_(video_ids))
+        .filter(
+            WatchHistory.video_id.in_(video_ids),
+            WatchHistory.user_id == user_id,
+        )
         .group_by(WatchHistory.video_id)
         .subquery()
     )
@@ -88,6 +109,7 @@ def latest_watch_map(db: Session, video_ids: list[int]) -> dict[int, WatchHistor
             (WatchHistory.video_id == latest_rows.c.video_id)
             & (WatchHistory.watched_at == latest_rows.c.max_watched_at),
         )
+        .filter(WatchHistory.user_id == user_id)
         .all()
     )
     return {history.video_id: history for history in histories}
@@ -199,6 +221,7 @@ def get_videos(
     category_ids: str | None = None,
     search: str | None = None,
     db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
 ):
     query = db.query(Video)
     if category_ids:
@@ -223,7 +246,7 @@ def get_videos(
         .limit(page_size)
         .all()
     )
-    watch_map = latest_watch_map(db, [item.id for item in selected])
+    watch_map = latest_watch_map(db, [item.id for item in selected], _uid(user))
     job_map = active_job_map(db, [item.id for item in selected])
     category_ids = {item.category_id for item in selected if item.category_id}
     category_map = {c.id: c.path for c in db.query(Category).filter(Category.id.in_(category_ids)).all()} if category_ids else {}
@@ -247,10 +270,19 @@ def get_videos(
 
 
 @router.get("/continue/last", response_model=VideoOut)
-def get_continue_video(db: Session = Depends(get_db)):
+def get_continue_video(
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+):
+    if user is None:
+        raise HTTPException(status_code=404, detail="No unfinished video")
     history = (
         db.query(WatchHistory)
-        .filter(WatchHistory.completed.is_(False), WatchHistory.progress > 5)
+        .filter(
+            WatchHistory.user_id == user.id,
+            WatchHistory.completed.is_(False),
+            WatchHistory.progress > 5,
+        )
         .order_by(WatchHistory.watched_at.desc())
         .first()
     )
@@ -271,9 +303,13 @@ def get_continue_video(db: Session = Depends(get_db)):
 def get_recent_history(
     limit: int = Query(8, ge=1, le=100),
     db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
 ):
+    if user is None:
+        return []
     latest_rows = (
         db.query(WatchHistory.video_id, func.max(WatchHistory.watched_at).label("max_watched_at"))
+        .filter(WatchHistory.user_id == user.id)
         .group_by(WatchHistory.video_id)
         .subquery()
     )
@@ -284,6 +320,7 @@ def get_recent_history(
             (WatchHistory.video_id == latest_rows.c.video_id)
             & (WatchHistory.watched_at == latest_rows.c.max_watched_at),
         )
+        .filter(WatchHistory.user_id == user.id)
         .order_by(WatchHistory.watched_at.desc())
         .limit(limit)
         .all()
@@ -310,6 +347,7 @@ def get_recent_videos(
     limit: int = Query(8, ge=1, le=30),
     category_id: int | None = None,
     db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
 ):
     query = db.query(Video)
     if category_id:
@@ -320,7 +358,7 @@ def get_recent_videos(
         return []
 
     video_ids = [video.id for video in videos]
-    watch_map = latest_watch_map(db, video_ids)
+    watch_map = latest_watch_map(db, video_ids, _uid(user))
     job_map = active_job_map(db, video_ids)
     category_ids = {video.category_id for video in videos if video.category_id}
     categories = {c.id: c.path for c in db.query(Category).filter(Category.id.in_(category_ids)).all()} if category_ids else {}
@@ -331,11 +369,15 @@ def get_recent_videos(
 
 
 @router.get("/{video_id}", response_model=VideoOut)
-def get_video(video_id: int, db: Session = Depends(get_db)):
+def get_video(
+    video_id: int,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    watch_map = latest_watch_map(db, [video.id])
+    watch_map = latest_watch_map(db, [video.id], _uid(user))
     job_map = active_job_map(db, [video.id])
     category_path = None
     if video.category_id:
@@ -357,11 +399,35 @@ def iter_file_range(path: Path, start: int, end: int, chunk_size: int = 1024 * 1
 
 
 @router.get("/{video_id}/file")
-def stream_video(video_id: int, request: Request, db: Session = Depends(get_db)):
-    video = db.query(Video).filter(Video.id == video_id).first()
-    if not video:
+def stream_video(video_id: int, request: Request):
+    """按 Range 分段返回视频文件。
+
+    **故意不用 Depends(get_db)**。
+
+    FastAPI 的 get_db 依赖在「响应发送完毕之后」才 close，而视频是
+    几百 MB 到几 GB、可能传上一小时 —— 那样一个 SELECT 会开着一个
+    `idle in transaction` 长达整个播放时长，既占死连接池的一个连接，
+    又对 videos 表持有 ACCESS SHARE 锁，把迁移的 ALTER TABLE 堵死。
+
+    这就是 2026-11-16 那次整站 502 的同一类问题（当时是缩略图把 ffmpeg
+    夹在 SELECT 和 commit 之间）。所以这里手动开一个短 session，
+    只取 filepath/filename，取完立刻关，之后纯文件 IO。
+    """
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(Video.filepath, Video.filename)
+            .filter(Video.id == video_id)
+            .first()
+        )
+    finally:
+        db.close()
+
+    if row is None:
         raise HTTPException(status_code=404, detail="Video not found")
-    video_path = resolve_media_path(video.filepath)
+    video_path = resolve_media_path(row.filepath)
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="Video file not found")
 
@@ -373,7 +439,7 @@ def stream_video(video_id: int, request: Request, db: Session = Depends(get_db))
 
     if not range_header:
         headers["Content-Length"] = str(file_size)
-        return FileResponse(video_path, media_type="video/mp4", filename=video.filename, headers=headers)
+        return FileResponse(video_path, media_type="video/mp4", filename=row.filename, headers=headers)
 
     try:
         unit, range_value = range_header.strip().split("=", 1)
@@ -513,7 +579,7 @@ def set_video_favorite(
     db.commit()
     db.refresh(video)
 
-    watch_map = latest_watch_map(db, [video.id])
+    watch_map = latest_watch_map(db, [video.id], _user.id)
     job_map = active_job_map(db, [video.id])
     category_path = None
     if video.category_id:
@@ -523,7 +589,13 @@ def set_video_favorite(
 
 
 @router.get("/{video_id}/playlist")
-def get_playlist(video_id: int, scope: str = "leaf", category_id: int | None = None, db: Session = Depends(get_db)):
+def get_playlist(
+    video_id: int,
+    scope: str = "leaf",
+    category_id: int | None = None,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -541,7 +613,7 @@ def get_playlist(video_id: int, scope: str = "leaf", category_id: int | None = N
     else:
         query = query.filter(Video.id == video.id)
     videos = query.all()
-    watch_map = latest_watch_map(db, [item.id for item in videos])
+    watch_map = latest_watch_map(db, [item.id for item in videos], _uid(user))
 
     items = []
     current_index = 0
@@ -568,18 +640,42 @@ def get_playlist(video_id: int, scope: str = "leaf", category_id: int | None = N
 
 
 @router.get("/{video_id}/notes", response_model=NoteOut)
-def get_video_note(video_id: int, db: Session = Depends(get_db)):
+def get_video_note(
+    video_id: int,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """读视频的共享笔记（AI 转写产物）。
+
+    三处修正：
+
+    1. **加鉴权**。原来不需要登录，而这接口会经 ensure_video_note 落到
+       notes 表上 —— 在修 scope 过滤之前，它能读到任意用户的私有笔记。
+       现在虽然只读 shared，但共享笔记也不该对匿名开放（视频库是登录内容）。
+    2. **去掉写副作用**。原来「没有笔记就建一条」，于是每打开一次视频详情
+       就多插一行。GET 应该是幂等的，创建交给转写流程或显式 POST。
+    3. **读文件前解析路径**。库里存的可能是宿主机路径（D://...），
+       容器里直接 Path() 必然找不到，会静默返回空内容。
+    """
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    note = ensure_video_note(db, video)
+    note = (
+        db.query(Note)
+        .filter(Note.video_id == video_id, Note.scope == "shared")
+        .order_by(Note.updated_at.desc())
+        .first()
+    )
+    if note is None:
+        raise HTTPException(status_code=404, detail="该视频还没有共享笔记")
+
     if note.markdown_path:
-        note_path = Path(note.markdown_path)
+        note_path = resolve_media_path(note.markdown_path)
         if note_path.exists():
+            # 只读出内容返回，不写回 DB：这个字段是文件内容的镜像，
+            # 每次 GET 都 commit 一次会让 updated_at 无意义地跳动。
             note.content = note_path.read_text(encoding="utf-8")
-            db.commit()
-            db.refresh(note)
     return note
 
 
@@ -608,16 +704,30 @@ def get_video_segments(video_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{video_id}/sprite")
-def get_sprite_sheet(video_id: int, db: Session = Depends(get_db)):
-    video = db.query(Video).filter(Video.id == video_id).first()
-    if not video:
+def get_sprite_sheet(video_id: int):
+    """缩略图雪碧图。首次请求会现场抽帧，所以要短事务。
+
+    get_or_generate_sprite 要跑几十次 ffmpeg 抽帧再拼图，几秒到十几秒。
+    原来用 Depends(get_db)，那段时间一直握着 videos 的读事务 ——
+    和缩略图 worker 那个把后端启动卡死 12 分钟的问题是同一模式。
+    """
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        row = db.query(Video.filepath).filter(Video.id == video_id).first()
+    finally:
+        db.close()
+
+    if row is None:
         raise HTTPException(status_code=404, detail="Video not found")
-    if not resolve_media_path(video.filepath).exists():
+    source_path = resolve_media_path(row.filepath)
+    if not source_path.exists():
         raise HTTPException(status_code=404, detail="Video file not found")
 
     sprite_path = get_sprite_path(video_id)
     if not has_sprite(video_id):
-        meta = get_or_generate_sprite(str(resolve_media_path(video.filepath)), video_id)
+        meta = get_or_generate_sprite(str(source_path), video_id)
         if not meta:
             raise HTTPException(status_code=500, detail="Sprite generation failed")
     else:
