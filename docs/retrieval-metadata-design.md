@@ -164,7 +164,7 @@ RETRIEVAL_META_ENABLED=0
   拼进文本会引入错误关联；
 - 顺序是**关系**而不是内容。同目录的 9 个视频如果都拼上「jQuery动画 / 第 N 节」，
   它们彼此的向量会进一步靠拢（见 §3.4 实测）；
-- 放在展示字段里，前端可以直接渲染「第 2/9 节 · 下一节：03-滚动距离」，
+- 放在展示字段里，前端接入后可以直接渲染「第 2/9 节 · 下一节：03-滚动距离」，
   模型也能据此说「建议按顺序看 03」。
 
 实现方式：拿到最终 top_k 后，按父目录分组，一次 SQL
@@ -281,7 +281,8 @@ RETRIEVAL_META_ENABLED=0
   meta: Optional[dict] = None
   meta_score: Optional[float] = None
   ```
-  在此之前 Pydantic 会把这两个键静默丢掉，前端/agent 拿不到「这条属于哪门课、第几节」。
+  在加字段之前，Pydantic 会把这两个键静默丢掉，接口返回里没有「这条属于哪门课、第几节」。
+  加完之后响应里有字段了，但**界面尚未渲染**（见 §8 第 1 条）。
 - 融合从两路变三路：`{"lexical": 0.8, "vector": 1.2, "meta": 1.5}`。
   meta 权重高于 vector 是有意的：它只在「路径能证明这条对」时出现，
   且一个视频只出一条；但仍低于「能证明这一段对」的重排，留出纠正空间。
@@ -460,9 +461,14 @@ top-5 命中率。只有当 summary 带来的提升显著高于「路径」时�
 
 ## 8. 遗留风险
 
-1. ~~`meta` 字段前端还看不到~~ —— **已修**：`schemas.py::HybridSearchHit` 已加
-   `meta` / `meta_score` 两个可选字段，`GET /api/search/hybrid` 现在会返回
-   `display`、`lesson_no`、`position/total`、`prev/next`。前端渲染仍需自己接。
+1. **`meta` 的展示层：对话侧已接，视频库搜索页未接**（对话侧见 commit `35dfb1d`）
+   **已修（接口）**：`schemas.py::HybridSearchHit` 加了 `meta` / `meta_score`，
+   `GET /api/search/hybrid` 与 agent 工具拿到的结果里已经带
+   `display`、`lesson_no`、`position/total`、`prev/next`。
+   **未修（展示）**：`src/components/layout/AIChatPanel.tsx`、`src/lib/videoApi.ts`、
+   `backend/app/agents/chat_agent.py`（引用卡片组装 `references` 的地方）
+   目前**都没有读 `meta`** —— 用户界面上还看不到「第几节 / 上一节」。
+   下一个接手的人要做的不是「再加字段」，而是「把已有字段渲染出来」。
 2. **同一视频可能出现两条**（一条来自 meta 通道、一条来自向量通道）。
    现有 `dedupe_overlapping(max_per_video=2)` 允许 2 条，本次未改
    （team 已确认：同视频 2 条可接受）。

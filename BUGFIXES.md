@@ -263,10 +263,11 @@
   是两个参数，不要混成一个）；本地通道串行，避免并发把单模型进程打爆。
   用 `CallMeta` 记录「是否降级、从哪降、试了几次、花了多久」，
   降级提示写进总结任务的消息（`已从 external 降级到 local（原因）`）；
-  对话的 `provider` / `degraded_from` 随流式 done 事件返回，界面提示尚未接入。
+  对话的 `provider` / `degraded_from` 随流式 done 事件返回；界面提示在 `35dfb1d` 接入（assistant 消息下方显示「已从外部降级」，按消息归属，历史加载后仍可见）。
   遗留：重试期间后端不发 SSE 事件，前端表现为静默等待，只有降级成功或彻底失败才有信号。`6811894`
 
-> 注：本轮后端已返回 meta / provider / degraded_from，前端展示留待下一轮。
+> 注：meta（章节线索）与 degraded_from（降级提示）已在 `35dfb1d` 接入对话界面；
+> 视频库搜索页的列表项仍未渲染 meta。
 
 - **[P1] 设置页保存的模型配置不生效** —— 设置页写数据库 `app_settings`，
   但 `llm.py` 的 `resolve_config` 读的是环境变量 `EXTERNAL_LLM_*` / `OPENAI_*`。
