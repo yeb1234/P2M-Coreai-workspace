@@ -17,10 +17,6 @@ def _load_runtime_prompts():
 
 _runtime_prompts = _load_runtime_prompts()
 
-ASSISTANT_CONTEXT_INSTRUCTION = _runtime_prompts.ASSISTANT_CONTEXT_INSTRUCTION
-ASSISTANT_SYSTEM_DEFAULT = _runtime_prompts.ASSISTANT_SYSTEM_DEFAULT
 SUBTITLE_CORRECTION_DEFAULT = _runtime_prompts.SUBTITLE_CORRECTION_DEFAULT
 SUBTITLE_CORRECTION_SYSTEM = _runtime_prompts.SUBTITLE_CORRECTION_SYSTEM
-build_assistant_learning_prompt = _runtime_prompts.build_assistant_learning_prompt
-build_contextual_user_message = _runtime_prompts.build_contextual_user_message
 build_summary_prompt = _runtime_prompts.build_summary_prompt

@@ -115,11 +115,16 @@ describe('regression contracts', () => {
   });
 
   it('keeps time center on the shared clock without an extra stopwatch interval', () => {
-    const timeCenter = readRepoFile('src/components/timecenter/TimeCenterPage.tsx');
+    // 2026-11 清理时删掉了 TimeCenterPage.tsx（零引用，路由用的是 Page2）。
+    // 契约本身没变，改成检查真正在跑的那一版。
+    // 秒表状态字段名从 stopwatchBaseElapsed 变成了 swStartAt / swBase，
+    // 但它仍然提升在页面级（注释写着「page-level so it survives widget hide/show」），
+    // 这正是这条契约要守的东西。
+    const timeCenter = readRepoFile('src/components/timecenter/TimeCenterPage2.tsx');
 
     expect(timeCenter).toContain('useClockNow');
     expect(timeCenter).not.toContain('setInterval');
-    expect(timeCenter).toContain('stopwatchBaseElapsed');
+    expect(timeCenter).toContain('swStartAt');
     expect(timeCenter).toContain('pauseStopwatch');
   });
 

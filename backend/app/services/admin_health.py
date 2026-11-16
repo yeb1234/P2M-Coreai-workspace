@@ -138,7 +138,6 @@ def backend_health() -> dict:
                 "running": running,
                 "queued": queued,
                 "failed": failed,
-                "worker_concurrency": settings.ai_worker_concurrency,
                 "paused": _is_queue_paused(),
             },
         ))
@@ -224,7 +223,6 @@ def backend_health() -> dict:
             "subtitle_correction_runtime": "LM Studio/OpenAI-compatible API; GPU/CPU placement is decided by the LLM server",
             "compute_type": settings.whisper_compute_type,
             "subtitle_correction_enabled": settings.subtitle_correction_enabled,
-            "thumbnail_background_enabled": settings.thumbnail_background_enabled,
             "whisper_engine": settings.whisper_engine,
             "whisper_cpp_exe": settings.whisper_cpp_exe,
             "whisper_cpp_model": settings.whisper_cpp_model,

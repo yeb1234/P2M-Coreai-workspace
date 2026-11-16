@@ -1,6 +1,5 @@
 import { ListTodo } from 'lucide-react';
 import type { Plugin } from '../types/plugin';
-import { TodoPage } from '../components/todo';
 import { TodoSummary } from '../components/dashboard/summaries/TodoSummary';
 
 export const todoPlugin: Plugin = {
@@ -13,8 +12,5 @@ export const todoPlugin: Plugin = {
     color: 'text-[var(--accent)]',
     defaultSize: 'small',
     summaryComponent: TodoSummary,
-  },
-  panel: {
-    component: TodoPage,
   },
 };

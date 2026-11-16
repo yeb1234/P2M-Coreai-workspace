@@ -7,13 +7,7 @@ class PluginRegistry {
     this.plugins.set(plugin.metadata.id, plugin);
   }
 
-  unregister(id: string): void {
-    this.plugins.delete(id);
-  }
 
-  getPlugin(id: string): Plugin | undefined {
-    return this.plugins.get(id);
-  }
 
   getAllPlugins(): Plugin[] {
     return Array.from(this.plugins.values())

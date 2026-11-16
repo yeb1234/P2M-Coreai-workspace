@@ -36,10 +36,6 @@ from app.database import settings
 logger = logging.getLogger(__name__)
 
 
-class RerankError(RuntimeError):
-    pass
-
-
 def rerank_available() -> bool:
     return bool(settings.rerank_api_key and settings.rerank_api_url and settings.rerank_model)
 

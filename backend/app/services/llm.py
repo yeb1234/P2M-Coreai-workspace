@@ -92,28 +92,6 @@ def build_chat_model(
     return ChatOpenAI(**kwargs)
 
 
-def fallback_models(
-    *,
-    temperature: float = 0.2,
-    max_tokens: int | None = None,
-) -> list[ChatOpenAI]:
-    """按优先级返回可用模型列表，用于「外部失败降级本地」。"""
-    policy = (settings.llm_usage_policy or "external_first").lower()
-    order: list[Provider] = (
-        ["local"] if policy == "local_only"
-        else ["external"] if policy == "external_only"
-        else ["external", "local"] if policy == "external_first"
-        else ["local", "external"]
-    )
-    models = []
-    for provider in order:
-        try:
-            models.append(build_chat_model(provider, temperature=temperature, max_tokens=max_tokens))
-        except Exception as exc:
-            logger.warning("构建 %s 模型失败: %s", provider, exc)
-    return models
-
-
 def llm_health() -> dict:
     """轻量探活：只验证配置完整性与端点可达，不消耗额度。"""
     config = resolve_config("external")

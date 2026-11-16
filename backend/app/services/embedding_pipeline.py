@@ -464,5 +464,3 @@ def start_auto_scan(interval: int = SCAN_INTERVAL_SECONDS) -> None:
     _scan_thread.start()
 
 
-def stop_auto_scan() -> None:
-    _scan_stop.set()

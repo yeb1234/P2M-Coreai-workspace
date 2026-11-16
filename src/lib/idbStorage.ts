@@ -21,12 +21,13 @@ class P2MDexie extends Dexie {
 const hasIndexedDb = typeof indexedDB !== 'undefined';
 const db = hasIndexedDb ? new P2MDexie() : null;
 const memoryKv = new Map<string, string>();
-const memoryUsers = new Map<string, UserRow>();
-
-let currentUser: string | null = null;
 
 export function setCurrentUser(username: string | null) {
-  currentUser = username;
+  // 只写一个本地标记。原来还有个内存变量 currentUser 和配套的
+  // getCurrentUser / restoreUser，但认证早已改成服务端 Cookie 会话，
+  // 那套本地账号体系整体废弃（2026-11 清理时删掉）。
+  // 这个 key 目前**没有读取方**，留着是为了不打断 authStore 的 7 处调用；
+  // 真要清干净，得连那些调用一起删。
   if (username) {
     localStorage.setItem('p2m-current-user', username);
   } else {
@@ -34,100 +35,8 @@ export function setCurrentUser(username: string | null) {
   }
 }
 
-export function getCurrentUser(): string | null {
-  return currentUser;
-}
-
-export function restoreUser(): string | null {
-  const saved = localStorage.getItem('p2m-current-user');
-  currentUser = saved;
-  return saved;
-}
-
-export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 export function normalizeUsername(username: string): string {
   return username.trim().toLowerCase();
-}
-
-export async function getUser(username: string): Promise<UserRow | undefined> {
-  const normalized = normalizeUsername(username);
-  if (!normalized) return undefined;
-  if (!db) return memoryUsers.get(normalized) ?? memoryUsers.get(username.trim());
-
-  const normalizedUser = await db.users.get(normalized);
-  if (normalizedUser) return normalizedUser;
-
-  const legacyUser = await db.users.get(username.trim());
-  if (!legacyUser) return undefined;
-
-  await db.users.put({
-    username: normalized,
-    passwordHash: legacyUser.passwordHash,
-    displayName: legacyUser.displayName || legacyUser.username,
-  });
-  return db.users.get(normalized);
-}
-
-export async function addUser(username: string, passwordHash: string): Promise<void> {
-  const normalized = normalizeUsername(username);
-  if (!normalized) return;
-  if (!db) {
-    if (memoryUsers.has(normalized)) throw new Error('User already exists');
-    memoryUsers.set(normalized, { username: normalized, passwordHash, displayName: username.trim() });
-    return;
-  }
-  await db.users.add({ username: normalized, passwordHash, displayName: username.trim() });
-}
-
-export async function upsertUser(username: string, passwordHash: string): Promise<void> {
-  const normalized = normalizeUsername(username);
-  if (!normalized) return;
-  if (!db) {
-    memoryUsers.set(normalized, { username: normalized, passwordHash, displayName: username.trim() });
-    return;
-  }
-  await db.users.put({ username: normalized, passwordHash, displayName: username.trim() });
-}
-
-export async function getAllIDBUsers(): Promise<UserRow[]> {
-  if (!db) return Array.from(memoryUsers.values());
-  return db.users.toArray();
-}
-
-export async function getAllIDBKvData(username: string): Promise<Record<string, string>> {
-  const prefix = `${username}:`;
-  if (!db) {
-    const result: Record<string, string> = {};
-    for (const [key, value] of memoryKv.entries()) {
-      if (key.startsWith(prefix)) {
-        result[key.slice(prefix.length)] = value;
-      }
-    }
-    return result;
-  }
-  const rows = await db.kv.where('key').startsWith(prefix).toArray();
-  const result: Record<string, string> = {};
-  for (const row of rows) {
-    result[row.key.slice(prefix.length)] = row.value;
-  }
-  return result;
-}
-
-export async function clearIDBData(): Promise<void> {
-  if (!db) {
-    memoryKv.clear();
-    memoryUsers.clear();
-    return;
-  }
-  await db.kv.clear();
-  await db.users.clear();
 }
 
 const pendingWrites = new Map<string, ReturnType<typeof setTimeout>>();
@@ -389,27 +298,6 @@ export async function bootstrapLocalToRemote(): Promise<{ pushed: number; skippe
  * 实现上要求每个 store 都用了 persist 中间件（有 .persist.rehydrate）。
  * 没用的会在 filter 里被跳过。
  */
-export async function rehydrateAllStores(): Promise<number> {
-  const mod = await import('../stores');
-  const candidates: unknown[] = [
-    mod.useUIStore, mod.useCalendarStore, mod.useScheduleStore,
-    mod.usePomodoroStore, mod.usePluginStore, mod.useNotesStore, mod.useNotificationStore,
-    mod.useVideoStore, mod.useTimeCenterStore, mod.useAIStore, mod.useTranscriptionStore,
-  ];
-
-  let count = 0;
-  await Promise.allSettled(
-    candidates.map(async (store) => {
-      const persist = (store as { persist?: { rehydrate?: () => Promise<void> | void } })?.persist;
-      if (typeof persist?.rehydrate === 'function') {
-        await persist.rehydrate();
-        count += 1;
-      }
-    }),
-  );
-  return count;
-}
-
 
 
 // 临时诊断入口（跨设备加载排查用，定位完删）

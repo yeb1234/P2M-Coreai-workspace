@@ -51,15 +51,6 @@ class DailyQuota:
 
     # -- 对外 --
 
-    def check(self, user_id: int) -> tuple[bool, int, int]:
-        """只读检查，不消耗配额。返回 (是否还有余量, 已用, 上限)。"""
-        try:
-            used = int(get_redis_connection().get(self._key(user_id)) or 0)
-        except Exception as exc:
-            logger.warning("配额查询失败，按放行处理（%s）: %s", self.name, exc)
-            return True, 0, self.limit
-        return used < self.limit, used, self.limit
-
     def consume(self, user_id: int, cost: int = 1) -> tuple[bool, int, int]:
         """扣一次配额。返回 (是否允许, 已用, 上限)。
 
@@ -85,7 +76,14 @@ class DailyQuota:
         return True, used, self.limit
 
     def refund(self, user_id: int, cost: int = 1) -> None:
-        """任务失败时退还配额，避免因为服务端问题扣用户的量。"""
+        """任务失败时退还配额，避免因为服务端问题扣用户的量。
+
+        **目前没有任何调用方，但不要删。**
+
+        routers/learning.py 的 consume 发生在「去重命中」「并发上限 429」
+        「生成失败」三条路径之前，这三种情况都会白扣一次额度。
+        修那个 bug 时需要这个方法，删了还得照原样写回来。
+        """
         try:
             get_redis_connection().decrby(self._key(user_id), cost)
         except Exception:

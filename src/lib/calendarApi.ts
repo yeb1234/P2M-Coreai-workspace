@@ -1,5 +1,5 @@
 import { authFetch } from './authApi';
-import type { CalendarEvent, ID } from '../types';
+import type { CalendarEvent } from '../types';
 
 interface ApiCalendarEvent {
   id: string;
@@ -67,34 +67,4 @@ export async function createCalendarEvent(
   });
   if (!res.ok) throw new Error('failed to create calendar event');
   return fromApi(await res.json() as ApiCalendarEvent);
-}
-
-export async function updateCalendarEvent(
-  id: ID,
-  updates: Partial<Omit<CalendarEvent, 'id' | 'createdAt'>>
-): Promise<CalendarEvent> {
-  const payload: Record<string, unknown> = {};
-  if (updates.title !== undefined) payload.title = updates.title;
-  if (updates.date !== undefined) payload.date = updates.date;
-  if (updates.startTime !== undefined) payload.start_time = updates.startTime ?? null;
-  if (updates.endTime !== undefined) payload.end_time = updates.endTime ?? null;
-  if (updates.type !== undefined) payload.type = updates.type;
-  if (updates.color !== undefined) payload.color = updates.color;
-  if (updates.todoId !== undefined) payload.todo_id = updates.todoId;
-  if (updates.pomodoroSessionId !== undefined) payload.pomodoro_session_id = updates.pomodoroSessionId;
-  if (updates.description !== undefined) payload.description = updates.description ?? null;
-
-  const res = await authFetch(`/api/calendar-events/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error('failed to update calendar event');
-  return fromApi(await res.json() as ApiCalendarEvent);
-}
-
-export async function deleteCalendarEvent(id: ID): Promise<void> {
-  const res = await authFetch(`/api/calendar-events/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error('failed to delete calendar event');
 }

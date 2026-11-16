@@ -1,7 +1,18 @@
-"""类型化错误体系与全局异常处理。
+"""全局异常处理。
 
 客户端只会看到 {error: {code, message, request_id}}，
 堆栈与内部细节只进服务端日志。
+
+## 为什么没有类型化异常类了
+
+这里原来有一套 AppError / NotFoundError / InvalidInputError /
+UpstreamError / ServiceUnavailableError，配一个 @app.exception_handler(AppError)。
+2026-11 清理时删掉了：全项目 0 处 raise，所有端点统一用 HTTPException。
+留着的话下一个人会以为「业务错误应该抛 AppError」，而实际上不会有人接。
+
+真要加回来，注意中间件顺序：@app.exception_handler(Exception) 挂在
+ServerErrorMiddleware 上，比 BaseHTTPMiddleware 更外层，那里读不到
+中间件设的 contextvar —— 需要像下面 _bind_rid 那样从 request.scope 回填。
 """
 
 from __future__ import annotations
@@ -16,43 +27,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.observability import request_id_var
 
 logger = logging.getLogger(__name__)
-
-
-class AppError(Exception):
-    """业务异常基类。"""
-
-    code = "internal_error"
-    status_code = 500
-    message = "服务内部错误"
-
-    def __init__(self, message: str | None = None, *, detail: object = None):
-        self.message = message or self.message
-        self.detail = detail
-        super().__init__(self.message)
-
-
-class NotFoundError(AppError):
-    code = "not_found"
-    status_code = 404
-    message = "资源不存在"
-
-
-class InvalidInputError(AppError):
-    code = "invalid_input"
-    status_code = 422
-    message = "参数不合法"
-
-
-class UpstreamError(AppError):
-    code = "upstream_error"
-    status_code = 502
-    message = "上游服务不可用"
-
-
-class ServiceUnavailableError(AppError):
-    code = "service_unavailable"
-    status_code = 503
-    message = "服务暂不可用"
 
 
 def _bind_rid(request: Request) -> None:
@@ -77,18 +51,6 @@ def _payload(code: str, message: str, detail: object = None) -> dict:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    @app.exception_handler(AppError)
-    async def handle_app_error(_request: Request, exc: AppError):
-        _bind_rid(_request)
-        if exc.status_code >= 500:
-            logger.error("业务异常 %s: %s", exc.code, exc.message, exc_info=exc)
-        else:
-            logger.info("业务异常 %s: %s", exc.code, exc.message)
-        return JSONResponse(
-            status_code=exc.status_code,
-            content=_payload(exc.code, exc.message, exc.detail),
-        )
-
     @app.exception_handler(RequestValidationError)
     async def handle_validation(_request: Request, exc: RequestValidationError):
         # 只回传字段与原因，不回显原始输入（可能含敏感内容）

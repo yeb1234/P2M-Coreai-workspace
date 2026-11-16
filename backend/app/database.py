@@ -4,7 +4,8 @@
 - 业务数据（视频/字幕/笔记/计划）落 PostgreSQL，解决 SQLite 单写锁与 15GB 体积问题
 - 向量检索走 pgvector 的 HNSW 索引，不再做全表暴力扫描
 
-SQLite 仅作为迁移来源（settings.sqlite_source_url）与只读回滚点保留。
+SQLite 仅作为迁移来源（见 scripts/migrate_sqlite_to_pg.py，用 SQLITE_SOURCE_DIR）
+与只读回滚点保留。
 """
 
 from __future__ import annotations
@@ -27,7 +28,6 @@ DEFAULT_CORS_ORIGINS = "http://localhost:5002,http://localhost:5173,http://local
 class Settings(BaseSettings):
     # ---------------- 数据库 ----------------
     database_url: str = "postgresql+psycopg://p2user:p2user@localhost:5432/p2learning"
-    sqlite_source_url: str = ""
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_pool_recycle_s: int = 1800
@@ -82,7 +82,6 @@ class Settings(BaseSettings):
     embedding_timeout_s: int = 120
     rerank_enabled: bool = True
     rerank_top_n: int = 20
-    rerank_keep: int = 6
 
     # 专用 reranker（cross-encoder）。留空则回退到原来的 LLM listwise 重排。
     # 用 API 而不是本地 LM Studio：后者 /v1/rerank 支持不一致。
@@ -125,10 +124,12 @@ class Settings(BaseSettings):
     # 这个冲突实际发生过：容器里的 worker 和后端拉起的 worker 同时活着，
     # Redis 里只剩一个注册。
     ai_worker_embedded: bool = True
-    ai_worker_concurrency: int = 1
+    # 注：ai_worker_concurrency / thumbnail_background_enabled 已删除（2026-11）。
+    # 前者只被 /admin/health 展示，RQ 的并发等于进程数，改它没有效果；
+    # 后者同理 —— 缩略图 worker 在 main.py 里是无条件 start_auto_scan()。
+    # 留着这种「看起来能调」的假开关比没有更糟：人会以为改了有用。
     ai_worker_poll_interval: float = 2.0
     ai_worker_requeue_running_on_start: bool = True
-    thumbnail_background_enabled: bool = False
     thumbnail_background_idle_cycles: int = 10
     thumbnail_background_limit: int = 1
     sprite_background_enabled: bool = False
@@ -184,22 +185,6 @@ class Settings(BaseSettings):
             for part in (self.admin_usernames or "").split(",")
             if part.strip()
         }
-
-    @property
-    def resolved_work_dir(self) -> str:
-        return self.work_dir or str(Path(self.video_folder) / "work")
-
-    @property
-    def resolved_output_dir(self) -> str:
-        return self.output_dir or str(Path(self.video_folder) / "output")
-
-    @property
-    def resolved_thumbnail_dir(self) -> str:
-        return self.thumbnail_dir or str(Path(self.video_folder) / "thumbnails")
-
-    @property
-    def resolved_sprite_dir(self) -> str:
-        return self.sprite_dir or str(Path(self.video_folder) / "sprites")
 
 
 settings = Settings()

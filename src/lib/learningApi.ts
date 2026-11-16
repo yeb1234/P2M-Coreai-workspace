@@ -103,14 +103,6 @@ export function fetchPaths(limit = 20): Promise<LearningPath[]> {
   return apiFetch<LearningPath[]>(`/api/learning/paths?limit=${limit}`);
 }
 
-export function fetchActivePath(): Promise<{ path: LearningPath | null }> {
-  return apiFetch<{ path: LearningPath | null }>('/api/learning/paths/active');
-}
-
-export function fetchGoals(): Promise<LearningGoal[]> {
-  return apiFetch<LearningGoal[]>('/api/learning/goals');
-}
-
 export function generatePath(payload: GeneratePathPayload): Promise<GenerateRunResult> {
   return apiFetch<GenerateRunResult>('/api/learning/paths/generate', {
     method: 'POST',

@@ -1,12 +1,6 @@
 import { API_BASE, resolveApiPath } from './apiBase';
 import { clearSession } from './authApi';
 
-export function resolveApiUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (/^https?:\/\//i.test(url)) return url;
-  return `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`;
-}
-
 type ApiFetchInit = RequestInit & { timeoutMs?: number };
 
 // 会话凭证在 httpOnly Cookie 里，JS 读不到；这里只负责带上 Cookie
@@ -375,10 +369,6 @@ export async function fetchContinueVideo(): Promise<VideoItem | null> {
   }
 }
 
-export async function rescanVideos(): Promise<{ added: number; removed: number; total: number }> {
-  return apiFetch<{ added: number; removed: number; total: number }>('/api/admin/rescan', { method: 'POST' });
-}
-
 export async function generateThumbnails(videoIds: number[]): Promise<{ generated: number; total: number }> {
   return apiFetch<{ generated: number; total: number }>('/api/admin/generate-thumbnails', {
     method: 'POST',
@@ -407,25 +397,9 @@ export async function fetchPlaylist(videoId: number, scope: 'leaf' | 'descendant
   return apiFetch<Playlist>(`/api/videos/${videoId}/playlist?${params}`);
 }
 
-export async function fetchSegments(videoId: number): Promise<SubtitleSegmentOut[]> {
-  return apiFetch<SubtitleSegmentOut[]>(`/api/videos/${videoId}/segments`);
-}
-
 export async function searchSegments(q: string, limit = 20): Promise<SegmentSearchResult[]> {
   const params = new URLSearchParams({ q, limit: String(limit) });
   return apiFetch<SegmentSearchResult[]>(`/api/videos/search/segments?${params}`);
-}
-
-export async function sendAssistantChat(
-  message: string,
-  limit = 5,
-  pageContext = '',
-  systemPrompt = ''
-): Promise<AssistantChatOut> {
-  return apiFetch<AssistantChatOut>('/api/assistant/chat', {
-    method: 'POST',
-    body: JSON.stringify({ message, limit, page_context: pageContext, system_prompt: systemPrompt }),
-  });
 }
 
 export type ChatStreamEvent =
@@ -607,10 +581,6 @@ export async function startAiJob(
   });
 }
 
-export async function fetchAiJob(jobId: string): Promise<AiJobOut> {
-  return apiFetch<AiJobOut>(`/api/ai-jobs/${jobId}`);
-}
-
 export async function fetchAiJobs(limit = 20, status?: string): Promise<AiJobListOut> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (status) params.set('status', status);
@@ -728,10 +698,6 @@ export async function clearActiveAiJobs(): Promise<{ cleared: number }> {
   return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-active', { method: 'POST' });
 }
 
-export async function clearQueuedAiJobs(): Promise<{ cleared: number }> {
-  return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-queued', { method: 'POST' });
-}
-
 export async function clearFinishedAiJobs(): Promise<{ cleared: number }> {
   return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-history', { method: 'POST' });
 }
@@ -742,13 +708,6 @@ export async function clearCompletedAiJobs(): Promise<{ cleared: number }> {
 
 export async function clearAllAiJobs(): Promise<{ cleared: number }> {
   return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-all', { method: 'POST' });
-}
-
-export async function recoverStuckAiJobs(minutes = 60, correctionMinutes = 15, force = false): Promise<{ recovered: number; cutoff_minutes: number; correction_cutoff_minutes?: number }> {
-  return apiFetch<{ recovered: number; cutoff_minutes: number; correction_cutoff_minutes?: number }>(
-    `/api/admin/ai-jobs/recover-stuck?minutes=${minutes}&correction_minutes=${correctionMinutes}&force=${force ? 'true' : 'false'}`,
-    { method: 'POST' }
-  );
 }
 
 export async function fetchAiQueueState(): Promise<AiQueueState> {

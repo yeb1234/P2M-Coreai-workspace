@@ -13,7 +13,4 @@ export const recentNotesPlugin: Plugin = {
     defaultSize: 'small',
     summaryComponent: RecentNotesSummary,
   },
-  panel: {
-    component: RecentNotesSummary,
-  },
 };

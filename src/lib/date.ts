@@ -6,13 +6,11 @@ import {
   endOfWeek,
   eachDayOfInterval,
   isSameMonth,
-  isSameDay,
   isToday,
   addMonths,
   subMonths,
   addWeeks,
   subWeeks,
-  differenceInMinutes,
   parseISO,
 } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -57,12 +55,6 @@ export const isCurrentMonth = (date: Date, referenceDate: Date): boolean => {
   return isSameMonth(date, referenceDate);
 };
 
-export const isSameDayCheck = (date1: Date | string, date2: Date | string): boolean => {
-  const d1 = typeof date1 === 'string' ? parseISO(date1) : date1;
-  const d2 = typeof date2 === 'string' ? parseISO(date2) : date2;
-  return isSameDay(d1, d2);
-};
-
 export const isTodayCheck = (date: Date | string): boolean => {
   const d = typeof date === 'string' ? parseISO(date) : date;
   return isToday(d);
@@ -75,12 +67,6 @@ export const getPrevWeek = (date: Date): Date => subWeeks(date, 1);
 
 export const getWeekDayNames = (): string[] => {
   return ['日', '一', '二', '三', '四', '五', '六'];
-};
-
-export const getMinutesDifference = (start: Date | string, end: Date | string): number => {
-  const s = typeof start === 'string' ? parseISO(start) : start;
-  const e = typeof end === 'string' ? parseISO(end) : end;
-  return differenceInMinutes(e, s);
 };
 
 export const formatDuration = (minutes: number): string => {

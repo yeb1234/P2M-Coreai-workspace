@@ -110,17 +110,3 @@ export function getAssistantPageContext(): AssistantPageContext {
   return { kind: 'none', label: '当前页面无专属上下文', promptContext: '' };
 }
 
-export function buildContextualAssistantMessage(message: string, context: AssistantPageContext): string {
-  if (!context.promptContext.trim()) return message;
-  return [
-    '请结合下面的当前页面上下文回答用户问题；如果上下文和问题无关，可以忽略上下文。不要在回答中说“我探测到页面”，直接回答。',
-    '',
-    '<当前页面上下文>',
-    context.promptContext,
-    '</当前页面上下文>',
-    '',
-    '<用户问题>',
-    message,
-    '</用户问题>',
-  ].join('\n');
-}

@@ -19,11 +19,6 @@ def unique_suffix() -> str:
     return datetime.now().strftime("%Y%m%d%H%M%S%f") + uuid.uuid4().hex[:8]
 
 
-def ensure_parent(path: Path) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def _normalize(value: str) -> str:
     """统一成小写、正斜杠、无尾斜杠，便于跨平台比较。"""
     return value.replace("\\", "/").rstrip("/").lower()

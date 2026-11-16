@@ -86,12 +86,6 @@ class PersonaPayload(BaseModel):
     freeform: str = ""
 
 
-class PersonaOut(PersonaPayload):
-    pass
-
-
-# ---------------- helpers ----------------
-
 def _to_out(row: MemoryItem) -> MemoryOut:
     return MemoryOut(
         id=row.id,

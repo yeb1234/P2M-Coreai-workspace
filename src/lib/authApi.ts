@@ -80,10 +80,6 @@ export async function authFetch(path: string, init?: RequestInit): Promise<Respo
 }
 
 /** 登录成功后调用，重置 401 去重标记。 */
-export function resetAuthExpiredFlag(): void {
-  authExpiredHandled = false;
-}
-
 export interface AuthUser {
   id: number;
   username: string;
@@ -164,18 +160,6 @@ export async function getMe(): Promise<AuthUser> {
   const res = await authFetch('/api/auth/me');
   if (!res.ok) throw new Error('not authenticated');
   return (await res.json()) as AuthUser;
-}
-
-export async function migrateFromIDB(
-  users: { username: string; passwordHash: string; displayName?: string }[],
-  kvData: Record<string, string>
-) {
-  const res = await authFetch('/api/auth/migrate', {
-    method: 'POST',
-    body: JSON.stringify({ users, kv_data: kvData }),
-  });
-  if (!res.ok) throw new Error('migration failed');
-  return (await res.json()) as { migrated_users: number; kv_imported: number };
 }
 
 export async function getUserData(storeKey: string): Promise<string | null> {

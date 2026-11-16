@@ -25,43 +25,6 @@ logger = logging.getLogger(__name__)
 VALID_EVENT_TYPES = {"play", "pause", "seek", "rate", "heartbeat", "ended", "close"}
 
 
-def ingest_event(
-    db: Session,
-    *,
-    video_id: int,
-    event_type: str,
-    position_sec: float,
-    duration_sec: float | None = None,
-    playback_rate: float = 1.0,
-    delta_sec: float = 0.0,
-    session_id: str | None = None,
-    user_id: int | None = None,
-) -> WatchEvent:
-    """写入一条行为事件。
-
-    delta_sec 由客户端按「实际播放时间」上报；服务端做上界钳制，
-    防止一次事件把画像时长刷爆（例如客户端 bug 报来 10 万秒）。
-    """
-    if event_type not in VALID_EVENT_TYPES:
-        raise ValueError(f"未知事件类型: {event_type}")
-
-    safe_delta = max(0.0, min(float(delta_sec or 0.0), 3600.0))
-    event = WatchEvent(
-        user_id=user_id,
-        video_id=video_id,
-        session_id=(session_id or "")[:64] or None,
-        event_type=event_type,
-        position_sec=max(0.0, float(position_sec or 0.0)),
-        duration_sec=float(duration_sec) if duration_sec else None,
-        playback_rate=max(0.25, min(float(playback_rate or 1.0), 4.0)),
-        delta_sec=safe_delta,
-        occurred_at=datetime.now(),
-    )
-    db.add(event)
-    db.commit()
-    return event
-
-
 def _hour_histogram(db: Session, user_id: int | None, since: datetime) -> dict[str, int]:
     query = db.query(WatchEvent.occurred_at, WatchEvent.delta_sec).filter(
         WatchEvent.occurred_at >= since, WatchEvent.delta_sec > 0

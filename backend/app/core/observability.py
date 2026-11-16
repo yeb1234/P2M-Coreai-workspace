@@ -249,7 +249,3 @@ def bind_request_id(value: str) -> None:
     就能把「同一个任务的日志」串起来 —— grep 一个 id 看完整过程。
     """
     request_id_var.set((value or "-")[:64])
-
-
-def current_request_id() -> str:
-    return request_id_var.get()

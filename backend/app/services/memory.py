@@ -35,21 +35,6 @@ class ConversationContext:
     messages: list[dict] = field(default_factory=list)
     total_messages: int = 0
 
-    def to_llm_messages(self, system_prompt: str = "") -> list[dict]:
-        items: list[dict] = []
-        if system_prompt:
-            items.append({"role": "system", "content": system_prompt})
-        if self.summary:
-            items.append(
-                {
-                    "role": "system",
-                    "content": f"以下是本次对话更早部分的摘要，供你保持连续性：\n{self.summary}",
-                }
-            )
-        items.extend(self.messages)
-        return items
-
-
 def ensure_session(db: Session, session_id: str | None, *, video_id: int | None = None,
                    user_id: int | None = None, title: str = "学习对话") -> ChatSession:
     """拿到（或新建）一个会话。

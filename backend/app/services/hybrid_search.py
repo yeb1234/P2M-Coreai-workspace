@@ -140,10 +140,6 @@ def rrf_fuse(
     return dict(scores)
 
 
-class _RerankChoice(list):
-    """with_structured_output 的返回容器，避免额外依赖 pydantic 模型定义。"""
-
-
 def _llm_rerank(query: str, hits: list[Hit], keep: int) -> list[Hit]:
     """用外部 LLM 做 listwise 重排。
 
