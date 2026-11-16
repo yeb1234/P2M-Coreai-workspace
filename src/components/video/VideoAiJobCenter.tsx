@@ -332,7 +332,10 @@ export function VideoAiJobCenter({
         <h3 className="shrink-0 text-sm font-semibold leading-5 text-[var(--text-primary)]">AI 任务中心</h3>
 
         {!collapsed && (
-          <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1">
+          /* 按钮组靠左，和标题、统计共用框的左边缘。
+             原来用 ml-auto 把它推到最右，换行后按钮组起点比统计还靠右，
+             整个框的内容左边缘乱掉。 */
+          <div className="flex shrink-0 flex-nowrap items-center gap-1">
             <button
               type="button"
               onClick={canToggleQueue ? onToggleQueue : undefined}
@@ -372,8 +375,9 @@ export function VideoAiJobCenter({
           </div>
         )}
 
-        {/* 统计独占整行：w-full 强制换行，pl-10 和标题左边缘对齐（折叠按钮 32px + gap 8px） */}
-        <div className="w-full min-w-0 space-y-0.5 pl-10">
+        {/* 统计独占整行：w-full 强制换行。
+            去掉 pl-10 —— 用户要「相对框的左边对齐」，缩进反而让统计比按钮组右一截。 */}
+        <div className="w-full min-w-0 space-y-0.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="whitespace-nowrap text-xs leading-5 text-[var(--text-muted)]">
               {totalActive > 0 ? `${jobs?.running ?? 0} 运行 / ${jobs?.queued ?? 0} 排队` : '队列空闲'}
