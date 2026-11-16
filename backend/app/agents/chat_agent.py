@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -26,7 +27,13 @@ from app.agents.tools import ALL_TOOLS, set_tool_user
 from app.database import SessionLocal
 from app.models import AgentRun, Video
 from app.services.learning_context import active_path_text
-from app.services.llm import build_chat_model
+from app.services.llm import (
+    ERR_UNKNOWN,
+    build_chat_model,
+    classify_llm_error,
+    describe_llm_error,
+    fallback_order,
+)
 from app.services.memory import load_conversation, memory_text
 from app.services.profile import profile_summary_text, recompute_profile
 from app.utils.files import unique_suffix
@@ -104,22 +111,40 @@ class AgentContext:
     intent: str | None = None
 
 
-# 只有这两类问题才需要「相关片段」卡片。
+# 什么时候才该给「相关片段」卡片。
 #
-# 用户反馈：问「总结我学得怎么样」时也甩三条不相关的视频片段出来，
-# 既干扰阅读又浪费一次 rerank 调用（200-500ms）。
+# 用户两轮反馈叠加后的规则：
+#   第一轮：问「总结我学得怎么样」甩三条不相关视频 → 学习总结这类别推
+#   第二轮：问「那如果我想学 Python 呢」也推了四条前端课 → 纯查询也别推
 #
-#   course-recommend  用户明确要课程/视频推荐
-#   knowledge-qa      问「某某概念讲过吗 / 哪节课讲了 X」—— 需要定位到具体视频
+# 所以从「按意图白名单」收紧成「按意图 + 问题内容双重判断」：
 #
-# 其余意图（学习总结 / 路径规划 / 代码助手 / 任务拆解）都是基于已有信息
-# 做加工，不该再推视频。intent 为空时退回旧行为（保守起见照样检索），
-# 因为认不出意图时可能是「有没有讲 X 的视频」这类该显示的问法。
-_INTENTS_WITH_VIDEO_REFERENCES = frozenset({"course-recommend", "knowledge-qa"})
+#   course-recommend  用户明确要课程/视频推荐 → 一定给
+#   knowledge-qa      要看问题里有没有「视频 / 课程 / 哪节课 / 讲过」这类
+#                     明确指向「找某个视频」的词。问「什么是 GC 算法」
+#                     这种纯知识问题不该配视频卡片 —— 模型直接回答就好，
+#                     硬塞片段只会让人以为答非所问。
+#
+# 其余意图（学习总结 / 路径规划 / 代码助手 / 任务拆解）一律不给。
+# intent 为空时也走内容判断（而不是无脑给），避免再出现"答 Python 推前端"。
+_COURSE_INTENT = "course-recommend"
+
+# 「我要找某个视频/课程」的信号词。宁可窄一点：漏给卡片只是少个便利，
+# 错给卡片会让用户怀疑整个检索是坏的。
+_VIDEO_SEEKING_RE = re.compile(
+    r"(?:视频|课程|教程|网课|哪一?节|第几[节课集]|哪一?集|哪一?个视频|讲过|讲过吗|有讲)"
+)
 
 
-def _needs_video_references(intent: str | None) -> bool:
-    return not intent or intent in _INTENTS_WITH_VIDEO_REFERENCES
+def _needs_video_references(intent: str | None, message: str = "") -> bool:
+    if intent == _COURSE_INTENT:
+        return True
+    if intent == "knowledge-qa":
+        return bool(_VIDEO_SEEKING_RE.search(message or ""))
+    # 认不出意图时按内容判断：问题里明确要视频才给
+    if not intent:
+        return bool(_VIDEO_SEEKING_RE.search(message or ""))
+    return False
 
 
 @dataclass
@@ -131,6 +156,9 @@ class AgentResult:
     tokens_in: int = 0
     tokens_out: int = 0
     latency_ms: int = 0
+    # 实际用的通道，以及「是不是从备用通道救回来的」
+    provider: str = ""
+    degraded_from: str | None = None
 
 
 _MEMORY_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mem-extract")
@@ -297,6 +325,47 @@ def _usage_of(messages: list) -> tuple[int, int]:
     return tokens_in, tokens_out
 
 
+def _log_channel_failure(provider: str, exc: Exception, *, channel: str) -> None:
+    logger.warning(
+        "对话通道 %s 失败（%s），准备切备用：%s",
+        provider,
+        channel,
+        describe_llm_error(exc, provider=provider),
+        extra={
+            "extra_fields": {
+                "llm_provider": provider,
+                "llm_channel": channel,
+                "llm_error_kind": classify_llm_error(exc),
+            }
+        },
+    )
+
+
+def _invoke_with_fallback(order: list[str], system_prompt: str, messages: list[dict]):
+    """按兜底方案依次尝试 provider，返回 (结果, 实际用的 provider, 降级来源)。
+
+    原来这里写死 `build_chat_model("external")`：既不看设置页的「兜底方案」，
+    也没有 local 兜底 —— 外部一挂用户就只能看到「对话生成失败」。
+    现在 401/403/404 或 429/5xx 重试耗尽后都会自动换另一套模型。
+    """
+    last_exc: Exception | None = None
+    for index, provider in enumerate(order):
+        try:
+            model = build_chat_model(provider, temperature=0.3)
+            agent = create_react_agent(model, ALL_TOOLS, prompt=system_prompt)
+            result = agent.invoke(
+                {"messages": messages},
+                config={"recursion_limit": 12},  # 防止工具调用死循环
+            )
+            return result, provider, (order[0] if index > 0 else None)
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            _log_channel_failure(provider, exc, channel="sync")
+
+    assert last_exc is not None
+    raise last_exc
+
+
 def run_chat(ctx: AgentContext, message: str) -> AgentResult:
     """同步执行一次对话（含工具调用）。"""
     started = time.perf_counter()
@@ -308,8 +377,9 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
     # 工具靠这个知道「是谁在问」，否则会读到别人的画像与路径
     set_tool_user(ctx.user_id)
 
-    model = build_chat_model("external", temperature=0.3)
-    agent = create_react_agent(model, ALL_TOOLS, prompt=system_prompt)
+    # 先按兜底方案决定第一顺位，AgentRun 里记的就是这个
+    order = fallback_order()
+    model = build_chat_model(order[0], temperature=0.3)
 
     messages: list[dict] = list(history)
     messages.append({"role": "user", "content": message})
@@ -329,10 +399,7 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
         )
         db.commit()
 
-        result = agent.invoke(
-            {"messages": messages},
-            config={"recursion_limit": 12},  # 防止工具调用死循环
-        )
+        result, used_provider, degraded_from = _invoke_with_fallback(order, system_prompt, messages)
         out_messages = result.get("messages", [])
         answer = ""
         for item in reversed(out_messages):
@@ -365,6 +432,8 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             latency_ms=latency_ms,
+            provider=used_provider,
+            degraded_from=degraded_from,
         )
     except Exception as exc:
         logger.exception("Agent 执行失败")
@@ -393,14 +462,17 @@ async def stream_chat(ctx: AgentContext, message: str):
     # ContextVar 能正常传递。
     set_tool_user(ctx.user_id)
 
-    model = build_chat_model("external", temperature=0.3, streaming=True)
-    agent = create_react_agent(model, ALL_TOOLS, prompt=system_prompt)
+    # 按兜底方案决定第一顺位（原来写死 external，设置页的「兜底方案」形同虚设）
+    order = fallback_order()
+    model = build_chat_model(order[0], temperature=0.3, streaming=True)
 
     messages: list[dict] = list(history)
     messages.append({"role": "user", "content": message})
 
     collected: list[str] = []
     steps: list[dict] = []
+    used_provider = order[0]
+    degraded_from: str | None = None
 
     db = SessionLocal()
     try:
@@ -420,34 +492,48 @@ async def stream_chat(ctx: AgentContext, message: str):
         db.close()
 
     try:
-        async for event in agent.astream_events(
-            {"messages": messages},
-            config={"recursion_limit": 12},
-            version="v2",
-        ):
-            kind = event.get("event")
-            if kind == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk")
-                text = getattr(chunk, "content", "")
-                if isinstance(text, str) and text:
-                    collected.append(text)
-                    yield {"type": "token", "text": text}
-            elif kind == "on_tool_start":
-                step = {
-                    "tool": event.get("name"),
-                    "args": event.get("data", {}).get("input"),
-                    "ok": None,
-                }
-                steps.append(step)
-                yield {"type": "tool_start", "tool": step["tool"]}
-            elif kind == "on_tool_end":
-                output = event.get("data", {}).get("output")
-                content = getattr(output, "content", output)
-                preview = str(content)[:200]
-                if steps:
-                    steps[-1]["ok"] = not preview.startswith(("Error", "Traceback"))
-                    steps[-1]["result_preview"] = preview
-                yield {"type": "tool_end", "tool": event.get("name"), "ok": steps[-1].get("ok") if steps else None}
+        for index, provider in enumerate(order):
+            model = build_chat_model(provider, temperature=0.3, streaming=True)
+            agent = create_react_agent(model, ALL_TOOLS, prompt=system_prompt)
+            try:
+                async for event in agent.astream_events(
+                    {"messages": messages},
+                    config={"recursion_limit": 12},
+                    version="v2",
+                ):
+                    kind = event.get("event")
+                    if kind == "on_chat_model_stream":
+                        chunk = event.get("data", {}).get("chunk")
+                        text = getattr(chunk, "content", "")
+                        if isinstance(text, str) and text:
+                            collected.append(text)
+                            yield {"type": "token", "text": text}
+                    elif kind == "on_tool_start":
+                        step = {
+                            "tool": event.get("name"),
+                            "args": event.get("data", {}).get("input"),
+                            "ok": None,
+                        }
+                        steps.append(step)
+                        yield {"type": "tool_start", "tool": step["tool"]}
+                    elif kind == "on_tool_end":
+                        output = event.get("data", {}).get("output")
+                        content = getattr(output, "content", output)
+                        preview = str(content)[:200]
+                        if steps:
+                            steps[-1]["ok"] = not preview.startswith(("Error", "Traceback"))
+                            steps[-1]["result_preview"] = preview
+                        yield {"type": "tool_end", "tool": event.get("name"), "ok": steps[-1].get("ok") if steps else None}
+                used_provider = provider
+                degraded_from = order[0] if index > 0 else None
+                break
+            except Exception as exc:  # noqa: BLE001
+                # 已经吐过字/调过工具就不能换通道重来 —— 前端会看到两遍回答
+                if collected or steps:
+                    raise
+                if index == len(order) - 1:
+                    raise
+                _log_channel_failure(provider, exc, channel="stream")
 
         answer = "".join(collected).strip()
         latency_ms = round((time.perf_counter() - started) * 1000)
@@ -459,7 +545,7 @@ async def stream_chat(ctx: AgentContext, message: str):
         # 只有「课程推荐 / 知识问答」才做这一步 —— 学习总结、任务拆解这类
         # 问题甩三条不相关视频出来只会干扰阅读，还白花一次 rerank 调用。
         references: list[dict] = []
-        if _needs_video_references(ctx.intent):
+        if _needs_video_references(ctx.intent, message):
             try:
                 from app.services.hybrid_search import hybrid_search
                 from app.utils.textclean import clean_promo_text
@@ -577,6 +663,9 @@ async def stream_chat(ctx: AgentContext, message: str):
             "steps": steps,
             "references": references,
             "mentioned_videos": mentioned_videos,
+            # 前端据此提示「已降级到本地 LLM」：变慢/变差时用户能知道原因
+            "provider": used_provider,
+            "degraded_from": degraded_from,
         }
     except Exception as exc:
         logger.exception("流式对话失败")
@@ -589,4 +678,16 @@ async def stream_chat(ctx: AgentContext, message: str):
                 db.commit()
         finally:
             db.close()
-        yield {"type": "error", "message": "对话生成失败，请稍后重试或换用本地模型。"}
+        # 别再用一句「对话生成失败」把原因盖住：能分类的就告诉用户是什么问题
+        # （两台通道都试过还在 this 里，说明确实没救了）
+        detail = (
+            describe_llm_error(exc, provider=used_provider)
+            if classify_llm_error(exc) != ERR_UNKNOWN
+            else ""
+        )
+        yield {
+            "type": "error",
+            "message": f"对话生成失败：{detail}" if detail else "对话生成失败，请稍后重试或换用本地模型。",
+            "provider": used_provider,
+            "degraded_from": degraded_from,
+        }

@@ -1,29 +1,41 @@
-"""相关片段只在该出现的意图下生成。
+"""相关片段只在该出现的时候生成。
 
-用户反馈：问「总结我学得怎么样」时也甩三条不相关视频片段出来，
-既干扰阅读，还白花一次 rerank 调用（200-500ms）。
+两轮用户反馈叠加后的规则：
 
-规则（app/agents/chat_agent.py::_needs_video_references）：
-  - 课程推荐 / 知识问答 → 需要视频片段（用户要明确找课/找讲解）
-  - 学习总结 / 路径规划 / 代码助手 / 任务拆解 → 不需要
-  - intent 为空 → 保守起见仍检索（认不出时可能是「有没有讲 X 的视频」）
+  第一轮：问「总结我学得怎么样」→ 甩三条不相关视频片段
+  第二轮：问「那如果我想学 Python 呢」→ 推四条前端课（答非所问）
+
+所以判定从「按意图白名单」收紧成「意图 + 问题内容双重判断」。
 """
 
-from app.agents.chat_agent import _needs_video_references
+from app.agents.chat_agent import _needs_video_references as need
 
 
-def test_course_and_qa_need_references():
-    assert _needs_video_references("course-recommend") is True
-    assert _needs_video_references("knowledge-qa") is True
+def test_course_intent_always_needs_references():
+    # 用户明确要课程推荐，无论怎么问都给
+    assert need("course-recommend", "有没有适合AI产品开发的课程") is True
+    assert need("course-recommend", "推荐几个讲 FastAPI 的视频") is True
 
 
-def test_processing_intents_skip_references():
-    # 这四类都是基于已有信息做加工，不该再推视频
+def test_knowledge_qa_only_when_asking_for_video():
+    # 纯知识问题：模型直接回答就行，硬塞片段会让人以为答非所问
+    assert need("knowledge-qa", "什么是GC算法") is False
+    assert need("knowledge-qa", "为什么这里要用依赖注入") is False
+    # 明确在找某个视频/课程
+    assert need("knowledge-qa", "有没有视频讲过GC算法") is True
+    assert need("knowledge-qa", "哪节课讲了依赖注入") is True
+    assert need("knowledge-qa", "第几集讲 FastAPI") is True
+
+
+def test_processing_intents_never_need_references():
+    # 这四类都是基于已有信息做加工，一律不推视频
     for intent in ("study-summary", "learning-path", "coding-helper", "task-planning"):
-        assert _needs_video_references(intent) is False, intent
+        assert need(intent, "这里提到视频也不行吗") is False, intent
 
 
-def test_unknown_intent_falls_back_to_generating():
-    # 认不出意图时不冒进屏蔽，保持旧行为
-    assert _needs_video_references(None) is True
-    assert _needs_video_references("") is True
+def test_unknown_intent_falls_back_to_content_check():
+    # 认不出意图时不再无脑给，而是看问题里有没有「找视频」的信号
+    assert need(None, "那如果我想学Python呢") is False
+    assert need("", "什么是指针") is False
+    assert need(None, "有讲 FastAPI 的视频吗") is True
+    assert need("", "哪节课讲 React Hooks") is True

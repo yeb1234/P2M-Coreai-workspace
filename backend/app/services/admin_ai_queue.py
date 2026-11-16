@@ -27,12 +27,29 @@ from app.services.rq_client import (
     ai_jobs_queue,
     cancel_job,
     clear_job_cancelled,
+    compute_job_timeout,
     get_redis_connection,
     is_job_cancelled,
     send_kill_to_worker,
 )
 
 _PAUSE_KEY = "ai_queue:paused"
+
+
+def _job_timeout_seconds(db, job) -> int:
+    """按这个任务对应视频的时长算超时。
+
+    2 小时课程不该和 20 分钟短片用同一个 4 小时固定值 ——
+    短片真卡死会白占 worker 四小时，长合集又可能不够。
+    算不出来时退回固定值，不阻塞入队。
+    """
+    try:
+        duration = (
+            db.query(Video.duration).filter(Video.id == job.video_id).scalar()
+        )
+    except Exception:
+        duration = None
+    return compute_job_timeout(duration)
 
 
 def _is_queue_paused() -> bool:
@@ -300,7 +317,7 @@ def resume_ai_job(job_id: str) -> dict:
                 "app.services.ai_job_tasks.run_ai_job_task",
                 args=(job_id,),
                 job_id=job_id,
-                job_timeout=AI_JOB_TIMEOUT_SECONDS,
+                job_timeout=_job_timeout_seconds(db, job),
                 result_ttl=AI_JOB_RESULT_TTL_SECONDS,
             )
         return {"resumed": True, "job_id": job.id}
@@ -318,13 +335,29 @@ def enqueue_ai_jobs(job_ids: list[str], at_front: bool = False) -> None:
     if not job_ids:
         return
     queue = ai_jobs_queue()
+    # 一次查出这批任务对应视频的时长，避免逐条 query
+    timeout_by_job: dict[str, int] = {}
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(AiJob.id, Video.duration)
+            .join(Video, Video.id == AiJob.video_id)
+            .filter(AiJob.id.in_(job_ids))
+            .all()
+        )
+        timeout_by_job = {jid: compute_job_timeout(dur) for jid, dur in rows}
+    except Exception:
+        pass
+    finally:
+        db.close()
+
     for job_id in job_ids:
         queue.enqueue(
             "app.services.ai_job_tasks.run_ai_job_task",
             args=(job_id,),
             job_id=job_id,
             at_front=at_front,
-            job_timeout=AI_JOB_TIMEOUT_SECONDS,
+            job_timeout=timeout_by_job.get(job_id, AI_JOB_TIMEOUT_SECONDS),
             result_ttl=AI_JOB_RESULT_TTL_SECONDS,
         )
 
@@ -523,7 +556,7 @@ def sync_db_queue_to_rq() -> int:
                         "app.services.ai_job_tasks.run_ai_job_task",
                         args=(job.id,),
                         job_id=job.id,
-                        job_timeout=AI_JOB_TIMEOUT_SECONDS,
+                        job_timeout=_job_timeout_seconds(db, job),
                         result_ttl=AI_JOB_RESULT_TTL_SECONDS,
                     )
                     enqueued += 1
@@ -588,7 +621,7 @@ def reconcile_stuck_ai_jobs(db, limit: int = 20) -> int:
                     "app.services.ai_job_tasks.run_ai_job_task",
                     args=(job.id,),
                     job_id=job.id,
-                    job_timeout=AI_JOB_TIMEOUT_SECONDS,
+                    job_timeout=_job_timeout_seconds(db, job),
                     result_ttl=AI_JOB_RESULT_TTL_SECONDS,
                 )
                 video = db.query(Video).filter(Video.id == job.video_id).first()

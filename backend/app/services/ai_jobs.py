@@ -498,7 +498,6 @@ def _step_summarize(db, job, video, transcript):
     update_job_state(db, job, video, status="running", stage="summarizing", message="Summarizing content")
     policy = _llm_usage_policy()
     runtime = _assistant_runtime_settings()
-    errors = []
     try:
         def summarize_with_local():
             if settings.assistant_llm_provider in ("openai", "lmstudio"):
@@ -535,22 +534,37 @@ def _step_summarize(db, job, video, transcript):
         elif policy == "external_only":
             attempts = [("external", summarize_with_external)]
 
-        summary = None
-        for index, (label, runner) in enumerate(attempts):
-            try:
-                if index > 0:
-                    update_job_state(db, job, video, status="running", stage="summarizing", message=f"{attempts[index - 1][0]} LLM failed, retrying {label} LLM")
-                summary = runner()
-                break
-            except Exception as exc:
-                errors.append(f"{label} failed: {exc}")
-        if summary is None:
-            raise RuntimeError(" | ".join(errors))
+        # 用 llm.call_with_fallback：每个 provider 内部先按错误类型重试
+        # （429/5xx/超时退避重试，401/403/404 立刻换下一个），
+        # 原来这里是「失败一次就直接换」，429 时容易一路撞墙。
+        from app.services.llm import call_with_fallback
+
+        # 注意签名：call_with_fallback(policy, attempts, ...) 返回 (值, CallMeta)。
+        # attempts 传 list 时它尊重调用方给的顺序（上面已按 policy 过滤/排好）。
+        summary, meta = call_with_fallback(
+            policy,
+            attempts,
+            retries_per_provider=2,
+            base_delay_s=1.0,
+        )
+        if not isinstance(summary, str):
+            summary = str(summary)
+
+        # 降级要让人知道：主通道挂了、是备用救回来的。
+        # 不写出来的话，用户只会觉得「这次总结怎么特别慢/质量不一样」。
+        note = meta.note()
+        if note:
+            logger.warning("总结发生降级 video=%s: %s", video.id, note)
+            update_job_state(
+                db, job, video,
+                status="running", stage="summarizing",
+                message=note,
+            )
         return summary, None
     except Exception as exc:
-        if errors:
-            return None, " | ".join([*errors, f"external fallback failed: {exc}"])
-        return None, str(exc)
+        # 总结失败不阻塞转写：字幕和转录已经拿到了，只是没总结。
+        # 原因用统一的翻译函数，前端能直接显示（而不是 "local: ..., external: ..."）
+        return None, humanize_job_error(exc, job)[0]
 
 
 def _step_write_outputs(db, job, video, paths, transcript, segments, summary, summary_error):
@@ -643,13 +657,90 @@ def _handle_job_failure(db, job_id, exc):
         job.error = "Cancelled by user"
         db.commit()
         return
+    # 把原始异常翻译成可读原因 + 建议：
+    #   job.error   前端直接展示（人话）
+    #   job.message 保留原始异常首行（排查用，用户一般看不到）
+    reason, advice = humanize_job_error(exc, job)
+    readable = f"{reason}\n{advice}"
+
     if video:
         video.ai_status = "failed"
         video.ai_stage = job.stage
-        video.ai_error = exc_str
+        video.ai_error = readable
     job.status = "failed"
-    job.error = exc_str
-    job.message = exc_str
+    job.error = readable
+    job.message = exc_str.strip().splitlines()[0][:300] if exc_str.strip() else reason
     db.commit()
+
+
+def humanize_job_error(exc: BaseException | str, job: AiJob | None = None) -> tuple[str, str]:
+    """把原始异常翻译成「用户能看懂的原因 + 可操作建议」。
+
+    返回值是 (原因, 建议)。前端直接展示原因，建议放第二行。
+
+    为什么要翻译：RQ 抛的是 JobTimeoutException / OOM 之类的英文类名，
+    前端原本直接显示 `JobTimeoutException('...')` 或一长串堆栈，
+    用户根本不知道发生了什么、下一步该做什么。
+    """
+    raw = str(exc)
+    lowered = raw.lower()
+    stage = (getattr(job, "stage", None) or "").lower()
+
+    # ① 超时
+    if "jobtimeoutexception" in lowered or "job timeout" in lowered or "timed out" in lowered:
+        stage_label = {
+            "extracting": "提取音频",
+            "transcribing": "转写字幕",
+            "summarizing": "生成总结",
+            "writing": "写入文件",
+        }.get(stage, "处理")
+        return (
+            f"{stage_label}阶段超时，任务被强制结束",
+            "视频较长或模型较慢时可能超时。可以直接重试；若反复超时，"
+            "建议换更小的模型（如 small/int8）或把视频拆段。",
+        )
+
+    # ② 内存不足
+    if "memoryerror" in lowered or "cannot allocate memory" in lowered or "killed" in lowered:
+        return (
+            "内存不足，进程被系统终止",
+            "建议换更小的模型（small/int8），或先关掉其它占用内存的程序再重试。",
+        )
+
+    # ③ 模型不可用
+    if "invalid model size" in lowered or ("model" in lowered and "not found" in lowered):
+        return (
+            "指定的转写模型不可用",
+            "检查设置页的模型名称是否正确，或先下载该模型再重试。",
+        )
+    if "connection" in lowered and ("refused" in lowered or "error" in lowered):
+        return (
+            "连接模型服务失败",
+            "如果是本地模型，确认 LM Studio / Ollama 已启动；"
+            "如果是外部服务，检查网络与设置页的地址、API Key。",
+        )
+
+    # ④ LLM 鉴权/限流
+    if "401" in raw or "403" in raw or "unauthorized" in lowered or "invalid api key" in lowered:
+        return (
+            "LLM 鉴权失败",
+            "设置页里的 API Key 可能已失效，重新填写后再试。",
+        )
+    if "429" in raw or "rate limit" in lowered or "too many requests" in lowered:
+        return (
+            "LLM 限流（请求过于频繁）",
+            "等 1-2 分钟后重试；批量处理时可以降低批次数量。",
+        )
+
+    # ⑤ 源文件问题
+    if "video file does not exist" in lowered or "no such file" in lowered:
+        return (
+            "找不到视频源文件",
+            "确认外接盘已挂载、文件没有被移动或重命名，然后重试。",
+        )
+
+    # ⑥ 兜底：保留原始信息但截断，别让前端撑爆
+    short = raw.strip().splitlines()[0][:200] if raw.strip() else "未知错误"
+    return (short, "可以直接重试；若反复失败，把这条错误码反馈给管理员。")
 
 
