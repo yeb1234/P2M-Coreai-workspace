@@ -8,7 +8,8 @@ import { playInteractionSound } from '../../lib/sounds';
 import { parseTodoQuickInput } from '../../lib/todoQuickInput';
 import { combineLocalDateTime, dateTimeParts, defaultDueAt, getNextWholeHour, toMinuteISOString } from '../../lib/scheduleTime';
 import {
-  ALLOWED_POMODORO_ROUNDS,
+  clampToAllowedRounds,
+  getAllowedPomodoroRounds,
   getPlannedMinutesForRounds,
   inferAllowedRoundsFromDuration,
   getScheduleDurationMinutes,
@@ -62,8 +63,12 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   const [reminderTime, setReminderTime] = useState(reminderParts?.time || startTime);
 
   // 初始 pomodoroCount：优先用户设定，其次从时长反推，未排期默认 1 轮
+  // 初始值必须夹到「允许的档位」里。
+  // 原来直接取 longBreakInterval（默认 4，可以配到 10），而下拉列表硬编码
+  // [1,2,3,4,6,7,8] —— interval 设成 5/9/10 时初始值不在列表里，
+  // <select> 显示空白，看起来就是「番茄钟数量坏了」。
   const initialPomodoroCount = todo?.pomodoroRounds && todo.pomodoroRounds > 0
-    ? todo.pomodoroRounds
+    ? clampToAllowedRounds(todo.pomodoroRounds, pomodoroConfig.longBreakInterval)
     : (startDate && startTime && dueDate && endTime
       ? inferAllowedRoundsFromDuration(
         getScheduleDurationMinutes(
@@ -72,7 +77,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
         ),
         pomodoroConfig
       )
-      : pomodoroConfig.longBreakInterval);
+      : clampToAllowedRounds(pomodoroConfig.longBreakInterval, pomodoroConfig.longBreakInterval));
   const [pomodoroCount, setPomodoroCount] = useState(initialPomodoroCount);
 
   // 当排程时间变化时，自动反推番茄钟数量
@@ -107,16 +112,20 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   }, []);
 
   const handleStartTimeFocus = useCallback(() => {
-    if (!startTime) {
-      const defaults = getNextWholeHour();
-      if (!startDate) setStartDate(defaults.date);
-      setStartTime(defaults.startTime);
-      if (!endTime) {
-        setEndTime(defaults.endTime);
-        if (!dueDate) setDueDate(defaults.endDate);
-      }
-    }
-  }, [startTime, endTime, startDate, dueDate]);
+    if (startTime) return;
+    const defaults = getNextWholeHour();
+    if (!startDate) setStartDate(defaults.date);
+    // 只填开始时间，**不要顺手填截止**。
+    //
+    // 这里原来还会 setEndTime(getNextWholeHour().endTime)，而那个值
+    // 是「当前时间的下一个整点 + 1 小时」，和用户随后填的开始时间无关。
+    // 实测症状：点开开始时间（自动填 15:00、截止 16:00），把开始改成 09:00 ——
+    // 截止停在 16:00，于是页面上算出 7 小时，番茄钟数量被推成 8 个。
+    //
+    // 截止时间交给两条明确路径：用户填（handleEndTimeFocus 会按开始+1h 给默认值），
+    // 或者改番茄钟数量反推（handlePomodoroCountChange）。
+    setStartTime(defaults.startTime);
+  }, [startTime, startDate]);
 
   const handleEndTimeFocus = useCallback(() => {
     if (!endTime) {
@@ -148,17 +157,55 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
     }
   }, [dueDate, startDate]);
 
+  /**
+   * 改番茄钟数量 → 反推时间。
+   *
+   * 原来只在「开始日期 + 开始时间都填了」时才动时间，其余情况什么都不做 ——
+   * 用户新建待办时通常先填截止时间（或什么都不填），选了几个番茄钟却看不到
+   * 任何时间变化，表现为「反向推测失效」。实测确认：
+   *   只填截止 12:00，选 6 个 → 数量变 6，截止仍是 12:00
+   *   什么都不填，选 8 个   → 只有数量变，时间全空
+   *
+   * 现在三种情况都有明确行为：
+   *   有开始        → 保持开始，改截止
+   *   只有截止      → 保持截止，反推开始
+   *   都没有        → 用下一个整点作开始，算截止
+   */
   const handlePomodoroCountChange = useCallback((count: number) => {
     setPomodoroCount(count);
+    const plannedMinutes = getPlannedMinutesForRounds(count, pomodoroConfig);
+    if (plannedMinutes <= 0) return;
+
     if (startDate && startTime) {
-      const plannedMinutes = getPlannedMinutesForRounds(count, pomodoroConfig);
       const startAt = new Date(`${startDate}T${startTime}:00`);
       const endAt = new Date(startAt.getTime() + plannedMinutes * 60000);
       const { date, time } = dateTimeParts(toMinuteISOString(endAt));
       setDueDate(date);
       setEndTime(time);
+      return;
     }
-  }, [startDate, startTime, pomodoroConfig]);
+
+    if (dueDate && endTime) {
+      // 只填了截止：用户想要的应该是「这个时间段能放几个」，
+      // 但既然他主动改数量，就保持截止不动、把开始时间往前推。
+      const endAt = new Date(`${dueDate}T${endTime}:00`);
+      const startAt = new Date(endAt.getTime() - plannedMinutes * 60000);
+      const { date, time } = dateTimeParts(toMinuteISOString(startAt));
+      setStartDate(date);
+      setStartTime(time);
+      return;
+    }
+
+    // 都没填：以下一个整点为起点，时间直接排出来，不让用户面对「选了没反应」。
+    const defaults = getNextWholeHour();
+    const startAt = new Date(`${defaults.date}T${defaults.startTime}:00`);
+    const endAt = new Date(startAt.getTime() + plannedMinutes * 60000);
+    const endParts = dateTimeParts(toMinuteISOString(endAt));
+    setStartDate(defaults.date);
+    setStartTime(defaults.startTime);
+    setDueDate(endParts.date);
+    setEndTime(endParts.time);
+  }, [startDate, startTime, dueDate, endTime, pomodoroConfig]);
 
   const handleReminderToggle = useCallback((checked: boolean) => {
     setReminderEnabled(checked);
@@ -339,7 +386,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
             onChange={(event) => handlePomodoroCountChange(Number(event.target.value))}
             className="flex-1 px-3 py-1.5 md:py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-base)] text-sm text-[var(--text-primary)]"
           >
-            {ALLOWED_POMODORO_ROUNDS.map((n) => (
+            {getAllowedPomodoroRounds(pomodoroConfig.longBreakInterval).map((n) => (
               <option key={n} value={n}>
                 {n} 个
               </option>
