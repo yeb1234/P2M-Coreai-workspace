@@ -441,6 +441,8 @@ export async function streamAssistantChat(
     pageContext?: string;
     systemPrompt?: string;
     videoId?: number;
+    /** 前端 detectIntent() 识别到的意图 id，随请求存库，历史会话还原时用 */
+    intent?: string | null;
     onEvent: (event: ChatStreamEvent) => void;
     signal?: AbortSignal;
   }
@@ -454,6 +456,7 @@ export async function streamAssistantChat(
       system_prompt: options.systemPrompt ?? '',
       session_id: options.sessionId || undefined,
       video_id: options.videoId ?? undefined,
+      intent: options.intent ?? undefined,
     }),
     signal: options.signal,
   });

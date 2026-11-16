@@ -320,6 +320,10 @@ class AssistantChatCreate(BaseModel):
     depth: str = "basic"
     use_rag: bool = False
     use_web_search: bool = False
+    # 前端 detectIntent() 识别出的意图模板 id。
+    # 由前端算是因为模板定义在前端（prompts/clientPrompts.ts），
+    # 后端只负责随消息一起持久化，历史会话加载时才能还原「当时用的策略」。
+    intent: str | None = None
     use_deep_research: bool = False
     limit: int = Field(default=6, ge=1, le=20)
 

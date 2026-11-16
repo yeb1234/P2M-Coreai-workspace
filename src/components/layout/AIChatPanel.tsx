@@ -215,6 +215,9 @@ export const AIChatPanel: React.FC = () => {
         role: 'user' | 'assistant';
         content: string;
         references?: ReferenceItem[];
+        /** 后端 references_json envelope 里带回来的富内容 */
+        mentioned_videos?: MentionedVideo[];
+        intent?: string | null;
         created_at?: string | null;
       }>;
     };
@@ -225,10 +228,16 @@ export const AIChatPanel: React.FC = () => {
         role: m.role,
         content: m.content,
         references: m.references ?? [],
+        // 这两个字段以前后端不存，历史会话加载后正文链接和意图标签全丢。
+        // 现在随消息一起还原，历史会话和当前会话显示一致。
+        mentioned_videos: m.mentioned_videos ?? [],
+        intent: m.intent ?? undefined,
       }))
     );
     setReferences([]);
-    setLastIntent(null);
+    // 意图标签取最近一条 assistant 消息的，和历史消息对得上
+    const lastWithIntent = [...data.messages].reverse().find((m) => m.intent);
+    setLastIntent(lastWithIntent?.intent ?? null);
     setHistoryOpen(false);
   };
 
@@ -410,6 +419,8 @@ export const AIChatPanel: React.FC = () => {
         sessionId,
         pageContext: context.promptContext,
         systemPrompt: requestSystemPrompt,
+        // 把识别出的意图一起存库，历史会话加载后才能还原「当时用的策略」
+        intent: detected,
         onEvent: (event) => {
           switch (event.type) {
             case 'token':

@@ -75,6 +75,55 @@ def ensure_session(db: Session, session_id: str | None, *, video_id: int | None 
     return session
 
 
+def encode_references(
+    references: list[dict] | None = None,
+    mentioned_videos: list[dict] | None = None,
+    intent: str | None = None,
+) -> str | None:
+    """把一条助手消息的富内容打包进 references_json。
+
+    历史上这个字段只存 references 的裸数组。现在要额外保存
+    mentioned_videos（正文里《视频标题》→ video_id 的映射）和
+    intent（这条回答用的模板 id），否则从历史列表加载旧会话时
+    只剩纯文字 —— 链接和推荐框全丢。
+
+    用 envelope 而不是加数据库列：只有一个消费者（get_session_messages），
+    不必跑 migration。读取端 decode_references() 同时兼容旧的裸数组。
+    """
+    payload = {
+        "references": references or [],
+        "mentioned_videos": mentioned_videos or [],
+        "intent": intent,
+    }
+    if not references and not mentioned_videos and not intent:
+        return None
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def decode_references(raw: str | None) -> dict:
+    """解 references_json，兼容三种历史格式：
+      1. None            → 全空
+      2. [...] 裸数组     → 旧格式，只有 references
+      3. {...} envelope  → 新格式
+    """
+    empty = {"references": [], "mentioned_videos": [], "intent": None}
+    if not raw:
+        return empty
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return empty
+    if isinstance(data, list):
+        return {**empty, "references": data}
+    if isinstance(data, dict):
+        return {
+            "references": data.get("references") or [],
+            "mentioned_videos": data.get("mentioned_videos") or [],
+            "intent": data.get("intent"),
+        }
+    return empty
+
+
 def append_message(
     db: Session,
     session_id: str,
@@ -82,6 +131,8 @@ def append_message(
     content: str,
     *,
     references: list[dict] | None = None,
+    mentioned_videos: list[dict] | None = None,
+    intent: str | None = None,
     tool_calls: list[dict] | None = None,
     model: str | None = None,
     tokens_in: int | None = None,
@@ -93,7 +144,7 @@ def append_message(
         session_id=session_id,
         role=role,
         content=content,
-        references_json=json.dumps(references or [], ensure_ascii=False) if references else None,
+        references_json=encode_references(references, mentioned_videos, intent),
         tool_calls_json=json.dumps(tool_calls, ensure_ascii=False) if tool_calls else None,
         model=model,
         tokens_in=tokens_in,

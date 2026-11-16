@@ -37,7 +37,7 @@ from app.schemas import (
 )
 from app.agents.chat_agent import AgentContext, run_chat
 from app.services.llm_client import OpenAICompatibleClient
-from app.services.memory import append_message, ensure_session, maybe_compress
+from app.services.memory import append_message, decode_references, ensure_session, maybe_compress
 from app.services.quota import chat_quota_for, quota_exceeded_detail
 from app.services.rate_limit import chat_limiter
 
@@ -102,7 +102,7 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
     if result.answer:
         db2 = SessionLocal()
         try:
-            append_message(db2, session_id, "assistant", result.answer)
+            append_message(db2, session_id, "assistant", result.answer, intent=payload.intent)
             maybe_compress(db2, session_id)
         except Exception:
             logger.exception("保存助手消息失败")
@@ -154,17 +154,31 @@ async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depen
 
     async def event_stream():
         collected: list[str] = []
+        # done 事件里带着 references / mentioned_videos，捕获下来一起持久化。
+        # 不存的话，用户从历史列表打开旧会话只剩纯文字 —— 正文链接和
+        # 相关推荐框全丢（它们原本只在前端组件 state 里）。
+        rich: dict = {}
         try:
             async for event in stream_chat(ctx, payload.message):
                 if event.get("type") == "token":
                     collected.append(event.get("text", ""))
+                elif event.get("type") == "done":
+                    rich = {
+                        "references": event.get("references") or [],
+                        "mentioned_videos": event.get("mentioned_videos") or [],
+                    }
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         finally:
             answer = "".join(collected).strip()
             if answer:
                 db2 = SessionLocal()
                 try:
-                    append_message(db2, session_id, "assistant", answer)
+                    append_message(
+                        db2, session_id, "assistant", answer,
+                        references=rich.get("references"),
+                        mentioned_videos=rich.get("mentioned_videos"),
+                        intent=payload.intent,
+                    )
                     maybe_compress(db2, session_id)
                 except Exception:
                     logger.exception("保存助手消息失败")
@@ -238,7 +252,7 @@ def get_session_messages(
                     "id": row.id,
                     "role": row.role,
                     "content": row.content,
-                    "references": json.loads(row.references_json) if row.references_json else [],
+                    **decode_references(row.references_json),
                     "created_at": row.created_at.isoformat() if row.created_at else None,
                 }
                 for row in rows
