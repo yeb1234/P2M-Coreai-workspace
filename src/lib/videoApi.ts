@@ -153,6 +153,20 @@ export interface SegmentSearchResult {
   text: string;
   subtitle_url: string | null;
   score_hint: number;
+  /** 相对文件夹层级（不含系统路径） */
+  folder_path?: string | null;
+  /** 课程 / 章 / 课时 / 第 N 节 —— 后端 retrieval_meta 解析 */
+  meta?: {
+    course?: string;
+    lesson?: string;
+    lesson_no?: number | string | null;
+    display?: string;
+    meta_text?: string;
+    position?: number;
+    total?: number;
+    prev?: string | null;
+    next?: string | null;
+  } | null;
 }
 
 export interface AssistantReference {

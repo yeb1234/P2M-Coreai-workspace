@@ -313,6 +313,10 @@ class SegmentSearchResult(BaseModel):
     text: str
     subtitle_url: str | None = None
     score_hint: float = 0
+    # 元数据线索：课程 / 章 / 课时 / 第 N/M 节。
+    # 由 retrieval_meta 从磁盘路径解析，不含系统路径。
+    folder_path: str | None = None
+    meta: dict | None = None
 
 
 class AssistantChatCreate(BaseModel):

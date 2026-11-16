@@ -142,75 +142,74 @@ def search_segments(
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    keywords = [part.strip().lower() for part in q.split() if part.strip()]
-    if not keywords:
-        keywords = [q.strip().lower()]
+    """按字幕内容搜索视频片段。
 
-    results = []
-    fts_rows = fts_segment_rows(db, q.strip(), limit)
-    if fts_rows:
-        for row in fts_rows:
-            text_lower = (row.text or "").lower()
-            score_hint = sum(1 for keyword in keywords if keyword in text_lower)
-            if score_hint <= 0:
-                continue
-            results.append(
-                SegmentSearchResult(
-                    video_id=row.video_id,
-                    video_title=row.title,
-                    category_id=row.category_id,
-                    start_sec=row.start_sec,
-                    end_sec=row.end_sec,
-                    text=row.text,
-                    subtitle_url=to_output_url(row.subtitle_path),
-                    score_hint=score_hint,
-                )
+    ## 为什么改走 hybrid_search
+
+    原来是「FTS + 关键词计数」：先查全文索引，再用 `score_hint = 命中几个词`
+    排序。这个分数没有任何语义权重 —— 「垃圾回收」命中 2 个词和
+    「回收」命中 1 个词区分不出相关性，而且**路径/课程名完全不可检索**。
+
+    现在走和 AI 助手同一条链路（三路召回 + RRF + 可选 rerank），
+    附带元数据线索（课程 / 章 / 第 N 节）。搜索质量与对话里的引用卡片一致，
+    不会出现「助手找得到、搜索页找不到」。
+
+    代价：单次约 100-500ms（含 rerank），比原来的 FTS 慢。
+    搜索是用户主动触发的低频操作，这个代价可以接受。
+    """
+    from app.services.hybrid_search import hybrid_search
+    from app.utils.paths import display_folder_path
+    from app.utils.textclean import clean_promo_text
+
+    try:
+        result = hybrid_search(q.strip(), top_k=limit, candidate_k=30, use_rerank=True)
+        hits = result.get("hits") or []
+    except Exception:
+        logger.exception("片段搜索失败，回退到 FTS")
+        hits = []
+
+    if hits:
+        return [
+            SegmentSearchResult(
+                video_id=hit.video_id,
+                video_title=hit.video_title or "",
+                category_id=hit.category_id,
+                start_sec=round(hit.start_sec, 1),
+                end_sec=round(getattr(hit, "end_sec", None) or hit.start_sec, 1),
+                text=clean_promo_text(hit.text or "")[:400],
+                subtitle_url=None,
+                score_hint=round(hit.score or 0, 4),
+                folder_path=display_folder_path(getattr(hit, "filepath", None)),
+                meta=getattr(hit, "meta", None),
             )
-        results.sort(key=lambda item: item.score_hint, reverse=True)
-        if results:
-            return results[:limit]
+            for hit in hits
+        ]
 
+    # 兜底：混合检索全挂（embedding 服务不可用 + 词法也没命中）时，
+    # 还能靠最简单的 LIKE 给出东西，不让用户面对一个空列表。
+    keywords = [part.strip() for part in q.split() if part.strip()] or [q.strip()]
     filters = [SubtitleSegment.text.contains(keyword) for keyword in keywords]
     rows = (
         db.query(SubtitleSegment, Video)
         .join(Video, Video.id == SubtitleSegment.video_id)
         .filter(or_(*filters))
-        .limit(limit * 3)
+        .limit(limit)
         .all()
     )
-
-    if not rows:
-        return []
-
-    for segment, video in rows:
-        text_lower = segment.text.lower()
-        score_hint = sum(1 for keyword in keywords if keyword in text_lower)
-        if score_hint == 0:
-            score_hint = 0.1
-        results.append(
-            SegmentSearchResult(
-                video_id=video.id,
-                video_title=video.title,
-                category_id=video.category_id,
-                start_sec=segment.start_sec,
-                end_sec=segment.end_sec,
-                text=segment.text,
-                subtitle_url=to_output_url(video.subtitle_path),
-                score_hint=score_hint,
-            )
+    return [
+        SegmentSearchResult(
+            video_id=video.id,
+            video_title=video.title,
+            category_id=video.category_id,
+            start_sec=segment.start_sec,
+            end_sec=segment.end_sec,
+            text=segment.text,
+            subtitle_url=to_output_url(video.subtitle_path),
+            score_hint=0,
+            folder_path=display_folder_path(video.filepath),
         )
-
-    results.sort(key=lambda item: item.score_hint, reverse=True)
-    return results[:limit]
-
-
-def _collect_descendant_ids(db: Session, category_id: int) -> list[int]:
-    """Collect the given category ID and all its descendant category IDs."""
-    ids = [category_id]
-    children = db.query(Category.id).filter(Category.parent_id == category_id).all()
-    for (child_id,) in children:
-        ids.extend(_collect_descendant_ids(db, child_id))
-    return ids
+        for segment, video in rows
+    ]
 
 
 @router.get("", response_model=VideoPage)

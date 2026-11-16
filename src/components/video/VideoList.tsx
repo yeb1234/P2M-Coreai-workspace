@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckSquare, ChevronRight, Folder, RefreshCw, Search, Square } from 'lucide-react';
+import { AlertCircle, CheckSquare, ChevronRight, Folder, PlayCircle, RefreshCw, Search, Square } from 'lucide-react';
+import { openVideoAt } from '../../lib/videoNavigation';
 import { useVideoStore } from '../../stores/videoStore';
 import {
   fetchContinueVideo,
@@ -117,6 +118,14 @@ const FolderTile = React.memo(function FolderTile({
   );
 });
 
+/** 秒 → mm:ss。片段搜索里显示时间点用。 */
+function formatClock(sec: number): string {
+  const total = Math.max(0, Math.round(sec));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 const SearchFolderTile = React.memo(function SearchFolderTile({
   category,
   onEnter,
@@ -183,8 +192,15 @@ export function VideoList() {
     searchQuery, setSearchQuery, categoryTree, breadcrumb, currentCategoryId,
     loadCategoryTree, enterCategory, goToBreadcrumb, getCurrentChildren,
     restoreNavigation, selectedFolderIds, setSelectedFolderIds, toggleFavorite,
+    searchResults, doSearch,
   } = useVideoStore();
   const [inputVal, setInputVal] = useState('');
+  // 搜索范围：标题/文件夹（默认，走 loadVideos）
+  //        vs 字幕内容（走 hybrid_search，带章节线索和 rerank）
+  //
+  // 后者原来只有 AI 助手能用 —— 用户想找「哪段字幕提到 XX」只能去问助手。
+  // 后端 /api/videos/search/segments 已改走同一条混合检索链路。
+  const [searchMode, setSearchMode] = useState<'title' | 'segments'>('title');
   const [navRestored, setNavRestored] = useState(false);
   const [continueVideo, setContinueVideo] = useState<VideoItem | null>(null);
   const [historyVideos, setHistoryVideos] = useState<VideoItem[]>([]);
@@ -316,6 +332,11 @@ export function VideoList() {
 
   const handleSearch = useCallback(() => {
     const query = inputVal.trim();
+    if (searchMode === 'segments') {
+      // 字幕搜索：不走分页视频列表，直接打混合检索
+      void doSearch(query);
+      return;
+    }
     const previousQuery = searchQuery.trim();
     if (query === previousQuery && selectedFolderIds.length === 0) return;
     setGridMode('normal');
@@ -323,7 +344,7 @@ export function VideoList() {
     selectionChangedRef.current = false;
     setSelectedFolderIds([]);
     loadVideos(1, query || undefined);
-  }, [inputVal, loadVideos, searchQuery, selectedFolderIds.length, setSearchQuery, setSelectedFolderIds]);
+  }, [inputVal, loadVideos, searchQuery, selectedFolderIds.length, setSearchQuery, setSelectedFolderIds, searchMode, doSearch]);
 
   const handleColumnsPerRowChange = useCallback((columns: number) => {
     const next = Math.max(2, Math.min(8, columns));
@@ -408,9 +429,35 @@ export function VideoList() {
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="搜索视频或文件夹..."
+          placeholder={searchMode === 'segments' ? '搜索字幕内容，例：闭包是什么' : '搜索视频或文件夹...'}
           className="w-full rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] py-2.5 pl-10 pr-4 text-sm"
         />
+        {/* 搜索范围切换。默认「标题/文件夹」保持老行为；
+            「字幕内容」走混合检索，能找到「哪段话里提到过」。 */}
+        <div className="mt-2 flex items-center gap-1.5">
+          {([
+            ['title', '标题 / 文件夹'],
+            ['segments', '字幕内容'],
+          ] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSearchMode(mode)}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                searchMode === mode
+                  ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                  : 'border-[var(--border-light)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {searchMode === 'segments' && (
+            <span className="ml-1 text-[11px] text-[var(--text-muted)]">
+              按语义检索字幕片段，结果带课程 / 章节线索
+            </span>
+          )}
+        </div>
       </div>
 
       {!isSearching && currentCategoryId && (
@@ -453,6 +500,69 @@ export function VideoList() {
               onEnter={enterFolderFromList}
             />
           ))}
+        </div>
+      )}
+
+      {/* 字幕内容搜索结果。只在「字幕内容」模式下渲染 ——
+          「标题 / 文件夹」模式看的是视频网格，不该出现片段列表。 */}
+      {searchMode === 'segments' && inputVal.trim() && (
+        <div>
+          <p className="mb-2 text-xs text-[var(--text-muted)]">
+            匹配的片段 ({searchResults.length})
+            {searchResults.length > 0 && (
+              <span className="ml-1 opacity-70">· 点击跳到对应时间点</span>
+            )}
+          </p>
+          {searchResults.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-4 text-sm text-[var(--text-secondary)]">
+              没有匹配的字幕片段。换个说法试试，比如用更具体的术语。
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {searchResults.map((item) => {
+                const pos = item.meta?.position && item.meta?.total
+                  ? `第 ${item.meta.position}/${item.meta.total} 节`
+                  : '';
+                const path = item.meta?.display || item.folder_path || '';
+                return (
+                  <button
+                    key={`${item.video_id}-${item.start_sec}`}
+                    type="button"
+                    onClick={() => openVideoAt(item.video_id, item.start_sec)}
+                    className="flex w-full items-start gap-2.5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-2.5 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
+                  >
+                    <PlayCircle size={15} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+                    <div className="min-w-0 flex-1">
+                      {path && (
+                        <p
+                          className="truncate text-[10px] text-[var(--text-muted)]"
+                          title={item.meta?.meta_text || path}
+                        >
+                          {path}
+                          {pos && <span className="ml-1 text-[var(--accent)]">{pos}</span>}
+                        </p>
+                      )}
+                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                        {item.video_title}
+                      </p>
+                      <p className="text-xs text-[var(--accent)]">
+                        {formatClock(item.start_sec)}
+                        {item.end_sec > item.start_sec + 5 ? ` – ${formatClock(item.end_sec)}` : ''}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-5 text-[var(--text-secondary)]" style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}>
+                        {item.text}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal, Plus, History } from 'lucide-react';
 import { useAIStore } from '../../stores';
 import { authFetch } from '../../lib/authApi';
+import { openVideoAt } from '../../lib/videoNavigation';
 import {
   fetchAssistantRuntimeSettings,
   streamAssistantChat,
@@ -19,8 +20,6 @@ import { playInteractionSound } from '../../lib/sounds';
 import { useAssistantPageContext } from '../../hooks/useAssistantPageContext';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const PENDING_RECOMMENDED_VIDEO_KEY = 'p2m_pending_recommended_video_id';
-const PENDING_SEEK_KEY = 'p2m_pending_seek_sec';
 const ASSISTANT_SETTINGS_CHANGED_EVENT = 'p2m:assistant-settings-changed';
 
 /** 正文里提到的视频：text 是回答原文里的书名号片段，video_id 用于跳转 */
@@ -100,17 +99,6 @@ function formatTimestamp(seconds: number) {
     : `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/** 跳转到视频指定时间点：先把 seek 位置落到 localStorage，播放器加载后自会读取 */
-function openVideoAt(videoId: number, startSec?: number) {
-  localStorage.setItem(PENDING_RECOMMENDED_VIDEO_KEY, String(videoId));
-  if (typeof startSec === 'number' && startSec > 0) {
-    localStorage.setItem(PENDING_SEEK_KEY, String(startSec));
-  }
-  window.location.hash = '/video';
-  window.dispatchEvent(new CustomEvent('p2m:play-video', { detail: { videoId, startSec } }));
-  playInteractionSound('start');
-}
-
 /**
  * 把回答正文里的《视频标题》渲染成可点按钮。
  *
@@ -168,12 +156,26 @@ function renderWithVideoLinks(text: string, links: MentionedVideo[]): React.Reac
  */
 function dedupeReferences(items: ReferenceItem[] | undefined): ReferenceItem[] {
   if (!items || !items.length) return [];
-  const best = new Map<number, ReferenceItem>();
+
+  // 两轮去重：
+  // ① 同一视频只留最高分那条（避免同一门课刷屏）
+  // ② 再按「标题 + 起始秒」去一次 —— 库里存在标题完全相同的重复视频
+  //    （早期扫描路径变化留下的），video_id 不同但内容是同一个，
+  //    只按 video_id 去重会并排出现两条一模一样的片段。
+  const byVideo = new Map<number, ReferenceItem>();
   for (const item of items) {
-    const existing = best.get(item.video_id);
-    if (!existing || (item.score ?? 0) > (existing.score ?? 0)) best.set(item.video_id, item);
+    const existing = byVideo.get(item.video_id);
+    if (!existing || (item.score ?? 0) > (existing.score ?? 0)) byVideo.set(item.video_id, item);
   }
-  return [...best.values()]
+
+  const byTitle = new Map<string, ReferenceItem>();
+  for (const item of byVideo.values()) {
+    const key = `${(item.video_title || '').trim()}|${Math.round(item.start_sec)}`;
+    const existing = byTitle.get(key);
+    if (!existing || (item.score ?? 0) > (existing.score ?? 0)) byTitle.set(key, item);
+  }
+
+  return [...byTitle.values()]
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     .slice(0, 5);
 }
@@ -445,6 +447,12 @@ export const AIChatPanel: React.FC = () => {
     setInput('');
     setLiveIntent(null);
     setToolHint('');
+    // 必须清空上一轮的检索结果。
+    // 「流式过程中的临时片段」区块读的就是这个 state —— 不清的话，
+    // 新一轮刚发出、还没检索回来的那几秒，界面上会挂着**上一轮**的片段，
+    // 用户会以为「这次问的问题检索到了这些」，而它们和当前问题毫无关系。
+    // （按消息归属渲染的那部分不受影响：每条历史消息自己带 references。）
+    setReferences([]);
 
     addMessage({ id: makeId(), role: 'user', content: text });
     setLoading(true);
