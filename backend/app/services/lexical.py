@@ -155,6 +155,10 @@ def lexical_search(
             s.end_sec       AS end_sec,
             s.text          AS text,
             v.title         AS video_title,
+            -- 相关片段要显示相对文件夹层级，词法路径也必须带 filepath。
+            -- 之前只有向量那条 SELECT 带了，导致「有的片段有路径、有的没有」，
+            -- 实际取决于这条命中来自哪个检索源。
+            v.filepath      AS filepath,
             v.category_id   AS category_id,
             similarity(s.text, :q) AS sim
         FROM {source_table} s
@@ -186,6 +190,7 @@ def lexical_search(
             "end_sec": row.end_sec,
             "text": row.text,
             "video_title": row.video_title,
+            "filepath": row.filepath,
             "category_id": row.category_id,
             "lexical_score": float(row.sim or 0.0),
         }
