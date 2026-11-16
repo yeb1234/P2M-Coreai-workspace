@@ -81,15 +81,41 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Inter 不含中文字形。原来只写 'Inter', system-ui —— 中文会落到各平台
+     的默认字体上，而 Windows 的默认是宋体/微软雅黑、macOS 是苹方，
+     导致同一段中英混排里，英文是 Inter、中文是另一种字，字重和字面高度
+     都对不上（12px 的说明文字尤其明显）。
+     显式排一串中文正文字体：苹方 → 冬青黑 → 雅黑 → 思源，再兜 system-ui。 */
+  font-family:
+    'Inter',
+    -apple-system,
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    'Noto Sans SC',
+    system-ui,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 中英混排时打开字距调整，避免「React教程」这种边界挤在一起 */
+  font-feature-settings: 'kern' 1, 'liga' 1;
   background: var(--bg-body);
   color: var(--text-primary);
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* 数字一律等宽。
+ *
+ * 「0」和「8」在比例字体里宽度不同，统计卡片的一列数字会左右轻微抖动；
+ * 倒计时跳秒时更明显（59 → 58 整行位移）。tabular-nums 让每个数字
+ * 占同样宽度，代价是字形略「方正」—— 在数字场景完全值得。
+ */
+.tabular-nums,
+[data-num] {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Wood texture - realistic wooden board */

@@ -33,15 +33,15 @@ export const TodoSummary: React.FC = () => {
     <div className="space-y-3">
       <div className="auto-grid-compact text-center">
         <div className="bg-[var(--bg-accent)] rounded-lg p-2">
-          <p className="text-xl font-bold text-[var(--accent)]">{pending}</p>
+          <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{pending}</p>
           <p className="text-xs font-medium text-[#92400e]">待处理</p>
         </div>
         <div className="bg-[var(--info-bg)] rounded-lg p-2">
-          <p className="text-xl font-bold text-[var(--info)]">{inProgress}</p>
+          <p className="text-xl font-bold tabular-nums text-[var(--info)]">{inProgress}</p>
           <p className="text-xs font-medium text-[#1e40af]">进行中</p>
         </div>
         <div className="bg-[var(--success-bg)] rounded-lg p-2">
-          <p className="text-xl font-bold text-[var(--success)]">{completed}</p>
+          <p className="text-xl font-bold tabular-nums text-[var(--success)]">{completed}</p>
           <p className="text-xs font-medium text-[#166534]">已完成</p>
         </div>
       </div>

@@ -67,22 +67,22 @@ export const PomodoroSummary: React.FC = () => {
         {mode === 'pomodoro' ? (
           <>
             <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
-              <p className="text-xl font-bold text-[var(--accent)]">{todayStats.totalPomodoros}</p>
+              <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{todayStats.totalPomodoros}</p>
               <p className="text-xs font-medium text-[#92400e]">番茄数</p>
             </div>
             <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
-              <p className="text-xl font-bold text-[#b06d20]">{formatDuration(todayStats.totalMinutes)}</p>
+              <p className="text-xl font-bold tabular-nums text-[#b06d20]">{formatDuration(todayStats.totalMinutes)}</p>
               <p className="text-xs font-medium text-[#92400e]">专注时长</p>
             </div>
           </>
         ) : (
           <>
             <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
-              <p className="text-xl font-bold text-[var(--success)]">{todoStats.completed}/{todoStats.total}</p>
+              <p className="text-xl font-bold tabular-nums text-[var(--success)]">{todoStats.completed}/{todoStats.total}</p>
               <p className="text-xs font-medium text-[#166534]">已完成</p>
             </div>
             <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
-              <p className="text-xl font-bold text-[var(--accent)]">{todoStats.inProgress}</p>
+              <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{todoStats.inProgress}</p>
               <p className="text-xs font-medium text-[#92400e]">进行中</p>
             </div>
           </>

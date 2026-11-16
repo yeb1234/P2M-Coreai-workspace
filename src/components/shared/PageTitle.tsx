@@ -23,7 +23,7 @@ export const PageTitle: React.FC<PageTitleProps> = React.memo(({ title, subtitle
               {title}
             </h2>
             {dev && (
-              <span className="shrink-0 rounded-full border border-[#f59e0b]/30 bg-[var(--warn)]/15 px-1.5 py-0.5 text-xs font-medium text-[#d97706]">
+              <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--warn)_38%,transparent)] bg-[var(--warn-bg)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--warn)]">
                 DEV
               </span>
             )}

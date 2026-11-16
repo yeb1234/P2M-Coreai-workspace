@@ -91,7 +91,7 @@ export const Header: React.FC = () => {
     <header className="rounded-t-2xl border-b border-[var(--border-light)] px-4 py-3 backdrop-blur-sm md:px-6" style={{ background: 'var(--header-bg)' }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">
+          <h1 className="text-xl font-bold tabular-nums text-[var(--text-primary)]">
             <span className="text-[var(--accent)]">灵</span>
             <span className="text-[color-mix(in_srgb,var(--accent)_62%,#7c3aed)]">境</span>
           </h1>

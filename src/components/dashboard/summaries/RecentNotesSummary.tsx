@@ -16,12 +16,25 @@ export const RecentNotesSummary: React.FC = () => {
   return (
     <div className="space-y-2">
       {recent.map((note) => (
-        <div key={note.id} className={`${note.color} rounded-lg p-2.5`}>
-          <div className="flex items-center gap-2 mb-1">
-            <StickyNote size={12} className="text-[var(--text-secondary)] flex-shrink-0" />
-            <span className="text-xs font-medium text-[var(--text-primary)] truncate">{note.title}</span>
+        <div key={note.id} className={`${note.color} flex min-h-[74px] flex-col rounded-[var(--r-1)] p-2.5`}>
+          <div className="mb-1 flex items-center gap-2">
+            <StickyNote size={12} className="flex-shrink-0 text-[var(--text-secondary)]" />
+            <span className="truncate text-xs font-medium text-[var(--text-primary)]">{note.title}</span>
           </div>
-          <p className="text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed">{note.content || '空笔记'}</p>
+          {/* line-clamp-2 的类名在产物里存在，但实际没截断 —— 便签正文会
+              撑出底色块，最后一行贴在边上。改用内联样式保证生效。
+              min-h 让三张便签高度一致，否则内容长短不同会参差。 */}
+          <p
+            className="text-xs leading-relaxed text-[var(--text-secondary)]"
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {note.content || '空笔记'}
+          </p>
         </div>
       ))}
     </div>
