@@ -99,6 +99,27 @@ class AgentContext:
     page_context: str = ""
     system_prompt_extra: str = ""
     history_limit: int = 10
+    # 前端 detectIntent() 识别的意图 id。用来决定要不要生成「相关片段」卡片 ——
+    # 不是每个意图都该推荐视频（见 _needs_video_references）。
+    intent: str | None = None
+
+
+# 只有这两类问题才需要「相关片段」卡片。
+#
+# 用户反馈：问「总结我学得怎么样」时也甩三条不相关的视频片段出来，
+# 既干扰阅读又浪费一次 rerank 调用（200-500ms）。
+#
+#   course-recommend  用户明确要课程/视频推荐
+#   knowledge-qa      问「某某概念讲过吗 / 哪节课讲了 X」—— 需要定位到具体视频
+#
+# 其余意图（学习总结 / 路径规划 / 代码助手 / 任务拆解）都是基于已有信息
+# 做加工，不该再推视频。intent 为空时退回旧行为（保守起见照样检索），
+# 因为认不出意图时可能是「有没有讲 X 的视频」这类该显示的问法。
+_INTENTS_WITH_VIDEO_REFERENCES = frozenset({"course-recommend", "knowledge-qa"})
+
+
+def _needs_video_references(intent: str | None) -> bool:
+    return not intent or intent in _INTENTS_WITH_VIDEO_REFERENCES
 
 
 @dataclass
@@ -434,57 +455,61 @@ async def stream_chat(ctx: AgentContext, message: str):
         # 补一次轻量检索作为「引用卡片」数据源。
         # 走工具轨迹解析太脆弱（返回的是给人读的格式化文本），
         # 这里多花约 30ms 换前端可直接跳转的结构化片段。
+        #
+        # 只有「课程推荐 / 知识问答」才做这一步 —— 学习总结、任务拆解这类
+        # 问题甩三条不相关视频出来只会干扰阅读，还白花一次 rerank 调用。
         references: list[dict] = []
-        try:
-            from app.services.hybrid_search import hybrid_search
-            from app.utils.textclean import clean_promo_text
-            from app.utils.paths import display_folder_path
+        if _needs_video_references(ctx.intent):
+            try:
+                from app.services.hybrid_search import hybrid_search
+                from app.utils.textclean import clean_promo_text
+                from app.utils.paths import display_folder_path
 
-            # 参数必须和 search_videos 工具（tools.py:65）一致，否则会出现
-            # 「AI 回答引用了正确的课，下面相关片段却是另外三个不相关的」——
-            # 因为这两批结果来自**两次不同的检索**：
-            #   工具：  candidate_k=30, use_rerank=True   ← AI 实际依据
-            #   卡片：  candidate_k=15, use_rerank=False  ← 用户看到的
-            # 候选池小一半、还不重排，质量自然差一截。
-            #
-            # 代价是多一次 rerank API 调用（约 200-500ms），
-            # 但比"答得对、引用却不相干"值。
-            ref_result = hybrid_search(message, top_k=6, candidate_k=30, use_rerank=True)
-            # 只保留真正相关的片段：低于 0.5 的多是「词面沾边」，点了也是浪费时间
-            strong = [h for h in ref_result["hits"] if (h.vector_score or 0) >= 0.5]
-            picked = strong[:5] if strong else ref_result["hits"][:3]
-            # 显式按相关度降序，不依赖上游顺序。
-            #
-            # 前端「相关片段」是按数组顺序从上往下渲染的，用户扫这个列表
-            # 是从上往下读 —— 所以最相关的必须排第一。
-            # 这和聊天消息相反（消息是时间序，最新的在底部），
-            # 两套排法混在一起就容易反。上游改了排序策略也不会影响这里。
-            #
-            # 用 vector_score 排而不是 rrf score：UI 上展示的分数就是
-            # vector_score，排序键和显示值必须一致，否则看起来是乱的。
-            picked = sorted(
-                picked,
-                key=lambda h: (h.vector_score or 0, h.score or 0),
-                reverse=True,
-            )
-            references = [
-                {
-                    "video_id": hit.video_id,
-                    "video_title": hit.video_title,
-                    # 只给相对文件夹层级，不给磁盘路径（安全 + 可读性）
-                    "folder_path": display_folder_path(getattr(hit, "filepath", None)),
-                    "start_sec": round(hit.start_sec, 1),
-                    # 带上结束时间：块平均跨 114 秒（最长 7000+ 秒），
-                    # 前端只显示起点会让用户以为「就这一秒的内容」，
-                    # 点进去发现要听两分钟，像是时间戳错了。
-                    "end_sec": round(getattr(hit, "end_sec", None) or hit.start_sec, 1),
-                    "text": clean_promo_text(hit.text)[:200],
-                    "score": round(hit.vector_score or hit.lexical_score or 0, 3),
-                }
-                for hit in picked
-            ]
-        except Exception as exc:
-            logger.warning("补充引用片段失败: %s", exc)
+                # 参数必须和 search_videos 工具（tools.py:65）一致，否则会出现
+                # 「AI 回答引用了正确的课，下面相关片段却是另外三个不相关的」——
+                # 因为这两批结果来自**两次不同的检索**：
+                #   工具：  candidate_k=30, use_rerank=True   ← AI 实际依据
+                #   卡片：  candidate_k=15, use_rerank=False  ← 用户看到的
+                # 候选池小一半、还不重排，质量自然差一截。
+                #
+                # 代价是多一次 rerank API 调用（约 200-500ms），
+                # 但比"答得对、引用却不相干"值。
+                ref_result = hybrid_search(message, top_k=6, candidate_k=30, use_rerank=True)
+                # 只保留真正相关的片段：低于 0.5 的多是「词面沾边」，点了也是浪费时间
+                strong = [h for h in ref_result["hits"] if (h.vector_score or 0) >= 0.5]
+                picked = strong[:5] if strong else ref_result["hits"][:3]
+                # 显式按相关度降序，不依赖上游顺序。
+                #
+                # 前端「相关片段」是按数组顺序从上往下渲染的，用户扫这个列表
+                # 是从上往下读 —— 所以最相关的必须排第一。
+                # 这和聊天消息相反（消息是时间序，最新的在底部），
+                # 两套排法混在一起就容易反。上游改了排序策略也不会影响这里。
+                #
+                # 用 vector_score 排而不是 rrf score：UI 上展示的分数就是
+                # vector_score，排序键和显示值必须一致，否则看起来是乱的。
+                picked = sorted(
+                    picked,
+                    key=lambda h: (h.vector_score or 0, h.score or 0),
+                    reverse=True,
+                )
+                references = [
+                    {
+                        "video_id": hit.video_id,
+                        "video_title": hit.video_title,
+                        # 只给相对文件夹层级，不给磁盘路径（安全 + 可读性）
+                        "folder_path": display_folder_path(getattr(hit, "filepath", None)),
+                        "start_sec": round(hit.start_sec, 1),
+                        # 带上结束时间：块平均跨 114 秒（最长 7000+ 秒），
+                        # 前端只显示起点会让用户以为「就这一秒的内容」，
+                        # 点进去发现要听两分钟，像是时间戳错了。
+                        "end_sec": round(getattr(hit, "end_sec", None) or hit.start_sec, 1),
+                        "text": clean_promo_text(hit.text)[:200],
+                        "score": round(hit.vector_score or hit.lexical_score or 0, 3),
+                    }
+                    for hit in picked
+                ]
+            except Exception as exc:
+                logger.warning("补充引用片段失败: %s", exc)
 
         # ── 正文里提到的视频 → 可点跳转 ──
         # 回答里会写《01、01-【基础认知】AI产品经理岗位及就业规划 194:47》这种，

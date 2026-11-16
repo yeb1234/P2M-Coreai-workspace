@@ -95,6 +95,7 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
         video_id=payload.video_id,
         page_context=payload.page_context,
         system_prompt_extra=payload.system_prompt,
+        intent=payload.intent,
     )
 
     result = run_chat(ctx, payload.message)
@@ -150,6 +151,7 @@ async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depen
         video_id=payload.video_id,
         page_context=payload.page_context,
         system_prompt_extra=payload.system_prompt,
+        intent=payload.intent,
     )
 
     async def event_stream():

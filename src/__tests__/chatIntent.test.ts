@@ -10,6 +10,12 @@ describe('聊天意图识别', () => {
     ['给我一个学习路径', 'learning-path'],
     ['帮我总结一下这节课', 'study-summary'],
     ['回顾一下刚才讲的内容', 'study-summary'],
+    // 「学得怎么样」这类口语问法必须归到总结，不能兜底成知识问答 ——
+    // 否则会触发相关片段检索，甩出三条不相关视频
+    ['总结我学得怎么样', 'study-summary'],
+    ['我这段时间学得如何', 'study-summary'],
+    ['看看我的学习进展', 'study-summary'],
+    ['最近学习情况怎么样', 'study-summary'],
     ['这段代码为什么报错', 'coding-helper'],
     ['写个 FastAPI 接口', 'coding-helper'],
     ['把目标拆成今日待办', 'task-planning'],
