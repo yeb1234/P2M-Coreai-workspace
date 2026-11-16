@@ -10,6 +10,7 @@ from watchdog.observers import Observer
 from sqlalchemy import or_
 
 from app.database import SessionLocal, settings
+from app.utils.textclean import clean_video_title
 from app.models import Category, Video
 from app.services.sprite import has_sprite, generate_sprite
 from app.utils.files import resolve_media_path
@@ -152,10 +153,36 @@ def upsert_video(db, file_path: Path) -> bool:
     resolved = str(file_path.resolve())
     stat = file_path.stat()
     existing = db.query(Video).filter(Video.filepath == resolved).first()
+
+    if not existing:
+        # 路径没命中时，按「文件名 + 字节数」再找一次。
+        #
+        # 为什么必须加这一步：项目从「本机直跑」迁到 Docker 后，扫描根路径
+        # 从 D:\ITJC\... 变成 /videos/...，同一个文件的绝对路径变了。
+        # 只按 filepath 匹配会把整个库重新入库一遍 —— 实际发生过：
+        # 28654 条记录里 14659 条是这么来的，检索结果里同一内容占两个坑。
+        #
+        # 用「文件名 + 字节数」而不是内容 hash：后者要对 28GB 视频跑一遍，
+        # 每次扫描都算等于自杀。同名同大小的概率已经足够低。
+        if stat.st_size:
+            existing = (
+                db.query(Video)
+                .filter(
+                    Video.filename == file_path.name,
+                    Video.file_size == stat.st_size,
+                )
+                .first()
+            )
+            if existing:
+                # 只修路径。title / chunks / 观看记录都不动 ——
+                # 这条记录可能已经带着几万条 chunks 和历史进度。
+                existing.filepath = resolved
+                db.commit()
+
     category_id = get_or_create_category(db, file_path)
 
     if existing:
-        existing.title = file_path.stem
+        existing.title = clean_video_title(file_path.stem)
         existing.filename = file_path.name
         existing.sort_key = natural_sort_value(file_path.name)
         existing.file_size = stat.st_size
@@ -176,7 +203,7 @@ def upsert_video(db, file_path: Path) -> bool:
 
     duration = get_video_duration(str(file_path))
     video = Video(
-        title=file_path.stem,
+        title=clean_video_title(file_path.stem),
         filename=file_path.name,
         sort_key=natural_sort_value(file_path.name),
         filepath=resolved,

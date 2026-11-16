@@ -18,6 +18,7 @@ from sqlalchemy import and_, desc, func, or_, text
 from app.database import SessionLocal
 from app.models import LearningGoal, LearningPath, Note, Video, WatchEvent, WatchHistory
 from app.services.hybrid_search import hybrid_search
+from app.utils.textclean import clean_promo_text
 from app.services.learning_context import active_path_text
 from app.services.profile import profile_summary_text, recompute_profile
 
@@ -72,7 +73,9 @@ def search_videos(query: str, top_k: int = 5) -> str:
         score = hit.vector_score or hit.lexical_score or 0
         lines.append(
             f"{index}. 《{hit.video_title}》 {_fmt_ts(hit.start_sec)}-{_fmt_ts(hit.end_sec)}"
-            f"（相关度 {score:.2f}）\n   {hit.text[:220]}"
+            # 字幕里的广告（微信、itjc8.com）要清掉：不清的话模型会照抄，
+            # 回答里就带出一串推广信息
+            f"（相关度 {score:.2f}）\n   {clean_promo_text(hit.text)[:220]}"
         )
     return "\n".join(lines)
 

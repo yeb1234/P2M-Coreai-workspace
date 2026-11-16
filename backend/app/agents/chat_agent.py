@@ -437,6 +437,7 @@ async def stream_chat(ctx: AgentContext, message: str):
         references: list[dict] = []
         try:
             from app.services.hybrid_search import hybrid_search
+            from app.utils.textclean import clean_promo_text
 
             # 参数必须和 search_videos 工具（tools.py:65）一致，否则会出现
             # 「AI 回答引用了正确的课，下面相关片段却是另外三个不相关的」——
@@ -474,7 +475,7 @@ async def stream_chat(ctx: AgentContext, message: str):
                     # 前端只显示起点会让用户以为「就这一秒的内容」，
                     # 点进去发现要听两分钟，像是时间戳错了。
                     "end_sec": round(getattr(hit, "end_sec", None) or hit.start_sec, 1),
-                    "text": hit.text[:200],
+                    "text": clean_promo_text(hit.text)[:200],
                     "score": round(hit.vector_score or hit.lexical_score or 0, 3),
                 }
                 for hit in picked

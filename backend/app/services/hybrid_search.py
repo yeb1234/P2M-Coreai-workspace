@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from sqlalchemy import select
 
+from app.utils.textclean import looks_like_promo
 from app.database import engine, settings
 from app.models import Category, Video
 from app.tables import CONTENT_CHUNKS
@@ -104,6 +105,9 @@ def fetch_segments(segment_ids: list[int]) -> dict[int, dict]:
         .join(video, video.c.id == seg.c.video_id)
         .outerjoin(category, category.c.id == video.c.category_id)
         .where(seg.c.id.in_(segment_ids))
+        # 排除零长度/负长度块：库里 190 条这种（分块时字幕时间轴异常产生），
+        # 展示出来是一段文字配一个 0 秒的跳转目标，点了什么也没发生。
+        .where(seg.c.end_sec > seg.c.start_sec)
     )
     with engine.connect() as conn:
         rows = conn.execute(stmt).fetchall()
@@ -411,6 +415,11 @@ def hybrid_search(
     for segment_id, score in ordered:
         hit = pool[segment_id]
         hit.score = score
+        # 整块都是推广内容（微信/资源站/要资料）的直接不要。
+        # 这类块在音乐类和搬运课程里很常见，命中后既讲不了内容，
+        # 又占掉 top_k 名额。
+        if looks_like_promo(hit.text):
+            continue
         candidates.append(hit)
 
     # 去重放在 rerank 之前：候选更干净，重排更准也更快。
