@@ -4,6 +4,7 @@ import { useScheduleStore, useUIStore } from '../../../stores';
 import { formatDate, toLocalDateString } from '../../../lib/date';
 import { datePart, hasScheduleTime, timePart } from '../../../lib/scheduleTime';
 import { PRIORITY_COLORS } from '../../../types';
+import { SummaryEmpty } from './SummaryEmpty';
 
 export const CalendarSummary: React.FC = () => {
   const items = useScheduleStore((s) => s.items);
@@ -14,7 +15,7 @@ export const CalendarSummary: React.FC = () => {
   const hasMore = todayEvents.length > 3;
 
   return (
-    <div className="space-y-2.5">
+    <div className="flex flex-1 flex-col gap-2.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
           <Calendar size={12} />
@@ -24,7 +25,12 @@ export const CalendarSummary: React.FC = () => {
       </div>
 
       {todayEvents.length === 0 ? (
-        <p className="text-xs text-[var(--text-muted)] text-center py-3">今日无事件</p>
+        <SummaryEmpty
+          icon={<Calendar size={16} />}
+          title="今天还没有安排"
+          hint="点这里打开周历"
+          onClick={() => setActiveView('calendar')}
+        />
       ) : (
         <div className="space-y-1">
           {displayEvents.map((event, idx) => {

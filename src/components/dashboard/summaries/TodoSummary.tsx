@@ -4,6 +4,7 @@ import { useScheduleStore, useUIStore } from '../../../stores';
 import { PRIORITY_COLORS } from '../../../types';
 import { toLocalDateString } from '../../../lib/date';
 import { datePart, hasScheduleTime } from '../../../lib/scheduleTime';
+import { SummaryEmpty } from './SummaryEmpty';
 
 export const TodoSummary: React.FC = () => {
   const items = useScheduleStore((s) => s.items);
@@ -30,19 +31,19 @@ export const TodoSummary: React.FC = () => {
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-1 flex-col gap-3">
       <div className="auto-grid-compact text-center">
-        <div className="bg-[var(--bg-accent)] rounded-lg p-2">
+        <div className="rounded-lg bg-[var(--bg-base)] p-2">
           <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{pending}</p>
-          <p className="text-xs font-medium text-[#92400e]">待处理</p>
+          <p className="text-xs font-medium text-[var(--text-muted)]">待处理</p>
         </div>
-        <div className="bg-[var(--info-bg)] rounded-lg p-2">
+        <div className="rounded-lg bg-[var(--bg-base)] p-2">
           <p className="text-xl font-bold tabular-nums text-[var(--info)]">{inProgress}</p>
-          <p className="text-xs font-medium text-[#1e40af]">进行中</p>
+          <p className="text-xs font-medium text-[var(--text-muted)]">进行中</p>
         </div>
-        <div className="bg-[var(--success-bg)] rounded-lg p-2">
+        <div className="rounded-lg bg-[var(--bg-base)] p-2">
           <p className="text-xl font-bold tabular-nums text-[var(--success)]">{completed}</p>
-          <p className="text-xs font-medium text-[#166534]">已完成</p>
+          <p className="text-xs font-medium text-[var(--text-muted)]">已完成</p>
         </div>
       </div>
 
@@ -90,7 +91,12 @@ export const TodoSummary: React.FC = () => {
           );
         })}
         {urgentTodos.length === 0 && (
-          <p className="text-xs text-[var(--text-muted)] text-center py-2">暂无待办</p>
+          <SummaryEmpty
+            icon={<ListTodo size={16} />}
+            title="暂无待办"
+            hint="在待办页回车即可添加"
+            onClick={() => setActiveView('todo')}
+          />
         )}
       </div>
 

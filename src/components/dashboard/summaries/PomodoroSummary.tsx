@@ -4,6 +4,7 @@ import { usePomodoroStore, useScheduleStore } from '../../../stores';
 import { PHASE_LABELS } from '../../../types';
 import { formatDuration, toLocalDateString } from '../../../lib/date';
 import { datePart, hasScheduleTime } from '../../../lib/scheduleTime';
+import { SummaryEmpty } from './SummaryEmpty';
 import { calculateSchedulePomodoroRounds } from '../../../lib/pomodoroPlanning';
 
 type StatsMode = 'pomodoro' | 'todo';
@@ -66,24 +67,24 @@ export const PomodoroSummary: React.FC = () => {
       <div className="grid grid-cols-2 gap-2">
         {mode === 'pomodoro' ? (
           <>
-            <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
+            <div className="rounded-lg bg-[var(--bg-base)] p-2.5 text-center">
               <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{todayStats.totalPomodoros}</p>
-              <p className="text-xs font-medium text-[#92400e]">番茄数</p>
+              <p className="text-xs font-medium text-[var(--text-muted)]">番茄数</p>
             </div>
-            <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
-              <p className="text-xl font-bold tabular-nums text-[#b06d20]">{formatDuration(todayStats.totalMinutes)}</p>
-              <p className="text-xs font-medium text-[#92400e]">专注时长</p>
+            <div className="rounded-lg bg-[var(--bg-base)] p-2.5 text-center">
+              <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{formatDuration(todayStats.totalMinutes)}</p>
+              <p className="text-xs font-medium text-[var(--text-muted)]">专注时长</p>
             </div>
           </>
         ) : (
           <>
-            <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
+            <div className="rounded-lg bg-[var(--bg-base)] p-2.5 text-center">
               <p className="text-xl font-bold tabular-nums text-[var(--success)]">{todoStats.completed}/{todoStats.total}</p>
-              <p className="text-xs font-medium text-[#166534]">已完成</p>
+              <p className="text-xs font-medium text-[var(--text-muted)]">已完成</p>
             </div>
-            <div className="bg-[var(--bg-accent)] rounded-lg p-2.5 text-center">
+            <div className="rounded-lg bg-[var(--bg-base)] p-2.5 text-center">
               <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{todoStats.inProgress}</p>
-              <p className="text-xs font-medium text-[#92400e]">进行中</p>
+              <p className="text-xs font-medium text-[var(--text-muted)]">进行中</p>
             </div>
           </>
         )}
@@ -115,7 +116,11 @@ export const PomodoroSummary: React.FC = () => {
 
       {/* No sessions today */}
       {todayStats.totalPomodoros === 0 && timer.status !== 'running' && mode === 'pomodoro' && (
-        <p className="text-xs text-[var(--text-muted)] text-center py-1">今天还没有专注记录</p>
+        <SummaryEmpty
+          icon={<Timer size={16} />}
+          title="今天还没有专注记录"
+          hint="在番茄钟页点开始"
+        />
       )}
     </div>
   );

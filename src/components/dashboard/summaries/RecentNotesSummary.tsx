@@ -1,20 +1,29 @@
 import React, { useMemo } from 'react';
 import { StickyNote } from 'lucide-react';
-import { useNotesStore } from '../../../stores';
+import { useNotesStore, useUIStore } from '../../../stores';
+import { SummaryEmpty } from './SummaryEmpty';
 
 export const RecentNotesSummary: React.FC = () => {
   const notes = useNotesStore((s) => s.notes);
+  const { setActiveView } = useUIStore();
 
   const recent = useMemo(() => {
     return [...notes].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 3);
   }, [notes]);
 
   if (recent.length === 0) {
-    return <p className="text-xs text-[var(--text-muted)] text-center py-4">还没有笔记</p>;
+    return (
+      <SummaryEmpty
+        icon={<StickyNote size={16} />}
+        title="还没有笔记"
+        hint="在笔记页记下第一条"
+        onClick={() => setActiveView('notes')}
+      />
+    );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-1 flex-col gap-2">
       {recent.map((note) => (
         <div key={note.id} className={`${note.color} flex min-h-[74px] flex-col rounded-[var(--r-1)] p-2.5`}>
           <div className="mb-1 flex items-center gap-2">

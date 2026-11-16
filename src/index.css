@@ -312,27 +312,59 @@ body {
 }
 
 /* Dashboard grid — 3 columns, cards span 1 (small) or 2 (large) */
+/* 12 列网格：给卡片留出「占 1/3」和「占 1/2」两档细粒度。
+ *
+ * 原来是 3 列 + 卡片只能占 1 档：5 张卡铺不出整行，第二行永远空一格，
+ * 那半块空白就是「支离破碎」的来源。
+ * 换成 12 列后 4+4+4=12、6+6=12 都能铺满，默认布局刚好两行。
+ *
+ * align-items 回到 stretch：卡片等高，行首行尾对齐。
+ * 上一版用 start 消掉了卡片内的空白，但同行高度参差反而更碎 ——
+ * 空白的正确去处是「同行的卡片一起长高」，不是「各自缩到内容高度」。
+ */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(12, 1fr);
   grid-auto-flow: dense;
   gap: 14px;
-  /* 原来是 stretch：同一行所有卡片被拉到最高那个的高度，
-     内容少的卡片（待办 0 条、今日无事件）下半截全是空白白块。
-     改成 start 后卡片高度 = 内容高度，空白落到纸面背景上而不是卡片里。
-     代价是同一行高度会参差 —— 但那比「三个大白块各空一半」好看得多。 */
-  align-items: start;
+  align-items: stretch;
 }
-@media (max-width: 1024px) {
+.plugin-card {
+  grid-column: span 4;
+}
+.plugin-card[data-size="large"] {
+  grid-column: span 6;
+}
+.plugin-card[data-size="full"] {
+  grid-column: span 12;
+}
+
+@media (max-width: 1100px) {
   .dashboard-grid {
-    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
+  /* 两列模式：large 也退回占一半，避免它独占整行把节奏打断 */
+  .plugin-card,
+  .plugin-card[data-size="large"] {
+    grid-column: span 6;
+  }
+  .plugin-card[data-size="full"] {
+    grid-column: span 12;
+  }
+  /* 卡片数是奇数时，最后一张独占整行 —— 否则右半边空着 */
+  .plugin-card:last-child {
+    grid-column: span 12;
+  }
 }
+
 @media (max-width: 768px) {
   .dashboard-grid {
-    grid-template-columns: 1fr;
     gap: 10px;
+  }
+  .plugin-card,
+  .plugin-card[data-size="large"],
+  .plugin-card[data-size="full"] {
+    grid-column: span 12;
   }
 }
 
@@ -341,9 +373,8 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  grid-column: span 1;
-  /* 只过渡 transform / box-shadow —— `all` 会让拖拽时的每一次
-     grid 重排都触发过渡，观感上像整块在抖。 */
+  /* grid-column 由上面的 .plugin-card / [data-size] 规则决定，
+     不要在这里再写 span 1 —— 特异性相同，会按顺序覆盖掉 large/full。 */
   transition:
     transform var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease);
@@ -351,27 +382,21 @@ body {
 .plugin-card:hover {
   transform: translateY(-1px);
 }
-.plugin-card[data-size="large"] {
-  grid-column: span 2;
-}
-.plugin-card[data-size="full"] {
-  grid-column: span 3;
-}
 @media (max-width: 768px) {
-  .plugin-card,
-  .plugin-card[data-size="large"],
-  .plugin-card[data-size="full"] {
-    grid-column: span 1;
-    grid-row: auto !important;
-  }
+  /* 这里原来还有一条 .plugin-card { grid-column: span 1 }。
+     改 12 列网格后它的含义从「占满一行」变成了「占 1/12 列」——
+     卡片被压成 30px 宽的竖条，内容全挤成一条线。
+     网格跨度统一由上面 .dashboard-grid 那组规则决定，这里只留按钮隐藏。 */
   .plugin-card button[title="缩小"],
   .plugin-card button[title="放大"] {
     display: none;
   }
 }
 .plugin-card > div {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 /* TimeCenter widget grid */

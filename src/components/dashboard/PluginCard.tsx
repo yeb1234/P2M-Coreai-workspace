@@ -101,7 +101,7 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
           </div>
         </div>
 
-        <div className="p-3 md:p-2 cursor-pointer flex-1 overflow-auto" onClick={handleNavigate}>
+        <div className="flex flex-1 cursor-pointer flex-col overflow-auto p-3 md:p-2" onClick={handleNavigate}>
           <SummaryComponent />
         </div>
 
