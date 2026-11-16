@@ -193,11 +193,24 @@ def _llm_rerank(query: str, hits: list[Hit], keep: int) -> list[Hit]:
             if hit.segment_id in seen:
                 continue
             seen.add(hit.segment_id)
-            hit.rerank_score = float(len(reranked))
             reranked.append(hit)
         if not reranked:
             return candidates[:keep]
-        return reranked[:keep]
+
+        result = reranked[:keep]
+        # rerank_score 统一成「0-1，越大越相关」，和交叉编码器分支同一语义。
+        #
+        # 原来是 float(len(reranked))，也就是 0/1/2/3… 这个下标 ——
+        # 第 1 名得 0 分、第 3 名得 2 分，越小越相关，和另一边
+        # （round(score, 4)，越大越相关）完全相反，却共用同一个字段名。
+        # 前端/agent 拿到这个值没法判断方向，只能当黑盒。
+        #
+        # LLM listwise 重排只给顺序不给绝对分，所以按返回条数线性归一化：
+        # 6 条 → 1.0 / 0.833 / 0.667 / 0.5 / 0.333 / 0.167。
+        total = len(result)
+        for rank, hit in enumerate(result):
+            hit.rerank_score = round((total - rank) / total, 4)
+        return result
     except Exception as exc:
         logger.warning("LLM 重排失败，保留 RRF 原序: %s", exc)
         return candidates[:keep]

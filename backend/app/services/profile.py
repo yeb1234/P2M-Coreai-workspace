@@ -15,7 +15,7 @@ import logging
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, text
+from sqlalchemy import distinct, func, text
 from sqlalchemy.orm import Session
 
 from app.models import Note, ScheduleItem, User, UserProfile, Video, WatchEvent, WatchHistory
@@ -26,19 +26,25 @@ VALID_EVENT_TYPES = {"play", "pause", "seek", "rate", "heartbeat", "ended", "clo
 
 
 def _hour_histogram(db: Session, user_id: int | None, since: datetime) -> dict[str, int]:
-    query = db.query(WatchEvent.occurred_at, WatchEvent.delta_sec).filter(
-        WatchEvent.occurred_at >= since, WatchEvent.delta_sec > 0
+    """活跃时段分布（分钟）。30 天窗口一次 GROUP BY，不把事件行捞出来。"""
+    hour_expr = func.extract("hour", WatchEvent.occurred_at)
+    query = (
+        db.query(hour_expr.label("h"), func.sum(WatchEvent.delta_sec))
+        .filter(
+            WatchEvent.occurred_at >= since,
+            WatchEvent.delta_sec > 0,
+            WatchEvent.occurred_at.isnot(None),
+        )
     )
     if user_id is not None:
         query = query.filter(WatchEvent.user_id == user_id)
 
-    buckets: dict[str, float] = defaultdict(float)
-    for occurred_at, delta in query.all():
-        if occurred_at is None:
-            continue
-        buckets[str(occurred_at.hour)] += float(delta or 0)
     # 转成分钟并只保留有数据的时段
-    return {hour: int(seconds // 60) for hour, seconds in sorted(buckets.items()) if seconds >= 60}
+    return {
+        str(int(hour)): int(round(float(secs or 0) / 60))
+        for hour, secs in query.group_by("h").all()
+        if hour is not None and secs
+    }
 
 
 def _top_categories(db: Session, user_id: int | None, since: datetime, limit: int = 6) -> list[dict]:
@@ -135,41 +141,109 @@ def resolve_user_id(db: Session, user_id: int | None) -> int:
 
 
 def recompute_profile(db: Session, user_id: int | None = None) -> UserProfile:
-    """重算画像。30 天窗口统计活跃习惯，全量窗口统计累计投入。"""
+    """重算画像。30 天窗口统计活跃习惯，全量窗口统计累计投入。
+
+    ## 所有聚合都下推到 SQL
+
+    心跳是 30 秒一条：重度用户一年就是几十万行。原实现把这些行
+    **整表捞进内存**再在 Python 里 sum/set/groupby —— 而 recompute_profile
+    在每次聊天、每次路径规划、每个 agent 工具调用里都会跑一次，
+    内存和延迟都随使用时长线性增长。
+
+    现在每个指标都是一条带 GROUP BY / DISTINCT 的聚合查询，
+    返回的是几十个标量，不是几十万行。
+
+    另外修了一个越权：notes_count 原来数的是**全库笔记**（不加 user_id 也不加
+    scope），所有用户看到同一个数字，而且把 8770 条 AI 生成的 shared 笔记
+    也算成「我写的」。改成只数本人 private 笔记。
+    """
     resolved_id = resolve_user_id(db, user_id)
     since_30d = datetime.now() - timedelta(days=30)
 
     # 必须用 resolved_id 而不是入参 user_id。
     # 入参为 None 时原实现会跳过过滤，把所有用户的事件加在一起算到一个人头上，
     # 多用户下等于画像串号。
-    events = db.query(WatchEvent).filter(WatchEvent.user_id == resolved_id).all()
 
-    total_watch_sec = sum(float(e.delta_sec or 0) for e in events)
-    event_video_ids = {e.video_id for e in events if e.event_type in ("play", "heartbeat")}
+    # ① 累计时长 + 最后活跃：一次聚合
+    total_watch_sec, last_active = (
+        db.query(
+            func.coalesce(func.sum(WatchEvent.delta_sec), 0),
+            func.max(WatchEvent.occurred_at),
+        )
+        .filter(WatchEvent.user_id == resolved_id)
+        .one()
+    )
+    total_watch_sec = float(total_watch_sec or 0)
 
-    # 完成度以 watch_history 为准（播放器上报的进度快照）
+    # ② 播放过的视频：只要 DISTINCT video_id
+    event_video_ids = {
+        vid
+        for (vid,) in db.query(distinct(WatchEvent.video_id))
+        .filter(
+            WatchEvent.user_id == resolved_id,
+            WatchEvent.event_type.in_(("play", "heartbeat")),
+            WatchEvent.video_id.isnot(None),
+        )
+        .all()
+    }
+
+    # ③ 完成度以 watch_history 为准（播放器上报的进度快照）
     history = db.query(WatchHistory).filter(WatchHistory.user_id == resolved_id).all()
     history_video_ids = {h.video_id for h in history}
     completed_ids = {h.video_id for h in history if h.completed}
 
-    # 「开始过」要把历史快照也算进来：新埋点上线前的老数据只有 history
     videos_started = len(event_video_ids | history_video_ids)
     videos_completed = len(completed_ids)
     completion_rate = round(videos_completed / videos_started, 4) if videos_started else 0.0
 
-    # 单次会话时长：按 session_id 聚合，没有 session_id 的按天退化
-    session_secs: dict[str, float] = defaultdict(float)
-    for event in events:
-        key = event.session_id or (event.occurred_at.strftime("%Y%m%d") if event.occurred_at else "unknown")
-        session_secs[key] += float(event.delta_sec or 0)
-    session_minutes = [secs / 60 for secs in session_secs.values() if secs >= 60]
+    # ④ 单次会话时长：有 session_id 的按会话聚合；
+    #    没有 session_id 的老数据按天退化（不能丢，否则老用户画像全是 0）
+    session_secs = dict(
+        db.query(WatchEvent.session_id, func.sum(WatchEvent.delta_sec))
+        .filter(WatchEvent.user_id == resolved_id, WatchEvent.session_id.isnot(None))
+        .group_by(WatchEvent.session_id)
+        .all()
+    )
+    legacy_day_secs = dict(
+        db.query(
+            func.date(WatchEvent.occurred_at).label("d"),
+            func.sum(WatchEvent.delta_sec),
+        )
+        .filter(WatchEvent.user_id == resolved_id, WatchEvent.session_id.is_(None))
+        .group_by("d")
+        .all()
+    )
+    session_minutes = [
+        secs / 60
+        for secs in list(session_secs.values()) + list(legacy_day_secs.values())
+        if secs and secs >= 60
+    ]
     avg_session_min = round(sum(session_minutes) / len(session_minutes), 1) if session_minutes else 0.0
 
-    active_days = len({e.occurred_at.date() for e in events if e.occurred_at and e.delta_sec > 0})
-    last_active = max((e.occurred_at for e in events if e.occurred_at), default=None)
+    # ⑤ 活跃天数：全量一次、30 天一次
+    active_days = (
+        db.query(func.count(distinct(func.date(WatchEvent.occurred_at))))
+        .filter(WatchEvent.user_id == resolved_id, WatchEvent.delta_sec > 0)
+        .scalar()
+    ) or 0
 
-    notes_query = db.query(func.count(Note.id))
-    notes_count = notes_query.scalar() or 0
+    active_days_30d = (
+        db.query(func.count(distinct(func.date(WatchEvent.occurred_at))))
+        .filter(
+            WatchEvent.user_id == resolved_id,
+            WatchEvent.delta_sec > 0,
+            WatchEvent.occurred_at >= since_30d,
+        )
+        .scalar()
+    ) or 0
+
+    # ⑥ 笔记数：只数本人 private。shared 是 AI 转写产物，
+    #    属于共享视频库，不该算进「我写的笔记」。
+    notes_count = (
+        db.query(func.count(Note.id))
+        .filter(Note.user_id == resolved_id, Note.scope == "private")
+        .scalar()
+    ) or 0
 
     profile = db.query(UserProfile).filter(UserProfile.user_id == resolved_id).first()
     if profile is None:
@@ -181,9 +255,7 @@ def recompute_profile(db: Session, user_id: int | None = None) -> UserProfile:
     profile.videos_completed = videos_completed
     profile.completion_rate = completion_rate
     profile.avg_session_min = avg_session_min
-    profile.active_days_30d = len(
-        {e.occurred_at.date() for e in events if e.occurred_at and e.occurred_at >= since_30d and e.delta_sec > 0}
-    )
+    profile.active_days_30d = int(active_days_30d)
     profile.streak_days = _streak_days(db, resolved_id)
     profile.notes_count = int(notes_count)
     profile.active_hours = _hour_histogram(db, resolved_id, since_30d)

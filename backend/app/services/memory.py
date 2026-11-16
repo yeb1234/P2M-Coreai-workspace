@@ -148,7 +148,24 @@ def maybe_compress(db: Session, session_id: str, *, force: bool = False) -> bool
     """消息过多时把较早的部分压成摘要，避免上下文无限增长。
 
     压缩失败不影响对话——保留原文比丢历史更安全。
+
+    ## 事务边界：LLM 调用不在事务里
+
+    原来整个函数是一个事务：三个 SELECT 之后直接在事务内调
+    model.invoke()（timeout 20s）。那 20 秒里连接一直是
+    `idle in transaction` —— 持有快照、挡住 vacuum、DDL 也会排在它后面。
+    这跟之前修过的「缩略图 worker 把 ffmpeg 夹在 SELECT 和 commit 之间、
+    把 videos 表的 ALTER TABLE 卡了 12 分钟」是同一类问题：
+    **事务不能跨越耗时操作**。
+
+    现在是三段式：
+      读（短事务）→ rollback 释放 → 调 LLM（无事务）→ 写（短事务）
+
+    db 是调用方专门为这次操作开的 Session（routers/assistant.py 里的
+    SessionLocal()），且 append_message 已经 commit 过，所以中间的
+    rollback 不会丢掉任何未提交的更改。
     """
+    # ─── ① 读：取完数据立刻释放事务 ───
     session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
     if session is None:
         return False
@@ -157,7 +174,6 @@ def maybe_compress(db: Session, session_id: str, *, force: bool = False) -> bool
     if total <= COMPRESS_THRESHOLD and not force:
         return False
 
-    # 取除最近 KEEP_RECENT 条以外的所有消息
     to_compress = (
         db.query(ChatMessage)
         .filter(ChatMessage.session_id == session_id)
@@ -168,9 +184,16 @@ def maybe_compress(db: Session, session_id: str, *, force: bool = False) -> bool
     if not to_compress:
         return False
 
-    transcript = "\n".join(f"{m.role}: {m.content[:400]}" for m in to_compress)
+    # 落成普通变量：rollback 之后 ORM 对象会过期，再访问属性会重新开事务
+    transcript = "\n".join(f"{msg.role}: {msg.content[:400]}" for msg in to_compress)
     previous = session.summary or "(无)"
+    last_id = to_compress[-1].id
+    compressed_count = len(to_compress)
 
+    # 读阶段结束，显式结束事务，把连接还给池子
+    db.rollback()
+
+    # ─── ② 无事务：调 LLM（最慢的一步） ───
     try:
         from app.services.llm import build_chat_model
 
@@ -190,14 +213,21 @@ def maybe_compress(db: Session, session_id: str, *, force: bool = False) -> bool
     if not isinstance(summary, str) or not summary.strip():
         return False
 
+    # ─── ③ 写：短事务，重新取一次（这期间别人可能也压过） ───
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if session is None:
+        return False
+
+    # 期间已经被别的请求压得更远，就不要用旧结果覆盖
+    if not force and (session.summary_upto_message_id or 0) >= last_id:
+        db.rollback()
+        return False
+
     session.summary = summary.strip()
-    session.summary_upto_message_id = to_compress[-1].id
+    session.summary_upto_message_id = last_id
     db.commit()
-    logger.info("会话 %s 已压缩 %s 条消息", session_id, len(to_compress))
+    logger.info("会话 %s 已压缩 %s 条消息", session_id, compressed_count)
     return True
-
-
-# ==================== 长期记忆 ====================
 
 
 def add_memory(
