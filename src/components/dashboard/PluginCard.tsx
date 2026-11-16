@@ -77,7 +77,7 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
       }}
       onDragEnd={() => onDragEnd?.()}
     >
-      <div className="bg-[var(--bg-card)] rounded-2xl md:rounded-xl border border-[var(--border-light)] shadow-sm overflow-hidden flex flex-col h-full">
+      <div className="bg-[var(--bg-card)] rounded-[var(--r-2)] border border-[var(--border-light)] shadow-[var(--shadow-1)] hover:shadow-[var(--shadow-2)] overflow-hidden flex flex-col h-full transition-shadow">
         <div className="flex items-center justify-between px-4 py-2.5 md:px-3 md:py-2 border-b border-[var(--border-light)]">
           <div className="flex items-center gap-2 min-w-0">
             <span className={plugin.metadata.color}>{plugin.metadata.icon}</span>

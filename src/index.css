@@ -45,6 +45,31 @@
   --danger-bg: #fef2f2;
   --shadow-wood: 4px 6px 0px rgba(0,0,0,0.08), 6px 10px 24px rgba(0,0,0,0.15);
 
+  /* ─── 圆角阶梯 ───
+   * 组件里 4/6/8/10/12/16/20px 混着用，同屏出现三种以上圆角的卡片
+   * 会显得随意。收敛成三档：控件 / 卡片 / 容器。
+   */
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 14px;
+
+  /* ─── 阴影阶梯 ───
+   * 原来的 --shadow-card 是 1px 1px 0 rgba(...,0.06)，等于没有 ——
+   * 卡片全靠边框浮起，层级只能靠颜色区分。两级轻投影够用。
+   *
+   * 刻意不叫 --shadow-card：那个变量由主题系统（lib/themes.ts）注入，
+   * 14 个主题各有各的定义。这两个是结构性 token，不该被主题覆盖。
+   */
+  --shadow-1: 0 1px 2px rgba(60, 48, 32, 0.06), 0 1px 3px rgba(60, 48, 32, 0.05);
+  --shadow-2: 0 2px 6px rgba(60, 48, 32, 0.08), 0 8px 20px rgba(60, 48, 32, 0.06);
+
+  /* ─── 过渡 ───
+   * 统一曲线和时长。原来有的地方 100ms、有的 300ms、有的没写。
+   * 160ms + 这条曲线接近物理感，不飘。
+   */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur: 160ms;
+
   /* Legacy compat */
   --accent-warm: var(--accent);
 }
@@ -266,7 +291,11 @@ body {
   grid-template-columns: repeat(3, 1fr);
   grid-auto-flow: dense;
   gap: 14px;
-  align-items: stretch;
+  /* 原来是 stretch：同一行所有卡片被拉到最高那个的高度，
+     内容少的卡片（待办 0 条、今日无事件）下半截全是空白白块。
+     改成 start 后卡片高度 = 内容高度，空白落到纸面背景上而不是卡片里。
+     代价是同一行高度会参差 —— 但那比「三个大白块各空一半」好看得多。 */
+  align-items: start;
 }
 @media (max-width: 1024px) {
   .dashboard-grid {
@@ -287,7 +316,14 @@ body {
   flex-direction: column;
   min-width: 0;
   grid-column: span 1;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 只过渡 transform / box-shadow —— `all` 会让拖拽时的每一次
+     grid 重排都触发过渡，观感上像整块在抖。 */
+  transition:
+    transform var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+.plugin-card:hover {
+  transform: translateY(-1px);
 }
 .plugin-card[data-size="large"] {
   grid-column: span 2;
@@ -308,7 +344,6 @@ body {
   }
 }
 .plugin-card > div {
-  flex: 1;
   display: flex;
   flex-direction: column;
 }

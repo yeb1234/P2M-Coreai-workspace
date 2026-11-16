@@ -321,16 +321,31 @@ export const AIChatPanel: React.FC = () => {
         </button>
       </div>
 
-      <div className="px-3 py-2 border-b border-[var(--border-light)] bg-[var(--bg-elevated)]">
-        <p className="text-xs text-[var(--text-muted)]">当前模板</p>
-        <p className="text-xs font-medium text-[var(--text-primary)] truncate">{activeTemplate?.name ?? '默认模板'}</p>
+      <div className="flex items-center gap-2 border-b border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-1.5">
+        <span className="shrink-0 text-[11px] text-[var(--text-muted)]">模板</span>
+        <span className="truncate text-xs font-medium text-[var(--text-primary)]">{activeTemplate?.name ?? '默认模板'}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
-          <div className="text-xs leading-6 text-[var(--text-muted)]">
-            可以问我：库里有讲 X 的视频吗 / 我最近学得怎么样 / 下一步该学什么。
-            回答会带上视频名与时间点，点一下直接跳到那一秒。
+          <div className="space-y-2">
+            <p className="text-xs text-[var(--text-muted)]">试试这样问：</p>
+            {[
+              '库里有讲 React Hooks 的视频吗',
+              '我最近学得怎么样',
+              '下一步该学什么',
+            ].map((q) => (
+              <button
+                key={q}
+                onClick={() => setInput(q)}
+                className="w-full rounded-[var(--r-1)] border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-2 text-left text-xs leading-5 text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--text-primary)]"
+              >
+                {q}
+              </button>
+            ))}
+            <p className="pt-1 text-[11px] leading-5 text-[var(--text-muted)]">
+              回答会带上视频名与时间点，点一下直接跳到那一秒。
+            </p>
           </div>
         )}
         {messages.map((message) => (
@@ -404,13 +419,14 @@ export const AIChatPanel: React.FC = () => {
                 void sendMessage();
               }
             }}
-            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-            className="min-h-[42px] max-h-28 flex-1 resize-none text-xs bg-[var(--bg-elevated)]"
+            placeholder="发消息…"
+            title="Enter 发送，Shift+Enter 换行"
+            className="min-h-[40px] max-h-28 flex-1 resize-none rounded-[var(--r-1)] border border-[var(--border-light)] bg-[var(--bg-card)] px-2.5 py-[10px] text-xs leading-5 text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
           />
           {loading ? (
             <button
               onClick={stopStreaming}
-              className="self-end p-2 rounded-lg border border-[var(--danger)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
+              className="self-end rounded-[var(--r-1)] border border-[var(--danger)] p-2.5 text-[var(--danger)] transition-colors hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
               title="停止生成"
             >
               <X size={15} />
@@ -419,7 +435,7 @@ export const AIChatPanel: React.FC = () => {
             <button
               onClick={() => void sendMessage()}
               disabled={!input.trim()}
-              className="self-end p-2 rounded-lg bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-50"
+              className="self-end rounded-[var(--r-1)] bg-[var(--accent)] p-2.5 text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
               title="发送"
             >
               <Send size={15} />
