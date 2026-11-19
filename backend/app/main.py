@@ -18,6 +18,7 @@ from app.core.observability import RequestContextMiddleware, setup_from_settings
 from app.database import SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
 from app.routers import admin, agent_actions, ai_jobs, assistant, auth, calendar_events, categories, interview, learning, mcp, memory_admin, notes, schedule_items, search, user_data, videos, watch_events
+from app.routers import asset_registry
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
 
@@ -198,7 +199,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="P2 Learning OS API",
-    version="6.0.0",
+    version="7.0.0",
     lifespan=lifespan,
     docs_url="/api/docs" if settings.enable_docs else None,
     openapi_url="/api/openapi.json" if settings.enable_docs else None,
@@ -260,6 +261,7 @@ app.include_router(calendar_events.router)
 app.include_router(mcp.router)
 app.include_router(interview.router)
 app.include_router(admin.router)
+app.include_router(asset_registry.router)
 
 app.mount("/output", StaticFiles(directory=settings.output_dir), name="output")
 app.mount("/thumbnails", StaticFiles(directory=settings.thumbnail_dir), name="thumbnails")
@@ -428,3 +430,4 @@ async def serve_spa(request: Request, full_path: str):
             },
         )
     return {"message": "P2 Learning OS API", "video_folder": settings.video_folder}
+

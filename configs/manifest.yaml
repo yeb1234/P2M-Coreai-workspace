@@ -1,0 +1,39 @@
+# 配置资产版本库清单。
+#
+# 只有列在这里的文件会被版本库前端展示、允许提交；其他文件可以存在，
+# 但不会被资产页误改。path 相对 configs/ 根目录。
+repo:
+  slug: siteyeb-config
+  name: SiteYeb 运行时配置
+  default_branch: main
+  description: 提示词、检索、向量、LLM 路由、数据库与工具治理的统一版本库
+assets:
+  - path: prompts/runtime_prompts.py
+    category: prompt
+    title: 后端运行时提示词
+    editable: true
+  - path: prompts/clientPrompts.ts
+    category: prompt
+    title: 前端意图与模板提示词
+    editable: true
+  - path: retrieval.yaml
+    category: retrieval
+    title: 混合检索与重排参数
+    editable: true
+  - path: vector.yaml
+    category: vector
+    title: 向量化与 HNSW 参数
+    editable: true
+  - path: llm.yaml
+    category: llm
+    title: LLM 路由、降级与预算
+    editable: true
+  - path: database.yaml
+    category: database
+    title: 数据库连接池与迁移基线
+    editable: true
+  - path: governance.yaml
+    category: governance
+    title: 工具治理与运行时预算
+    editable: true
+

@@ -1,0 +1,27 @@
+# LLM 路由与降级策略（只放非密钥配置）。
+#
+# API Key、Base URL 属于运行时秘密，仍在 AppSetting / .env 中管理。
+# 这里版本化的是「用哪条通道、什么顺序、超时多少、失败几次降级」，
+# 便于对比 6.0 与 7.0 的行为差异。
+
+version: 1
+usage_policy: local_first      # local_first | external_first | local_only | external_only
+local:
+  model: qwen3-8b-instruct
+  timeout_s: 45
+  max_retries: 2
+  concurrency: 2
+external:
+  model: deepseek-v4.1-flash
+  timeout_s: 60
+  max_retries: 2
+  concurrency: 3
+fallback:
+  enabled: true
+  max_attempts: 2
+  cooldown_s: 30
+budget:
+  max_prompt_chars: 24000
+  max_output_tokens: 2048
+  per_run_tool_calls: 8
+  per_run_write_calls: 1

@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     db_echo: bool = False
 
     # ---------------- 路径 ----------------
-    video_folder: str = str(ROOT_DIR / "video-library")
+    video_folder: str = str(ROOT_DIR / "data" / "video-library")
     # ---- 日志 ----
     log_level: str = "INFO"
     # 为空则只走 stdout（交给 docker 采集）；设了目录就额外写一份 JSONL 到磁盘。
@@ -224,7 +224,7 @@ settings = Settings()
 
 # 路径统一先归一化，再从 video_folder 派生缺省产物目录。
 # 这样 .env 里写 ./video-library 也能在任意启动目录下稳定落到项目根。
-settings.video_folder = _resolve_project_path(settings.video_folder) or str(ROOT_DIR / "video-library")
+settings.video_folder = _resolve_project_path(settings.video_folder) or str(ROOT_DIR / "data" / "video-library")
 
 # 兼容既有代码里 settings.work_dir / output_dir / thumbnail_dir / sprite_dir 的读取
 if not settings.work_dir:

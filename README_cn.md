@@ -1,14 +1,15 @@
 # SiteYeb / P2M 个人 IT 学习工作台
 
-> 状态：现行（最后校对 2026-11-20）
-> 当前发布：6.0.0 SmartAgents（2026-11-20）
+> 状态：现行（最后校对 2026-11-21）
+> 当前发布：7.0.0 Framework Registry（2026-11-21）
 
-> **6.0 SmartAgents（2026-11-20）**
+> **7.0 Framework Registry（2026-11-21）**
 >
-> 工具契约与模型通道解耦：意图只决定本轮工具集，工具由同一套注册表、预算、超时、熔断与审计层执行；
-> 本地 LLM 与外部 LLM 可切换、可降级，工具权限和确认边界不随模型变化。
-> 写动作走 LangGraph HITL 确认卡，确认后才落库；每轮最多 1 个写动作，写入后生成动作回执并支持撤回。
-> 详见 [docs/2026-11-20-6.0-smartagents-release.md](docs/2026-11-20-6.0-smartagents-release.md)。
+> 仓库改为标准 monorepo：`frontend/ backend/ configs/ infra/ ops/ artifacts/ data/ docs/`。
+> 提示词、检索 / 向量参数、LLM 路由、数据库与工具治理配置纳入 PostgreSQL 原生版本库，
+> 支持提交、分支、标签、diff、三路合并、回滚、发布写回与审计；入口在设置 → 配置资产（管理员），
+> 也可单独打开 `/#/asset-registry`。
+> 详见 [docs/2026-11-21-7.0-framework-overhaul.md](docs/2026-11-21-7.0-framework-overhaul.md)。
 
 一个本地优先的个人学习工作台：React 前端 + FastAPI 后端 + PostgreSQL 17（pgvector）+ Redis（RQ 队列）。适合个人日常使用，也适合在局域网里给小团队、工作室或家庭设备改造使用。当前不是开箱即用的公网 SaaS，更像一个可以继续加固、继续接 AI 能力的开源底座。
 
@@ -61,11 +62,11 @@
 - **6.0 SmartAgents 的核心是「工具契约与模型通道解耦」**：意图只决定本轮工具集，工具仍由同一套注册表、预算、超时、熔断和审计层执行；本地 LLM 与外部 LLM 可以按兜底策略切换，模型换了，工具契约和权限边界不变。
 - 写动作走人工确认：保存笔记、日历、Todo 由 LangGraph `interrupt` 弹出确认卡，确认后才写库；每轮最多 1 个写动作，写入后生成动作回执，可在消息里撤回。审计落在 `AgentAction`，工具轨迹落在 `AgentRun.steps`。
 - 支持本地 LLM 与 OpenAI-compatible 外部 LLM，按设置页兜底策略在两个通道间切换；429 / 5xx / 超时退避重试，鉴权与路径错误立即换下一家。
-- 意图识别在前端完成（根目录 `prompts/clientPrompts.ts`）：6 类有序正则（课程推荐 / 学习路径 / 学习总结 / 代码助手 / 任务拆解 / 知识问答），识别不出才退回手选模板。
+- 意图识别在前端完成（`configs/prompts/clientPrompts.ts`）：6 类有序正则（课程推荐 / 学习路径 / 学习总结 / 代码助手 / 任务拆解 / 知识问答），识别不出才退回手选模板。
 - 记忆系统四层：`ChatMessage` 原文 / 会话摘要（超 24 条压缩、保留最近 10 条）/ `MemoryItem` 长期记忆条目 / `UserData` 档案 KV；对话结束后异步抽取记忆。
-- 检索三路召回：词法（pg_trgm + ILIKE）+ 向量（HNSW halfvec）+ 视频级元数据，加权 RRF 融合；`RRF_K=60`，权重 lexical `0.8` / vector `1.2` / meta `1.5`，`candidate_k=30`，`rerank_top_n=20`；重排 API 失败时退回 LLM 重排。
+- 检索三路召回：词法（pg_trgm + ILIKE）+ 向量（HNSW halfvec）+ 视频级元数据，加权 RRF 融合；参数集中在 `configs/retrieval.yaml`（`RRF_K=60`，lexical `0.8` / vector `1.2` / meta `1.5`，`candidate_k=30`，`rerank_top_n=20`）；重排 API 失败时退回 LLM 重排。
 
-> 「相关片段」卡片 2026-11-16 起由 `src/config/features.ts` 的 `FEATURES.chatVideoReferences` 开关关闭（默认 `false`）。关闭只影响渲染：`ReferenceBlock`、`dedupeReferences` 和后端 `chat_agent` 的 references 生成都保留，改回 `true` 重建前端即恢复；后端仍照常生成 references，只是前端不渲染。
+> 「相关片段」卡片 2026-11-16 起由 `frontend/src/config/features.ts` 的 `FEATURES.chatVideoReferences` 开关关闭（默认 `false`）。关闭只影响渲染：`ReferenceBlock`、`dedupeReferences` 和后端 `chat_agent` 的 references 生成都保留，改回 `true` 重建前端即恢复；后端仍照常生成 references，只是前端不渲染。
 
 ### 界面
 
@@ -78,23 +79,23 @@
 
 ```bash
 cp .env.example .env      # 填 POSTGRES_PASSWORD、JWT_SECRET、EXTERNAL_LLM_API_KEY
-docker compose up -d --build
-# 或 Windows 双击 start.bat 选 [1]；./start.sh 完整启动
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+# 或 Windows 双击 ops\start.bat 选 [1]；./ops/start.sh 完整启动
 ```
 
 一次起全套：PostgreSQL(pgvector) + Redis + backend + worker + frontend。
 GPU 转写、数据迁移、常见问题见 [docs/docker.md](docs/docker.md)。
 
 视频库位置、相对路径与跨盘挂载见 [docs/runtime-paths.md](docs/runtime-paths.md)。默认约定是：
-Docker 用 `.env` 的 `VIDEO_HOST_PATH=./video-library` 挂到容器 `/videos`；容器内的
+Docker 用 `.env` 的 `VIDEO_HOST_PATH=../data/video-library` 挂到容器 `/videos`；容器内的
 `VIDEO_FOLDER` 始终是 `/videos`，不要改成宿主机的 `D:/ITJC`。项目在 C 盘、素材在 D 盘时，
-用 junction / symlink 在项目内建 `video-library` 挂载点，配置保持相对路径。
+用 junction / symlink 在 `data/video-library` 建挂载点，配置保持相对路径。
 
 只要页面、不起 worker：
 
 ```bash
-docker compose up -d postgres redis backend frontend
-# 或 ./start.sh web
+docker compose --env-file .env -f infra/docker-compose.yml up -d postgres redis backend frontend
+# 或 ./ops/start.sh web
 ```
 
 ### 方式二：前端本地开发（改 UI 用这个）
@@ -102,6 +103,7 @@ docker compose up -d postgres redis backend frontend
 后端跑在容器里，只起 Vite 热更新：
 
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
@@ -150,36 +152,39 @@ GPU / 外部引擎路线主要是 `whisper.cpp`。因为本机为了 A 卡做过
 
 ```text
 SiteYeb/
-  src/                  React 前端
-    config/             页面注册表 pageRegistry、功能开关 features
-    components/         页面、布局、通用组件
-    stores/             Zustand 状态（13 个）
-    hooks/              跨模块同步和恢复逻辑（13 个）
-    plugins/            工作台插件（5 个）
-    lib/                API、提示词、工具函数
-    types/              TypeScript 类型
-  prompts/              前端提示词与意图识别（clientPrompts.ts）
-  backend/app/          FastAPI 后端
-    routers/            API 路由（14 个业务路由）
-    services/           扫描、转录、检索、AI、记忆、管理服务（39 个）
-    agents/             chat_agent / plan_agent / tools
-    models.py           21 个 ORM 模型
-    worker.py           RQ worker（ai_jobs + background 两个队列）
-  docs/                 设计记录、踩坑记录、更新日志
-  scripts/              诊断、日志查询、检索评估等脚本
-  public/sounds/        本地提示音和背景音
+  frontend/             React 前端
+    src/                页面、组件、状态、hooks、插件、API 客户端
+    tests/              契约测试与 e2e
+    public/             静态资源与独立入口页（asset-registry.html）
+  backend/              FastAPI 后端
+    app/                routers / services / agents / models / worker
+    alembic/            数据库迁移
+    tests/              pytest
+  configs/              运行时配置与资产基线
+    prompts/            前端意图提示词与后端运行时提示词
+    retrieval.yaml      检索、RRF、重排参数
+    vector.yaml         embedding、分块、HNSW 参数
+    llm.yaml            LLM 路由与预算（不含密钥）
+    database.yaml       连接池、超时、迁移基线
+    governance.yaml     工具预算与审计策略
+  infra/                docker-compose、nginx、Caddy、HTTPS/GPU/腾讯云编排
+  ops/                  启动脚本、停止脚本、诊断与运维脚本
+  artifacts/            demo、监控面板、设计稿、面试资料等可交付展示物
+  data/                 运行时数据（视频库、日志、缓存、模型、legacy），默认不入库
+  docs/                 设计记录、发布说明、踩坑与运维文档
 ```
 
 ## 测试
 
 ```bash
+cd frontend
 npm test
 npm run build
 npm run test:e2e
-cd backend && python -m compileall app
+cd ../backend && python -m compileall app
 ```
 
-测试盘点（截至 2026-11-16）：`src/__tests__` 28 个前端测试文件；`backend/tests` 5 个后端测试文件；仓库根 `tests/` 下只有 `contracts` 与 `e2e` 两个目录，后端没有 API 级集成测试。
+测试基线（7.0）：前端 34 文件 / 335 项；后端容器内 62 项；工具路由评估 72 cases / 1 probe / 0 failures。
 
 ## 参与
 
@@ -189,10 +194,20 @@ cd backend && python -m compileall app
 
 如果要给小团队使用，建议优先补账号权限、备份恢复、HTTPS / 反向代理、安全审计和 AI 调用限制。
 
+## 配置资产版本库
+
+7.0 把 7 个配置资产纳入 PostgreSQL 原生版本库，由后端提供 Git 风格 API，前端设置页提供管理界面：
+
+- 入口：管理员登录后，设置 → 配置资产；或直接打开 `/asset-registry.html` / `/#/asset-registry`。
+- 纳管清单：`configs/manifest.yaml`，当前 7 个文件（前后端提示词、检索、向量、LLM、数据库、工具治理）。
+- 操作：编辑 → 提交；新建分支 / 标签；对比上一提交；合并；回滚；发布 HEAD 原子写回 `configs/`；审计日志。
+- 发布后：后端读取新配置会热刷新；已加载旧提示词的 worker 需要重启后生效。
+- 权限：仅 `role=admin` 可见可写；版本库只存文本 blob，不依赖外部 Git 服务。
+
 ## 文档
 
 设计记录、踩坑记录、更新日志与部署说明的完整索引见 [docs/README.md](docs/README.md)（文档索引统一维护）。
-根目录 `CHANGELOG.md` 记录用户可感知的功能变化，`BUGFIXES.md` 记录缺陷修复，`PERFORMANCE.md` 记录性能改动。
+根目录 `CHANGELOG.md` 记录用户可感知的功能变化，`docs/BUGFIXES.md` 记录缺陷修复，`docs/PERFORMANCE.md` 记录性能改动。
 
 ## License
 

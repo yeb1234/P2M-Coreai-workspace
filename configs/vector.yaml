@@ -1,0 +1,26 @@
+# 向量库与 embedding 的非密钥参数。
+#
+# 连接地址、密钥仍在 .env / AppSetting 中，不进版本库；这里是可评审、
+# 需要版本化的算法参数。
+
+version: 1
+embedding:
+  model: text-embedding-bge-m3@q8_0
+  dim: 1024
+  batch_size: 16
+  timeout_s: 120
+  normalize: true
+chunking:
+  target_tokens: 512
+  overlap_tokens: 64
+  min_tokens: 32
+  max_tokens: 900
+hnsw:
+  m: 16
+  ef_construction: 64
+  ef_search: 40
+rerank:
+  enabled: true
+  model: BAAI/bge-reranker-v2-m3
+  top_n: 20
+  min_score: 0.02

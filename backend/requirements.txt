@@ -34,3 +34,5 @@ faster-whisper==1.0.3
 watchdog==5.0.3
 requests==2.32.3
 PyJWT==2.9.0
+# 7.0 运行时配置从 configs/*.yaml 读取
+PyYAML==6.0.3

@@ -708,3 +708,131 @@ class InterviewQuestionReport(Base):
     created_at = Column(DateTime, default=datetime.now, index=True)
     resolved_at = Column(DateTime, nullable=True)
 
+
+# ─────────────────────────────────────────────────────────────
+# 7.0 配置资产版本库（DB-native Git）
+#
+# 为什么不直接用外部 Git 服务：提示词、检索参数、LLM 路由这些资产属于
+# 应用运行时的一部分，需要在设置页里直接提交/对比/发布，并且和生产库
+# 的生命周期绑定。这里用 PostgreSQL 存内容快照与提交图，不依赖 Git
+# 二进制，也不把密钥写进版本库。
+# ─────────────────────────────────────────────────────────────
+
+
+class AssetRepository(Base):
+    __tablename__ = "asset_repositories"
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(80), unique=True, nullable=False, index=True)
+    name = Column(String(160), nullable=False)
+    description = Column(Text, nullable=True)
+    default_branch = Column(String(80), nullable=False, default="main")
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class AssetBranch(Base):
+    __tablename__ = "asset_branches"
+    __table_args__ = (
+        UniqueConstraint("repo_id", "name", name="uix_asset_branch_repo_name"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    repo_id = Column(Integer, ForeignKey("asset_repositories.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(80), nullable=False)
+    head_hash = Column(String(64), nullable=True)
+    is_default = Column(Boolean, nullable=False, default=False)
+    protected = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class AssetCommit(Base):
+    __tablename__ = "asset_commits"
+    __table_args__ = (
+        Index("ix_asset_commits_repo_created", "repo_id", "created_at"),
+        Index("ix_asset_commits_parent", "repo_id", "parent_hash"),
+    )
+
+    hash = Column(String(64), primary_key=True)
+    repo_id = Column(Integer, ForeignKey("asset_repositories.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_hash = Column(String(64), nullable=True)
+    # 合并提交的第二个父提交；普通提交为空。
+    parent2_hash = Column(String(64), nullable=True)
+    tree_hash = Column(String(64), nullable=False, index=True)
+    message = Column(Text, nullable=False, default="")
+    author_id = Column(Integer, nullable=True)
+    author_name = Column(String(120), nullable=False, default="system")
+    kind = Column(String(20), nullable=False, default="commit")  # seed/commit/merge/rollback
+    created_at = Column(DateTime, default=datetime.now, index=True)
+
+
+class AssetBlob(Base):
+    __tablename__ = "asset_blobs"
+
+    hash = Column(String(64), primary_key=True)
+    size = Column(Integer, nullable=False, default=0)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+
+class AssetEntry(Base):
+    __tablename__ = "asset_entries"
+    __table_args__ = (
+        UniqueConstraint("commit_hash", "path", name="uix_asset_entry_commit_path"),
+        Index("ix_asset_entries_path", "path"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    commit_hash = Column(String(64), ForeignKey("asset_commits.hash", ondelete="CASCADE"), nullable=False, index=True)
+    path = Column(String(400), nullable=False)
+    blob_hash = Column(String(64), ForeignKey("asset_blobs.hash", ondelete="RESTRICT"), nullable=False)
+    mode = Column(String(20), nullable=False, default="100644")
+    size = Column(Integer, nullable=False, default=0)
+
+
+class AssetTag(Base):
+    __tablename__ = "asset_tags"
+    __table_args__ = (
+        UniqueConstraint("repo_id", "name", name="uix_asset_tag_repo_name"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    repo_id = Column(Integer, ForeignKey("asset_repositories.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(80), nullable=False)
+    commit_hash = Column(String(64), ForeignKey("asset_commits.hash", ondelete="CASCADE"), nullable=False)
+    message = Column(Text, nullable=True)
+    created_by = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+
+
+class AssetAuditEvent(Base):
+    __tablename__ = "asset_audit_events"
+    __table_args__ = (
+        Index("ix_asset_audit_repo_created", "repo_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    repo_id = Column(Integer, ForeignKey("asset_repositories.id", ondelete="CASCADE"), nullable=False, index=True)
+    action = Column(String(40), nullable=False, index=True)
+    actor_id = Column(Integer, nullable=True)
+    actor_name = Column(String(120), nullable=False, default="system")
+    detail = Column(JsonColumn, nullable=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+
+
+class AssetPublication(Base):
+    __tablename__ = "asset_publications"
+    __table_args__ = (
+        Index("ix_asset_publications_repo_created", "repo_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    repo_id = Column(Integer, ForeignKey("asset_repositories.id", ondelete="CASCADE"), nullable=False, index=True)
+    commit_hash = Column(String(64), ForeignKey("asset_commits.hash", ondelete="CASCADE"), nullable=False)
+    branch = Column(String(80), nullable=True)
+    status = Column(String(20), nullable=False, default="published")
+    files_count = Column(Integer, nullable=False, default=0)
+    actor_id = Column(Integer, nullable=True)
+    detail = Column(JsonColumn, nullable=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)

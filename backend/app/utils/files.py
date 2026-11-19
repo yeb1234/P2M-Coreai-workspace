@@ -51,8 +51,8 @@ def _implicit_video_roots() -> list[str]:
     目录结构迁移后，同一个视频库可能以不同前缀出现：
     - 容器内 `/videos`
     - 旧数据库的 `D:/ITJC`
-    - 仓库里的 `./video-library`（Windows Junction 到 D:/ITJC）
-    - 宿主机绝对路径 `C:/SiteYeb/video-library`
+    - 仓库里的 `./data/video-library`（Windows Junction 到 D:/ITJC）
+    - 宿主机绝对路径 `C:/SiteYeb/data/video-library`
 
     这里不做硬编码迁移，只在原路径不存在时互相尝试。显式 PATH_MAP
     仍然优先；这个列表只兜底“路径前缀换了、文件其实还在”的情况。
@@ -60,8 +60,8 @@ def _implicit_video_roots() -> list[str]:
     return [
         "/videos",
         "D:/ITJC",
-        "./video-library",
-        "C:/SiteYeb/video-library",
+        "./data/video-library",
+        "C:/SiteYeb/data/video-library",
     ]
 
 

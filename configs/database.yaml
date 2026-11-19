@@ -1,0 +1,22 @@
+# 数据库、连接池与治理开关。
+#
+# 密码与 DSN 不进版本库，只在 .env 中；这里记录可评审的连接策略。
+
+version: 1
+postgres:
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout_s: 30
+  pool_recycle_s: 3600
+  statement_timeout_ms: 30000
+  lock_timeout_ms: 10000
+  idle_in_transaction_timeout_ms: 60000
+migration:
+  # 7.0 基线；运行时以 alembic heads 为准，本字段用于展示与审计。
+  baseline_revision: d7e8f9a0b1c2
+  require_upgrade_before_start: false
+governance:
+  audit_retention_days: 180
+  agent_action_retention_days: 365
+  enable_query_audit: true
+  enable_asset_publish_audit: true

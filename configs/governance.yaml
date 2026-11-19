@@ -1,0 +1,21 @@
+# Agent 工具治理与运行时预算。
+#
+# 7.0 把 6.0 散落在代码里的白名单/预算外置，发布前可在这里评审。
+
+version: 1
+tool_policy:
+  max_tools_per_turn: 8
+  max_write_calls_per_turn: 1
+  require_confirmation_for_writes: true
+  max_retries_per_tool: 2
+  tool_timeout_s: 20
+  per_tool_rate_limit_per_minute: 30
+personal_actions:
+  save_note: 1
+  summarize_and_save_note: 1
+  create_calendar_event: 1
+  create_todo: 1
+audit:
+  record_agent_actions: true
+  record_tool_calls: true
+  redact_secrets_in_logs: true

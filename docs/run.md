@@ -1,6 +1,6 @@
 # 怎么把服务跑起来
 
-> 状态：事实已核实（核对基线 2026-11-16）
+> 状态：事实已核实（核对基线 2026-11-21，7.0 monorepo）
 
 这份文档回答两个问题：**为什么启动方式和以前不一样了**，以及**本机/服务器上分别怎么起、起完看哪里**。容器组成、镜像、卷的口径见 `docs/docker.md`。
 
@@ -10,7 +10,7 @@
 
 ## 二、容器启动（默认路径）
 
-### Windows：`start.bat`
+### Windows：`ops\start.bat`
 
 ```
 [1] Full stack   db + redis + backend + worker + web（AI 转写/索引需要 worker）
@@ -23,27 +23,27 @@
 [0] Exit
 ```
 
-依据：`start.bat:48-59`。
+依据：`ops/start.bat`。
 
-### Linux / macOS / WSL：`start.sh`
+### Linux / macOS / WSL：`ops/start.sh`
 
 ```bash
-./start.sh            # full，全部服务（默认）
-./start.sh web        # web-only，不带 worker
-./start.sh backend    # 重建 + 重启 backend & worker
-./start.sh frontend   # 重建 + 重启 frontend
-./start.sh stop       # 停止，卷保留
-./start.sh status     # 服务状态 + 探针
-./start.sh logs        # 跟后端日志
+./ops/start.sh            # full，全部服务（默认）
+./ops/start.sh web        # web-only，不带 worker
+./ops/start.sh backend    # 重建 + 重启 backend & worker
+./ops/start.sh frontend   # 重建 + 重启 frontend
+./ops/start.sh stop       # 停止，卷保留
+./ops/start.sh status     # 服务状态 + 探针
+./ops/start.sh logs       # 跟后端日志
 ```
 
-依据：`start.sh:9-16,44-87`。
+依据：`ops/start.sh`。
 
-两条脚本在 Docker 未运行、缺 `docker-compose.yml`、缺 `.env` 时先做 sanity check（`start.bat:20-40`；`start.sh:23-26`）。
+两条脚本都会先 `cd` 到仓库根，并用 `docker compose --env-file .env -f infra/docker-compose.yml`；Docker 未运行、缺 `infra/docker-compose.yml`、缺 `.env` 时先做 sanity check。
 
 ## 三、端口与访问入口
 
-端口规则：`<服务前缀><两位项目号>`，P2 尾号 02（`docker-compose.yml:1-6`）。
+端口规则：`<服务前缀><两位项目号>`，P2 尾号 02（`infra/docker-compose.yml`）。
 
 | 端口 | 服务 | 绑定 | 说明 | 依据 |
 |---|---|---|---|---|
@@ -69,7 +69,7 @@ curl -s http://localhost/ready     # database / vectors / transactions / embeddi
 ## 四、本机开发（非默认路径）
 
 - 后端：venv 下 `uvicorn app.main:app --port 8100 --reload`（`README_cn.md:72` 口径；本次未复核 venv 启动命令）。
-- 前端：`npm run dev`，Vite 端口 12322，`/api` 代理到 `127.0.0.1:12302`（`vite.config.ts:12,16`），不需要再单独配 `VITE_API_BASE_URL`。
+- 前端：`cd frontend && npm run dev`，Vite 端口 12322，`/api` 代理到 `127.0.0.1:12302`，不需要再单独配 `VITE_API_BASE_URL`。
 - embedding：本机跑 LM Studio 等兼容服务时，容器侧用 `EMBEDDING_BASE_URL_DOCKER=http://host.docker.internal:1234/v1`（`docker-compose.yml:164`；`.env.example:100`）。
 
 ## 五、当前数据基线（2026-11-16 口径）
@@ -83,12 +83,12 @@ curl -s http://localhost/ready     # database / vectors / transactions / embeddi
 
 ## 六、起不来 / 页面打不开时
 
-先跑 `bash scripts/diagnose.sh`（只读，八段输出）：容器状态 → 探针最后输出 → PG 长事务/锁等待 → 队列注册与积压 → 后端最近错误 → nginx 最近错误 → worker 日志 → 应用日志文件（`scripts/diagnose.sh:34-109`）。
+先跑 `bash ops/scripts/diagnose.sh`（只读，八段输出）：容器状态 → 探针最后输出 → PG 长事务/锁等待 → 队列注册与积压 → 后端最近错误 → nginx 最近错误 → worker 日志 → 应用日志文件。
 
 - 整站 502 且 backend 不健康：看第 3 段，有 `idle in transaction` + 锁等待，说明迁移卡在 DDL，后端还没监听端口。
 - backend 健康但仍 502：看第 6 段 nginx 错误。
 - 转写一直排队：看第 4 段 worker 注册数（正常 1；0 没有消费者，2+ 是重复 worker）。
-- 接口 500 但日志没细节：`bash scripts/logq.sh errors`，再按 `request_id` 用 `logq.sh req <id>` 拉全量；日志口径见 `docs/logging.md`。
+- 接口 500 但日志没细节：`bash ops/scripts/logq.sh errors`，再按 `request_id` 用 `logq.sh req <id>` 拉全量；日志口径见 `docs/logging.md`。
 
 ## 待用户确认
 

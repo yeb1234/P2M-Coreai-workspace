@@ -29,10 +29,12 @@ from app.services import retrieval_meta
 from app.services.embeddings import get_embedding_client
 from app.services.lexical import lexical_search, meta_search
 from app.services.llm import build_chat_model
+from app.services.runtime_config import get_retrieval_config
 from app.services.vector_store import VectorStoreError, search as vector_search
 
 logger = logging.getLogger(__name__)
 
+# 兼容旧调用方的兜底值；实际运行值从 configs/retrieval.yaml 读取。
 RRF_K = 60
 
 # 检索三路（词法 / 元数据 / query embedding）互不依赖，放到同一个固定线程池。
@@ -196,13 +198,15 @@ def fetch_segments(segment_ids: list[int]) -> dict[int, dict]:
 def rrf_fuse(
     rankings: dict[str, list[int]],
     weights: dict[str, float] | None = None,
-    k: int = RRF_K,
+    k: int | None = None,
 ) -> dict[int, float]:
     """Reciprocal Rank Fusion。rankings = {来源: 有序 segment_id 列表}
 
     加权版：语义检索在跨表述召回上更可靠（实测「函数返回另一个函数」能召回
     闭包内容），词法擅长精确术语但容易被短碎片干扰，因此默认给向量更高权重。
     """
+    cfg = get_retrieval_config()
+    k = int(k or cfg.get("rrf_k") or RRF_K)
     weights = weights or {}
     scores: dict[int, float] = defaultdict(float)
     for source, ids in rankings.items():
@@ -395,13 +399,17 @@ def hybrid_search(
     query: str,
     *,
     top_k: int = 8,
-    candidate_k: int = 30,
+    candidate_k: int | None = None,
     category_ids: list[int] | None = None,
     video_ids: list[int] | None = None,
     use_rerank: bool | None = None,
-    min_vector_score: float = 0.0,
+    min_vector_score: float | None = None,
 ) -> dict:
     """返回 {hits, timings, degraded}。任一通路失败都会降级而非报错。"""
+    cfg = get_retrieval_config()
+    candidate_k = int(candidate_k or cfg.get("candidate_k") or 30)
+    if min_vector_score is None:
+        min_vector_score = float(cfg.get("min_vector_score") or 0.0)
     query = (query or "").strip()
     if not query:
         return {"hits": [], "timings": {}, "degraded": []}
@@ -578,7 +586,12 @@ def hybrid_search(
     # 但也不能给太高 —— 路径只能证明「课程对」，不能证明「这一段对」，
     # 所以仍要留出 rerank 用正文纠正的空间。
     fused = rrf_fuse(
-        rankings, weights={"lexical": 0.8, "vector": 1.2, "meta": 1.5}
+        rankings,
+        weights={
+            "lexical": float((cfg.get("weights") or {}).get("lexical", 0.8)),
+            "vector": float((cfg.get("weights") or {}).get("vector", 1.2)),
+            "meta": float((cfg.get("weights") or {}).get("meta", 1.5)),
+        },
     )
 
     for source, ids in rankings.items():

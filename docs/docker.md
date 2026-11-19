@@ -59,7 +59,7 @@ CORS 允许来源：`http://localhost,http://localhost:12302,http://localhost:12
 
 旧文档把 `siteyeb-output` / `siteyeb-thumbnails` / `siteyeb-sprites` / `siteyeb-work` 当成命名卷，实际它们是上面的绑定挂载；compose `volumes:` 段里只有两个数据库卷。
 
-`VIDEO_HOST_PATH` 默认 `./video-library`，相对 `docker-compose.yml` 所在目录解析；容器内视频库固定为 `/videos`。当前 Windows 项目在 C 盘、素材在 D 盘时，项目内 `video-library` 用 junction 指向 `D:\ITJC`；完整路径口径和换机步骤见 [runtime-paths.md](runtime-paths.md)。
+`VIDEO_HOST_PATH` 默认 `../data/video-library`，相对 `infra/docker-compose.yml` 所在目录解析；容器内视频库固定为 `/videos`。当前 Windows 项目在 C 盘、素材在 D 盘时，`data/video-library` 用 junction 指向 `D:\ITJC`；完整路径口径和换机步骤见 [runtime-paths.md](runtime-paths.md)。
 
 ## 四、为什么不推荐本机直跑
 
@@ -67,32 +67,34 @@ CORS 允许来源：`http://localhost,http://localhost:12302,http://localhost:12
 
 ## 五、常用命令
 
+所有 compose 命令在仓库根执行，并显式带 `--env-file .env -f infra/docker-compose.yml`；下文把这一段写成 `DC` 仅作阅读缩写，实际执行请展开。
+
 ```bash
-docker compose up -d                                 # 起全部 5 个服务
-docker compose up -d postgres redis backend frontend # web-only，不带 worker
-docker compose build backend                         # 改了后端依赖或代码后重建
-docker compose stop                                  # 停容器，保留卷
-docker compose ps                                   # 看服务状态（以服务名为准）
-docker compose logs -f backend                       # 跟后端日志
-docker compose down                                  # 删容器，命名卷保留
+docker compose --env-file .env -f infra/docker-compose.yml up -d                                 # 起全部 5 个服务
+docker compose --env-file .env -f infra/docker-compose.yml up -d postgres redis backend frontend # web-only，不带 worker
+docker compose --env-file .env -f infra/docker-compose.yml build backend                         # 改了后端依赖或代码后重建
+docker compose --env-file .env -f infra/docker-compose.yml stop                                  # 停容器，保留卷
+docker compose --env-file .env -f infra/docker-compose.yml ps                                    # 看服务状态（以服务名为准）
+docker compose --env-file .env -f infra/docker-compose.yml logs -f backend                       # 跟后端日志
+docker compose --env-file .env -f infra/docker-compose.yml down                                  # 删容器，命名卷保留
 ```
 
 宿主机直连后端调试：`curl http://127.0.0.1:12402/health`（回环口，只给本机用）。
 
-GPU 转写用覆盖文件：`docker-compose.gpu.yml` 给 backend 和 worker 都挂 NVIDIA 设备（`docker-compose.gpu.yml:13-39`），构建参数 `INSTALL_CUDA=true`。
+GPU 转写用覆盖文件：`infra/docker-compose.gpu.yml` 给 backend 和 worker 都挂 NVIDIA 设备，构建参数 `INSTALL_CUDA=true`。
 
 ## 六、覆盖文件（overlay）
 
 | 文件 | 用途 |
 |---|---|
-| `docker-compose.https.yml` | Caddy 承担 80/443；frontend 只绑回环 12302 |
-| `docker-compose.pg.yml` | 独立 PostgreSQL 实例覆盖（SQLite 迁移/回滚场景），同项目名、同卷名 |
-| `docker-compose.tencent.yml` | 腾讯云部署：资源上限、日志轮转、可选内嵌 embedding 服务 |
-| `docker-compose.gpu.yml` | GPU 转写覆盖 |
+| `infra/docker-compose.https.yml` | Caddy 承担 80/443；frontend 只绑回环 12302 |
+| `infra/docker-compose.pg.yml` | 独立 PostgreSQL 实例覆盖（SQLite 迁移/回滚场景），同项目名、同卷名 |
+| `infra/docker-compose.tencent.yml` | 腾讯云部署：资源上限、日志轮转、可选内嵌 embedding 服务 |
+| `infra/docker-compose.gpu.yml` | GPU 转写覆盖 |
 
-用法是 `-f docker-compose.yml -f docker-compose.<overlay>.yml up -d`，overlay 里同名段会合并覆盖。
+用法是 `-f infra/docker-compose.yml -f infra/docker-compose.<overlay>.yml up -d`，overlay 里同名段会合并覆盖。
 
 ## 配置口径（已统一）
 
 - `CORS_ORIGINS` 三处默认值已统一为六源：`localhost` / `127.0.0.1` 的 12302、12322，以及裸域 `localhost` / `127.0.0.1`；`.env.example`、`docker-compose.yml:205,341`、`database.py` 代码回退完全一致。
-- 六个运维脚本（`start.bat`、`start.sh`、`scripts/diagnose.sh`、`backup.sh`、`restore.sh`、`preflight.sh`）已统一按 compose 生成名 `p2-siteyeb-<service>-1` 取容器，并保留 `*_CONTAINER` 环境变量覆盖；compose 仍不写死 `container_name`。
+- 六个运维脚本（`ops/start.bat`、`ops/start.sh`、`ops/scripts/diagnose.sh`、`backup.sh`、`restore.sh`、`preflight.sh`）已统一按 compose 生成名 `p2-siteyeb-<service>-1` 取容器，并保留 `*_CONTAINER` 环境变量覆盖；compose 仍不写死 `container_name`。

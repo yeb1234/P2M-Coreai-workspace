@@ -1,9 +1,17 @@
 # SiteYeb / P2M 个人 IT 学习工作台
 
-> 状态：现行（最后校对 2026-11-20）
-> 当前发布：6.0.0 SmartAgents（2026-11-20）
+> 状态：现行（最后校对 2026-11-21）
+> 当前发布：7.0.0 Framework Registry（2026-11-21）
 
 一个本地优先的个人学习工作台：React 前端 + FastAPI 后端 + PostgreSQL 17（pgvector）+ Redis（RQ 队列）。把视频学习、笔记、待办、日历、番茄钟、时间中心、AI 助手和长期记忆放在一个界面里，本机和局域网都能用。
+
+> **7.0 Framework Registry（2026-11-21）**
+>
+> 仓库改为标准 monorepo（`frontend/ backend/ configs/ infra/ ops/ artifacts/ data/ docs/`）；
+> 提示词、检索/向量参数、LLM 路由、数据库与工具治理配置进入 PostgreSQL 原生版本库，
+> 支持提交、分支、标签、diff、三路合并、回滚、发布写回与审计。
+> 设置 → 配置资产（管理员）可管理，也可直接打开 `/#/asset-registry`。
+> 详见 [docs/2026-11-21-7.0-framework-overhaul.md](docs/2026-11-21-7.0-framework-overhaul.md)。
 
 项目目前偏个人使用，也欢迎拿去研究、改造和提交想法。定位是个人、家庭、小团队在可信局域网里使用的内部工具底座，不是开箱即用的公网 SaaS；要对外暴露前需要自行做权限、审计和安全加固。
 
@@ -42,15 +50,15 @@
 - **6.0 SmartAgents 的核心是「工具契约与模型通道解耦」**：意图只决定本轮工具集，工具仍由同一套注册表、预算、超时、熔断和审计层执行；本地 LLM 与外部 LLM 可以按兜底策略切换，模型换了，工具契约和权限边界不变。
 - 写动作走人工确认：保存笔记、日历、Todo 由 LangGraph `interrupt` 弹出确认卡，确认后才写库；每轮最多 1 个写动作，写入后生成动作回执，可在消息里撤回。审计落在 `AgentAction`，工具轨迹落在 `AgentRun.steps`。
 - 支持本地 LLM 与 OpenAI-compatible 外部 LLM，按设置页兜底策略在两个通道间切换；429 / 5xx / 超时退避重试，鉴权与路径错误立即换下一家。
-- 意图识别在前端完成（根目录 `prompts/clientPrompts.ts`）：6 类有序正则（课程推荐 / 学习路径 / 学习总结 / 代码助手 / 任务拆解 / 知识问答），识别不出才退回手选模板。
+- 意图识别在前端完成（`configs/prompts/clientPrompts.ts`）：6 类有序正则（课程推荐 / 学习路径 / 学习总结 / 代码助手 / 任务拆解 / 知识问答），识别不出才退回手选模板。
 - 记忆系统四层：`ChatMessage` 原文 / 会话摘要（超 24 条压缩、保留最近 10 条）/ `MemoryItem` 长期记忆条目（类型、重要度、置信度、置顶、过期、命中次数）/ `UserData` 档案 KV；对话结束后异步抽取记忆，不拖慢回答。
-- 检索三路召回：词法（pg_trgm + ILIKE）+ 向量（HNSW halfvec）+ 视频级元数据，加权 RRF 融合；`RRF_K=60`，权重 lexical `0.8` / vector `1.2` / meta `1.5`，`candidate_k=30`，`rerank_top_n=20`；重排 API 失败时退回 LLM 重排。
+- 检索三路召回：词法（pg_trgm + ILIKE）+ 向量（HNSW halfvec）+ 视频级元数据，加权 RRF 融合；参数集中在 `configs/retrieval.yaml`（`RRF_K=60`，lexical `0.8` / vector `1.2` / meta `1.5`，`candidate_k=30`，`rerank_top_n=20`）；重排 API 失败时退回 LLM 重排。
 
-> 「相关片段」卡片 2026-11-16 起由 `src/config/features.ts` 的 `FEATURES.chatVideoReferences` 开关关闭（默认 `false`）。关闭只影响渲染：`ReferenceBlock`、`dedupeReferences` 和后端 `chat_agent` 的 references 生成都保留，改回 `true` 重建前端即恢复；后端仍照常生成 references，只是前端不渲染。
+> 「相关片段」卡片 2026-11-16 起由 `frontend/src/config/features.ts` 的 `FEATURES.chatVideoReferences` 开关关闭（默认 `false`）。关闭只影响渲染：`ReferenceBlock`、`dedupeReferences` 和后端 `chat_agent` 的 references 生成都保留，改回 `true` 重建前端即恢复；后端仍照常生成 references，只是前端不渲染。
 
 ### 界面与配置
 
-- 左侧三组导航：日常 7 项 / 学习 9 项 / 工具 13 项，共 29 个注册页面（`src/config/pageRegistry.tsx`）；部分工具类页面仍是静态占位，带「施工中」标记。
+- 左侧三组导航：日常 7 项 / 学习 9 项 / 工具 13 项，共 29 个注册页面（`frontend/src/config/pageRegistry.tsx`）；部分工具类页面仍是静态占位，带「施工中」标记。
 - 主题系统（含按时间表自动切换调度）、声音 / 背景音、通知；Header 右上角可呼出主题调色板弹窗。
 
 ## 运行方式
@@ -66,7 +74,7 @@ cp .env.example .env
 
 ### 启动
 
-Windows 双击 `start.bat`，菜单选择：
+Windows 双击 `ops\start.bat`，菜单选择：
 
 - `[1]` 全套：postgres + redis + backend + worker + frontend（要 AI 转写 / 索引选这个）
 - `[2]` 仅页面：postgres + redis + backend + frontend，不起 worker
@@ -75,18 +83,18 @@ Windows 双击 `start.bat`，菜单选择：
 命令行（WSL / macOS / Linux）：
 
 ```bash
-./start.sh            # 完整（含 AI worker）
-./start.sh web        # 只要页面，不起 worker
-./start.sh stop       # 全停（数据卷保留）
-./start.sh status     # 容器状态 + 探针
-./start.sh logs       # 跟后端日志
+./ops/start.sh            # 完整（含 AI worker）
+./ops/start.sh web        # 只要页面，不起 worker
+./ops/start.sh stop       # 全停（数据卷保留）
+./ops/start.sh status     # 容器状态 + 探针
+./ops/start.sh logs       # 跟后端日志
 ```
 
-也可以直接用 compose：
+也可以直接用 compose（compose 文件在 `infra/`，必须显式指定）：
 
 ```bash
-docker compose up -d                                              # 完整
-docker compose up -d postgres redis backend frontend              # 不用 AI 助手（不起 worker）
+docker compose --env-file .env -f infra/docker-compose.yml up -d
+docker compose --env-file .env -f infra/docker-compose.yml up -d postgres redis backend frontend
 ```
 
 访问 http://localhost （第二入口 http://localhost:12302）。
@@ -110,6 +118,7 @@ compose 项目名 `p2-siteyeb`，共五个服务；镜像标签 `3.0`，backend 
 Vite 热更新可用，后端跑在容器里：
 
 ```bash
+cd frontend
 npm install
 npm run dev        # http://localhost:12322，/api 代理到 http://127.0.0.1:12302
 ```
@@ -158,36 +167,40 @@ A 卡 / GPU 部分和本机环境绑定较深，换机器、换显卡或换系�
 
 ```text
 SiteYeb/
-  src/                  React 前端
-    config/             页面注册表 pageRegistry、功能开关 features
-    components/         页面、布局、通用组件
-    stores/             Zustand 状态（13 个）
-    hooks/              跨模块同步和恢复逻辑（13 个）
-    plugins/            工作台插件（5 个）
-    lib/                API、提示词、工具函数
-    types/              TypeScript 类型
-  prompts/              前端提示词与意图识别（clientPrompts.ts）
-  backend/app/          FastAPI 后端
-    routers/            API 路由（14 个业务路由）
-    services/           扫描、转录、检索、AI、记忆、管理服务（39 个）
-    agents/             chat_agent / plan_agent / tools
-    models.py           21 个 ORM 模型
-    worker.py           RQ worker（ai_jobs + background 两个队列）
-  docs/                 设计记录、踩坑记录、更新日志
-  scripts/              诊断、日志查询、检索评估等脚本
-  public/sounds/        本地提示音和背景音
+  frontend/             React 前端
+    src/                页面、组件、状态、hooks、插件、API 客户端
+    tests/              契约测试与 e2e
+    public/             静态资源与独立入口页（asset-registry.html）
+    Dockerfile          从前端目录构建
+  backend/              FastAPI 后端
+    app/                routers / services / agents / models / worker
+    alembic/            数据库迁移
+    tests/              pytest
+  configs/              运行时配置与资产基线
+    prompts/            前端意图提示词与后端运行时提示词
+    retrieval.yaml      检索、RRF、重排参数
+    vector.yaml         embedding、分块、HNSW 参数
+    llm.yaml            LLM 路由与预算（不含密钥）
+    database.yaml       连接池、超时、迁移基线
+    governance.yaml     工具预算与审计策略
+  infra/                docker-compose、nginx、Caddy、HTTPS/GPU/腾讯云编排
+  ops/                  启动脚本、停止脚本、诊断与运维脚本
+  artifacts/            demo、监控面板、设计稿、面试资料等可交付展示物
+  data/                 运行时数据（视频库、日志、缓存、模型、legacy），默认不入库
+  docs/                 设计记录、发布说明、踩坑与运维文档
 ```
 
 ## 测试和构建
 
 ```bash
+cd frontend
 npm test
 npm run build
 npm run test:e2e
-cd backend && python -m compileall app
+cd ../backend && python -m compileall app
 ```
 
-测试盘点（截至 2026-11-16）：`src/__tests__` 28 个前端测试文件；`backend/tests` 5 个后端测试文件；仓库根 `tests/` 下只有 `contracts` 与 `e2e` 两个目录，后端没有 API 级集成测试。
+测试基线（7.0）：前端 34 文件 / 335 项；后端容器内 62 项；工具路由评估 72 cases / 1 probe / 0 failures。
 
 日常改前端时至少跑：
 
@@ -213,7 +226,7 @@ npm run build
 站点异常时第一条命令（只读，不改任何状态）：
 
 ```bash
-bash scripts/diagnose.sh
+bash ops/scripts/diagnose.sh
 ```
 
 打出容器状态、健康探针最后输出、PG 长事务 / 锁等待、worker 注册与队列积压、nginx 错误。
@@ -221,15 +234,25 @@ bash scripts/diagnose.sh
 查日志：
 
 ```bash
-bash scripts/logq.sh errors --since 1h    # 错误（含异常类型与 request_id）
-bash scripts/logq.sh req <request_id>    # 一次请求 / 一个任务的完整日志
-bash scripts/logq.sh stats --since 24h  # 按级别 / logger / 状态码聚合
+bash ops/scripts/logq.sh errors --since 1h    # 错误（含异常类型与 request_id）
+bash ops/scripts/logq.sh req <request_id>    # 一次请求 / 一个任务的完整日志
+bash ops/scripts/logq.sh stats --since 24h  # 按级别 / logger / 状态码聚合
 ```
+
+## 配置资产版本库
+
+7.0 把 7 个配置资产纳入 PostgreSQL 原生版本库，由后端提供 Git 风格 API，前端设置页提供管理界面：
+
+- 入口：管理员登录后，设置 → 配置资产；或直接打开 `/asset-registry.html` / `/#/asset-registry`。
+- 纳管清单：`configs/manifest.yaml`，当前 7 个文件（前后端提示词、检索、向量、LLM、数据库、工具治理）。
+- 操作：编辑 → 提交；新建分支 / 标签；对比上一提交；合并；回滚；发布 HEAD 原子写回 `configs/`；审计日志。
+- 发布后：后端读取新配置会热刷新；已加载旧提示词的 worker 需要重启后生效。
+- 权限：仅 `role=admin` 可见可写。版本库只存文本 blob，不依赖外部 Git 服务。
 
 ## 文档
 
 设计记录、踩坑记录、更新日志与部署说明的完整索引见 [docs/README.md](docs/README.md)（文档索引统一维护）。
-根目录 `CHANGELOG.md` 记录用户可感知的功能变化，`BUGFIXES.md` 记录缺陷修复，`PERFORMANCE.md` 记录性能改动。
+根目录 `CHANGELOG.md` 记录用户可感知的功能变化，`docs/BUGFIXES.md` 记录缺陷修复，`docs/PERFORMANCE.md` 记录性能改动。
 
 ## License
 

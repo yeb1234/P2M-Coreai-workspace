@@ -1,10 +1,10 @@
 # 文档索引
 
-> 状态：现行（最后校对 2026-11-20）
+> 状态：现行（最后校对 2026-11-21）
 
 这份索引管全项目的文档：哪个文件讲什么、现在还可不可信、最后一次对照代码是哪天。写新文档或改老文档前，先在这里定位，不要另起一套。
 
-代码基线：主线 `P2U-3.0-LangChain`，发布标签 `v6.0.0`；`release/6.0-smartagents` 保留为发布分支。
+代码基线：`main` 已合并 7.0（`feat/7.0-framework-overhaul`），发布标签 `v7.0.0`；6.0 对照线 `P2U-3.0-LangChain` 冻结在 `cae8d1b` / `v6.0.0`。
 
 ## 状态怎么读
 
@@ -63,7 +63,7 @@
 | 文件 | 用途 | 状态 | 最后校对 |
 |---|---|---|---|
 | [README.md](../README.md) | 项目总览、能力清单、五服务 compose 与端口、启动方式、技术栈 | 现行 | 2026-11-16 |
-| [README_cn.md](../README_cn.md) | 与 README 对应的中文版，多了 3.0 架构 / 安全 / 会话 / 部署几块 callout | 现行 | 2026-11-16 |
+| [README_cn.md](../README_cn.md) | 与 README 对应的中文版，多了 3.0 架构 / 安全 / 会话 / 部署几块 callout | 现行 | 2026-11-21 |
 | [backend/README.md](../backend/README.md) | 后端入口：14 路由前缀、服务分组、两队列与状态机、迁移双机制、环境变量、安全要点 | 现行 | 2026-11-16 |
 | [CHANGELOG.md](../CHANGELOG.md) | 面向用户的版本变化（现行记录以这份为准） | 现行 | 2026-11-16 |
 | [BUGFIXES.md](../BUGFIXES.md) | 缺陷修复台账，带 commit 溯源 | 现行 | 2026-11-16 |
@@ -107,7 +107,8 @@
 
 | 文件 | 用途 | 状态 | 最后校对 |
 |---|---|---|---|
-| [2026-11-20-6.0-smartagents-release.md](2026-11-20-6.0-smartagents-release.md) | 6.0 SmartAgents 发布说明：工具与模型解耦、HITL 写动作、审计与撤回 | 现行发布记录 | 2026-11-20 |
+| [2026-11-21-7.0-framework-overhaul.md](2026-11-21-7.0-framework-overhaul.md) | 7.0 框架级重构：monorepo、配置资产版本库、发布与回退 | 现行发布记录 | 2026-11-21 |
+| [2026-11-20-6.0-smartagents-release.md](2026-11-20-6.0-smartagents-release.md) | 6.0 SmartAgents 发布说明：工具与模型解耦、HITL 写动作、审计与撤回 | 历史发布记录（对照线保留） | 2026-11-20 |
 | [project-structure.md](project-structure.md) | 目录树与结构计数（第一节现状；后面几节是未执行的重构提案） | 部分现行 | 2026-11-16 |
 | [maintainability.md](maintainability.md) | 分层与依赖方向、坏味道清单、已修与未修技术债 | 部分现行 | 2026-11-16 |
 | [security-audit.md](security-audit.md) | 两轮安全审计：Cookie/CSRF、五档限流、安全头、SSRF、遗留项复核表 | 历史审计记录（已复核） | 2026-11-16 |

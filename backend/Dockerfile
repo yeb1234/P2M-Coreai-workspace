@@ -63,12 +63,11 @@ RUN if [ "$INSTALL_CUDA" = "true" ]; then \
     fi
 
 COPY backend/ .
-COPY prompts/ ./prompts/
-
+COPY configs/ ./configs/
 # 题库/知识库以后端只读工具的数据源出现在容器里；直接从同一份前端源数据复制，
 # 避免先手工复制到 backend/app/data 再忘记同步，导致助手读到旧题库。
-COPY src/data/interview/questions.json ./app/data/interview_questions.json
-COPY src/data/interview/knowledge.json ./app/data/interview_knowledge.json
+COPY frontend/src/data/interview/questions.json ./app/data/interview_questions.json
+COPY frontend/src/data/interview/knowledge.json ./app/data/interview_knowledge.json
 
 # 去掉 Windows 检出带来的 CRLF，否则容器会报 "no such file or directory"
 COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
