@@ -32,6 +32,12 @@ import { transcriptionFormToDto, transcriptionDtoToForm } from '../settings/type
 import { useTranscriptionStore } from '../../stores';
 import { VideoAiJobCenter } from '../video/VideoAiJobCenter';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { getJobPollDelay, shouldReconcileJobs } from '../../lib/jobPolling';
+
+// 转写页只需要运维视角的最近任务，不是全量历史。以前传 999999，
+// 几千条 queued 任务每 5 秒重新拉一遍、重新渲染几千个 DOM 节点，
+// 浏览器主线程会被拖住，看起来就是「转写一开，网站就卡」。
+const TRANSCRIBER_JOB_LIMIT = 100;
 
 export function TranscriberPage() {
   const isMobile = useIsMobile();
@@ -47,6 +53,8 @@ export function TranscriberPage() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [queuePaused, setQueuePaused] = useState(false);
+  const jobsRequestRef = useRef(false);
+  const lastJobReconcileRef = useRef(Date.now());
 
   // Right-side advanced batch panel state
   const [rightBatchMode, setRightBatchMode] = useState<AiJobBatchMode>('unfinished');
@@ -101,11 +109,16 @@ export function TranscriberPage() {
     }
   }, []);
 
-  const loadJobs = useCallback(async () => {
-    setJobsLoading(true);
+  const loadJobs = useCallback(async (options: { silent?: boolean; reconcile?: boolean } = {}) => {
+    // 后台轮询不抢手动刷新的结果；手动刷新始终执行。
+    if (options.silent && jobsRequestRef.current) return;
+    jobsRequestRef.current = true;
+    const reconcile = options.reconcile ?? true;
+    if (reconcile) lastJobReconcileRef.current = Date.now();
+    if (!options.silent) setJobsLoading(true);
     try {
       const [data, queue] = await Promise.all([
-        fetchAiJobs(999999, selectedStatus ?? undefined),
+        fetchAiJobs(TRANSCRIBER_JOB_LIMIT, selectedStatus ?? undefined, { reconcile }),
         fetchAiQueueState().catch(() => ({ paused: false })),
       ]);
       setJobs(data);
@@ -113,7 +126,8 @@ export function TranscriberPage() {
     } catch {
       // ignore
     } finally {
-      setJobsLoading(false);
+      jobsRequestRef.current = false;
+      if (!options.silent) setJobsLoading(false);
     }
   }, [selectedStatus]);
 
@@ -218,9 +232,40 @@ export function TranscriberPage() {
 
   useEffect(() => {
     const id = setTimeout(() => loadJobs(), 0);
-    const timer = setInterval(loadJobs, 5000);
-    return () => { clearTimeout(id); clearInterval(timer); };
+    return () => clearTimeout(id);
   }, [loadJobs]);
+
+  const hasActiveJobs = (jobs?.running ?? 0) + (jobs?.queued ?? 0) > 0;
+
+  // 任务队列空闲时降频、页面切到后台时降频；只有真的有任务在跑才
+  // 保持 10 秒一次。这样转写期间页面不会自己制造大量请求和重渲染。
+  useEffect(() => {
+    let timer = 0;
+    let disposed = false;
+
+    const schedule = () => {
+      if (disposed) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(tick, getJobPollDelay(hasActiveJobs, document.visibilityState));
+    };
+
+    const tick = () => {
+      if (disposed) return;
+      const reconcile = shouldReconcileJobs(lastJobReconcileRef.current);
+      void loadJobs({ silent: true, reconcile });
+      schedule();
+    };
+
+    const handleVisibilityChange = () => schedule();
+
+    schedule();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [hasActiveJobs, loadJobs]);
 
   useEffect(() => {
     const id = setTimeout(() => loadSelectedVideos(), 0);

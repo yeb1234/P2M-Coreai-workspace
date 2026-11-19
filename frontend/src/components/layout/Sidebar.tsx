@@ -4,12 +4,14 @@ import { useUIStore, usePomodoroStore } from '../../stores';
 import { PAGE_MAP, preloadPage } from '../../config/pageRegistry';
 import type { ActiveView } from '../../stores/uiStore';
 import { useDragResize } from '../../hooks/useDragResize';
+import { groupNavOrder, type NavGroup } from './navOrder';
 
 // 侧边栏分组。24 项平铺认知负担太重，按使用场景分三组。
-// 分组只影响「标题插在哪」，不影响用户拖拽出来的实际顺序 ——
-// 判断依据是「当前项和上一项是否同组」，同组就不重复插标题。
+// 分组只决定「标题插在哪」和组间顺序，组内顺序完全跟随用户拖拽后的
+// navOrder；否则 reorderNav 写入成功，渲染时又被固定 ids 排回去，
+// 表现就是「拖了没反应」。
 // 排序规则：已完成并验收的项目入口往本组前部放，不按建设时间追加到末尾。
-const NAV_GROUPS: { label: string; ids: string[] }[] = [
+const NAV_GROUPS: NavGroup<ActiveView>[] = [
   {
     label: '日常',
     ids: ['dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'mdnotes', 'pomodoro', 'timecenter'],
@@ -40,24 +42,13 @@ export const Sidebar: React.FC = () => {
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
   const navOrder = useUIStore((s) => s.navOrder);
-  // 按分组聚合：组内保留用户拖拽出来的相对顺序，组间按 NAV_GROUPS 顺序。
+  // 按分组聚合：组间按 NAV_GROUPS 顺序，组内保留用户拖拽出来的相对顺序。
   // 不这么做的话，navOrder 的默认顺序里 compare/stats 夹在学习项中间，
   // 分组标题会反复出现（工具/学习/工具/学习），比不分还乱。
-  const groupedNav = React.useMemo(() => {
-    const seen = new Set<string>();
-    const out: typeof navOrder = [];
-    NAV_GROUPS.forEach((g) => {
-      g.ids.forEach((id) => {
-        if (navOrder.includes(id as never) && !seen.has(id)) {
-          seen.add(id);
-          out.push(id as never);
-        }
-      });
-    });
-    // 不在任何分组里的（理论上没有）按原顺序追加，避免页面凭空消失
-    navOrder.forEach((id) => { if (!seen.has(id)) out.push(id); });
-    return out;
-  }, [navOrder]);
+  const groupedNav = React.useMemo(
+    () => groupNavOrder(navOrder, NAV_GROUPS),
+    [navOrder],
+  );
   const reorderNav = useUIStore((s) => s.reorderNav);
   const resetNavOrder = useUIStore((s) => s.resetNavOrder);
 

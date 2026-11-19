@@ -1,14 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bold, CalendarDays, CalendarPlus, Check, ChevronDown, Code2, Columns2, Copy, Download,
-  Eye, FilePlus2, FileText, Folder, FolderPlus, Hash, Heading1, Heading2, Heading3,
-  Image as ImageIcon, Italic, Link2, List, ListChecks, ListOrdered, ListTodo, Loader2, MoreHorizontal, PanelLeft, PanelRight,
+  Eye, EyeOff, FilePlus2, FileText, Folder, FolderPlus, Hash, Heading1, Heading2, Heading3,
+  Image as ImageIcon, Italic, Link2, List, ListChecks, ListOrdered, ListTodo, Loader2, Maximize2,
+  MoreHorizontal, PanelLeft, PanelRight,
   Palette, Highlighter, Pilcrow, Plus, Quote, Redo2, RotateCcw, Search, Sparkles, Star, Strikethrough, Table2,
   Trash2, Type, Underline, Undo2, Upload, Wand2, X,
 } from 'lucide-react';
 import { useMdNotesStore } from '../../stores/mdNotesStore';
 import type { MdNote, MdNoteFont, MdNoteSize } from '../../stores/mdNotesStore';
 import { htmlToMarkdown, markdownStats, plainText, renderMarkdown } from '../../lib/markdown';
+import {
+  MDN_LIBRARY_DEFAULT_WIDTH,
+  clampMdnLibraryWidth,
+  clampMdnSplitRatio,
+  persistMdnNumber,
+  readMdnNumber,
+} from './mdnLayout';
 import {
   createCalendarEventFromAi,
   createTodoFromAi,
@@ -41,7 +49,7 @@ const FONT_OPTIONS: { value: MdNoteFont; label: string }[] = [
   { value: 'serif', label: '衬线字体' },
   { value: 'mono', label: '等宽字体' },
 ];
-const SIZE_OPTIONS: MdNoteSize[] = [14, 15, 16, 17, 18];
+const SIZE_OPTIONS: MdNoteSize[] = [13, 14, 15, 16, 17, 18];
 const BLOCK_OPTIONS: { value: BlockKind; label: string; icon: React.ReactNode }[] = [
   { value: 'paragraph', label: '正文', icon: <Pilcrow size={14} /> },
   { value: 'h1', label: '标题 1', icon: <Heading1 size={14} /> },
@@ -193,7 +201,7 @@ const ColorMenu: React.FC<{
   </div>
 );
 
-export const MarkdownNotesPage: React.FC = () => {
+export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalone = false }) => {
   const notes = useMdNotesStore((s) => s.notes);
   const folders = useMdNotesStore((s) => s.folders);
   const activeNoteId = useMdNotesStore((s) => s.activeNoteId);
@@ -215,6 +223,15 @@ export const MarkdownNotesPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [menu, setMenu] = useState<MenuName>(null);
   const [saveState, setSaveState] = useState<'saved' | 'saving'>('saved');
+  const [libraryWidth, setLibraryWidth] = useState(() => (
+    readMdnNumber('siteyeb:mdn-library-width', MDN_LIBRARY_DEFAULT_WIDTH, clampMdnLibraryWidth)
+  ));
+  const [splitRatio, setSplitRatio] = useState(() => (
+    readMdnNumber('siteyeb:mdn-split-ratio', 50, clampMdnSplitRatio)
+  ));
+  const [libraryVisible, setLibraryVisible] = useState(true);
+  const [editorVisible, setEditorVisible] = useState(true);
+  const [previewVisible, setPreviewVisible] = useState(true);
   const [tagInput, setTagInput] = useState('');
   const [toast, setToast] = useState('');
   const [richLoadedId, setRichLoadedId] = useState<string | null>(null);
@@ -231,6 +248,7 @@ export const MarkdownNotesPage: React.FC = () => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const richRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const richSelectionRef = useRef<Range | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -299,6 +317,79 @@ export const MarkdownNotesPage: React.FC = () => {
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     toastTimerRef.current = window.setTimeout(() => setToast(''), 2200);
   }, []);
+
+  useEffect(() => {
+    persistMdnNumber('siteyeb:mdn-library-width', libraryWidth);
+  }, [libraryWidth]);
+
+  useEffect(() => {
+    persistMdnNumber('siteyeb:mdn-split-ratio', splitRatio);
+  }, [splitRatio]);
+
+  const startLibraryResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = libraryWidth;
+    const previousCursor = document.body.style.cursor;
+    const previousSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (moveEvent: PointerEvent) => {
+      setLibraryWidth(clampMdnLibraryWidth(startWidth + moveEvent.clientX - startX));
+    };
+    const onUp = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousSelect;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [libraryWidth]);
+
+  const startSplitResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const previousCursor = document.body.style.cursor;
+    const previousSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (moveEvent: PointerEvent) => {
+      const ratio = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+      setSplitRatio(clampMdnSplitRatio(ratio));
+    };
+    const onUp = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousSelect;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, []);
+
+  const openInWindow = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const width = Math.min(1680, Math.max(1024, window.screen.availWidth - 96));
+    const height = Math.min(1080, Math.max(640, window.screen.availHeight - 72));
+    const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2));
+    const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2));
+    const popup = window.open(
+      `${window.location.origin}${window.location.pathname}#/mdnotes-window`,
+      'p2-mdnotes-window',
+      `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
+    );
+    if (!popup) {
+      showToast('浏览器拦截了新窗口，请允许本站弹窗');
+      return;
+    }
+    popup.focus();
+  }, [showToast]);
 
   const markSaving = useCallback(() => {
     setSaveState('saving');
@@ -447,10 +538,18 @@ export const MarkdownNotesPage: React.FC = () => {
   }, [syncRichNow]);
 
   const switchMode = useCallback((next: EditorMode) => {
-    if (next === mode) return;
+    if (next === mode) {
+      if (next === 'split') {
+        setEditorVisible(true);
+        setPreviewVisible(true);
+      }
+      return;
+    }
     if (mode === 'rich') syncRichNow();
     if (next === 'rich') setRichLoadedId(null);
     setMode(next);
+    setEditorVisible(true);
+    setPreviewVisible(next === 'split');
     setMenu(null);
   }, [mode, syncRichNow]);
 
@@ -730,6 +829,8 @@ export const MarkdownNotesPage: React.FC = () => {
     setActiveNote(id);
     setFilter({ kind: 'all' });
     setMode('split');
+    setEditorVisible(true);
+    setPreviewVisible(true);
     event.target.value = '';
     showToast('已导入 Markdown');
   }, [createNote, filter, setActiveNote, showToast]);
@@ -740,6 +841,8 @@ export const MarkdownNotesPage: React.FC = () => {
     setActiveNote(id);
     setFilter({ kind: 'all' });
     setMode('split');
+    setEditorVisible(true);
+    setPreviewVisible(true);
     showToast('已新建笔记');
   }, [createNote, filter, setActiveNote, showToast]);
 
@@ -809,22 +912,32 @@ export const MarkdownNotesPage: React.FC = () => {
   const previewHtml = activeNote ? renderMarkdown(activeNote.markdown) : '';
   const noteStyle = {
     '--mdn-font': FONT_MAP[activeNote?.font || 'sans'],
-    '--mdn-size': `${activeNote?.fontSize || 16}px`,
+    '--mdn-size': `${activeNote?.fontSize || 15}px`,
   } as React.CSSProperties;
+  const splitPanes = mode === 'split' && editorVisible && previewVisible;
 
   return (
-    <div className="mdn-shell" style={noteStyle}>
-      <aside className="mdn-library">
+    <div className={`mdn-shell${standalone ? ' mdn-standalone' : ''}`} style={noteStyle}>
+      <aside className={`mdn-library${libraryVisible ? '' : ' is-hidden'}`} style={{ width: libraryVisible ? libraryWidth : undefined }}>
         <div className="mdn-library-head">
           <div className="mdn-brand">
             <span className="mdn-brand-mark"><FileText size={17} /></span>
             <div>
               <strong>笔记</strong>
-              <small>{activeNotes.length} 篇 · Markdown 工作台</small>
+              <small>{activeNotes.length} 篇笔记</small>
             </div>
           </div>
           <button type="button" className="mdn-new-btn" onClick={handleNewNote} title="新建笔记">
             <Plus size={16} />
+          </button>
+          <button
+            type="button"
+            className="mdn-library-collapse"
+            onClick={() => setLibraryVisible(false)}
+            title="收起笔记目录"
+            aria-label="收起笔记目录"
+          >
+            <PanelLeft size={15} />
           </button>
         </div>
 
@@ -922,6 +1035,17 @@ export const MarkdownNotesPage: React.FC = () => {
         </div>
       </aside>
 
+      {libraryVisible && (
+        <div
+          className="mdn-splitter mdn-library-splitter"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="调整笔记目录宽度"
+          onPointerDown={startLibraryResize}
+          onDoubleClick={() => setLibraryWidth(MDN_LIBRARY_DEFAULT_WIDTH)}
+        />
+      )}
+
       <main className="mdn-main">
         {!activeNote ? (
           <div className="mdn-empty-doc">
@@ -942,6 +1066,14 @@ export const MarkdownNotesPage: React.FC = () => {
                     {saveState === 'saving' ? <RotateCcw size={12} /> : <Check size={12} />}
                     {saveState === 'saving' ? '保存中' : '已保存'}
                   </span>
+                  <IconButton label={libraryVisible ? '收起笔记目录' : '展开笔记目录'} onClick={() => setLibraryVisible((value) => !value)} active={libraryVisible}>
+                    <PanelLeft size={16} />
+                  </IconButton>
+                  {!standalone && (
+                    <IconButton label="在新窗口打开笔记工作台" onClick={openInWindow}>
+                      <Maximize2 size={16} />
+                    </IconButton>
+                  )}
                   <IconButton label={activeNote.starred ? '取消星标' : '星标'} onClick={() => toggleStar(activeNote.id)} active={activeNote.starred}>
                     <Star size={16} fill={activeNote.starred ? 'currentColor' : 'none'} />
                   </IconButton>
@@ -1152,10 +1284,12 @@ export const MarkdownNotesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className={`mdn-canvas mdn-mode-${mode}`}>
+            <div ref={canvasRef} className={`mdn-canvas mdn-mode-${mode}${splitPanes ? ' is-split' : ''}`}>
               {mode === 'rich' ? (
                 <section className="mdn-rich-pane">
-                  <div className="mdn-pane-label"><PanelRight size={13} /> 富文本编辑 <span>改动会自动转回 Markdown</span></div>
+                  <div className="mdn-pane-label">
+                    <PanelRight size={13} /> 富文本编辑 <span>改动会自动转回 Markdown</span>
+                  </div>
                   <div
                     ref={richRef}
                     className="mdn-rich-editor"
@@ -1181,9 +1315,21 @@ export const MarkdownNotesPage: React.FC = () => {
                     }}
                   />
                 </section>
-              ) : (
-                <section className="mdn-source-pane">
-                  <div className="mdn-pane-label"><Code2 size={13} /> Markdown 源码 <span>{stats.chars} 字符</span></div>
+              ) : editorVisible ? (
+                <section className="mdn-source-pane" style={splitPanes ? { flexBasis: `${splitRatio}%` } : undefined}>
+                  <div className="mdn-pane-label">
+                    <Code2 size={13} /> Markdown 源码
+                    {mode === 'split' && (
+                      <div className="mdn-pane-tools">
+                        <button type="button" title="编辑区占满" onClick={() => { setEditorVisible(true); setPreviewVisible(false); }}>
+                          <Maximize2 size={12} />
+                        </button>
+                        <button type="button" title="隐藏编辑区" disabled={!previewVisible} onClick={() => setEditorVisible(false)}>
+                          <EyeOff size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <textarea
                     ref={textareaRef}
                     className="mdn-source-editor"
@@ -1214,11 +1360,32 @@ export const MarkdownNotesPage: React.FC = () => {
                     aria-label="Markdown 源码编辑器"
                   />
                 </section>
+              ) : null}
+
+              {splitPanes && (
+                <div
+                  className="mdn-splitter mdn-canvas-splitter"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="调整源码与预览宽度"
+                  onPointerDown={startSplitResize}
+                  onDoubleClick={() => setSplitRatio(50)}
+                />
               )}
 
-              {mode === 'split' && (
-                <aside className="mdn-preview-pane">
-                  <div className="mdn-pane-label"><Eye size={13} /> 实时预览 <span>HTML</span></div>
+              {mode === 'split' && previewVisible && (
+                <aside className="mdn-preview-pane" style={splitPanes ? { flexBasis: `${100 - splitRatio}%` } : undefined}>
+                  <div className="mdn-pane-label">
+                    <Eye size={13} /> 实时预览
+                    <div className="mdn-pane-tools">
+                      <button type="button" title="预览占满" onClick={() => { setEditorVisible(false); setPreviewVisible(true); }}>
+                        <Maximize2 size={12} />
+                      </button>
+                      <button type="button" title="隐藏预览" onClick={() => { setPreviewVisible(false); setEditorVisible(true); }}>
+                        <EyeOff size={12} />
+                      </button>
+                    </div>
+                  </div>
                   <article className="mdn-preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
                 </aside>
               )}

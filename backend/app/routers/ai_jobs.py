@@ -55,15 +55,20 @@ def _job_list_item(job: AiJob) -> AiJobListItem:
 def list_ai_jobs(
     status: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=999999),
+    # 轮询请求可以显式跳过 DB/RQ 对账：对账要扫 running 任务并查 RQ，
+    # 转写页 5 秒一次全量对账会把 DB 连接池和前端一起拖慢。手动刷新
+    # 和用户操作仍走默认 True，保留原来的自愈能力。
+    reconcile: bool = Query(default=True),
     db: Session = Depends(get_db),
     # 任务列表是运维视图：会暴露所有视频标题、失败原因、模型配置。
     # 普通用户不需要看，原来这里**完全没有鉴权**，不登录就能翻。
     _admin=Depends(require_admin),
 ):
-    # 前端每 3 秒轮询这个接口。顺手校对 DB 与 RQ 的状态：
+    # 前端轮询时顺手校对 DB 与 RQ 的状态：
     # worker 被强杀后 RQ 把任务标 failed，DB 却还停在 queued，
     # 用户会看到永远不动的「处理中 / 1 排队」。这里发现后重新投递。
-    reconcile_stuck_ai_jobs(db)
+    if reconcile:
+        reconcile_stuck_ai_jobs(db)
 
     base_query = db.query(AiJob).outerjoin(Video)
     total_all = base_query.count()
