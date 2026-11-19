@@ -134,11 +134,16 @@ describe('regression contracts', () => {
 
   it('keeps AI job polling adaptive to page visibility', () => {
     const aiJobCenter = readRepoFile('src/hooks/useAiJobCenter.ts');
+    const polling = readRepoFile('src/lib/jobPolling.ts');
 
-    expect(aiJobCenter).toContain("document.visibilityState === 'visible' ? 5000 : 20000");
+    expect(aiJobCenter).toContain('getJobPollDelay');
+    expect(aiJobCenter).toContain('document.visibilityState');
     expect(aiJobCenter).toContain('document.addEventListener(\'visibilitychange\'');
     expect(aiJobCenter).toContain('window.setTimeout(tick');
     expect(aiJobCenter).not.toContain('window.setInterval');
+    // 空闲队列降到 60 秒，后台再降；有任务时才 10 秒。
+    expect(polling).toContain('IDLE_JOB_POLL_MS = 60_000');
+    expect(polling).toContain('HIDDEN_IDLE_JOB_POLL_MS = 120_000');
   });
 
   it('keeps assistant page context updates state-driven', () => {

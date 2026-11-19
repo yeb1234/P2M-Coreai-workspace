@@ -1,7 +1,9 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
+from starlette.concurrency import run_in_threadpool
 
 from app.auth import hash_password, require_admin
 from app.database import SessionLocal
@@ -289,8 +291,42 @@ def save_assistant_runtime_settings(payload: AssistantRuntimeSettingsIn):
 
 
 @router.get("/health")
-def backend_health():
-    return collect_backend_health()
+async def backend_health():
+    """管理面健康检查，最多 12 秒返回。
+
+    以前这里直接调用同步的 collect_backend_health()，GPU 探测、
+    LLM 探测、whisper.cpp 子进程探测串在一起，任何一项卡住都会
+    把前端的 60 秒超时耗尽。现在：
+    - 服务层内部并行探测 LLM，不再串行叠 3 秒超时；
+    - GPU 不可用只记一条失败检查项，不让整个接口 500；
+    - 路由层再兜一个 12 秒硬预算，超时也返回结构化结果。
+    """
+    try:
+        return await asyncio.wait_for(
+            run_in_threadpool(collect_backend_health),
+            timeout=12.0,
+        )
+    except asyncio.TimeoutError:
+        return {
+            "ok": False,
+            "checks": [{
+                "name": "后端健康检查",
+                "ok": False,
+                "message": "检查超时（>12s）。后端可能被数据库连接池、GPU 探测或外部 LLM 探测拖住，请查看容器日志。",
+                "details": {"timeout_s": 12},
+            }],
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("后端健康检查失败")
+        return {
+            "ok": False,
+            "checks": [{
+                "name": "后端健康检查",
+                "ok": False,
+                "message": f"检查失败：{str(exc)[:200]}",
+                "details": {},
+            }],
+        }
 
 
 @router.get("/ai-jobs/queue")

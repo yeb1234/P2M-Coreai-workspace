@@ -74,7 +74,7 @@ class ProfilePayload(BaseModel):
     occupation: str = ""
     goal: str = ""
     timezone: str = "Asia/Shanghai"
-    weekly_hours: int = 0
+    weekly_hours: int = Field(default=0, ge=0, le=70)
     language: str = "中文"
 
 

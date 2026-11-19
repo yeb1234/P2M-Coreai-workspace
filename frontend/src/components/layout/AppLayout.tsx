@@ -14,6 +14,8 @@ import { TodoReminderPopup } from './TodoReminderPopup';
 import { UnderConstructionBanner } from '../shared/UnderConstruction';
 import { IS_DESKTOP_CLIENT } from '../../lib/clientContext';
 import { AssetRegistryPage } from '../settings/AssetRegistrySection';
+import { MarkdownNotesPage } from '../mdnotes/MarkdownNotesPage';
+import { pageTitle } from '../../config/appMeta';
 
 interface AppLayoutProps {
   storesReady?: boolean;
@@ -51,6 +53,7 @@ const PagePane: React.FC<{ page: PageDescriptor; isActive: boolean }> = ({ page,
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
   const { fontSize, compactMode } = useUIStore();
+  const navPlacement = useUIStore((s) => s.navPlacement);
   const role = useAuthStore((s) => s.role);
   const isMobile = useIsMobile();
   const location = useLocation();
@@ -85,6 +88,17 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
   const scrollByPath = useRef<Record<string, number>>({});
   const activeKey = currentPage?.path ?? '';
 
+  // 浏览器标签跟着版本和页面走，避免每个页面都停留在旧的工程代号。
+  useEffect(() => {
+    if (location.pathname === '/mdnotes-window') {
+      document.title = pageTitle('笔记工作台');
+    } else if (location.pathname === '/asset-registry') {
+      document.title = pageTitle('配置资产版本库');
+    } else {
+      document.title = pageTitle(currentPage?.label);
+    }
+  }, [currentPage?.label, location.pathname]);
+
   useEffect(() => {
     if (!currentPage) return;
     setMountedIds((prev) =>
@@ -103,6 +117,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
       scrollByPath.current[activeKey] = main.scrollTop;
     };
   }, [activeKey]);
+
+  // 笔记工作台「在新窗口打开」：独立窗口不带侧栏、顶栏和聊天面板，
+  // 由页面自己的三栏撑满整个视口，方便在大屏上并排写作与预览。
+  if (location.pathname === '/mdnotes-window') {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-[var(--bg-body)]">
+        <MarkdownNotesPage standalone />
+      </div>
+    );
+  }
 
   // 设置里的“单独打开”入口：不挂侧边栏与聊天面板，直接给运维/管理员
   // 一个可全屏钉住的资产版本库页面。普通用户即使手动拼 hash 也进不来。
@@ -156,9 +180,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
       <div className="flex-1 m-1 md:m-2 wood-texture rounded-lg p-1 md:p-2 overflow-hidden flex flex-col">
         <div className="flex-1 paper-surface flex flex-col overflow-hidden">
           <Header />
-          {IS_DESKTOP_CLIENT && <DesktopNav />}
+          {navPlacement === 'top' && <DesktopNav />}
           <div className="app-content-row flex flex-1 overflow-hidden">
-            {!IS_DESKTOP_CLIENT && <Sidebar />}
+            {navPlacement === 'left' && <Sidebar />}
             <main ref={mainRef} className="app-main min-w-0 flex-1 overflow-y-auto">
               {currentPage?.dev && (
                 <div className="px-3 pt-3 md:px-4">

@@ -19,6 +19,7 @@ import {
   type AiJobListOut,
 } from '../lib/videoApi';
 import { playInteractionSound } from '../lib/sounds';
+import { getJobPollDelay, shouldReconcileJobs } from '../lib/jobPolling';
 
 interface AiJobCenterProps {
   jobs: AiJobListOut | null;
@@ -90,6 +91,9 @@ export function useAiJobCenter(
   useEffect(() => {
     statusFilterRef.current = aiJobStatusFilter;
   }, [aiJobStatusFilter]);
+  const jobsRequestRef = useRef(false);
+  const lastReconcileAtRef = useRef(Date.now());
+  const lastVideoRefreshRef = useRef(Date.now());
 
   // Build base options from transcription settings
   const baseOptions = useMemo(() => ({
@@ -141,16 +145,22 @@ export function useAiJobCenter(
   }, []);
 
   // Core: load job list + queue state
-  const loadAiJobs = useCallback(async () => {
+  const loadAiJobs = useCallback(async (options: { silent?: boolean; reconcile?: boolean } = {}) => {
+    if (options.silent && jobsRequestRef.current) return;
+    jobsRequestRef.current = true;
+    const reconcile = options.reconcile ?? true;
+    if (reconcile) lastReconcileAtRef.current = Date.now();
     try {
       const [jobs, queue] = await Promise.all([
-        fetchAiJobs(12, statusFilterRef.current ?? undefined),
+        fetchAiJobs(12, statusFilterRef.current ?? undefined, { reconcile }),
         fetchAiQueueState(),
       ]);
       setAiJobs(jobs);
       setQueuePaused(queue.paused);
     } catch {
       // diagnostic UI, don't break the app
+    } finally {
+      jobsRequestRef.current = false;
     }
   }, []);
 
@@ -354,11 +364,13 @@ export function useAiJobCenter(
     });
   }, [loadAiJobs]);
 
-  // Auto-poll when there are active jobs
+  // Auto-poll: active jobs keep the list fresh; an idle queue only needs
+  // a slow heartbeat. The current video detail is heavier, so refresh it
+  // at most every 30s and only while a job is actually running.
   useEffect(() => {
     const hasActiveAiJobs = (aiJobs?.running ?? 0) + (aiJobs?.queued ?? 0) > 0;
-    if (!hasActiveAiJobs) return;
     let timer: number | null = null;
+    let disposed = false;
 
     const clearTimer = () => {
       if (timer) {
@@ -369,19 +381,17 @@ export function useAiJobCenter(
 
     const schedule = () => {
       clearTimer();
-      // 转写任务动辄几十分钟，3 秒一次的轮询纯属浪费：
-      // 每次 tick 要拉 job 列表 + 当前视频详情（两个请求），
-      // 一天开着的页面会累积上千次无意义查询，还会和后端的
-      // 检索/对话抢 DB 连接池。
-      // 5 秒的体感延迟可以忽略（进度条本来就按 1/60 秒精度显示）。
-      // 页面切到后台时进一步降到 20 秒。
-      const delay = document.visibilityState === 'visible' ? 5000 : 20000;
-      timer = window.setTimeout(tick, delay);
+      if (disposed) return;
+      timer = window.setTimeout(tick, getJobPollDelay(hasActiveAiJobs, document.visibilityState));
     };
 
     const tick = () => {
-      void loadAiJobs();
-      if (currentVideoId && document.visibilityState === 'visible') {
+      if (disposed) return;
+      const reconcile = shouldReconcileJobs(lastReconcileAtRef.current);
+      void loadAiJobs({ silent: true, reconcile });
+      const videoDetailDue = Date.now() - lastVideoRefreshRef.current >= 30_000;
+      if (hasActiveAiJobs && currentVideoId && document.visibilityState === 'visible' && videoDetailDue) {
+        lastVideoRefreshRef.current = Date.now();
         void loadCurrentVideo(currentVideoId);
       }
       schedule();
@@ -392,6 +402,7 @@ export function useAiJobCenter(
     schedule();
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      disposed = true;
       clearTimer();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };

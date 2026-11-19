@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { idbStorage } from '../lib/idbStorage';
+import { IS_DESKTOP_CLIENT } from '../lib/clientContext';
 import { type ThemeVars, type ThemeScheduleRule, THEME_PRESETS, applyTheme, DEFAULT_THEME_SCHEDULE_RULES } from '../lib/themes';
 import { VIEW_PATH } from '../config/pageRegistry';
 
@@ -9,6 +10,7 @@ export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'note
 export type FontSize = 'sm' | 'md' | 'lg';
 export type ThemeId = string;
 export type NoteEnterBehavior = 'enter_save' | 'enter_newline';
+export type NavPlacement = 'left' | 'top';
 
 const DEFAULT_NAV_ORDER: ActiveView[] = [
   'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'mdnotes', 'pomodoro', 'timecenter',
@@ -29,6 +31,7 @@ interface UIState {
   activeView: ActiveView;
   sidebarOpen: boolean;
   sidebarWidth: number;
+  navPlacement: NavPlacement;
   modalState: ModalState | null;
   navOrder: ActiveView[];
   hiddenNavItems: ActiveView[];
@@ -48,6 +51,7 @@ interface UIState {
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
+  setNavPlacement: (placement: NavPlacement) => void;
   openModal: (type: string, data?: unknown) => void;
   closeModal: () => void;
   reorderNav: (fromId: ActiveView, toId: ActiveView) => void;
@@ -76,6 +80,8 @@ export const useUIStore = create<UIState>()(
       activeView: 'dashboard',
       sidebarOpen: true,
       sidebarWidth: 184,
+      // 桌面壳原本就是顶部横排；网页端保持左侧分组侧栏。
+      navPlacement: IS_DESKTOP_CLIENT ? 'top' : 'left',
       modalState: null,
       navOrder: DEFAULT_NAV_ORDER,
       hiddenNavItems: [],
@@ -106,6 +112,7 @@ export const useUIStore = create<UIState>()(
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setSidebarWidth: (width) => set({ sidebarWidth: clampSidebarWidth(width) }),
+      setNavPlacement: (navPlacement) => set({ navPlacement }),
       openModal: (type, data) => set({ modalState: { type, data } }),
       closeModal: () => set({ modalState: null }),
       reorderNav: (fromId, toId) => {
@@ -217,6 +224,7 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         sidebarOpen: state.sidebarOpen,
         sidebarWidth: state.sidebarWidth,
+        navPlacement: state.navPlacement,
         navOrder: state.navOrder,
         hiddenNavItems: state.hiddenNavItems,
         displayName: state.displayName,
@@ -257,6 +265,9 @@ export const useUIStore = create<UIState>()(
           themeScheduleEnabled: saved.themeScheduleEnabled ?? current.themeScheduleEnabled,
           themeScheduleRules: saved.themeScheduleRules ?? current.themeScheduleRules,
           sidebarWidth: clampSidebarWidth(saved.sidebarWidth),
+          navPlacement: saved.navPlacement === 'top' || saved.navPlacement === 'left'
+            ? saved.navPlacement
+            : current.navPlacement,
           navOrder: merged,
           hiddenNavItems: validHidden,
         };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Plus, Trash2, Clock, CalendarDays } from 'lucide-react';
+import { Download, Plus, Trash2, Clock, CalendarDays, PanelLeft, PanelTop } from 'lucide-react';
 import { useUIStore } from '../../stores';
 import {
   BUILT_IN_THEME_IDS,
@@ -13,11 +13,13 @@ import {
   formatScheduleRuleWeekdays,
 } from '../../lib/themes';
 import { playInteractionSound } from '../../lib/sounds';
-import { ToggleSwitch, SettingsHint } from './SettingsPrimitives';
+import { ToggleSwitch, SettingsHint, SettingsFieldLabel } from './SettingsPrimitives';
 
 export function AppearanceSettings() {
   const themeId = useUIStore((s) => s.themeId);
   const setTheme = useUIStore((s) => s.setTheme);
+  const navPlacement = useUIStore((s) => s.navPlacement);
+  const setNavPlacement = useUIStore((s) => s.setNavPlacement);
   const themeScheduleEnabled = useUIStore((s) => s.themeScheduleEnabled);
   const setThemeScheduleEnabled = useUIStore((s) => s.setThemeScheduleEnabled);
   const themeScheduleRules = useUIStore((s) => s.themeScheduleRules);
@@ -127,6 +129,37 @@ export function AppearanceSettings() {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] p-4">
+        <SettingsFieldLabel>插件栏位置</SettingsFieldLabel>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {([
+            { id: 'left' as const, label: '左侧竖排', hint: '保留日常 / 学习 / 工具分组，适合宽屏', icon: <PanelLeft size={18} /> },
+            { id: 'top' as const, label: '顶部横排', hint: '像桌面端一样横向铺开，正文更宽', icon: <PanelTop size={18} /> },
+          ]).map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setNavPlacement(option.id)}
+              aria-pressed={navPlacement === option.id}
+              className={`flex items-start gap-3 rounded-lg border px-3 py-3 text-left transition ${
+                navPlacement === option.id
+                  ? 'border-[var(--accent)] bg-[var(--accent-bg)]'
+                  : 'border-[var(--border-light)] bg-[var(--bg-elevated)] hover:border-[var(--border-medium)]'
+              }`}
+            >
+              <span className={navPlacement === option.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}>
+                {option.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-semibold text-[var(--text-primary)]">{option.label}</span>
+                <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-muted)]">{option.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+        <SettingsHint className="mt-2">桌面端与网页端都生效；移动端仍使用底部导航。</SettingsHint>
+      </div>
+
       {/* 主题选择 */}
       <div>
         <div className="mb-3 flex items-center justify-between">

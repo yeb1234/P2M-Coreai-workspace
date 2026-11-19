@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save, Users, Brain, GitBranch } from 'lucide-react';
+import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save, Users, Brain, GitBranch, Package } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { usePomodoroStore, useUIStore, useNotificationStore, useAuthStore } from '../../stores';
 import { changePassword } from '../../lib/authApi';
@@ -14,6 +14,7 @@ import { SettingsButton, SettingsFieldLabel, SettingsHint, SettingsPanelTitle, S
 import { AMBIENT_SOUNDS, playInteractionSound } from '../../lib/sounds';
 import { PrivacySettings, DataSettings, BackendHealthSettings } from './PrivacyDataSettings';
 import { AssetRegistrySection } from './AssetRegistrySection';
+import { PluginVersionsSection } from './PluginVersionsSection';
 
 const SECTIONS = [
   { id: 'pomodoro', label: '番茄钟', icon: <Timer size={16} /> },
@@ -31,8 +32,9 @@ const SECTIONS = [
 // 用户管理只对管理员显示，不放进公共 SECTIONS 里
 const ADMIN_SECTION = { id: 'users', label: '用户管理', icon: <Users size={16} /> } as const;
 const ASSET_SECTION = { id: 'assets', label: '配置资产', icon: <GitBranch size={16} /> } as const;
+const PLUGIN_SECTION = { id: 'plugins', label: '插件版本', icon: <Package size={16} /> } as const;
 
-type SectionId = (typeof SECTIONS)[number]['id'] | 'users' | 'assets';
+type SectionId = (typeof SECTIONS)[number]['id'] | 'users' | 'assets' | 'plugins';
 
 /* ─── Pomodoro ─── */
 type PomodoroSettingsForm = Pick<
@@ -322,7 +324,7 @@ function NotificationSettings() {
 export const SettingsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionId>('pomodoro');
   const role = useAuthStore((s) => s.role);
-  const visibleSections = role === 'admin' ? [...SECTIONS, ADMIN_SECTION, ASSET_SECTION] : [...SECTIONS];
+  const visibleSections = role === 'admin' ? [...SECTIONS, ADMIN_SECTION, ASSET_SECTION, PLUGIN_SECTION] : [...SECTIONS];
 
   const renderSection = () => {
     switch (activeSection) {
@@ -350,6 +352,8 @@ export const SettingsPage: React.FC = () => {
         return <div><SettingsPanelTitle>用户管理</SettingsPanelTitle><UserManagementSection /></div>;
       case 'assets':
         return <div><SettingsPanelTitle>配置资产版本库</SettingsPanelTitle><AssetRegistrySection /></div>;
+      case 'plugins':
+        return <div><SettingsPanelTitle>内部插件版本</SettingsPanelTitle><PluginVersionsSection /></div>;
     }
   };
 

@@ -405,7 +405,9 @@ def test_breaker_opens_and_short_circuits_after_threshold():
         assert calls["count"] == 2
         assert METRICS.snapshot("fake_cb")["circuit_open_rejections"] == 1
 
-        time.sleep(0.06)
+        # Windows 的 monotonic 分辨率约 15.6ms，0.06s 在整机负载高时会落到
+        # 冷却边界之内；留足 0.15s，避免把定时器粒度误判成熔断逻辑回归。
+        time.sleep(0.15)
         execute_tool(tool, spec, budget, "test-skill", {})
         assert calls["count"] == 3
     finally:

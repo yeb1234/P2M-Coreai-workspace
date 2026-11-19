@@ -1,5 +1,7 @@
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, wait
 import shutil
+from typing import Callable
 
 import requests
 from sqlalchemy import text
@@ -8,6 +10,14 @@ from app.database import SessionLocal, engine, settings
 from app.models import Video
 from app.services.admin_ai_queue import _is_queue_paused, ai_job_status_counts
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
+
+
+# 这三个 LLM 探测是互相独立的。以前串行跑，3 个 3 秒超时叠起来，
+# 再加上 LM Studio / Ollama 的 HTTP 探测，管理页点一次「检测后端状态」
+# 就可能把 60 秒的前端超时耗尽。现在并行探测并给整体预算封顶。
+_LLM_PROBE_BUDGET_S = 4.0
+_LLM_PROBE_TIMEOUT_S = 3.0
+_HTTP_PROBE_TIMEOUT_S = 2.0
 
 
 def health_item(name: str, ok: bool, message: str, details: dict | None = None) -> dict:
@@ -19,7 +29,7 @@ def health_item(name: str, ok: bool, message: str, details: dict | None = None) 
     }
 
 
-def check_http_json(name: str, url: str, timeout_s: float = 2.0) -> dict:
+def check_http_json(name: str, url: str, timeout_s: float = _HTTP_PROBE_TIMEOUT_S) -> dict:
     try:
         response = requests.get(url, timeout=timeout_s)
         if response.status_code == 200:
@@ -29,48 +39,83 @@ def check_http_json(name: str, url: str, timeout_s: float = 2.0) -> dict:
         return health_item(name, False, str(exc), {"url": url})
 
 
-def probe_llm_contexts() -> dict:
+def _run_llm_context_probe(key: str, label: str, runner) -> tuple[str, dict]:
+    try:
+        context_length, raw = runner()
+        return key, {
+            "name": label,
+            "context_length": context_length,
+            "message": f"探测到 {context_length} tokens" if context_length else "模型接口未返回上下文字段",
+            "raw_keys": sorted(raw.keys())[:20] if isinstance(raw, dict) else [],
+        }
+    except Exception as exc:  # noqa: BLE001
+        return key, {
+            "name": label,
+            "context_length": None,
+            "message": str(exc)[:300],
+            "raw_keys": [],
+        }
+
+
+def probe_llm_contexts(
+    budget_s: float = _LLM_PROBE_BUDGET_S,
+    specs: list[tuple[str, str, Callable[[], tuple[int | None, dict]]]] | None = None,
+) -> dict:
+    """并行探测 LLM 上下文窗口，整体最多等待 budget_s 秒。
+
+    线程不能被强杀，所以超时的探测标记为 timeout 后不再等待；
+    这些请求的底层 socket 超时是 _LLM_PROBE_TIMEOUT_S，不会无限挂住。
+    """
     probes = {}
-    for key, label, runner in (
-        (
-            "local_openai",
-            "LM Studio / OpenAI 兼容接口",
-            lambda: OpenAICompatibleClient(
-                base_url=settings.openai_base_url,
-                api_key=settings.openai_api_key,
-                timeout_s=3,
-            ).model_context_length(settings.openai_model),
-        ),
-        (
-            "external_openai",
-            "外部网络 LLM",
-            lambda: OpenAICompatibleClient(
-                base_url=settings.external_llm_base_url,
-                api_key=settings.external_llm_api_key,
-                timeout_s=3,
-            ).model_context_length(settings.external_llm_model),
-        ),
-        (
-            "ollama",
-            "Ollama",
-            lambda: OllamaClient(base_url=settings.ollama_base_url, timeout_s=3).model_context_length(settings.ollama_model),
-        ),
-    ):
-        try:
-            context_length, raw = runner()
-            probes[key] = {
-                "name": label,
-                "context_length": context_length,
-                "message": f"探测到 {context_length} tokens" if context_length else "模型接口未返回上下文字段",
-                "raw_keys": sorted(raw.keys())[:20] if isinstance(raw, dict) else [],
-            }
-        except Exception as exc:
-            probes[key] = {
-                "name": label,
-                "context_length": None,
-                "message": str(exc),
-                "raw_keys": [],
-            }
+    if specs is None:
+        specs = [
+            (
+                "local_openai",
+                "LM Studio / OpenAI 兼容接口",
+                lambda: OpenAICompatibleClient(
+                    base_url=settings.openai_base_url,
+                    api_key=settings.openai_api_key,
+                    timeout_s=_LLM_PROBE_TIMEOUT_S,
+                ).model_context_length(settings.openai_model),
+            ),
+            (
+                "external_openai",
+                "外部网络 LLM",
+                lambda: OpenAICompatibleClient(
+                    base_url=settings.external_llm_base_url,
+                    api_key=settings.external_llm_api_key,
+                    timeout_s=_LLM_PROBE_TIMEOUT_S,
+                ).model_context_length(settings.external_llm_model),
+            ),
+            (
+                "ollama",
+                "Ollama",
+                lambda: OllamaClient(
+                    base_url=settings.ollama_base_url,
+                    timeout_s=_LLM_PROBE_TIMEOUT_S,
+                ).model_context_length(settings.ollama_model),
+            ),
+        ]
+
+    executor = ThreadPoolExecutor(max_workers=len(specs), thread_name_prefix="llm-health")
+    futures = {
+        executor.submit(_run_llm_context_probe, key, label, runner): (key, label)
+        for key, label, runner in specs
+    }
+    done, pending = wait(futures, timeout=budget_s)
+    for future in done:
+        key, item = future.result()
+        probes[key] = item
+    for future in pending:
+        key, label = futures[future]
+        probes[key] = {
+            "name": label,
+            "context_length": None,
+            "message": f"探测超时（>{budget_s:g}s）",
+            "raw_keys": [],
+        }
+        future.cancel()
+    executor.shutdown(wait=False, cancel_futures=True)
     return probes
 
 
@@ -80,7 +125,7 @@ def backend_health() -> dict:
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-        checks.append(health_item("数据库", True, "SQLite 连接正常", {"url": settings.database_url}))
+        checks.append(health_item("数据库", True, "数据库连接正常", {"url": settings.database_url}))
     except Exception as exc:
         checks.append(health_item("数据库", False, str(exc), {"url": settings.database_url}))
 
@@ -131,40 +176,74 @@ def backend_health() -> dict:
         running = job_counts.get("running", 0)
         failed = job_counts.get("failed", 0)
         videos = db.query(Video).count()
-        checks.append(health_item(
-            "AI 队列",
-            True,
-            f"运行 {running}，排队 {queued}，失败 {failed}",
-            {
+        try:
+            paused = _is_queue_paused()
+            queue_ok = True
+            queue_message = f"运行 {running}，排队 {queued}，失败 {failed}"
+            queue_details = {
                 "running": running,
                 "queued": queued,
                 "failed": failed,
-                "paused": _is_queue_paused(),
-            },
-        ))
+                "paused": paused,
+            }
+        except Exception as exc:  # Redis 不可用不应该让整个健康页 500
+            queue_ok = False
+            queue_message = f"Redis 队列不可用：{str(exc)[:160]}"
+            queue_details = {
+                "running": running,
+                "queued": queued,
+                "failed": failed,
+                "paused": None,
+            }
+        checks.append(health_item("AI 队列", queue_ok, queue_message, queue_details))
         checks.append(health_item("视频库", True, f"{videos} 个视频", {"videos": videos}))
+    except Exception as exc:  # noqa: BLE001
+        checks.append(health_item("AI 队列", False, f"队列状态读取失败：{str(exc)[:160]}", {}))
     finally:
         db.close()
 
+    cuda_devices = 0
+    cuda_available = False
+    resolved_device = "unavailable"
     try:
         import ctranslate2
+
         cuda_devices = ctranslate2.get_cuda_device_count()
         cuda_available = cuda_devices > 0
-    except Exception:
-        cuda_devices = 0
-        cuda_available = False
-    from app.services.transcribe_whisper import _resolve_device
-    resolved_device = _resolve_device(settings.device_type)
-    checks.append(health_item(
-        "CUDA / GPU",
-        cuda_available,
-        f"检测到 {cuda_devices} 个 CUDA 设备，转写将使用 {resolved_device}" if cuda_available else f"未检测到 CUDA 设备，转写将使用 {resolved_device}",
-        {
-            "cuda_devices": cuda_devices,
-            "resolved_device": resolved_device,
-            "configured_device_type": settings.device_type,
-        },
-    ))
+    except Exception as exc:  # noqa: BLE001
+        cuda_probe_error = str(exc)[:160]
+    else:
+        cuda_probe_error = ""
+
+    try:
+        from app.services.transcribe_whisper import _resolve_device
+
+        resolved_device = _resolve_device(settings.device_type)
+        checks.append(health_item(
+            "CUDA / GPU",
+            cuda_available,
+            f"检测到 {cuda_devices} 个 CUDA 设备，转写将使用 {resolved_device}" if cuda_available else f"未检测到 CUDA 设备，转写将使用 {resolved_device}",
+            {
+                "cuda_devices": cuda_devices,
+                "resolved_device": resolved_device,
+                "configured_device_type": settings.device_type,
+            },
+        ))
+    except Exception as exc:  # noqa: BLE001
+        # GPU-only 模式下，没有 CUDA 时 _resolve_device 会明确抛错。
+        # 这是「当前机器不具备转写能力」，不是健康接口本身坏了；
+        # 必须降级成一条失败检查项，不能让整个 /api/admin/health 返回 500。
+        checks.append(health_item(
+            "CUDA / GPU",
+            False,
+            f"转写设备不可用：{str(exc)[:200]}",
+            {
+                "cuda_devices": cuda_devices,
+                "resolved_device": "unavailable",
+                "configured_device_type": settings.device_type,
+                "probe_error": cuda_probe_error,
+            },
+        ))
 
     # When CUDA is actually selected, also probe cuBLAS / cuDNN runtime DLLs because
     # faster-whisper fails opaquely if those are missing on Windows.

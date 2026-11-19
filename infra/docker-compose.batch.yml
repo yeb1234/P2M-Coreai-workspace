@@ -2,7 +2,8 @@
 #
 # 角色边界（只按队列分工，不靠宿主脚本切模型）：
 #   audio-prep             CPU 抽 WAV（Docker 内 ffmpeg）
-#   worker / worker2       台式机 GPU 转写（ai_jobs）
+#   worker                 台式机 GPU 转写主 worker（默认唯一一个）
+#   worker2                可选第二转写 worker，默认不启动
 #   vector-worker          台式机向量化（background，走桌面 bge-m3）
 #   summary-worker-laptop  笔记本 AI 总结（summary_jobs，走 250:1234 的宿主桥）
 #
@@ -46,9 +47,15 @@ services:
               count: all
               capabilities: [gpu]
 
-  # 第二个转写 worker：只做 secondary，不参与启动恢复，避免两个进程
-  # 同时扫 4k+ DB 队列。GPU 仍由 compose 的 gpu 覆盖提供。
+  # 第二个转写 worker：默认不启动。单人客户端让 GPU 专心跑一个任务，
+  # 避免两个进程同时扫 4k+ DB 队列、同时读 HDD 把抽音频拖慢。
+  # 需要临时翻倍吞吐时显式开：
+  #   docker compose -p p2-siteyeb --env-file .env \
+  #     -f infra/docker-compose.yml -f infra/docker-compose.batch.yml \
+  #     --profile dual-transcribe up -d worker2
+  # 或直接跑 ops/scripts/transcribe-workers.ps1 -Count 2。
   worker2:
+    profiles: ["dual-transcribe"]
     extends:
       file: docker-compose.yml
       service: worker

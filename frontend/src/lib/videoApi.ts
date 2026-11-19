@@ -709,9 +709,15 @@ export async function startAiJob(
   });
 }
 
-export async function fetchAiJobs(limit = 20, status?: string): Promise<AiJobListOut> {
+export async function fetchAiJobs(
+  limit = 20,
+  status?: string,
+  options: { reconcile?: boolean } = {},
+): Promise<AiJobListOut> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (status) params.set('status', status);
+  // 后台轮询传 false，跳过后端逐轮 DB/RQ 对账；手动刷新保持默认 true。
+  if (options.reconcile === false) params.set('reconcile', 'false');
   return apiFetch<AiJobListOut>(`/api/ai-jobs?${params}`);
 }
 
@@ -863,7 +869,8 @@ export async function syncQueuedAiJobSettings(): Promise<{ updated: number }> {
 }
 
 export async function fetchBackendHealth(): Promise<BackendHealthOut> {
-  return apiFetch<BackendHealthOut>('/api/admin/health');
+  // 后端内部有 12 秒硬预算；前端留 3 秒余量，避免用户对着 60 秒转圈。
+  return apiFetch<BackendHealthOut>('/api/admin/health', { timeoutMs: 15000 });
 }
 
 export async function fetchWhisperModels(): Promise<WhisperModelsOut> {

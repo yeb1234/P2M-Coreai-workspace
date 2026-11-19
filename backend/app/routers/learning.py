@@ -53,7 +53,9 @@ class GoalCreate(BaseModel):
     title: str = Field(min_length=2, max_length=120)
     target_role: str = ""
     deadline: str = ""
-    weekly_hours: float = Field(default=10.0, gt=0, le=80)
+    # 每天最多 10 小时 ⇒ 每周最多 70 小时。前端快捷档也以此为上限，
+    # 这里守住 API 入口，避免绕过 UI 写入 11 小时/天。
+    weekly_hours: float = Field(default=10.0, gt=0, le=70)
     skills: list[str] = []
 
 

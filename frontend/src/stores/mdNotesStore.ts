@@ -4,7 +4,7 @@ import { idbStorage } from '../lib/idbStorage';
 import { generateId } from '../lib/id';
 
 export type MdNoteFont = 'sans' | 'serif' | 'mono';
-export type MdNoteSize = 14 | 15 | 16 | 17 | 18;
+export type MdNoteSize = 13 | 14 | 15 | 16 | 17 | 18;
 
 export interface MdFolder {
   id: string;
@@ -62,7 +62,7 @@ const seedNotes: MdNote[] = [
     tags: ['Markdown', '上手'],
     starred: true,
     font: 'sans',
-    fontSize: 16,
+    fontSize: 15,
     createdAt: '2026-11-18T09:00:00.000Z',
     updatedAt: '2026-11-18T09:00:00.000Z',
     markdown: `# 欢迎使用笔记
@@ -139,7 +139,7 @@ type Note = {
     tags: ['架构', 'P2'],
     starred: false,
     font: 'sans',
-    fontSize: 16,
+    fontSize: 15,
     createdAt: '2026-11-17T15:00:00.000Z',
     updatedAt: '2026-11-17T15:00:00.000Z',
     markdown: `# 项目架构记录
@@ -161,15 +161,31 @@ type Note = {
  * 旧种子标题里带「MD 笔记」。现在这个工作台就叫「笔记」，已存在用户
  * IndexedDB 里的那条种子不会因为 seed 改名而自动更新，所以在恢复时做一次
  * 精确迁移，只动 id=mdn-welcome 的种子，不碰用户自己写的笔记。
+ *
+ * 同时把两篇示例笔记的 16px 默认字号收一档到 15px。只在种子仍保持
+ * 原始 updatedAt 时生效，用户一旦改过字号或正文就不会被反复覆盖。
  */
-function migrateLegacySeedTitle(notes: MdNote[]): MdNote[] {
+function migrateLegacySeedNotes(notes: MdNote[]): MdNote[] {
   return notes.map((note) => {
-    if (note.id !== 'mdn-welcome') return note;
+    const seedTypography: Record<string, { updatedAt: string; size: MdNoteSize }> = {
+      'mdn-welcome': { updatedAt: '2026-11-18T09:00:00.000Z', size: 15 },
+      'mdn-project': { updatedAt: '2026-11-17T15:00:00.000Z', size: 15 },
+    };
+    const typography = seedTypography[note.id];
+    const nextSize = typography
+      && note.updatedAt === typography.updatedAt
+      && note.fontSize === 16
+      ? typography.size
+      : note.fontSize;
+
+    if (note.id !== 'mdn-welcome') {
+      return nextSize === note.fontSize ? note : { ...note, fontSize: nextSize };
+    }
     const title = note.title === '欢迎使用 MD 笔记' ? '欢迎使用笔记' : note.title;
     const markdown = note.markdown.replace(/^# 欢迎使用 MD 笔记(?=\n|$)/m, '# 欢迎使用笔记');
-    return title === note.title && markdown === note.markdown
+    return title === note.title && markdown === note.markdown && nextSize === note.fontSize
       ? note
-      : { ...note, title, markdown };
+      : { ...note, title, markdown, fontSize: nextSize };
   });
 }
 
@@ -190,7 +206,7 @@ export const useMdNotesStore = create<MdNotesState>()(
           tags: data?.tags || [],
           starred: data?.starred ?? false,
           font: data?.font || 'sans',
-          fontSize: data?.fontSize || 16,
+          fontSize: data?.fontSize || 15,
           createdAt: ts,
           updatedAt: ts,
         };
@@ -305,7 +321,7 @@ export const useMdNotesStore = create<MdNotesState>()(
         > | undefined;
         return {
           ...current,
-          notes: migrateLegacySeedTitle(persistedState?.notes ?? current.notes),
+          notes: migrateLegacySeedNotes(persistedState?.notes ?? current.notes),
           folders: persistedState?.folders ?? current.folders,
           activeNoteId: persistedState && 'activeNoteId' in persistedState
             ? persistedState.activeNoteId ?? null

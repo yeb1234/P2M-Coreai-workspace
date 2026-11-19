@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, KeyRound, Plus, RefreshCw, Shield, Trash2, UserX, UserCheck } from 'lucide-react';
+import { AlertCircle, KeyRound, Plus, RefreshCw, Trash2, UserX, UserCheck } from 'lucide-react';
 import {
   createUser,
   deleteUser,
@@ -79,15 +79,25 @@ export const UserManagementSection: React.FC = () => {
     }
   };
 
-  const handleToggleRole = async (user: AdminUser) => {
+  const handleRoleChange = async (user: AdminUser, nextRole: 'admin' | 'member') => {
+    if (user.role === nextRole) return;
+    const promote = nextRole === 'admin';
+    const ok = window.confirm(
+      promote
+        ? `将 ${user.username} 设为管理员？\n\n管理员可以访问所有配置、用户管理和任务队列，请确认对方可信。`
+        : `将 ${user.username} 降为成员？\n\n该用户会立即失去管理端权限，但个人数据不受影响。`
+    );
+    if (!ok) return;
+
     setBusyId(user.id);
     setError('');
     try {
-      await updateUser(user.id, { role: user.role === 'admin' ? 'member' : 'admin' });
-      flash(user.role === 'admin' ? `${user.username} 已降为普通成员` : `${user.username} 已设为管理员`);
+      await updateUser(user.id, { role: nextRole });
+      flash(promote ? `${user.username} 已设为管理员` : `${user.username} 已降为普通成员`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
+      await load();
     } finally {
       setBusyId(null);
     }
@@ -182,7 +192,7 @@ export const UserManagementSection: React.FC = () => {
               <thead className="bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
                 <tr>
                   <th scope="col" className="px-3 py-2 font-medium">账号</th>
-                  <th scope="col" className="px-3 py-2 font-medium">角色</th>
+                  <th scope="col" className="px-3 py-2 font-medium">权限</th>
                   <th scope="col" className="px-3 py-2 font-medium">状态</th>
                   <th scope="col" className="px-3 py-2 font-medium">最近登录</th>
                   <th scope="col" className="px-3 py-2 font-medium">数据</th>
@@ -200,15 +210,26 @@ export const UserManagementSection: React.FC = () => {
                         {isSelf && <span className="ml-1.5 text-xs text-[var(--text-muted)]">(你)</span>}
                       </td>
                       <td className="px-3 py-2">
-                        <span
-                          className={`rounded border px-1.5 py-0.5 text-xs ${
+                        <select
+                          value={user.role}
+                          disabled={busy || isSelf}
+                          onChange={(e) => {
+                            const nextRole = e.currentTarget.value as 'admin' | 'member';
+                            // 确认弹窗取消时，受控值不会触发重渲染；先把 DOM 值拨回当前角色。
+                            e.currentTarget.value = user.role;
+                            void handleRoleChange(user, nextRole);
+                          }}
+                          aria-label={`修改 ${user.username} 的权限`}
+                          title={isSelf ? '不能修改自己的权限' : '修改权限'}
+                          className={`rounded border px-2 py-1 text-xs outline-none transition disabled:cursor-not-allowed disabled:opacity-50 ${
                             user.role === 'admin'
                               ? 'border-[#f0dcc0] bg-[var(--bg-accent)] text-[var(--accent)]'
                               : 'border-[var(--border-light)] bg-[var(--bg-base)] text-[var(--text-secondary)]'
                           }`}
                         >
-                          {user.role === 'admin' ? '管理员' : '成员'}
-                        </span>
+                          <option value="member">成员</option>
+                          <option value="admin">管理员</option>
+                        </select>
                       </td>
                       <td className="px-3 py-2">
                         <span className={user.is_active ? 'text-[var(--success)]' : 'text-[var(--danger)]'}>
@@ -221,15 +242,6 @@ export const UserManagementSection: React.FC = () => {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            disabled={busy || isSelf}
-                            onClick={() => void handleToggleRole(user)}
-                            title={user.role === 'admin' ? '降为成员' : '设为管理员'}
-                            className="rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--bg-base)] hover:text-[var(--accent)] disabled:opacity-30"
-                          >
-                            <Shield size={13} />
-                          </button>
                           <button
                             type="button"
                             disabled={busy || isSelf}
@@ -268,6 +280,7 @@ export const UserManagementSection: React.FC = () => {
         )}
 
         <SettingsHint>
+          权限分为「成员 / 管理员」。管理员可访问管理端配置、用户管理和任务队列；成员只能使用个人功能。
           停用或重置密码会立即使该用户已签发的登录凭证失效；管理员不能停用、降级或删除自己，
           系统也始终保留至少一个启用的管理员。
         </SettingsHint>

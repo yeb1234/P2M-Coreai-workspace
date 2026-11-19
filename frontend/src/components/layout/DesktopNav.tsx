@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useUIStore } from '../../stores';
 import { PAGES } from '../../config/pageRegistry';
-import type { ActiveView } from '../../stores/uiStore';
 
 /**
  * 桌面壳的顶部快捷导航。
@@ -12,18 +11,23 @@ import type { ActiveView } from '../../stores/uiStore';
  * dev: true 的施工中页面仍然排除；等页面去掉 dev 标记后会自动出现在这里。
  * 仍然走同一个 activeView/hash 路由，所以和浏览器版完全同源同逻辑。
  */
-const DESKTOP_NAV_IDS: ActiveView[] = PAGES.filter((page) => !page.dev).map(
-  (page) => page.id,
-);
-
 export const DesktopNav: React.FC = () => {
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
+  const navOrder = useUIStore((s) => s.navOrder);
+  const hiddenNavItems = useUIStore((s) => s.hiddenNavItems);
   const location = useLocation();
 
-  const items = DESKTOP_NAV_IDS.map((id) => PAGES.find((page) => page.id === id)).filter(
-    (page): page is (typeof PAGES)[number] => Boolean(page),
-  );
+  const items = useMemo(() => {
+    const available = PAGES.filter(
+      (page) => !page.dev && !hiddenNavItems.includes(page.id),
+    );
+    const ordered = navOrder
+      .map((id) => available.find((page) => page.id === id))
+      .filter((page): page is (typeof PAGES)[number] => Boolean(page));
+    const tail = available.filter((page) => !navOrder.includes(page.id));
+    return [...ordered, ...tail];
+  }, [hiddenNavItems, navOrder]);
 
   return (
     <nav
@@ -53,7 +57,7 @@ export const DesktopNav: React.FC = () => {
           );
         })}
         <span className="ml-1 select-none rounded border border-[var(--border-light)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">
-          DESKTOP
+          TOP
         </span>
       </div>
     </nav>
