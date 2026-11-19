@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckSquare, ChevronRight, Folder, RefreshCw, Search, Square } from 'lucide-react';
+import { AlertCircle, CheckSquare, ChevronRight, Folder, RefreshCw, Search, Square, Star } from 'lucide-react';
 import { useVideoStore } from '../../stores/videoStore';
 import {
   fetchContinueVideo,
@@ -84,13 +84,17 @@ function groupFoldersByParent(items: CategoryTree[], allFolders: CategoryTree[])
 const FolderTile = React.memo(function FolderTile({
   category,
   checked,
+  isFavorite,
   onSelect,
   onEnter,
+  onToggleFavorite,
 }: {
   category: CategoryTree;
   checked: boolean;
+  isFavorite: boolean;
   onSelect: (id: number) => void;
   onEnter: (id: number, name: string) => void;
+  onToggleFavorite: (id: number) => void;
 }) {
   const displayName = folderDisplayName(category);
 
@@ -109,9 +113,16 @@ const FolderTile = React.memo(function FolderTile({
       <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
         <Folder size={20} className="text-[#c87d2f] shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
+          <p title={category.full_path} className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
           <p className="text-[10px] text-[#9ca3af]">{category.video_count} 个视频</p>
         </div>
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(category.id); }}
+        className="shrink-0 rounded-md p-1 transition-colors hover:bg-[#f3f2ef]"
+        title={isFavorite ? '取消收藏文件夹' : '收藏文件夹'}
+      >
+        <Star size={14} className={isFavorite ? 'text-[#fbbf24]' : 'text-[#d1cdc6] group-hover:text-[#9ca3af]'} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
     </div>
   );
@@ -131,7 +142,7 @@ const SearchFolderTile = React.memo(function SearchFolderTile({
     <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-3 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all text-left group">
       <Folder size={20} className="text-[#c87d2f] shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
+        <p title={category.full_path} className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
         {parentPath && <p className="text-[10px] text-[#b8b4ac] truncate">{parentPath}</p>}
         <p className="text-[10px] text-[#9ca3af]">{category.video_count} 个视频</p>
       </div>
@@ -158,7 +169,7 @@ const FolderSearchGroupCard = React.memo(function FolderSearchGroupCard({
             onClick={() => onEnterParent(group.parent!.id, group.parentLabel)}
             className="min-w-0 text-left"
           >
-            <span className="block truncate text-xs font-semibold text-[#1a1a1a] hover:text-[#c87d2f]">{group.parentLabel}</span>
+            <span title={group.parentPath || group.parentLabel} className="block truncate text-xs font-semibold text-[#1a1a1a] hover:text-[#c87d2f]">{group.parentLabel}</span>
             {group.parentPath && <span className="block truncate text-[10px] text-[#9ca3af]">{group.parentPath}</span>}
           </button>
         ) : (
@@ -181,8 +192,8 @@ export function VideoList() {
   const {
     videos, total, page, totalPages, loading, error, loadVideos, loadCurrentVideo,
     searchQuery, setSearchQuery, categoryTree, breadcrumb, currentCategoryId,
-    loadCategoryTree, enterCategory, goToBreadcrumb, getCurrentChildren,
-    restoreNavigation, selectedFolderIds, setSelectedFolderIds, toggleFavorite,
+    loadCategoryTree, enterCategory, goToBreadcrumb, getCurrentChildren, restoreNavigation, selectedFolderIds, setSelectedFolderIds, toggleFavorite,
+    favoriteCategoryIds, toggleFavoriteCategory,
   } = useVideoStore();
   const [inputVal, setInputVal] = useState('');
   const [navRestored, setNavRestored] = useState(false);
@@ -449,8 +460,10 @@ export function VideoList() {
               key={cat.id}
               category={cat}
               checked={selectedFolderIdSet.has(cat.id)}
+              isFavorite={favoriteCategoryIds.includes(cat.id)}
               onSelect={toggleFolderSelection}
               onEnter={enterFolderFromList}
+              onToggleFavorite={toggleFavoriteCategory}
             />
           ))}
         </div>

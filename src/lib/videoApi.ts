@@ -317,7 +317,7 @@ export interface SpriteMeta {
   duration: number;
 }
 
-export async function fetchVideos(page = 1, pageSize = 20, categoryId?: number, search?: string, categoryIds?: number[]): Promise<VideoPage> {
+export async function fetchVideos(page = 1, pageSize = 20, categoryId?: number, search?: string, categoryIds?: number[], isFavorite?: boolean): Promise<VideoPage> {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
   if (categoryIds && categoryIds.length > 0) {
     params.set('category_ids', categoryIds.join(','));
@@ -325,6 +325,7 @@ export async function fetchVideos(page = 1, pageSize = 20, categoryId?: number, 
     params.set('category_id', String(categoryId));
   }
   if (search) params.set('search', search);
+  if (isFavorite !== undefined) params.set('is_favorite', String(isFavorite));
   return apiFetch<VideoPage>(`/api/videos?${params}`, { timeoutMs: 300000 });
 }
 
@@ -381,15 +382,44 @@ export async function searchSegments(q: string, limit = 20): Promise<SegmentSear
   return apiFetch<SegmentSearchResult[]>(`/api/videos/search/segments?${params}`);
 }
 
+export interface AssistantIntentOut {
+  intent: string;
+  confidence: number;
+  cleaned_query: string;
+  keywords: string[];
+  reasoning: string;
+}
+
+export async function detectAssistantIntent(
+  message: string,
+  pageContext = ''
+): Promise<AssistantIntentOut> {
+  return apiFetch<AssistantIntentOut>('/api/assistant/detect-intent', {
+    method: 'POST',
+    body: JSON.stringify({ message, page_context: pageContext }),
+  });
+}
+
 export async function sendAssistantChat(
   message: string,
-  limit = 5,
+  limit = 15,
   pageContext = '',
-  systemPrompt = ''
+  systemPrompt = '',
+  cleanedQuery?: string,
+  sessionId?: string | null,
+  intent?: string,
+  intentHint?: string
 ): Promise<AssistantChatOut> {
+  const body: Record<string, unknown> = {
+    message, limit, page_context: pageContext, system_prompt: systemPrompt
+  };
+  if (cleanedQuery) body.cleaned_query = cleanedQuery;
+  if (sessionId) body.session_id = sessionId;
+  if (intent) body.intent = intent;
+  if (intentHint) body.intent_hint = intentHint;
   return apiFetch<AssistantChatOut>('/api/assistant/chat', {
     method: 'POST',
-    body: JSON.stringify({ message, limit, page_context: pageContext, system_prompt: systemPrompt }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -573,6 +603,10 @@ export async function batchAiJobs(
 
     remainingMaxEnqueue -= result.enqueued;
     if (remainingMaxEnqueue <= 0) break;
+  }
+
+  if (merged) {
+    merged.max_enqueue = opts.max_enqueue ?? 20;
   }
 
   return merged!;

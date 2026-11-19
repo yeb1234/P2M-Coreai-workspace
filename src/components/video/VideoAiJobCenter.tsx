@@ -191,6 +191,13 @@ function normalizedStage(job: AiJobListItem) {
   return job.stage || job.status;
 }
 
+function isStepSkipped(job: AiJobListItem, stepKey: string) {
+  if (stepKey !== 'correcting-subtitles') return false;
+  if (job.subtitle_correction_enabled === false) return true;
+  if (job.subtitle_correction_scope === 'off') return true;
+  return false;
+}
+
 function statusIcon(status: string) {
   if (status === 'running') return <Loader2 size={13} className="animate-spin text-[var(--accent)]" />;
   if (status === 'cancelling') return <Loader2 size={13} className="animate-spin text-[var(--text-muted)]" />;
@@ -567,7 +574,8 @@ export function VideoAiJobCenter({
                         {showSteps && (
                           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
                             {PROCESS_STEPS.map((step, index) => {
-                              const done = currentStepIndex >= 0 && index < currentStepIndex;
+                              const skipped = isStepSkipped(job, step.key);
+                              const done = !skipped && currentStepIndex >= 0 && index < currentStepIndex;
                               const active = index === currentStepIndex;
                               return (
                                 <span
@@ -577,6 +585,8 @@ export function VideoAiJobCenter({
                                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                                       : done
                                       ? 'border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success)]'
+                                      : skipped
+                                      ? 'border-dashed border-[var(--border-light)] text-[var(--text-muted)] opacity-60'
                                       : 'border-[var(--border-light)] text-[var(--text-muted)]'
                                   }`}
                                 >

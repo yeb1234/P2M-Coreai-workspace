@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { RefreshCw, X, PlayCircle } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { CategoryTree, collectVideoIds } from './CategoryTree';
+import { CategoryTree, collectVideoIds, buildDescendantMap } from './CategoryTree';
 import { TranscriptionSettingsPanel } from './TranscriptionSettingsPanel';
 import { BatchActionPanel } from './BatchActionPanel';
 import {
@@ -224,6 +224,8 @@ export function TranscriberPage() {
     return () => clearTimeout(id);
   }, [loadSelectedVideos]);
 
+  const descendantMap = useMemo(() => buildDescendantMap(tree), [tree]);
+
   const selectedVideoIds = useMemo(() => {
     const fromTree = collectVideoIds(tree, selectedIds);
     if (fromTree.length > 0) return fromTree;
@@ -231,15 +233,8 @@ export function TranscriberPage() {
   }, [tree, selectedIds, selectedVideos]);
 
   const handleToggle = useCallback((node: CategoryTreeWithVideos) => {
+    const ids = descendantMap.get(node.id) ?? [node.id];
     setSelectedIds((prev) => {
-      function getDescendantIds(n: CategoryTreeWithVideos): number[] {
-        const ids: number[] = [n.id];
-        for (const child of n.children as CategoryTreeWithVideos[]) {
-          ids.push(...getDescendantIds(child));
-        }
-        return ids;
-      }
-      const ids = getDescendantIds(node);
       const allSelected = ids.every((id) => prev.has(id));
       const next = new Set(prev);
       for (const id of ids) {
@@ -251,11 +246,20 @@ export function TranscriberPage() {
       }
       return next;
     });
-  }, []);
+  }, [descendantMap]);
+
+  useEffect(() => {
+    setBatchError(null);
+    setBatchPreview(null);
+  }, [selectedIds]);
 
   const handlePreview = useCallback(async () => {
     if (selectedVideoIds.length === 0) {
-      setBatchError('请先在左侧勾选含视频的文件夹。');
+      if (selectedIds.size > 0 && videosLoading) {
+        setBatchError('视频列表加载中，请稍候...');
+      } else {
+        setBatchError('请先在左侧勾选含视频的文件夹。');
+      }
       return;
     }
     setBatchLoading(true);
@@ -291,7 +295,11 @@ export function TranscriberPage() {
 
   const handleEnqueue = useCallback(async () => {
     if (selectedVideoIds.length === 0) {
-      setBatchError('请先在左侧勾选含视频的文件夹。');
+      if (selectedIds.size > 0 && videosLoading) {
+        setBatchError('视频列表加载中，请稍候...');
+      } else {
+        setBatchError('请先在左侧勾选含视频的文件夹。');
+      }
       return;
     }
     setBatchLoading(true);
@@ -329,7 +337,11 @@ export function TranscriberPage() {
   // Right-side advanced batch (mode + limit + correction)
   const runRightBatch = useCallback(async (dryRun: boolean) => {
     if (selectedVideoIds.length === 0) {
-      setBatchError('请先在左侧勾选含视频的文件夹。');
+      if (selectedIds.size > 0 && videosLoading) {
+        setBatchError('视频列表加载中，请稍候...');
+      } else {
+        setBatchError('请先在左侧勾选含视频的文件夹。');
+      }
       return;
     }
     setBatchLoading(true);
@@ -452,6 +464,7 @@ export function TranscriberPage() {
           <div className="border-t border-[var(--border-light)] pt-3">
             <BatchActionPanel
               selectedVideoCount={selectedVideoIds.length}
+              videosLoading={videosLoading}
               batchLoading={batchLoading}
               batchPreview={batchPreview}
               batchError={batchError}

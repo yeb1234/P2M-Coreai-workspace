@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save } from 'lucide-react';
-import { PageTitle } from '../shared';
+import { ConfirmDialog, PageTitle } from '../shared';
 import { usePomodoroStore, useUIStore, useAuthStore, useNotificationStore } from '../../stores';
 import { getUser, hashPassword, upsertUser } from '../../lib/idbStorage';
 import type { PomodoroConfig } from '../../types';
@@ -56,6 +56,7 @@ function PomodoroSettings() {
   const clearHistory = usePomodoroStore((s) => s.clearHistory);
   const sessions = usePomodoroStore((s) => s.sessions);
   const [saved, setSaved] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [form, setForm] = useState<PomodoroSettingsForm>(() => createPomodoroSettingsForm(config));
 
   const handleSave = () => {
@@ -136,10 +137,19 @@ function PomodoroSettings() {
       <div className="border-t border-[#e5e2dd] pt-4">
         <SettingsSectionTitle>历史数据</SettingsSectionTitle>
         <SettingsHint className="mb-3 mt-2">共 {sessionCount} 个已完成的番茄记录</SettingsHint>
-        <SettingsButton variant="danger" onClick={() => { if (window.confirm('确定清除所有番茄历史记录？此操作不可撤销。')) { clearHistory(); playInteractionSound('delete'); } }} className="px-3 py-1.5 text-xs">
+        <SettingsButton variant="danger" onClick={() => setShowClearConfirm(true)} className="px-3 py-1.5 text-xs">
           清除历史记录
         </SettingsButton>
       </div>
+      <ConfirmDialog
+        isOpen={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={() => { clearHistory(); playInteractionSound('delete'); }}
+        title="清除所有番茄历史记录"
+        message={`你共有 ${sessionCount} 条番茄历史记录，确定要全部清除吗？此操作不可撤销。`}
+        confirmText="确认清除"
+        variant="danger"
+      />
     </div>
   );
 }

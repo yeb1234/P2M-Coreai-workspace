@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P2 演示中心 · SiteYeb Demo Hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M8 23V9h7.5c4.4 0 7 2.2 7 6.1 0 3.9-2.7 6.2-7.2 6.2H13v1.7H8zm5-5.4h2.3c1.7 0 2.8-.8 2.8-2.4 0-1.6-1.1-2.4-2.8-2.4H13v4.8z' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#f3f6fa;
+    --bg2:#e8edf5;
+    --panel:#ffffff;
+    --ink:#101828;
+    --muted:#667085;
+    --line:#d6dee9;
+    --accent:#2563eb;
+    --accent-ink:#1d4ed8;
+    --accent-soft:#eaf1ff;
+    --shadow:0 10px 30px rgba(16,24,40,.08);
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  }
+  [data-theme="dark"]{
+    --bg:#07111f;
+    --bg2:#0a1728;
+    --panel:#0d1a2b;
+    --ink:#e8f0fb;
+    --muted:#93a4bd;
+    --line:#22324a;
+    --accent:#79a8ff;
+    --accent-ink:#a9c4ff;
+    --accent-soft:#13294a;
+    --shadow:0 16px 40px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;overflow:hidden}
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;justify-content:space-between;gap:24px;
+    min-height:72px;padding:14px 28px;
+    background:color-mix(in srgb,var(--panel) 92%,transparent);
+    border-bottom:1px solid var(--line);
+    backdrop-filter:blur(12px);
+  }
+  main{display:flex;flex-direction:column;flex:1;min-height:0}
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .mark{
+    width:36px;height:36px;border-radius:9px;background:var(--accent);color:#fff;
+    display:grid;place-items:center;font:700 16px/1 var(--mono);letter-spacing:.02em;
+    box-shadow:0 4px 12px rgba(37,99,235,.24);flex:none;
+  }
+  .brand-copy{min-width:0}
+  .brand-title{font-size:15px;font-weight:700;letter-spacing:.01em;white-space:nowrap}
+  .brand-sub{font:500 10px/1.6 var(--mono);color:var(--muted);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+  .top-actions{display:flex;align-items:center;gap:10px;flex:none}
+  .host-badge{
+    display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 10px;
+    border:1px solid var(--line);border-radius:6px;background:var(--bg);
+    color:var(--muted);font:500 10px/1 var(--mono);letter-spacing:.04em;white-space:nowrap;
+  }
+  .dot{width:6px;height:6px;border-radius:50%;background:#22a06b;box-shadow:0 0 0 3px rgba(34,160,107,.12)}
+  .theme-btn{
+    height:30px;padding:0 11px;border:1px solid var(--line);border-radius:6px;
+    background:var(--panel);color:var(--ink);font:500 11px/1 var(--sans);cursor:pointer;
+  }
+  .theme-btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .head{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+    padding:22px 28px 16px;max-width:1680px;margin:0 auto;flex:none;width:100%;
+  }
+  .eyebrow{font:600 10px/1.5 var(--mono);color:var(--accent-ink);letter-spacing:.12em;text-transform:uppercase}
+  .page-title{margin:7px 0 0;font-size:clamp(24px,2.1vw,34px);line-height:1.18;letter-spacing:-.02em}
+  .page-desc{margin:7px 0 0;max-width:760px;color:var(--muted);font-size:13px;line-height:1.7}
+  .open-link{
+    display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;
+    border:1px solid var(--line);border-radius:6px;background:var(--panel);
+    color:var(--ink);text-decoration:none;font:600 11px/1 var(--sans);white-space:nowrap;flex:none;
+  }
+  .open-link:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .open-link span{font:500 10px/1 var(--mono);color:var(--muted)}
+  .tabs-wrap{
+    position:sticky;top:72px;z-index:19;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(10px);
+    flex:none;
+  }
+  .tabs{
+    display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin;
+    max-width:1680px;margin:0 auto;padding:0 24px;
+  }
+  .tab{
+    appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;
+    display:flex;align-items:baseline;gap:7px;
+    padding:13px 12px 11px;color:var(--muted);cursor:pointer;white-space:nowrap;flex:none;
+    font:600 12px/1 var(--sans);
+  }
+  .tab .idx{font:500 9px/1 var(--mono);color:var(--muted);letter-spacing:.05em}
+  .tab .en{font:500 9px/1 var(--mono);color:var(--muted);letter-spacing:.09em;text-transform:uppercase}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--accent-ink);border-bottom-color:var(--accent);background:var(--accent-soft)}
+  .tab[aria-selected="true"] .idx,.tab[aria-selected="true"] .en{color:var(--accent-ink)}
+  .tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .stage-wrap{max-width:1680px;margin:0 auto;padding:18px 28px 24px;flex:1;min-height:0;display:flex;flex-direction:column;width:100%}
+  .stage-shell{
+    position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    box-shadow:var(--shadow);overflow:hidden;
+    flex:1;min-height:0;height:auto;
+  }
+  .stage-head{
+    display:flex;align-items:center;justify-content:space-between;gap:18px;
+    height:34px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--bg);
+  }
+  .stage-path{font:500 10px/1 var(--mono);color:var(--muted);letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stage-status{display:flex;align-items:center;gap:7px;font:500 10px/1 var(--mono);color:var(--muted);white-space:nowrap}
+  .stage-status .dot{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .frame{width:100%;height:calc(100% - 34px);border:0;display:block;background:#fff}
+  [data-theme="dark"] .frame{background:#07111f}
+  .loading{
+    position:absolute;left:0;right:0;bottom:0;top:34px;display:grid;place-items:center;
+    background:var(--panel);z-index:2;transition:opacity .25s ease,visibility .25s ease;
+  }
+  .loading-inner{display:flex;align-items:center;gap:10px;color:var(--muted);font:500 11px/1 var(--mono);letter-spacing:.06em}
+  .spinner{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading.is-hidden{opacity:0;visibility:hidden;pointer-events:none}
+  .foot{
+    display:flex;justify-content:space-between;gap:16px;max-width:1680px;margin:0 auto;
+    padding:0 28px 24px;color:var(--muted);font:500 10px/1.7 var(--mono);flex:none;width:100%;
+  }
+  .foot a{color:var(--accent-ink);text-decoration:none}
+  .foot a:hover{text-decoration:underline}
+  @media (max-width:980px){
+    body{overflow:auto}
+    main{flex:none}
+    .topbar{padding:12px 16px;gap:12px}
+    .host-badge{display:none}
+    .head{padding:18px 16px 12px;align-items:flex-start;flex-direction:column;gap:12px}
+    .open-link{align-self:flex-start}
+    .tabs{top:65px;padding:0 12px}
+    .stage-wrap{padding:12px 12px 18px;flex:none;display:block}
+    .stage-shell{height:calc(100vh - 238px);min-height:480px;flex:none}
+    .foot{padding:0 16px 18px;flex-direction:column;gap:4px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{scroll-behavior:auto!important}
+    .loading,.spinner{transition:none;animation:none}
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">P2</div>
+      <div class="brand-copy">
+        <div class="brand-title">P2 演示中心</div>
+        <div class="brand-sub">SiteYeb · Demo Hub</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="host-badge" title="当前局域网入口"><span class="dot"></span><span id="hostLabel">LOCAL</span> · READ ONLY</div>
+      <button class="theme-btn" id="themeToggle" type="button" aria-label="切换明暗主题">深色</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="head">
+      <div>
+        <div class="eyebrow" id="pageKicker">DEMO 01 / MULTI-CLUSTER OPS</div>
+        <h1 class="page-title" id="pageTitle">多集群监控 DEMO</h1>
+        <p class="page-desc" id="pageDesc">一组动态集群、Worker 与管线状态页，用演示数据模拟调度、故障和恢复。</p>
+      </div>
+      <a class="open-link" id="openExternal" href="pages/multi-cluster.html" target="_blank" rel="noopener">独立窗口打开 <span>↗</span></a>
+    </div>
+
+    <div class="tabs-wrap">
+      <div class="tabs" role="tablist" aria-label="演示页面切换">
+        <button class="tab" role="tab" type="button" data-page="multi" aria-selected="true"><span class="idx">01</span>多集群 DEMO <span class="en">Cluster</span></button>
+        <button class="tab" role="tab" type="button" data-page="monitor" aria-selected="false"><span class="idx">02</span>P2 实时监控 <span class="en">Live</span></button>
+        <button class="tab" role="tab" type="button" data-page="ops" aria-selected="false"><span class="idx">03</span>语控台设计稿 <span class="en">Ops Control</span></button>
+        <button class="tab" role="tab" type="button" data-page="ui" aria-selected="false"><span class="idx">04</span>UI 布局实验 <span class="en">UI Study</span></button>
+        <button class="tab" role="tab" type="button" data-page="eval" aria-selected="false"><span class="idx">05</span>AI 检索评估 <span class="en">Eval</span></button>
+        <button class="tab" role="tab" type="button" data-page="ports" aria-selected="false"><span class="idx">06</span>端口号段规划 <span class="en">Ports</span></button>
+        <button class="tab" role="tab" type="button" data-page="handbook" aria-selected="false"><span class="idx">07</span>面试冲刺手册 <span class="en">Learning</span></button>
+      </div>
+    </div>
+
+    <section class="stage-wrap" aria-label="演示页面">
+      <div class="stage-shell">
+        <div class="stage-head">
+          <div class="stage-path" id="stagePath">/demo/pages/multi-cluster.html</div>
+          <div class="stage-status"><span class="dot"></span><span id="stageStatus">IFRAME / SAME ORIGIN</span></div>
+        </div>
+        <iframe class="frame" id="stage" title="演示页面" src="pages/multi-cluster.html"></iframe>
+        <div class="loading" id="loading" aria-live="polite">
+          <div class="loading-inner"><div class="spinner" aria-hidden="true"></div><span>LOADING PAGE</span></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span id="footHost">P2 / SITEYEB · 局域网只读演示 · 页面由 DOCKER NGINX 提供</span>
+      <span>监控数据来自 <a href="/demo/api/status" target="_blank" rel="noopener">/demo/api/status</a> · 其余页面为本地设计稿</span>
+    </footer>
+  </main>
+
+<script>
+  const PAGES = {
+    multi: {
+      kicker:'DEMO 01 / MULTI-CLUSTER OPS',
+      title:'多集群监控 DEMO',
+      desc:'一组动态集群、Worker 与管线状态页，用演示数据模拟调度、故障和恢复。',
+      src:'pages/multi-cluster.html'
+    },
+    monitor: {
+      kicker:'DEMO 02 / LIVE PIPELINE',
+      title:'P2 实时监控',
+      desc:'P2 视频流水线的实时快照：队列、GPU、Worker 与最近任务。数据经 Docker 同源代理读取。',
+      src:'pages/monitor.html'
+    },
+    ops: {
+      kicker:'DESIGN 03 / LANGUAGE OPS',
+      title:'语控台设计稿',
+      desc:'自然语言运维控制面的产品与架构设计：能力分级、策略裁决、预演、审批、回滚与审计。',
+      src:'pages/ops-control.html'
+    },
+    ui: {
+      kicker:'STUDY 04 / UI LAYOUT',
+      title:'UI 布局实验',
+      desc:'此前留下的一版控制台布局实验页，用来对照当前 P2 与监控页的密度、层级和摆放。',
+      src:'pages/ui-console.html'
+    },
+    eval: {
+      kicker:'REPORT 05 / AI RETRIEVAL',
+      title:'AI 检索评估报告',
+      desc:'P2 2.94 版 AI 检索链路评估：命中率、引用数、延迟与尚未解决的工程问题。',
+      src:'pages/eval-report.html'
+    },
+    ports: {
+      kicker:'REFERENCE 06 / PORT MAP',
+      title:'端口号段规划',
+      desc:'五位端口规则：服务前缀 + 两位项目号，P2 的 12302 / 12402 / 12502 / 12602 / 12702。',
+      src:'pages/port-plan.html'
+    },
+    handbook: {
+      kicker:'REFERENCE 07 / LEARNING',
+      title:'面试冲刺手册',
+      desc:'SiteYeb 学习与面试冲刺材料，按项目链路组织知识点、练习和回答模板。',
+      src:'pages/interview-handbook.html'
+    }
+  };
+
+  const tabs = [...document.querySelectorAll('.tab')];
+  const stage = document.getElementById('stage');
+  const loading = document.getElementById('loading');
+  const pageKicker = document.getElementById('pageKicker');
+  const pageTitle = document.getElementById('pageTitle');
+  const pageDesc = document.getElementById('pageDesc');
+  const stagePath = document.getElementById('stagePath');
+  const openExternal = document.getElementById('openExternal');
+  const hostLabel = document.getElementById('hostLabel');
+  const footHost = document.getElementById('footHost');
+  const themeToggle = document.getElementById('themeToggle');
+
+  hostLabel.textContent = location.host || 'LOCAL';
+  footHost.textContent = 'P2 / SITEYEB · ' + (location.host || 'LOCAL') + ' · 局域网只读演示';
+
+  let active = 'multi';
+  let loadTimer = null;
+
+  function setTheme(theme){
+    document.documentElement.dataset.theme = theme;
+    themeToggle.textContent = theme === 'dark' ? '浅色' : '深色';
+    try { localStorage.setItem('p2-demo-theme', theme); } catch (e) {}
+  }
+
+  function beginLoad(){
+    loading.classList.remove('is-hidden');
+    if (loadTimer) clearTimeout(loadTimer);
+    loadTimer = setTimeout(() => {
+      loading.classList.add('is-hidden');
+    }, 5000);
+  }
+
+  function show(id, updateHash){
+    const page = PAGES[id];
+    if (!page) return;
+    active = id;
+    tabs.forEach(tab => tab.setAttribute('aria-selected', String(tab.dataset.page === id)));
+    pageKicker.textContent = page.kicker;
+    pageTitle.textContent = page.title;
+    pageDesc.textContent = page.desc;
+    stagePath.textContent = '/demo/' + page.src;
+    openExternal.href = page.src;
+    if (stage.getAttribute('src') !== page.src) {
+      beginLoad();
+      stage.src = page.src;
+    }
+    if (updateHash) history.replaceState(null, '', '#' + id);
+    const current = tabs.find(tab => tab.dataset.page === id);
+    if (current && current.scrollIntoView) current.scrollIntoView({block:'nearest', inline:'nearest'});
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => show(tab.dataset.page, true));
+  });
+
+  document.querySelector('.tabs').addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const index = tabs.findIndex(tab => tab.dataset.page === active);
+    const next = event.key === 'ArrowRight'
+      ? (index + 1) % tabs.length
+      : (index - 1 + tabs.length) % tabs.length;
+    tabs[next].focus();
+    show(tabs[next].dataset.page, true);
+    event.preventDefault();
+  });
+
+  stage.addEventListener('load', () => {
+    if (loadTimer) clearTimeout(loadTimer);
+    loading.classList.add('is-hidden');
+  });
+
+  themeToggle.addEventListener('click', () => {
+    setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+  });
+
+  const savedTheme = (() => { try { return localStorage.getItem('p2-demo-theme'); } catch (e) { return null; } })();
+  if (savedTheme === 'dark') setTheme('dark');
+
+  const hash = location.hash.replace('#','');
+  show(PAGES[hash] ? hash : 'multi', false);
+</script>
+</body>
+</html>

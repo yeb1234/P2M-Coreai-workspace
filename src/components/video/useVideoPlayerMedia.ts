@@ -15,17 +15,26 @@ export interface VideoPlayerMediaInput {
 }
 
 export function useVideoPlayerMedia({ currentVideo, currentSegments }: VideoPlayerMediaInput) {
-  const videoUrl = currentVideo ? getVideoStreamUrl(currentVideo.id) : '';
-  const subtitleUrl = currentVideo && (currentVideo.subtitle_url || currentVideo.subtitle_path)
-    ? getSubtitleFileUrl(currentVideo.id)
-    : null;
+  const videoUrl = useMemo(
+    () => (currentVideo ? getVideoStreamUrl(currentVideo.id) : ''),
+    [currentVideo?.id]
+  );
+  const subtitleUrl = useMemo(
+    () => (currentVideo && (currentVideo.subtitle_url || currentVideo.subtitle_path)
+      ? getSubtitleFileUrl(currentVideo.id)
+      : null),
+    [currentVideo?.id, currentVideo?.subtitle_url, currentVideo?.subtitle_path]
+  );
   const normalizedSegments = useMemo(
     () => currentSegments.map(normalizeSegment).filter((segment): segment is TranscriptSegment => !!segment),
     [currentSegments]
   );
   const hasEmbeddedSubtitle = normalizedSegments.length > 0;
   const hasSubtitle = !!subtitleUrl || hasEmbeddedSubtitle;
-  const videoKey = `${currentVideo?.id ?? 'none'}`;
+  const videoKey = useMemo(
+    () => `${currentVideo?.id ?? 'none'}`,
+    [currentVideo?.id]
+  );
   const currentVideoId = currentVideo?.id ?? null;
   const hasVideoDetails = !!(
     currentVideo?.transcript_segments?.length ||

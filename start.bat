@@ -25,6 +25,7 @@ if errorlevel 1 goto restart_all
 :restart_all
 call :stop_backend
 call :stop_frontend
+call :start_redis
 call :start_backend
 timeout /t 2 /nobreak >nul
 call :start_frontend
@@ -32,18 +33,31 @@ goto after_action
 
 :restart_backend
 call :stop_backend
+call :start_redis
 call :start_backend
 goto after_action
 
 :restart_frontend
 call :stop_frontend
+call :clean_vite_cache
 call :start_frontend
 goto after_action
 
 :stop_all
 call :stop_backend
 call :stop_frontend
+call :stop_redis
 goto after_action
+
+:start_redis
+docker --version >nul 2>&1
+if errorlevel 1 (
+    echo WARNING: Docker not found. Please start Redis manually on localhost:6379.
+    exit /b
+)
+echo Starting Redis (port 6379)...
+docker compose up -d redis
+exit /b
 
 :start_backend
 echo Starting backend (port 80)...
@@ -53,6 +67,18 @@ exit /b
 :start_worker
 echo Starting AI RQ worker...
 start "SiteYeb AI Worker" /D "%ROOT%backend" cmd /k ".venv311\Scripts\python -m app.worker"
+exit /b
+
+:clean_vite_cache
+echo Cleaning Vite cache...
+if exist "%ROOT%node_modules\.vite" (
+    rmdir /s /q "%ROOT%node_modules\.vite"
+    echo   Vite cache cleared.
+)
+if exist "%ROOT%dist" (
+    rmdir /s /q "%ROOT%dist"
+    echo   dist folder cleared.
+)
 exit /b
 
 :start_frontend
@@ -68,6 +94,13 @@ exit /b
 :stop_frontend
 echo Stopping frontend...
 python "%~dp0stop.py" frontend
+exit /b
+
+:stop_redis
+docker --version >nul 2>&1
+if errorlevel 1 exit /b
+echo Stopping Redis...
+docker compose down redis >nul 2>&1
 exit /b
 
 :after_action

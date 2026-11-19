@@ -5,13 +5,13 @@ import {
   fetchAssistantRuntimeSettings,
   sendAssistantChat,
   type AssistantRuntimeSettingsDto,
-  type SegmentSearchResult,
 } from '../../lib/videoApi';
 import { useDragResize } from '../../hooks/useDragResize';
 import { getAssistantPageContext } from '../../lib/assistantPageContext';
 import { buildAIRequestSystemPrompt } from '../../lib/aiPromptDefaults';
 import { playInteractionSound } from '../../lib/sounds';
 import { useAssistantPageContext } from '../../hooks/useAssistantPageContext';
+import { detectIntent, getTemplateIdForIntent, INTENT_LABELS } from '../../lib/intentRouter';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const PENDING_RECOMMENDED_VIDEO_KEY = 'p2m_pending_recommended_video_id';
@@ -48,7 +48,7 @@ function openRecommendedVideo(videoId: number) {
 export const AIChatPanel: React.FC = () => {
   const {
     chatOpen, setChatOpen, model, systemPrompt, promptTemplates, activeTemplateId,
-    chatWidth, setChatWidth, messages, addMessage, clearMessages,
+    chatWidth, setChatWidth, messages, addMessage, clearMessages, setActiveTemplateId,
   } = useAIStore();
   const { width: liveChatWidth, startResize } = useDragResize({
     initialWidth: chatWidth,
@@ -61,22 +61,27 @@ export const AIChatPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [streamingId, setStreamingId] = useState<string | null>(null);
-  const [videoResults, setVideoResults] = useState<SegmentSearchResult[]>([]);
   const [pageContext, setPageContext] = useAssistantPageContext(chatOpen);
   const [runtimeModelLabel, setRuntimeModelLabel] = useState('');
+  const [autoSwitched, setAutoSwitched] = useState<{ name: string; intent: string } | null>(null);
+  const autoSwitchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
+  useEffect(() => {
+    return () => {
+      if (autoSwitchTimerRef.current) {
+        clearTimeout(autoSwitchTimerRef.current);
+      }
+    };
+  }, []);
+
   const activeTemplate = useMemo(
     () => promptTemplates.find((template) => template.id === activeTemplateId) ?? promptTemplates[0],
     [activeTemplateId, promptTemplates]
-  );
-  const visibleVideoResults = useMemo(
-    () => [...new Map(videoResults.filter((item) => item.score_hint > 0).map((item) => [item.video_id, item])).values()].slice(0, 5),
-    [videoResults]
   );
 
   useEffect(() => {
@@ -107,7 +112,25 @@ export const AIChatPanel: React.FC = () => {
     if (!text || loading) return;
     setError('');
     setInput('');
-    setVideoResults([]);
+
+    const context = getAssistantPageContext();
+    let effectiveTemplateId = activeTemplateId;
+
+    // 1. 本地正则意图识别（零延迟）
+    const intentResult = detectIntent(text, context);
+    const detectedIntent = intentResult.type;
+
+    // 自动切换提示词模板
+    const matchedId = getTemplateIdForIntent(intentResult.type, promptTemplates);
+    if (matchedId && matchedId !== activeTemplateId) {
+      setActiveTemplateId(matchedId);
+      effectiveTemplateId = matchedId;
+      const switchedName = promptTemplates.find((t) => t.id === matchedId)?.name ?? '';
+      setAutoSwitched({ name: switchedName, intent: INTENT_LABELS[intentResult.type] });
+      if (autoSwitchTimerRef.current) clearTimeout(autoSwitchTimerRef.current);
+      autoSwitchTimerRef.current = setTimeout(() => setAutoSwitched(null), 3000);
+    }
+
     const userId = makeId();
     addMessage({ id: userId, role: 'user', content: text });
     setLoading(true);
@@ -118,34 +141,39 @@ export const AIChatPanel: React.FC = () => {
     addMessage({ id: assistantId, role: 'assistant', content: '' });
 
     try {
-      const context = getAssistantPageContext();
       setPageContext(context);
-      const requestSystemPrompt = buildAIRequestSystemPrompt(systemPrompt, activeTemplate?.content ?? '');
-      const data = await sendAssistantChat(text, 5, context.promptContext, requestSystemPrompt);
+      const effectiveTemplate = promptTemplates.find((t) => t.id === effectiveTemplateId) ?? promptTemplates[0];
+      const requestSystemPrompt = buildAIRequestSystemPrompt(systemPrompt, effectiveTemplate?.content ?? '');
+      const currentSessionId = useAIStore.getState().currentSessionId;
+      const data = await sendAssistantChat(text, 15, context.promptContext, requestSystemPrompt, undefined, currentSessionId, detectedIntent, intentResult.intent_hint);
       const finalText = data.answer?.trim() || '灵境小助手已返回，但没有可显示的文本。';
-      setVideoResults(data.references.filter((item) => item.score_hint > 0) as SegmentSearchResult[]);
+      const refs = (data.references ?? []).filter((item) => item.score_hint > 0);
       setError('');
       playInteractionSound('success');
+      // 保存后端返回的 session_id，实现会话连续性
+      if (data.session_id) {
+        useAIStore.getState().setCurrentSessionId(data.session_id);
+      }
       useAIStore.setState((state) => ({
         messages: state.messages.map((message) =>
-          message.id === assistantId ? { ...message, content: finalText } : message
+          message.id === assistantId ? { ...message, content: finalText, references: refs } : message
         ),
       }));
-      if (!finalText.trim()) {
-        setVideoResults([]);
-        useAIStore.setState((state) => ({
-          messages: state.messages.map((message) =>
-            message.id === assistantId ? { ...message, content: '灵境小助手已返回，但没有可显示的文本。' } : message
-          ),
-        }));
-      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '灵境小助手请求失败');
+      const rawMsg = err instanceof Error ? err.message : '灵境小助手请求失败';
+      // 尝试从 API 错误响应中提取 detail 字段
+      let displayMsg = '请求失败，请检查灵境小助手的模型服务是否已启动。';
+      const detailMatch = rawMsg.match(/"detail"\s*:\s*"([^"]+)"/);
+      if (detailMatch) {
+        displayMsg = detailMatch[1];
+      } else if (!rawMsg.startsWith('API ')) {
+        displayMsg = rawMsg;
+      }
+      setError(rawMsg);
       playInteractionSound('error');
-      setVideoResults([]);
       useAIStore.setState((state) => ({
         messages: state.messages.map((message) =>
-          message.id === assistantId ? { ...message, content: '请求失败，请检查灵境小助手的模型服务是否已启动。' } : message
+          message.id === assistantId ? { ...message, content: `❌ ${displayMsg}` } : message
         ),
       }));
     } finally {
@@ -195,7 +223,14 @@ export const AIChatPanel: React.FC = () => {
 
       <div className="px-3 py-2 border-b border-[var(--border-light)] bg-[var(--bg-elevated)]">
         <p className="text-[10px] text-[var(--text-muted)]">当前模板</p>
-        <p className="text-xs font-medium text-[var(--text-primary)] truncate">{activeTemplate?.name ?? '默认模板'}</p>
+        <p className="text-xs font-medium text-[var(--text-primary)] truncate">
+          {activeTemplate?.name ?? '默认模板'}
+          {autoSwitched && (
+            <span className="ml-1.5 inline-flex items-center rounded bg-[var(--accent-bg)] px-1 py-0.5 text-[10px] text-[var(--accent)] animate-pulse">
+              → 已切{autoSwitched.intent}
+            </span>
+          )}
+        </p>
         <p className={`mt-1 text-[10px] truncate ${pageContext.kind === 'none' ? 'text-[var(--text-muted)]' : 'text-[var(--accent)]'}`}>
           {pageContext.label}
         </p>
@@ -208,7 +243,7 @@ export const AIChatPanel: React.FC = () => {
           </div>
         )}
         {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={message.id} className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'} gap-1`}>
             <div
               className={`max-w-[88%] rounded-xl px-3 py-2 text-xs leading-6 whitespace-pre-wrap ${
                 message.role === 'user'
@@ -218,6 +253,25 @@ export const AIChatPanel: React.FC = () => {
             >
               {message.content || (streamingId === message.id ? '...' : '')}
             </div>
+            {message.role === 'assistant' && message.references && message.references.length > 0 && (
+              <div className="w-[88%] space-y-1.5">
+                <p className="text-[10px] font-medium text-[var(--text-muted)]">相关视频</p>
+                {message.references.map((r) => (
+                  <button
+                    key={r.video_id}
+                    type="button"
+                    onClick={() => openRecommendedVideo(r.video_id)}
+                    className="flex w-full items-start gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2.5 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
+                  >
+                    <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-[var(--text-primary)] truncate">{r.video_title || `视频 ${r.video_id}`}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] line-clamp-2">{r.text}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {loading && (
@@ -228,25 +282,6 @@ export const AIChatPanel: React.FC = () => {
         )}
         {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
         <div ref={messagesEndRef} />
-        {visibleVideoResults.length > 0 && !loading && !error && (
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-medium text-[var(--text-muted)]">相关视频</p>
-            {visibleVideoResults.map((r) => (
-              <button
-                key={r.video_id}
-                type="button"
-                onClick={() => openRecommendedVideo(r.video_id)}
-                className="flex w-full items-start gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2.5 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
-              >
-                <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-[var(--text-primary)] truncate">{r.video_title || `视频 ${r.video_id}`}</p>
-                  <p className="text-[10px] text-[var(--text-muted)] line-clamp-2">{r.text}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="p-3 border-t border-[var(--border-light)]">

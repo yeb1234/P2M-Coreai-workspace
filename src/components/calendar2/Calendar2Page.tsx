@@ -47,7 +47,7 @@ interface CalendarLane {
 }
 
 const START_HOUR = 6;
-const END_HOUR = 23;
+const END_HOUR = 24;
 const HOUR_HEIGHT = 64;
 const SNAP_MINUTES = 15;
 const DEFAULT_DAY_WIDTH = 124;
@@ -272,6 +272,20 @@ export const Calendar2Page: React.FC = () => {
   }, [pageWidth]);
   const maxCompactOffset = Math.max(0, 7 - visibleDayCount);
   const visibleDayOffset = visibleDayCount === 7 ? 0 : Math.min(compactDayOffset, maxCompactOffset);
+
+  useEffect(() => {
+    const today = new Date();
+    const todayStr = toISODateString(today);
+    const todayIndex = weekDateStrings.indexOf(todayStr);
+    if (todayIndex < 0) return;
+    if (visibleDayCount < 7 && todayIndex >= visibleDayCount) {
+      const nextOffset = Math.min(maxCompactOffset, todayIndex - visibleDayCount + 1);
+      setCompactDayOffset(nextOffset);
+    } else {
+      setCompactDayOffset(0);
+    }
+  }, [weekStart, visibleDayCount, maxCompactOffset, weekDateStrings]);
+
   const visibleWeekDays = useMemo(() => weekDays.slice(visibleDayOffset, visibleDayOffset + visibleDayCount), [visibleDayCount, visibleDayOffset, weekDays]);
   const dayWidth = useMemo(() => {
     const widthSource = gridAvailableWidth || pageWidth;
@@ -283,7 +297,7 @@ export const Calendar2Page: React.FC = () => {
     if (visibleDayCount === 6) return clamp(preferred, 96, 220);
     return Math.max(preferred, MIN_DAY_WIDTH);
   }, [gridAvailableWidth, pageWidth, visibleDayCount]);
-  const gridWidth = gridAvailableWidth ? Math.max(0, gridAvailableWidth) : LEFT_GUTTER + visibleDayCount * dayWidth;
+  const gridWidth = Math.max(gridAvailableWidth || 0, LEFT_GUTTER + visibleDayCount * dayWidth);
 
   const visibleItems = useMemo(() => Object.values(items).filter((item) => !item.deletedAt), [items]);
   const todoPool = useMemo(() => {

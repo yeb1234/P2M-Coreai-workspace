@@ -1,0 +1,142 @@
+{
+  "dataset": "P2 2.94 IT 教育检索集",
+  "source": "C:\\SiteYeb\\learning_os.db",
+  "notes": "gold_titles 为视频标题子串；命中任意一个即算该题检索成功。题目来自现有视频库的标题和字幕主题，不引入外部语料。",
+  "cases": [
+    {
+      "id": "p2-001",
+      "query": "Python 包管理器 uv 工具怎么用",
+      "gold_titles": ["4-2 Python包管理器"]
+    },
+    {
+      "id": "p2-002",
+      "query": "FastAPI 依赖注入怎么实现",
+      "gold_titles": ["05-依赖注入数据说明", "05-掌柜问数-API接口-QueryService依赖注入", "02-掌柜问数-API接口-基础-依赖项"]
+    },
+    {
+      "id": "p2-003",
+      "query": "JavaScript 闭包是什么",
+      "gold_titles": ["09-使用闭包的例子", "02-JS基础-谈谈你对闭包", "08-闭包-基本写法", "9、闭包", "18、闭包"]
+    },
+    {
+      "id": "p2-004",
+      "query": "Python 装饰器原理",
+      "gold_titles": ["13.装饰器", "09-03-装饰器"]
+    },
+    {
+      "id": "p2-005",
+      "query": "Vue 跨级组件通讯 provide inject 怎么用",
+      "gold_titles": ["01-跨级组件通讯provide与inject函数", "04-context跨级组件通讯"]
+    },
+    {
+      "id": "p2-006",
+      "query": "jQuery 对象怎么获取",
+      "gold_titles": ["05-Jquery对象"]
+    },
+    {
+      "id": "p2-007",
+      "query": "MySQL 索引怎么优化",
+      "gold_titles": ["20 MySQL-1", "21 MySQL-2", "22 MySQL-3"]
+    },
+    {
+      "id": "p2-008",
+      "query": "Redis Stream 消息队列怎么用",
+      "gold_titles": ["8-7 Redis-Stream", "8-8 基于Redis-Stream"]
+    },
+    {
+      "id": "p2-009",
+      "query": "Docker 一键安装 PostgreSQL 和 Redis",
+      "gold_titles": ["6-6 利用Docker一键安装Postgres与Redis"]
+    },
+    {
+      "id": "p2-010",
+      "query": "JWT 的工作原理",
+      "gold_titles": ["19.jwt - 了解jwt的工作原理", "161：REST framework-JWT"]
+    },
+    {
+      "id": "p2-011",
+      "query": "React 虚拟 DOM 创建过程",
+      "gold_titles": ["12、虚拟DOM创建过程"]
+    },
+    {
+      "id": "p2-012",
+      "query": "Vue 生命周期钩子函数",
+      "gold_titles": ["6、生命周期钩子函数使用", "25-组件的创建使用和组件的生命周期函数"]
+    },
+    {
+      "id": "p2-013",
+      "query": "Python 生成器怎么用",
+      "gold_titles": ["12.生成器", "10-03-生成器和生成器函数"]
+    },
+    {
+      "id": "p2-014",
+      "query": "Python 迭代器是什么",
+      "gold_titles": ["11.迭代器", "10-04-迭代器（了解）"]
+    },
+    {
+      "id": "p2-015",
+      "query": "SQL 案例讲解",
+      "gold_titles": ["65.3-3SQL案例讲解"]
+    },
+    {
+      "id": "p2-016",
+      "query": "LoRA 微调介绍",
+      "gold_titles": ["06_关于LoRA的介绍"]
+    },
+    {
+      "id": "p2-017",
+      "query": "产品经理 立项评审",
+      "gold_titles": ["5--[视频]4-5 立项评审"]
+    },
+    {
+      "id": "p2-018",
+      "query": "Less 变量和嵌套",
+      "gold_titles": ["15-Less-变量", "14-Less-嵌套"]
+    },
+    {
+      "id": "p2-019",
+      "query": "Vue Router 基础使用",
+      "gold_titles": ["05_vue-router基础使用"]
+    },
+    {
+      "id": "p2-020",
+      "query": "Webpack 配置代理",
+      "gold_titles": ["14-webpack配置代理"]
+    },
+    {
+      "id": "p2-021",
+      "query": "Vue 组件通信 父向子",
+      "gold_titles": ["05_组件通信_父向子"]
+    },
+    {
+      "id": "p2-022",
+      "query": "Docker Sandbox 沙箱怎么配置",
+      "gold_titles": ["14-2 基于Docker的Sandbox"]
+    },
+    {
+      "id": "p2-023",
+      "query": "闭包为什么能记住外部变量",
+      "gold_titles": ["09-使用闭包的例子", "02-JS基础-谈谈你对闭包", "08-闭包-基本写法", "9、闭包", "18、闭包"]
+    },
+    {
+      "id": "p2-024",
+      "query": "接口鉴权时 token 怎么校验",
+      "gold_titles": ["19.jwt - 了解jwt的工作原理", "161：REST framework-JWT", "25.jwt", "26.jwt", "27.jwt"]
+    },
+    {
+      "id": "p2-025",
+      "query": "用容器起数据库和缓存",
+      "gold_titles": ["6-6 利用Docker一键安装Postgres与Redis"]
+    },
+    {
+      "id": "p2-026",
+      "query": "父组件怎么把数据传给子组件",
+      "gold_titles": ["05_组件通信_父向子", "09_组件通信_跨组件传值"]
+    },
+    {
+      "id": "p2-027",
+      "query": "装饰器会不会改变原函数",
+      "gold_titles": ["13.装饰器", "09-03-装饰器"]
+    }
+  ]
+}

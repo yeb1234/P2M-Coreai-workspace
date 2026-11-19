@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { Film, Loader2, PlayCircle, Sparkles, ArrowDownWideNarrow, ArrowUpWideNarrow, Clock, Columns3, Star } from 'lucide-react';
+import { Film, Loader2, PlayCircle, Sparkles, ArrowDownWideNarrow, ArrowUpWideNarrow, Clock, Columns3, Star, CheckCircle2 } from 'lucide-react';
 import { getThumbnailUrl, type VideoItem } from '../../lib/videoApi';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { formatVideoDuration, formatWatchProgress, getWatchProgressPercent } from './videoFormat';
@@ -42,7 +42,12 @@ const VideoCard = React.memo(function VideoCard({
             <Star size={13} fill={video.is_favorite ? 'currentColor' : 'none'} />
           </button>
         )}
-        {video.completed && <span className="absolute left-1 top-1 z-10 rounded bg-[var(--success)] px-1 py-0.5 text-[9px] text-white">✓</span>}
+        {video.completed && (
+          <div className="absolute left-1 top-1 z-10 flex items-center gap-0.5 rounded bg-[#16a34a] px-1.5 py-0.5 text-white shadow-sm">
+            <CheckCircle2 size={12} />
+            <span className="text-[9px] font-medium">已看完</span>
+          </div>
+        )}
         {progressPercent !== null && !video.completed && (
           <div className="absolute bottom-0 left-0 right-0 z-10 h-0.5 bg-black/20">
             <div className="theme-progress-fill h-full" style={{ width: `${progressPercent}%` }} />
@@ -50,7 +55,10 @@ const VideoCard = React.memo(function VideoCard({
         )}
       </VideoCardPreviewFrame>
       <div className="px-2 py-1.5">
-        <h4 className="theme-text-primary truncate text-xs font-medium transition-colors group-hover:text-[var(--accent)]">{video.title}</h4>
+        <div className="flex items-center gap-1">
+          {video.completed && <CheckCircle2 size={12} className="shrink-0 text-[#16a34a]" />}
+          <h4 title={`${video.title}\n${video.filepath}`} className={`theme-text-primary truncate text-xs font-medium transition-colors group-hover:text-[var(--accent)] ${video.completed ? 'line-through opacity-60' : ''}`}>{video.title}</h4>
+        </div>
       </div>
     </div>
   );

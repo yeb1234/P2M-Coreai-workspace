@@ -1,0 +1,2399 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-palette="p2" data-lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P2 / 视频流水线 · 多集群控制台</title>
+<script>
+(function () {
+  try {
+    var theme = localStorage.getItem("p2-multi-demo-theme");
+    if (theme !== "p2" && theme !== "green" && theme !== "dark") theme = "p2";
+    var lang = localStorage.getItem("p2-multi-demo-lang");
+    document.documentElement.dataset.theme = theme === "dark" ? "dark" : "light";
+    document.documentElement.dataset.palette = theme;
+    document.documentElement.dataset.lang = lang === "en" ? "en" : "zh";
+    document.documentElement.lang = document.documentElement.dataset.lang === "en" ? "en" : "zh-CN";
+  } catch (e) {}
+})();
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1116'/%3E%3Cpath d='M7 21h4l2-9 3 14 3-10 2 5h3' fill='none' stroke='%2350d3e8' stroke-width='2'/%3E%3Ctext x='16' y='10' text-anchor='middle' fill='%23eaf3f7' font-family='Arial' font-size='7' font-weight='700'%3EP2%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --page:#090e12;
+  --bg:#0e151a;
+  --panel:#111a20;
+  --panel-2:#162129;
+  --panel-3:#1a2831;
+  --line:rgba(172,202,216,.12);
+  --line-strong:rgba(172,202,216,.24);
+  --ink-1:#edf6fa;
+  --ink-2:#b5c5ce;
+  --ink-3:#8a9da9;
+  --accent:#52d5e8;
+  --accent-soft:rgba(82,213,232,.12);
+  --accent-glow:rgba(82,213,232,.28);
+  --amber:#efb25f;
+  --amber-soft:rgba(239,178,95,.12);
+  --green:#6ed6a6;
+  --green-soft:rgba(110,214,166,.1);
+  --topo-gpu-a:#52d5e8;
+  --topo-gpu-b:#8ca9ff;
+  --topo-edge:#efb25f;
+  --topo-burst:#6ed6a6;
+  --red:#ff8179;
+  --red-soft:rgba(255,129,121,.12);
+  --blue:#8ca9ff;
+  --blue-soft:rgba(140,169,255,.11);
+  --track:var(--track);
+  --idle-bg:rgba(255,255,255,.03);
+  --idle-border:rgba(255,255,255,.1);
+  --ok-text:#a8efca;
+  --warn-text:#f8cf93;
+  --blue-text:#dfe5ff;
+  --bad-text:#ffaaa4;
+  --accent-text:#b8f3fb;
+  --ui:"Aptos","Segoe UI Variable","Microsoft YaHei",sans-serif;
+  --display:"Bahnschrift","Aptos Display","Microsoft YaHei",sans-serif;
+  --mono:"Cascadia Mono","Consolas","SFMono-Regular",monospace;
+  --radius:10px;
+  --gap:12px;
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --page:#edf2f5;
+  --bg:#e8eff3;
+  --panel:#ffffff;
+  --panel-2:#f4f8fa;
+  --panel-3:#e9f0f4;
+  --line:rgba(16,45,59,.14);
+  --line-strong:rgba(16,45,59,.28);
+  --ink-1:#10212b;
+  --ink-2:#425763;
+  --ink-3:#6c808b;
+  --accent:#0a8ea3;
+  --accent-soft:rgba(10,142,163,.10);
+  --accent-glow:rgba(10,142,163,.18);
+  --amber:#a86515;
+  --amber-soft:rgba(168,101,21,.10);
+  --green:#15805a;
+  --green-soft:rgba(21,128,90,.10);
+  --topo-gpu-a:#0a8ea3;
+  --topo-gpu-b:#3b5bc7;
+  --topo-edge:#a86515;
+  --topo-burst:#15805a;
+  --red:#bf4a43;
+  --red-soft:rgba(191,74,67,.10);
+  --blue:#3b5bc7;
+  --blue-soft:rgba(59,91,199,.09);
+  --track:rgba(16,33,43,.12);
+  --idle-bg:rgba(16,33,43,.04);
+  --idle-border:rgba(16,33,43,.16);
+  --ok-text:#136c4d;
+  --warn-text:#8a5a12;
+  --blue-text:#33459e;
+  --bad-text:#a33c35;
+  --accent-text:#0b7184;
+}
+html[data-theme="light"][data-palette="p2"]{
+  color-scheme:light;
+  --page:#f3f3f3;
+  --bg:#ececec;
+  --panel:#ffffff;
+  --panel-2:#fafafa;
+  --panel-3:#f1f1f1;
+  --line:#d6d6d6;
+  --line-strong:#b8b8b8;
+  --ink-1:#1b1b1b;
+  --ink-2:#5d5d5d;
+  --ink-3:#767676;
+  --accent:#0067c0;
+  --accent-soft:rgba(0,103,192,.08);
+  --accent-glow:rgba(0,103,192,.16);
+  --amber:#b75b00;
+  --amber-soft:rgba(183,91,0,.09);
+  --green:#0f6cbd;
+  --green-soft:rgba(15,108,189,.08);
+  --topo-gpu-a:#0067c0;
+  --topo-gpu-b:#0f6cbd;
+  --topo-edge:#b75b00;
+  --topo-burst:#3a7abf;
+  --red:#c42b1c;
+  --red-soft:rgba(196,43,28,.09);
+  --blue:#0067c0;
+  --blue-soft:rgba(0,103,192,.08);
+  --track:#e5e5e5;
+  --idle-bg:rgba(27,27,27,.035);
+  --idle-border:rgba(27,27,27,.12);
+  --ok-text:#005a9e;
+  --warn-text:#8a4500;
+  --blue-text:#005a9e;
+  --bad-text:#a4261c;
+  --accent-text:#005a9e;
+}
+html[data-theme="light"][data-palette="p2"] body{
+  background:
+    radial-gradient(1000px 520px at 8% -8%, rgba(0,103,192,.06), transparent 58%),
+    radial-gradient(900px 480px at 92% 4%, rgba(27,27,27,.035), transparent 62%),
+    var(--page);
+}
+html[data-theme="light"][data-palette="p2"] body::before{
+  background-image:
+    linear-gradient(rgba(27,27,27,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27,27,27,.045) 1px, transparent 1px);
+}
+html[data-theme="light"][data-palette="p2"] ::selection{background:rgba(0,103,192,.22);color:#fff}
+html[data-theme="light"][data-palette="p2"] .mark{border-color:rgba(0,103,192,.35);box-shadow:inset 0 0 0 1px rgba(27,27,27,.04),0 0 20px rgba(0,103,192,.08)}
+html[data-theme="light"][data-palette="p2"] .env-pill,html[data-theme="light"][data-palette="p2"] .live-pill{color:var(--accent-text);border-color:rgba(0,103,192,.24);background:rgba(0,103,192,.07)}
+html[data-theme="light"][data-palette="p2"] .live-dot{background:var(--accent);box-shadow:0 0 0 3px rgba(0,103,192,.10)}
+html[data-theme="light"][data-palette="p2"] .state-dot{box-shadow:0 0 0 3px rgba(15,108,189,.08)}
+html[data-theme="light"][data-palette="p2"] .icon-btn:hover,html[data-theme="light"][data-palette="p2"] .lang-btn:hover{border-color:rgba(0,103,192,.35);background:rgba(0,103,192,.05)}
+html[data-theme="light"][data-palette="p2"] .icon-btn:focus-visible,html[data-theme="light"][data-palette="p2"] .lang-btn:focus-visible{outline-color:rgba(0,103,192,.38)}
+html[data-theme="light"][data-palette="p2"] .tag.is-accent{border-color:rgba(0,103,192,.22);background:rgba(0,103,192,.06)}
+html[data-theme="light"][data-palette="p2"] .core-mark{border-color:rgba(0,103,192,.30)}
+html[data-theme="light"][data-palette="p2"] .cluster-card.is-selected{box-shadow:inset 0 0 0 1px var(--c,var(--accent)),0 0 24px rgba(0,103,192,.07)}
+html[data-theme="light"][data-palette="p2"] .fabric-board::before{background-image:linear-gradient(rgba(0,103,192,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,103,192,.03) 1px,transparent 1px)}
+html[data-theme="light"][data-palette="p2"] .cluster-state.is-online{border-color:rgba(0,103,192,.20)}
+html[data-theme="light"][data-palette="p2"] .status-pill.is-running{border-color:rgba(0,103,192,.20)}
+html[data-theme="light"][data-palette="p2"] .stage-state.is-running{border-color:rgba(0,103,192,.20)}
+html[data-theme="light"][data-palette="p2"] .dr-node.is-takeover{box-shadow:inset 0 0 0 1px rgba(0,103,192,.12)}
+html[data-theme="light"][data-palette="p2"] .dr-btn.is-restore{border-color:rgba(0,103,192,.35)}
+*{box-sizing:border-box}
+html{color-scheme:dark;background:var(--page)}
+html[data-theme="light"]{color-scheme:light;background:var(--page)}
+body{
+  margin:0;
+  min-width:320px;
+  color:var(--ink-1);
+  background:
+    radial-gradient(1000px 520px at 8% -8%, rgba(82,213,232,.10), transparent 58%),
+    radial-gradient(900px 480px at 92% 4%, rgba(239,178,95,.06), transparent 62%),
+    var(--page);
+  font-family:var(--ui);
+  font-size:14px;
+  line-height:1.5;
+  padding-bottom:58px;
+  overflow-x:hidden;
+}
+html[data-theme="light"] body{
+  background:
+    radial-gradient(1000px 520px at 8% -8%, rgba(10,142,163,.08), transparent 58%),
+    radial-gradient(900px 480px at 92% 4%, rgba(168,101,21,.05), transparent 62%),
+    var(--page);
+}
+html[data-theme="light"] body::before{
+  background-image:
+    linear-gradient(rgba(16,33,43,.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16,33,43,.055) 1px, transparent 1px);
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background-image:
+    linear-gradient(rgba(171,200,214,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(171,200,214,.035) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), rgba(0,0,0,.2) 60%, transparent 100%);
+  z-index:0;
+}
+::selection{background:rgba(82,213,232,.24);color:#fff}
+button{font:inherit}
+.mast, .shell, .statusbar{position:relative;z-index:2}
+.shell{width:min(1560px, calc(100% - 40px));margin:0 auto}
+.mast{
+  position:sticky;
+  top:0;
+  z-index:30;
+  background:rgba(9,14,18,.82);
+  backdrop-filter:blur(20px) saturate(130%);
+  border-bottom:1px solid var(--line);
+}
+html[data-theme="light"] .mast{background:rgba(255,255,255,.86);box-shadow:0 1px 0 rgba(16,33,43,.04)}
+.mast-inner{
+  width:min(1560px, calc(100% - 40px));
+  min-height:66px;
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.mark{
+  display:grid;
+  place-items:center;
+  width:34px;height:34px;
+  border-radius:8px;
+  background:#071014;
+  border:1px solid rgba(82,213,232,.32);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.04), 0 0 24px rgba(82,213,232,.08);
+}
+.mark svg{width:34px;height:34px;display:block}
+.brand-copy{min-width:0}
+.brand-crumb{
+  display:block;
+  color:var(--ink-3);
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.13em;
+  white-space:nowrap;
+}
+.brand-title{
+  display:flex;align-items:baseline;gap:9px;
+  margin-top:2px;
+  font-size:16px;font-weight:650;letter-spacing:-.015em;
+  white-space:nowrap;
+}
+.brand-title span{color:var(--ink-3);font-size:10px;font-weight:500;font-family:var(--mono);letter-spacing:.08em}
+.mast-meta{display:flex;align-items:center;gap:10px;color:var(--ink-3);font-family:var(--mono);font-size:10px;white-space:nowrap}
+.env-pill{
+  border:1px solid rgba(110,214,166,.3);
+  background:rgba(110,214,166,.08);
+  color:var(--ok-text);
+  border-radius:999px;
+  padding:3px 8px;
+  letter-spacing:.08em;
+}
+.mast-divider{width:1px;height:16px;background:var(--line)}
+.mast-meta b{color:var(--ink-2);font-weight:500}
+.mast-actions{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.live-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  color:var(--ok-text);background:rgba(110,214,166,.08);
+  border:1px solid rgba(110,214,166,.24);
+  padding:3px 8px;border-radius:999px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+}
+.live-dot{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 0 3px rgba(110,214,166,.10);
+  animation:livePulse 2.4s ease-in-out infinite;
+}
+.sync-label{color:var(--ink-3);font-family:var(--mono);font-size:10px}
+.sync-label b{color:var(--ink-2);font-weight:500;display:inline-block;min-width:26px}
+.clock{font-family:var(--mono);font-size:11px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.icon-btn{
+  width:30px;height:30px;display:grid;place-items:center;
+  color:var(--ink-2);background:transparent;border:1px solid var(--line);
+  border-radius:999px;cursor:pointer;
+  transition:border-color .18s ease,color .18s ease,background .18s ease;
+}
+.icon-btn:hover{color:var(--accent);border-color:rgba(82,213,232,.35);background:rgba(82,213,232,.06)}
+.icon-btn:focus-visible{outline:2px solid rgba(82,213,232,.38);outline-offset:2px}
+.icon-btn svg{width:15px;height:15px}
+.icon-btn.is-spinning svg{animation:spin .65s linear}
+.theme-switch{display:inline-flex;align-items:center;gap:3px;padding:3px 5px;border:1px solid var(--line);border-radius:999px;background:var(--panel-2)}
+.theme-dot{width:16px;height:16px;padding:0;border:0;border-radius:50%;cursor:pointer;position:relative;background:var(--accent)}
+.theme-dot[data-theme-opt="p2"]{background:#0067c0}
+.theme-dot[data-theme-opt="green"]{background:#15805a}
+.theme-dot[data-theme-opt="dark"]{background:#141c21;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
+.theme-dot.is-active{box-shadow:0 0 0 2px var(--panel-2),0 0 0 3px var(--ink-3)}
+.theme-dot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.theme-dot:hover{transform:scale(1.08)}
+.lang-btn{
+  height:30px;display:inline-flex;align-items:center;gap:3px;padding:0 10px;
+  border:1px solid var(--line);border-radius:999px;background:transparent;
+  color:var(--ink-3);font-family:var(--mono);font-size:9px;letter-spacing:.04em;cursor:pointer;
+}
+.lang-btn .lang-slash{color:var(--faint,var(--ink-3));opacity:.55;font-size:8px}
+.lang-btn [data-lang-opt]{transition:color .18s ease}
+.lang-btn [data-lang-opt].is-active{color:var(--accent);font-weight:600}
+.lang-btn:hover{border-color:rgba(82,213,232,.35);color:var(--ink-2)}
+.lang-btn:focus-visible{outline:2px solid rgba(82,213,232,.38);outline-offset:2px}
+html[data-theme="light"] .mark{background:#fff;border-color:rgba(10,142,163,.35);box-shadow:inset 0 0 0 1px rgba(16,33,43,.04),0 0 20px rgba(10,142,163,.08)}
+html[data-theme="light"] .mark svg text{fill:#10212b}
+html[data-theme="light"] .mast-meta{color:var(--ink-3)}
+html[data-theme="light"] .env-pill{color:var(--ok-text);border-color:rgba(21,128,90,.28);background:rgba(21,128,90,.10)}
+html[data-theme="light"] .live-pill{color:var(--ok-text);border-color:rgba(21,128,90,.26);background:rgba(21,128,90,.10)}
+html[data-theme="light"] .icon-btn:hover,html[data-theme="light"] .lang-btn:hover{border-color:rgba(10,142,163,.4);background:rgba(10,142,163,.06)}
+html[data-theme="light"] .tag{background:rgba(16,33,43,.04)}
+html[data-theme="light"] .tag i{background:var(--ink-3)}
+html[data-theme="light"] .tag.is-accent{color:var(--accent-text);border-color:rgba(10,142,163,.22);background:rgba(10,142,163,.07)}
+html[data-theme="light"] .topology{background:linear-gradient(145deg,rgba(255,255,255,.9),transparent 42%),var(--panel)}
+html[data-theme="light"] .core-mark{background:#fff;border-color:rgba(10,142,163,.32);color:var(--ink-1)}
+html[data-theme="light"] .core-state{color:var(--ok-text)}
+html[data-theme="light"] .kpi-strip{background:rgba(255,255,255,.82)}
+html[data-theme="light"] .worker-table thead th{background:rgba(16,33,43,.03)}
+html[data-theme="light"] .statusbar{background:rgba(255,255,255,.94);box-shadow:0 -18px 40px rgba(16,33,43,.12)}
+html[data-theme="light"] .foot-live{color:var(--ok-text)}
+html[data-theme="light"] .filter-chip.is-active{color:var(--accent-text)}
+html[data-theme="light"] .cluster-card.is-selected{box-shadow:inset 0 0 0 1px var(--c,var(--accent)),0 0 24px rgba(10,142,163,.08)}
+.hero{
+  display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(390px,.75fr);
+  gap:26px;
+  padding:34px 0 22px;
+  align-items:stretch;
+}
+.hero-copy{display:flex;flex-direction:column;justify-content:center;min-width:0}
+.eyebrow{
+  display:flex;align-items:center;gap:8px;
+  color:var(--ink-3);font-family:var(--mono);font-size:10px;letter-spacing:.11em;
+}
+.eyebrow::before{content:"";width:18px;height:1px;background:var(--accent);box-shadow:0 0 10px var(--accent-glow)}
+h1{
+  margin:13px 0 10px;
+  max-width:720px;
+  font-family:var(--display);
+  font-size:clamp(34px,4vw,56px);
+  line-height:.95;
+  font-weight:650;
+  letter-spacing:-.035em;
+}
+.h1-en{display:block;color:var(--ink-1)}
+.h1-cn{display:block;margin-top:10px;font-size:18px;line-height:1.15;color:var(--accent);font-weight:500;letter-spacing:.015em}
+.hero-lede{
+  max-width:610px;
+  margin:0;
+  color:var(--ink-2);
+  font-size:13px;line-height:1.8;
+}
+.hero-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px}
+.tag{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 8px;border-radius:5px;
+  border:1px solid var(--line);background:rgba(255,255,255,.02);
+  color:var(--ink-3);font-family:var(--mono);font-size:9px;letter-spacing:.04em;
+}
+.tag i{width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
+.tag.is-accent{color:var(--accent-text);border-color:rgba(82,213,232,.22);background:var(--accent-soft)}
+.tag.is-accent i{background:var(--accent)}
+.health-line{
+  display:flex;align-items:center;flex-wrap:wrap;gap:7px;
+  margin-top:16px;color:var(--ink-3);font-size:11px;
+}
+.state-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(110,214,166,.08)}
+.state-dot.is-amber{background:var(--amber);box-shadow:0 0 0 3px rgba(239,178,95,.08)}
+.state-dot.is-red{background:var(--red);box-shadow:0 0 0 3px rgba(255,129,121,.09)}
+.health-line strong{color:var(--ink-1);font-weight:600}
+.health-line .sep{color:var(--line-strong)}
+.health-line b{color:var(--ink-2);font-weight:500}
+.project-stats{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;margin-top:18px;padding-top:13px;max-width:720px;
+  border-top:1px solid var(--line);
+}
+.project-stat{min-width:0}
+.project-stat span{display:block;color:var(--ink-3);font-family:var(--mono);font-size:8px;letter-spacing:.05em;white-space:nowrap}
+.project-stat b{display:block;margin-top:4px;font-family:var(--display);font-size:19px;line-height:1;font-weight:600;letter-spacing:-.02em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.project-stat b small{display:block;margin-top:3px;font-family:var(--mono);font-size:8px;font-weight:400;letter-spacing:0;color:var(--ink-3)}
+.phase-strip{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:14px;margin-top:24px;max-width:720px;
+}
+.phase-item{min-width:0}
+.phase-head{display:flex;justify-content:space-between;gap:6px;color:var(--ink-3);font-family:var(--mono);font-size:9px;letter-spacing:.04em;white-space:nowrap}
+.phase-head b{color:var(--ink-2);font-weight:500}
+.phase-track{height:3px;background:var(--track);margin-top:8px;overflow:hidden;border-radius:2px}
+.phase-track i{display:block;height:100%;width:0%;background:var(--accent);box-shadow:0 0 10px var(--accent-glow);transition:width .9s ease}
+.phase-item:nth-child(2) .phase-track i{background:var(--blue)}
+.phase-item:nth-child(3) .phase-track i{background:var(--amber)}
+.phase-item:nth-child(4) .phase-track i{background:var(--green)}
+.topology{
+  position:relative;
+  padding:17px 18px 15px;
+  background:linear-gradient(145deg, rgba(255,255,255,.035), transparent 42%), var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.topology::before{
+  content:"";position:absolute;inset:0;
+  background-image:linear-gradient(rgba(82,213,232,.035) 1px, transparent 1px),linear-gradient(90deg, rgba(82,213,232,.035) 1px, transparent 1px);
+  background-size:26px 26px;pointer-events:none;mask-image:linear-gradient(to bottom,rgba(0,0,0,.8),transparent 85%);
+}
+.topology>*{position:relative}
+.topo-head{display:flex;justify-content:space-between;gap:12px;color:var(--ink-3);font-family:var(--mono);font-size:9px;letter-spacing:.11em}
+.topo-head b{color:var(--accent);font-weight:500}
+.topo-core{
+  display:flex;align-items:center;gap:10px;margin:15px 0 14px;
+  padding:10px 11px;
+  background:rgba(82,213,232,.045);
+  border:1px solid rgba(82,213,232,.2);
+  border-radius:7px;
+}
+.core-mark{
+  display:grid;place-items:center;width:36px;height:36px;flex:0 0 auto;
+  border:1px solid rgba(82,213,232,.36);border-radius:6px;
+  color:var(--ink-1);font-family:var(--display);font-size:16px;font-weight:700;
+  background:#071116;letter-spacing:-.04em;
+}
+.core-copy{min-width:0;flex:1}
+.core-copy b{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--ink-1);font-weight:500}
+.core-copy small{display:block;margin-top:2px;color:var(--ink-3);font-size:10px}
+.core-state{display:flex;align-items:center;gap:5px;color:var(--ok-text);font-family:var(--mono);font-size:9px;white-space:nowrap}
+.topo-list{position:relative;display:flex;flex-direction:column;gap:1px}
+.topo-list::before{content:"";position:absolute;left:7px;top:12px;bottom:12px;width:1px;background:linear-gradient(var(--accent),rgba(82,213,232,.1))}
+.topo-row{
+  position:relative;display:grid;grid-template-columns:18px 26px minmax(0,1fr) auto auto;
+  align-items:center;gap:7px;min-height:35px;padding-left:0;
+}
+.topo-row i{position:relative;z-index:1;width:8px;height:8px;border-radius:50%;background:var(--c,var(--accent));box-shadow:0 0 0 3px rgba(82,213,232,.06);margin-left:3px}
+.topo-code{color:var(--ink-3);font-family:var(--mono);font-size:9px}
+.topo-row strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:10px;font-weight:500;color:var(--ink-2)}
+.topo-role{color:var(--ink-3);font-family:var(--mono);font-size:8px;letter-spacing:.06em;white-space:nowrap}
+.topo-row em{color:var(--ink-2);font-family:var(--mono);font-size:9px;font-style:normal;text-align:right;white-space:nowrap}
+.topo-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);color:var(--ink-3);font-family:var(--mono);font-size:9px}
+.topo-foot b{color:var(--ink-2);font-weight:500}
+.kpi-strip{
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+  margin:8px 0 20px;
+  background:rgba(17,26,32,.68);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.kpi-cell{padding:16px 18px 15px;border-right:1px solid var(--line);min-width:0}
+.kpi-cell:last-child{border-right:0}
+.kpi-label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--ink-3);font-family:var(--mono);font-size:9px;letter-spacing:.08em;white-space:nowrap}
+.kpi-label i{width:5px;height:5px;border-radius:50%;background:var(--ink-3)}
+.kpi-label i.is-green{background:var(--green)}
+.kpi-label i.is-amber{background:var(--amber)}
+.kpi-value{display:flex;align-items:baseline;gap:5px;margin-top:7px;font-family:var(--display);font-size:28px;font-weight:600;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.kpi-value small{font-family:var(--mono);font-size:10px;font-weight:400;color:var(--ink-3);letter-spacing:0}
+.kpi-note{margin-top:8px;display:block;color:var(--ink-3);font-family:var(--mono);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-note b{color:var(--ink-2);font-weight:500}
+.section{margin-top:24px}
+.section-head{display:flex;justify-content:space-between;align-items:flex-end;gap:22px;margin-bottom:11px}
+.section-kicker{display:block;color:var(--ink-3);font-family:var(--mono);font-size:9px;letter-spacing:.12em;margin-bottom:4px}
+.section-head h2{margin:0;font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:-.02em}
+.section-head p{max-width:470px;margin:0;color:var(--ink-3);font-size:11px;line-height:1.65;text-align:right}
+.cluster-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.cluster-card{
+  position:relative;min-width:0;padding:13px 14px 13px;
+  background:linear-gradient(160deg, rgba(255,255,255,.028), transparent 48%), var(--panel);
+  border:1px solid var(--line);border-top:2px solid var(--c,var(--accent));
+  border-radius:8px;cursor:pointer;
+  transition:border-color .18s ease,background .18s ease,transform .18s ease;
+}
+.cluster-card:hover{border-color:rgba(172,202,216,.25);background:var(--panel-2)}
+.cluster-card.is-selected{border-color:var(--c,var(--accent));box-shadow:inset 0 0 0 1px var(--c,var(--accent)),0 0 24px rgba(82,213,232,.06)}
+.cluster-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.cluster-id{display:flex;align-items:center;gap:7px;min-width:0}
+.cluster-no{font-family:var(--mono);font-size:9px;color:var(--ink-3)}
+.cluster-name{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cluster-state{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 6px;font-family:var(--mono);font-size:8px;letter-spacing:.04em;white-space:nowrap}
+.cluster-state.is-online{color:var(--ok-text);background:var(--green-soft);border:1px solid rgba(110,214,166,.2)}
+.cluster-state.is-degraded{color:var(--warn-text);background:var(--amber-soft);border:1px solid rgba(239,178,95,.24)}
+.cluster-state.is-draining{color:#d8dffb;background:var(--blue-soft);border:1px solid rgba(140,169,255,.24)}
+.cluster-state i{width:4px;height:4px;border-radius:50%;background:currentColor}
+.cluster-role{margin-top:7px;display:flex;align-items:center;gap:7px;color:var(--ink-3);font-family:var(--mono);font-size:8px;letter-spacing:.05em}
+.cluster-role b{color:var(--c,var(--accent));font-weight:500;letter-spacing:.08em}
+.cluster-loc{color:var(--ink-3);font-size:10px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cluster-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:14px}
+.cluster-metric{min-width:0}
+.cluster-metric span{display:block;color:var(--ink-3);font-family:var(--mono);font-size:8px;letter-spacing:.04em;white-space:nowrap}
+.cluster-metric strong{display:block;margin-top:3px;font-family:var(--display);font-size:18px;line-height:1;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cluster-metric strong small{font-family:var(--mono);font-size:9px;font-weight:400;color:var(--ink-3);letter-spacing:0;margin-left:2px}
+.cluster-metric strong.is-warn{color:var(--amber)}
+.cluster-bar{height:3px;background:var(--track);border-radius:2px;overflow:hidden;margin-top:7px}
+.cluster-bar i{display:block;height:100%;background:var(--c,var(--accent));box-shadow:0 0 9px var(--accent-glow);transition:width .9s ease}
+.cluster-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);min-height:32px}
+.cluster-spark{width:96px;height:24px;overflow:hidden;opacity:.9;flex:0 1 96px}
+.cluster-spark svg{display:block;width:100%;height:100%}
+.cluster-rate{text-align:right;color:var(--ink-3);font-family:var(--mono);font-size:8px;line-height:1.4;white-space:nowrap;flex:0 0 auto}
+.cluster-rate b{display:block;color:var(--ink-2);font-weight:500;font-size:10.5px}
+.workspace-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(340px,.7fr);gap:12px;margin-top:24px;align-items:stretch}
+.panel{background:linear-gradient(160deg, rgba(255,255,255,.025), transparent 45%),var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:14px 16px 12px;border-bottom:1px solid var(--line);min-height:66px}
+.panel-title{min-width:0}
+.panel-title .panel-kicker{display:block;color:var(--ink-3);font-family:var(--mono);font-size:9px;letter-spacing:.11em;margin-bottom:4px}
+.panel-title h3{margin:0;font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:-.015em}
+.panel-title p{margin:4px 0 0;color:var(--ink-3);font-size:10px;line-height:1.5}
+.panel-tools{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.filter-chip{
+  display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;
+  border:1px solid var(--line);border-radius:5px;background:transparent;
+  color:var(--ink-3);font-family:var(--mono);font-size:9px;cursor:pointer;white-space:nowrap;
+}
+.filter-chip em{font-style:normal;color:var(--ink-2)}
+.filter-chip:hover{border-color:rgba(82,213,232,.28);color:var(--ink-2)}
+.filter-chip.is-active{color:var(--accent-text);background:var(--accent-soft);border-color:rgba(82,213,232,.32)}
+.filter-chip:focus-visible{outline:2px solid rgba(82,213,232,.35);outline-offset:1px}
+.filter-chip[hidden]{display:none}
+.table-wrap{overflow-x:auto}
+.worker-table{width:100%;min-width:780px;border-collapse:collapse;table-layout:fixed}
+.worker-table col:nth-child(1){width:18%}
+.worker-table col:nth-child(2){width:13%}
+.worker-table col:nth-child(3){width:9%}
+.worker-table col:nth-child(4){width:30%}
+.worker-table col:nth-child(5){width:13%}
+.worker-table col:nth-child(6){width:8%}
+.worker-table col:nth-child(7){width:10%}
+.worker-table thead th{padding:9px 12px;border-bottom:1px solid var(--line);color:var(--ink-3);font-family:var(--mono);font-size:8px;font-weight:400;letter-spacing:.05em;text-align:left;white-space:nowrap;background:rgba(255,255,255,.012)}
+.worker-table tbody tr{border-bottom:1px solid rgba(172,202,216,.075);transition:background .15s ease}
+.worker-table tbody tr:last-child{border-bottom:0}
+.worker-table tbody tr:hover{background:rgba(82,213,232,.035)}
+.worker-table td{padding:7px 12px;vertical-align:middle;min-width:0}
+.worker-id{display:flex;align-items:center;gap:7px;min-width:0}
+.worker-dot{width:5px;height:5px;flex:0 0 auto;border-radius:50%;background:var(--green)}
+.worker-dot.is-amber{background:var(--amber)}
+.worker-dot.is-red{background:var(--red)}
+.worker-dot.is-muted{background:var(--ink-3)}
+.worker-id b{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:10px;font-weight:500;color:var(--ink-2)}
+.worker-id small{display:block;margin-top:1px;color:var(--ink-3);font-family:var(--mono);font-size:8px;white-space:nowrap}
+.cluster-badge{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:2px 5px;border:1px solid var(--line);border-radius:4px;color:var(--ink-3);font-family:var(--mono);font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cluster-badge i{width:4px;height:4px;border-radius:50%;background:var(--c,var(--ink-3))}
+.status-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:999px;font-family:var(--mono);font-size:8px;white-space:nowrap;border:1px solid transparent}
+.status-pill i{width:4px;height:4px;border-radius:50%;background:currentColor}
+.status-pill.is-running{color:var(--ok-text);background:rgba(110,214,166,.08);border-color:rgba(110,214,166,.2)}
+.status-pill.is-draining{color:var(--blue-text);background:rgba(140,169,255,.09);border-color:rgba(140,169,255,.22)}
+.status-pill.is-degraded{color:var(--warn-text);background:rgba(239,178,95,.1);border-color:rgba(239,178,95,.26)}
+.status-pill.is-idle{color:var(--ink-3);background:var(--idle-bg);border-color:var(--idle-border)}
+.status-pill.is-offline{color:var(--bad-text);background:rgba(255,129,121,.09);border-color:rgba(255,129,121,.22)}
+.task-line{font-family:var(--mono);font-size:9px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-sub{display:block;margin-top:2px;font-family:var(--ui);font-size:9px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.progress-cell{display:flex;align-items:center;gap:7px;min-width:0}
+.progress-track{flex:1;height:3px;background:var(--track);border-radius:2px;overflow:hidden}
+.progress-track i{display:block;height:100%;width:0;background:var(--accent);transition:width .9s linear}
+.progress-track i.is-amber{background:var(--amber)}
+.progress-track i.is-blue{background:var(--blue)}
+.progress-track i.is-muted{background:var(--ink-3)}
+.progress-pct{width:28px;text-align:right;color:var(--ink-3);font-family:var(--mono);font-size:8px;white-space:nowrap}
+.rate-cell,.hb-cell{font-family:var(--mono);font-size:9px;color:var(--ink-2);white-space:nowrap}
+.hb-cell{display:flex;align-items:center;gap:5px;color:var(--ink-3)}
+.hb-cell i{width:4px;height:4px;border-radius:50%;background:var(--green)}
+.hb-cell.is-late i{background:var(--red)}
+.panel-foot{display:flex;justify-content:space-between;gap:12px;padding:9px 14px;border-top:1px solid var(--line);color:var(--ink-3);font-family:var(--mono);font-size:9px;white-space:nowrap;overflow:hidden}
+.panel-foot b{color:var(--ink-2);font-weight:500}
+.events-panel{display:flex;flex-direction:column}
+.events-panel .panel-head{min-height:66px}
+.live-mini{display:inline-flex;align-items:center;gap:5px;color:var(--ink-3);font-family:var(--mono);font-size:8px;white-space:nowrap}
+.live-mini .live-dot{width:5px;height:5px}
+.event-feed{padding:8px 14px 6px;flex:1}
+.event-row{display:grid;grid-template-columns:38px minmax(0,1fr);gap:9px;padding:8px 0;border-bottom:1px solid rgba(172,202,216,.075);min-width:0}
+.event-row:last-child{border-bottom:0}
+.event-time{color:var(--ink-3);font-family:var(--mono);font-size:8px;padding-top:2px;white-space:nowrap}
+.event-copy{min-width:0}
+.event-copy b{display:inline-flex;align-items:center;gap:4px;margin-right:5px;color:var(--ink-2);font-family:var(--mono);font-size:8px;font-weight:500;white-space:nowrap}
+.event-copy b i{width:4px;height:4px;border-radius:50%;background:var(--c,var(--ink-3))}
+.event-copy span{color:var(--ink-2);font-size:10px;line-height:1.55;overflow-wrap:anywhere}
+.event-copy.is-warn span{color:var(--warn-text)}
+.event-copy.is-error span{color:var(--bad-text)}
+.event-foot{padding:9px 14px 11px;border-top:1px solid var(--line);color:var(--ink-3);font-family:var(--mono);font-size:8px;display:flex;justify-content:space-between;gap:8px}
+.stage-grid{display:grid;grid-template-columns:minmax(0,1fr) 23px minmax(0,1fr) 23px minmax(0,1fr) 23px minmax(0,1fr);align-items:stretch;gap:0}
+.stage-card{position:relative;min-width:0;padding:13px 13px 11px;border:1px solid var(--line);border-top:2px solid var(--c,var(--accent));border-radius:7px;background:linear-gradient(160deg, rgba(255,255,255,.026),transparent 52%),var(--panel)}
+.stage-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.stage-code{font-family:var(--mono);font-size:9px;color:var(--ink-3);display:block;margin-bottom:3px}
+.stage-name{font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage-state{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 6px;font-family:var(--mono);font-size:8px;white-space:nowrap}
+.stage-state.is-running{color:var(--ok-text);background:rgba(110,214,166,.08);border:1px solid rgba(110,214,166,.2)}
+.stage-state.is-degraded{color:var(--warn-text);background:rgba(239,178,95,.1);border:1px solid rgba(239,178,95,.26)}
+.stage-state.is-idle{color:var(--ink-3);background:var(--idle-bg);border:1px solid var(--idle-border)}
+.stage-metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px 10px;margin-top:12px}
+.stage-metric span{display:block;color:var(--ink-3);font-family:var(--mono);font-size:8px;letter-spacing:.04em;white-space:nowrap}
+.stage-metric strong{display:block;margin-top:3px;color:var(--ink-1);font-family:var(--mono);font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage-metric strong small{font-size:8px;color:var(--ink-3);margin-left:2px}
+.stage-bar{height:2px;margin-top:11px;background:var(--track);overflow:hidden;border-radius:2px}
+.stage-bar i{display:block;height:100%;width:0;background:var(--c,var(--accent));transition:width .9s ease}
+.stage-cluster{display:flex;align-items:center;gap:5px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line);color:var(--ink-3);font-family:var(--mono);font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage-cluster i{width:4px;height:4px;border-radius:50%;background:var(--c,var(--ink-3))}
+.stage-arrow{position:relative;display:flex;align-items:center;justify-content:center;min-width:23px;color:var(--line-strong)}
+.stage-arrow::before{content:"";position:absolute;left:2px;right:5px;height:1px;background:linear-gradient(90deg,var(--line-strong),rgba(82,213,232,.28))}
+.stage-arrow::after{content:"";position:absolute;right:4px;width:5px;height:5px;border-top:1px solid rgba(82,213,232,.4);border-right:1px solid rgba(82,213,232,.4);transform:rotate(45deg)}
+.stage-note{display:flex;align-items:flex-start;gap:7px;margin-top:9px;color:var(--ink-3);font-size:10px;line-height:1.6}
+.stage-note::before{content:"";flex:0 0 auto;width:14px;height:1px;margin-top:7px;background:var(--accent);opacity:.65}
+.trend-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,.7fr);gap:12px;margin-top:24px}
+.trend-panel{min-width:0}
+.trend-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:14px 16px 8px}
+.trend-head h3{margin:0;font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:-.015em}
+.trend-head p{margin:3px 0 0;color:var(--ink-3);font-size:10px}
+.trend-value{display:flex;align-items:baseline;gap:5px;font-family:var(--display);font-size:25px;font-weight:600;letter-spacing:-.03em;white-space:nowrap}
+.trend-value small{font-family:var(--mono);font-size:9px;font-weight:400;color:var(--ink-3)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;padding:0 16px 8px}
+.legend-item{display:inline-flex;align-items:center;gap:5px;color:var(--ink-3);font-family:var(--mono);font-size:8px;white-space:nowrap}
+.legend-item i{width:12px;height:2px;border-radius:2px;background:var(--accent)}
+.legend-item:nth-child(2) i{background:var(--blue)}
+.legend-item:nth-child(3) i{background:var(--amber)}
+.chart-wrap{padding:0 10px 8px}
+.chart-wrap svg{display:block;width:100%;height:180px;overflow:visible}
+.chart-axis{display:flex;justify-content:space-between;padding:0 18px 14px;color:var(--ink-3);font-family:var(--mono);font-size:8px}
+.capacity-panel{padding-bottom:6px}
+.capacity-head{padding:14px 16px 8px}
+.capacity-head h3{margin:0;font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:-.015em}
+.capacity-head p{margin:3px 0 0;color:var(--ink-3);font-size:10px}
+.capacity-list{padding:4px 16px 10px}
+.capacity-row{margin:12px 0 0}
+.capacity-meta{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--ink-3);font-family:var(--mono);font-size:9px}
+.capacity-meta b{color:var(--ink-2);font-weight:500}
+.capacity-bar{height:3px;background:var(--track);border-radius:2px;margin-top:6px;overflow:hidden}
+.capacity-bar i{display:block;height:100%;width:0;background:var(--c,var(--accent));transition:width .9s ease}
+.capacity-foot{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:6px;border-top:1px solid var(--line);background:var(--line)}
+.capacity-foot div{background:var(--panel);padding:9px 10px 10px;min-width:0}
+.capacity-foot span{display:block;color:var(--ink-3);font-family:var(--mono);font-size:8px;white-space:nowrap}
+.capacity-foot b{display:block;margin-top:3px;font-family:var(--mono);font-size:10px;font-weight:500;color:var(--ink-2);white-space:nowrap}
+/* ===== server fabric / request flow / hot standby ===== */
+.fabric-board{
+  position:relative;
+  padding:14px;
+  background:linear-gradient(150deg,rgba(255,255,255,.028),transparent 48%),var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+  transition:border-color .25s ease,background .25s ease;
+}
+html[data-theme="light"] .fabric-board{background:linear-gradient(150deg,rgba(255,255,255,.92),transparent 48%),var(--panel)}
+.fabric-board::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(82,213,232,.028) 1px,transparent 1px),linear-gradient(90deg,rgba(82,213,232,.028) 1px,transparent 1px);
+  background-size:28px 28px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.72),transparent 82%);
+}
+html[data-theme="light"] .fabric-board::before{background-image:linear-gradient(rgba(10,142,163,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(10,142,163,.035) 1px,transparent 1px)}
+.fabric-board>*{position:relative;z-index:1}
+.fabric-board.is-failover{border-color:rgba(239,178,95,.4);background:linear-gradient(150deg,rgba(239,178,95,.055),transparent 46%),var(--panel)}
+.fabric-board-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;color:var(--ink-3);font-family:var(--mono);font-size:9px;letter-spacing:.07em;white-space:nowrap}
+.fabric-board-top span{overflow:hidden;text-overflow:ellipsis}
+.fabric-mode{color:var(--accent);font-weight:500;letter-spacing:.08em;transition:color .2s ease}
+.fabric-mode.is-failover{color:var(--amber)}
+.fabric-flow{display:grid;grid-template-columns:180px 26px 210px 26px minmax(340px,1fr) 26px 185px;align-items:stretch;gap:0}
+.fabric-node{
+  position:relative;min-width:0;padding:11px 12px 10px;
+  background:linear-gradient(160deg,rgba(255,255,255,.024),transparent 56%),var(--panel-2);
+  border:1px solid var(--line);border-top:2px solid var(--fc,var(--accent));border-radius:8px;
+  display:flex;flex-direction:column;
+}
+html[data-theme="light"] .fabric-node{background:linear-gradient(160deg,rgba(255,255,255,.9),transparent 56%),var(--panel-2)}
+.fabric-node-top{display:flex;align-items:center;justify-content:space-between;gap:7px;min-width:0}
+.fabric-code{color:var(--ink-3);font-family:var(--mono);font-size:8px;letter-spacing:.04em;white-space:nowrap}
+.fabric-label{color:var(--fc,var(--accent));font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fabric-node>b{display:block;margin-top:8px;font-family:var(--display);font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fabric-node>small{display:block;margin-top:3px;color:var(--ink-3);font-family:var(--mono);font-size:8px;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fabric-node-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:9px;border-top:1px solid var(--line);color:var(--ink-3);font-family:var(--mono);font-size:7px;white-space:nowrap}
+.fabric-node-foot span{display:inline-flex;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis}
+.fabric-node-foot i{width:4px;height:4px;border-radius:50%;background:var(--fc,var(--accent))}
+.fabric-node-foot b{color:var(--ink-2);font-weight:500;font-size:7px}
+.fabric-node-details{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 10px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);color:var(--ink-3);font-family:var(--mono);font-size:7px;line-height:1.4}
+.fabric-node-details span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fabric-node-details b{text-align:right;color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fabric-node-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px;padding-top:8px;border-top:1px solid var(--line)}
+.fabric-metric{min-width:0}
+.fabric-metric span{display:block;color:var(--ink-3);font-family:var(--mono);font-size:7px;letter-spacing:.04em;white-space:nowrap}
+.fabric-metric b{display:block;margin-top:3px;color:var(--ink-2);font-family:var(--mono);font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fabric-link{position:relative;min-width:26px}
+.fabric-link-line{position:absolute;left:0;right:8px;top:50%;height:1px;background:linear-gradient(90deg,var(--line-strong),var(--accent))}
+.fabric-link::after{content:"";position:absolute;right:2px;top:50%;width:5px;height:5px;border-top:1px solid var(--accent);border-right:1px solid var(--accent);transform:translateY(-50%) rotate(45deg);opacity:.8}
+.fabric-link-bead{position:absolute;left:0;top:50%;width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);transform:translate(-50%,-50%);animation:fabricBead 1.35s linear infinite;opacity:.9}
+.fabric-flow>.fabric-link:nth-of-type(2) .fabric-link-bead{animation-delay:.18s}
+.fabric-flow>.fabric-link:nth-of-type(3) .fabric-link-bead{animation-delay:.42s}
+.fabric-pools{padding-bottom:12px}
+.fabric-pool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}
+.fabric-pool{position:relative;min-width:0;padding:8px 9px 7px;border:1px solid var(--line);border-left:2px solid var(--fc,var(--accent));border-radius:5px;background:var(--panel-3);transition:border-color .2s ease,background .2s ease}
+.fabric-pool.is-failed{border-color:var(--red);border-left-color:var(--red);background:var(--red-soft);box-shadow:inset 0 0 0 1px rgba(255,129,121,.15)}
+.fabric-pool.is-failed::after{content:"×";position:absolute;right:7px;top:4px;color:var(--red);font-family:var(--mono);font-size:13px;font-weight:700;line-height:1}
+.fabric-pool-head{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
+.fabric-pool-name{color:var(--ink-1);font-family:var(--mono);font-size:9px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fabric-pool-state{color:var(--ink-3);font-family:var(--mono);font-size:7px;white-space:nowrap}
+.fabric-pool-state.is-failed{color:var(--bad-text)}
+.fabric-pool-meta{margin-top:4px;color:var(--ink-3);font-family:var(--mono);font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fabric-pool-metrics{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-top:6px;padding-top:5px;border-top:1px solid var(--line);font-family:var(--mono);font-size:8px;white-space:nowrap}
+.fabric-pool-metrics b{color:var(--ink-2);font-weight:500}
+.fabric-pool-metrics span{color:var(--ink-3)}
+.dr-strip{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,.8fr) minmax(185px,220px) auto;
+  align-items:center;gap:12px;margin-top:12px;padding:11px 12px;
+  border:1px solid var(--line);border-radius:7px;background:var(--panel-2);
+  transition:border-color .25s ease,background .25s ease;
+}
+.dr-strip.is-failover{border-color:rgba(239,178,95,.4);background:var(--amber-soft)}
+.dr-copy{min-width:0}
+.dr-kicker{display:block;color:var(--ink-3);font-family:var(--mono);font-size:8px;letter-spacing:.07em;white-space:nowrap}
+.dr-copy>b{display:block;margin-top:3px;color:var(--ink-2);font-family:var(--mono);font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr-copy>small{display:block;margin-top:2px;color:var(--ink-3);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr-route{min-width:0}
+.dr-route-track{position:relative;display:block;height:11px;margin-top:5px;border-bottom:1px dashed var(--line-strong)}
+.dr-route-track i{position:absolute;left:0;bottom:-3px;width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0;animation:drBead 1.7s linear infinite}
+.dr-route-track i:nth-child(2){animation-delay:.56s}
+.dr-route-track i:nth-child(3){animation-delay:1.12s}
+.dr-strip.is-failover .dr-route-track{border-color:var(--amber)}
+.dr-strip.is-failover .dr-route-track i{background:var(--amber);animation-duration:.9s}
+.dr-route>b{display:block;margin-top:2px;color:var(--ink-3);font-family:var(--mono);font-size:8px;font-weight:400;text-align:right;white-space:nowrap}
+.dr-node{min-width:0;padding:9px 10px;border:1px solid var(--line);border-left:2px solid var(--green);border-radius:5px;background:var(--panel-3);transition:border-color .25s ease,background .25s ease}
+.dr-node.is-takeover{border-color:var(--green);background:var(--green-soft);box-shadow:inset 0 0 0 1px rgba(110,214,166,.12)}
+.dr-node-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.dr-node-name{color:var(--ink-1);font-family:var(--mono);font-size:9px;font-weight:600;white-space:nowrap}
+.dr-node-state{color:var(--ok-text);font-family:var(--mono);font-size:7px;white-space:nowrap}
+.dr-node.is-takeover .dr-node-state{color:var(--ok-text);font-weight:600}
+.dr-node-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:7px;padding-top:6px;border-top:1px solid var(--line)}
+.dr-node-metric{min-width:0}
+.dr-node-metric span{display:block;color:var(--ink-3);font-family:var(--mono);font-size:7px;white-space:nowrap}
+.dr-node-metric b{display:block;margin-top:2px;color:var(--ink-2);font-family:var(--mono);font-size:9px;font-weight:500;white-space:nowrap}
+.dr-actions{display:flex;flex-direction:column;align-items:stretch;gap:5px}
+.dr-btn{height:29px;padding:0 11px;border:1px solid rgba(239,178,95,.34);border-radius:5px;background:var(--amber-soft);color:var(--warn-text);font-family:var(--mono);font-size:8px;letter-spacing:.04em;cursor:pointer;white-space:nowrap;transition:border-color .18s ease,color .18s ease,background .18s ease}
+.dr-btn:hover{border-color:var(--amber);color:var(--amber)}
+.dr-btn:focus-visible{outline:2px solid rgba(239,178,95,.35);outline-offset:2px}
+.dr-btn.is-restore{border-color:rgba(110,214,166,.35);background:var(--green-soft);color:var(--ok-text)}
+.dr-btn.is-restore:hover{border-color:var(--green);color:var(--green)}
+.dr-next{color:var(--ink-3);font-family:var(--mono);font-size:8px;text-align:center;white-space:nowrap}
+.fabric-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;color:var(--ink-3);font-family:var(--mono);font-size:8px}
+.fabric-legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.fabric-legend i{width:14px;height:2px;border-radius:2px;background:var(--accent)}
+.fabric-legend span:nth-child(2) i{background:var(--amber)}
+.fabric-legend span:nth-child(3) i{background:var(--green)}
+@keyframes fabricBead{0%{left:0;opacity:.15}12%{opacity:1}88%{opacity:1}100%{left:100%;opacity:.15}}
+@keyframes drBead{0%{left:0;opacity:.15}12%{opacity:1}88%{opacity:1}100%{left:100%;opacity:.15}}
+.statusbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;
+  height:46px;
+  display:flex;align-items:center;gap:0;
+  background:rgba(9,14,18,.92);
+  border-top:1px solid var(--line);
+  box-shadow:0 -18px 40px rgba(0,0,0,.24);
+  backdrop-filter:blur(18px);
+  font-family:var(--mono);font-size:9px;color:var(--ink-3);
+}
+.statusbar::before{content:"";position:absolute;left:0;top:-1px;width:30%;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.7}
+.statusbar-inner{width:min(1560px,calc(100% - 40px));margin:0 auto;display:flex;align-items:center;gap:0;min-width:0}
+.foot-brand{padding:0 16px 0 0;color:var(--ink-2);font-weight:500;white-space:nowrap;letter-spacing:.06em}
+.foot-item{display:flex;align-items:baseline;gap:5px;padding:0 14px;border-left:1px solid var(--line);white-space:nowrap}
+.foot-item b{color:var(--ink-1);font-weight:500;font-size:10px}
+.foot-right{margin-left:auto;display:flex;align-items:center;gap:12px;white-space:nowrap;padding-left:16px}
+.foot-sync b{color:var(--ink-2);font-weight:500;display:inline-block;min-width:24px}
+.foot-live{display:inline-flex;align-items:center;gap:5px;color:var(--ok-text)}
+.foot-live .live-dot{width:5px;height:5px}
+@keyframes livePulse{0%,100%{opacity:.55;transform:scale(.92)}50%{opacity:1;transform:scale(1.06)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes eventIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (max-width:1180px){
+  .hero{grid-template-columns:1fr;gap:24px}
+  .phase-strip{max-width:none}
+  .cluster-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .kpi-cell:nth-child(3){border-right:0}
+  .kpi-cell:nth-child(4),.kpi-cell:nth-child(5){border-top:1px solid var(--line)}
+  .workspace-grid{grid-template-columns:1fr}
+  .trend-grid{grid-template-columns:1fr}
+  .stage-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .stage-arrow{display:none}
+  .stage-note{margin-top:10px}
+  .fabric-flow{grid-template-columns:1fr 1fr;gap:10px}
+  .fabric-link{display:none}
+  .fabric-pools{grid-column:1/-1}
+  .fabric-node{min-height:auto}
+  .dr-strip{grid-template-columns:minmax(0,1fr) minmax(190px,240px);align-items:start}
+  .dr-actions{align-items:flex-start}
+}
+@media (max-width:1180px) and (min-width:981px){
+  .fabric-flow{grid-template-columns:148px 22px 176px 22px minmax(0,1fr) 22px 148px;gap:8px}
+  .fabric-link{display:block}
+  .fabric-pools{grid-column:auto}
+  .fabric-node{padding:10px}
+  .fabric-node b{font-size:12px}
+  .fabric-node>small{font-size:7px}
+  .fabric-link-line{width:22px}
+  .fabric-pool-name{font-size:9px}
+  .fabric-pool-metric b{font-size:11px}
+  .fabric-pool-meta{font-size:6px}
+}
+@media (max-width:760px){
+  body{padding-bottom:52px}
+  .shell,.mast-inner,.statusbar-inner{width:calc(100% - 24px)}
+  .mast-inner{min-height:62px;gap:10px;flex-wrap:wrap;padding:9px 0}
+  .brand{flex:1 1 100%}
+  .mast-meta{order:2;flex:1 1 auto;overflow:hidden}
+  .mast-actions{order:3;margin-left:auto}
+  .clock,.sync-label{display:none}
+  .mast-meta .mast-divider,.mast-meta .mast-label{display:none}
+  .hero{padding-top:26px}
+  h1{font-size:38px}
+  .h1-cn{font-size:16px}
+  .phase-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .project-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
+  .topology{padding:14px}
+  .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi-cell:nth-child(2n){border-right:0}
+  .kpi-cell:nth-child(3),.kpi-cell:nth-child(4),.kpi-cell:nth-child(5){border-top:1px solid var(--line)}
+  .kpi-cell:nth-child(3){border-right:1px solid var(--line)}
+  .section-head{display:block}
+  .section-head p{text-align:left;margin-top:6px}
+  .cluster-grid{grid-template-columns:1fr}
+  .panel-head{display:block}
+  .panel-tools{justify-content:flex-start;margin-top:10px}
+  .stage-grid{grid-template-columns:1fr}
+  .stage-metrics{grid-template-columns:1fr 1fr}
+  .fabric-flow{grid-template-columns:1fr}
+  .fabric-pools{grid-column:auto}
+  .fabric-pool-grid{grid-template-columns:1fr 1fr}
+  .fabric-board{padding:10px}
+  .dr-strip{grid-template-columns:1fr}
+  .statusbar{height:42px}
+  .statusbar-inner{overflow:hidden}
+  .foot-brand{padding-right:9px;font-size:8px}
+  .foot-item{padding:0 7px;font-size:8px}
+  .foot-item b{font-size:9px}
+  .foot-item:nth-child(5),.foot-item:nth-child(6){display:none}
+  .foot-right{gap:8px;padding-left:8px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+}
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="mast-inner">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 34 34" fill="none">
+          <path d="M5 21h5l2-9 3 14 3-10 1.5 5H28" stroke="#52d5e8" stroke-width="1.5" stroke-linejoin="round"/>
+          <text x="17" y="10" text-anchor="middle" fill="#edf6fa" font-family="Arial" font-size="7" font-weight="700" letter-spacing=".4">P2</text>
+        </svg>
+      </div>
+      <div class="brand-copy">
+        <span class="brand-crumb" data-i18n="brandCrumb">PROJECT P2 / VIDEO INTELLIGENCE</span>
+        <span class="brand-title"><span data-i18n="brandTitle">视频流水线</span> <span data-i18n="brandTag">MULTI-CLUSTER OPS</span></span>
+      </div>
+    </div>
+    <div class="mast-meta">
+      <span class="env-pill" data-i18n="production">PRODUCTION</span>
+      <span class="mast-divider"></span>
+      <span class="mast-label" data-i18n="controlPlane">CONTROL PLANE</span>
+      <b data-i18n="clusterMeta">CN / 4 CLUSTERS</b>
+    </div>
+    <div class="mast-actions">
+      <span class="live-pill"><i class="live-dot"></i><span data-i18n="live">LIVE</span></span>
+      <span class="sync-label"><span data-i18n="sync">SYNC</span> <b id="sync-age">0.4s</b></span>
+      <span class="clock" id="clock">--:--:--</span>
+      <button class="lang-btn" id="langToggle" type="button" aria-label="切换语言 / Switch language">
+        <span data-lang-opt="zh">中</span><span class="lang-slash">/</span><span data-lang-opt="en">EN</span>
+      </button>
+      <div class="theme-switch" role="group" aria-label="Theme / 主题">
+        <button class="theme-dot is-active" type="button" data-theme-opt="p2" title="P2 配色" aria-label="P2 配色" aria-pressed="true"></button>
+        <button class="theme-dot" type="button" data-theme-opt="green" title="绿色主题" aria-label="绿色主题" aria-pressed="false"></button>
+        <button class="theme-dot" type="button" data-theme-opt="dark" title="深色主题" aria-label="深色主题" aria-pressed="false"></button>
+      </div>
+      <button class="icon-btn" id="refreshBtn" type="button" title="刷新遥测" aria-label="刷新遥测">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <div class="eyebrow" data-i18n="heroEyebrow">ONE PROJECT · FOUR EXECUTION POOLS</div>
+      <h1 id="hero-title">
+        <span class="h1-en"><span data-i18n="heroLine1">VIDEO</span><br><span data-i18n="heroLine2">PIPELINE</span></span>
+        <span class="h1-cn" data-i18n="heroSub">一个项目，四个执行集群。</span>
+      </h1>
+      <p class="hero-lede" data-i18n="heroLede">字幕转写、向量化、AI 总结和发布拆到不同的算力池，控制面只保留一套项目级口径。每一台 worker 的当前任务、进度和心跳，都汇入同一条状态轨道。</p>
+      <div class="hero-tags">
+        <span class="tag is-accent" data-i18n="tagProject">1 PROJECT</span>
+        <span class="tag" data-i18n="tagClusters">4 CLUSTERS</span>
+        <span class="tag" data-i18n="tagLocations">CN-SHENZHEN / CN-QINGDAO</span>
+        <span class="tag" data-i18n="tagBurst">CLOUD BURST ENABLED</span>
+      </div>
+      <div class="health-line">
+        <span class="state-dot is-amber" id="hero-state-dot"></span>
+        <strong id="hero-health" data-i18n="healthStable">Control plane stable</strong>
+        <span class="sep">·</span>
+        <span><b id="hero-workers">23 / 26</b> <span data-i18n="workersActive">workers active</span></span>
+        <span class="sep">·</span>
+        <span><b id="hero-attention">2</b> <span data-i18n="workersAttention">workers need attention</span></span>
+      </div>
+      <div class="project-stats" aria-label="项目资产统计">
+        <div class="project-stat"><span data-i18n="statAssets">VIDEO ASSETS</span><b id="project-assets">14,380</b><small data-i18n="statAssetsSub">project corpus</small></div>
+        <div class="project-stat"><span data-i18n="statSubtitled">SUBTITLED</span><b id="project-subtitled">12,184</b><small data-i18n="statSubtitledSub">ready for RAG</small></div>
+        <div class="project-stat"><span data-i18n="statSummarized">SUMMARIZED</span><b id="project-summarized">6,321</b><small data-i18n="statSummarizedSub">notes generated</small></div>
+        <div class="project-stat"><span data-i18n="statBatch">CURRENT BATCH</span><b>P2-2418</b><small data-i18n="statBatchSub">240 min window</small></div>
+      </div>
+      <div class="phase-strip" aria-label="阶段进度">
+        <div class="phase-item">
+          <div class="phase-head"><span data-i18n="phase1">01 TRANSCRIBE</span><b id="phase-1-pct">65%</b></div>
+          <div class="phase-track"><i id="phase-1-bar"></i></div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-head"><span data-i18n="phase2">02 VECTORIZE</span><b id="phase-2-pct">94%</b></div>
+          <div class="phase-track"><i id="phase-2-bar"></i></div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-head"><span data-i18n="phase3">03 SUMMARIZE</span><b id="phase-3-pct">84%</b></div>
+          <div class="phase-track"><i id="phase-3-bar"></i></div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-head"><span data-i18n="phase4">04 PUBLISH</span><b id="phase-4-pct">42%</b></div>
+          <div class="phase-track"><i id="phase-4-bar"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="topology" aria-label="项目集群拓扑">
+      <div class="topo-head"><span data-i18n="topoProject">PROJECT → CLUSTERS</span><b>1 : 4</b></div>
+      <div class="topo-core">
+        <div class="core-mark">P2</div>
+        <div class="core-copy">
+          <b data-i18n="topoControl">CONTROL PLANE</b>
+          <small data-i18n="topoCoreSub">项目编排 · 队列分流 · 健康聚合</small>
+        </div>
+        <span class="core-state"><i class="live-dot"></i><span data-i18n="topoHealthy">HEALTHY</span></span>
+      </div>
+      <div class="topo-list">
+        <div class="topo-row" style="--c:var(--topo-gpu-a)">
+          <i></i><span class="topo-code">01</span><strong>SZ-GPU-01</strong><span class="topo-role" data-i18n="roleTranscribe">TRANSCRIBE</span><em>6/7</em>
+        </div>
+        <div class="topo-row" style="--c:var(--topo-gpu-b)">
+          <i></i><span class="topo-code">02</span><strong>SZ-GPU-02</strong><span class="topo-role" data-i18n="roleVectorize">VECTORIZE</span><em>6/6</em>
+        </div>
+        <div class="topo-row" style="--c:var(--topo-edge)">
+          <i></i><span class="topo-code">03</span><strong>QD-EDGE-01</strong><span class="topo-role" data-i18n="roleSummarize">SUMMARIZE</span><em>3/4</em>
+        </div>
+        <div class="topo-row" style="--c:var(--topo-burst)">
+          <i></i><span class="topo-code">04</span><strong>CLOUD-BURST</strong><span class="topo-role" data-i18n="rolePublish">PUBLISH + OVERFLOW</span><em>8/9</em>
+        </div>
+      </div>
+      <div class="topo-foot"><span data-i18n="projectClusters">1 project / 4 clusters</span><span><b id="topo-online">23</b> <span data-i18n="workersOnline">workers online</span></span></div>
+    </aside>
+  </section>
+
+  <section class="kpi-strip" aria-label="项目关键指标">
+    <div class="kpi-cell">
+      <div class="kpi-label"><span data-i18n="kpiWorkers">ACTIVE WORKERS</span><i class="is-green"></i></div>
+      <div class="kpi-value"><span id="kpi-workers">23</span><small>/ 26</small></div>
+      <span class="kpi-note"><b>1</b> <span data-i18n="kpiDegrading">degrading</span> · <b>1</b> <span data-i18n="kpiDraining">draining</span></span>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label"><span data-i18n="kpiQueue">GLOBAL QUEUE</span><i class="is-amber"></i></div>
+      <div class="kpi-value"><span id="kpi-queue">3,728</span><small data-i18n="kpiJobs">jobs</small></div>
+      <span class="kpi-note"><b id="kpi-queue-note">1,996</b> <span data-i18n="kpiOnTranscribe">on transcribe pool</span></span>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label"><span data-i18n="kpiThroughput">THROUGHPUT</span><i></i></div>
+      <div class="kpi-value"><span id="kpi-tp">49.3</span><small data-i18n="kpiAudio">audio h/h</small></div>
+      <span class="kpi-note"><span data-i18n="kpiRolling">rolling 10 min median</span> · <b id="kpi-tp-delta">+0.2</b></span>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label"><span data-i18n="kpiEta">PROJECT ETA</span><i></i></div>
+      <div class="kpi-value"><span id="kpi-eta">18h 36m</span></div>
+      <span class="kpi-note"><span data-i18n="kpiExpected">expected</span> <b id="kpi-eta-at">11/19 08:04</b></span>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label"><span data-i18n="kpiHealth">PIPELINE HEALTH</span><i class="is-amber"></i></div>
+      <div class="kpi-value"><span id="kpi-health">99.2</span><small>%</small></div>
+      <span class="kpi-note"><b id="kpi-health-note">1</b> <span data-i18n="kpiDegradedCluster">degraded cluster · retry rate 0.12%</span></span>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="fabric-title">
+    <div class="section-head">
+      <div>
+        <span class="section-kicker" data-i18n="fabricKicker">SERVER FABRIC / REQUEST TO STORAGE</span>
+        <h2 id="fabric-title" data-i18n="fabricTitle">服务器架构与容灾</h2>
+      </div>
+      <p data-i18n="fabricDesc">请求从入口网关进入，经控制面调度分到四个执行池，产物最终写入共享存储；热备集群持续复制，演练时可接管一个执行池。</p>
+    </div>
+    <div class="fabric-board" id="fabricBoard">
+      <div class="fabric-board-top">
+        <span data-i18n="fabricFlowLabel">REQUEST → EXECUTION → OBJECT</span>
+        <span class="fabric-mode" id="fabric-mode" data-i18n="fabricModeNormal">NOMINAL</span>
+      </div>
+      <div id="fabricContent"></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="clusters-title">
+    <div class="section-head">
+      <div>
+        <span class="section-kicker" data-i18n="sectionClustersKicker">CLUSTER FABRIC / EXECUTION POOLS</span>
+        <h2 id="clusters-title" data-i18n="sectionClusters">执行集群</h2>
+      </div>
+      <p data-i18n="sectionClustersDesc">四个集群各管一段链路；点击卡片会把 Worker 列表切到对应集群。吞吐、队列和温度持续抖动，状态以最近一次心跳为准。</p>
+    </div>
+    <div class="cluster-grid" id="clusterGrid"></div>
+  </section>
+
+  <section class="workspace-grid" aria-label="Worker 与事件">
+    <div class="panel worker-panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-kicker" data-i18n="workerKicker">WORKER FLEET / LIVE SAMPLE</span>
+          <h3 data-i18n="workerTitle">Worker 状态</h3>
+          <p id="worker-subtitle">12 sampled workers · 23 live heartbeats</p>
+        </div>
+        <div class="panel-tools">
+          <button class="filter-chip is-active" data-filter="all" type="button"><span data-i18n="filterAll">全部</span> <em id="count-all">12</em></button>
+          <button class="filter-chip" data-filter="running" type="button"><span data-i18n="filterRunning">运行中</span> <em id="count-running">8</em></button>
+          <button class="filter-chip" data-filter="attention" type="button"><span data-i18n="filterAttention">需关注</span> <em id="count-attention">2</em></button>
+          <button class="filter-chip" data-filter="idle" type="button"><span data-i18n="filterIdle">空闲</span> <em id="count-idle">2</em></button>
+          <button class="filter-chip" data-filter="clear-cluster" id="clearCluster" type="button" hidden>清除集群</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="worker-table" aria-label="Worker 运行状态">
+          <colgroup>
+            <col><col><col><col><col><col><col>
+          </colgroup>
+          <thead>
+            <tr>
+              <th data-i18n="thWorker">WORKER</th>
+              <th data-i18n="thCluster">CLUSTER</th>
+              <th data-i18n="thState">STATE</th>
+              <th data-i18n="thTask">当前任务</th>
+              <th data-i18n="thProgress">PROGRESS</th>
+              <th data-i18n="thRate">RATE</th>
+              <th data-i18n="thHeartbeat">HEARTBEAT</th>
+            </tr>
+          </thead>
+          <tbody id="workerBody"></tbody>
+        </table>
+      </div>
+      <div class="panel-foot">
+        <span><span data-i18n="fleetScope">fleet scope</span> <b id="worker-scope">all clusters</b></span>
+        <span data-i18n="rowsInPlace">rows update in place · no reflow</span>
+      </div>
+    </div>
+
+    <aside class="panel events-panel" aria-labelledby="events-title">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-kicker" data-i18n="eventsKicker">EVENT STREAM / TAIL</span>
+          <h3 id="events-title" data-i18n="eventsTitle">控制面事件</h3>
+          <p data-i18n="eventsDesc">任务完成、心跳变化和队列再平衡</p>
+        </div>
+        <span class="live-mini"><i class="live-dot"></i><span data-i18n="tailing">TAILING</span></span>
+      </div>
+      <div class="event-feed" id="eventFeed"></div>
+      <div class="event-foot"><span data-i18n="retainEvents">retain last 9 events</span><span id="event-count">9 / 9</span></div>
+    </aside>
+  </section>
+
+  <section class="section" aria-labelledby="pipeline-title">
+    <div class="section-head">
+      <div>
+        <span class="section-kicker" data-i18n="pipelineKicker">PIPELINE MAP / TWO PARALLEL BRANCHES</span>
+        <h2 id="pipeline-title" data-i18n="pipelineTitle">阶段依赖</h2>
+      </div>
+      <p data-i18n="pipelineDesc">01 转写完成后，02 向量化和 03 总结并行；04 发布等两个分支都收敛。队列和速率跟随所在集群。</p>
+    </div>
+    <div class="stage-grid" id="stageGrid"></div>
+    <div class="stage-note" data-i18n="stageNote">04 PUBLISH 不在 03 后面串行等待：它同时消费向量化与总结产物，任何一边落后都会把发布队列顶住。</div>
+  </section>
+
+  <section class="trend-grid" aria-label="吞吐与容量">
+    <div class="panel trend-panel">
+      <div class="trend-head">
+        <div>
+          <span class="panel-kicker" data-i18n="trendKicker">THROUGHPUT / LAST 24H</span>
+          <h3 data-i18n="trendTitle">项目吞吐趋势</h3>
+          <p data-i18n="trendDesc">三个执行池的归一化产出，按 10 分钟滑动窗口</p>
+        </div>
+        <div class="trend-value"><span id="trend-total">49.3</span><small data-i18n="kpiAudio">audio h/h</small></div>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><i></i><span data-i18n="legendTranscribe">TRANSCRIBE</span></span>
+        <span class="legend-item"><i></i><span data-i18n="legendVectorize">VECTORIZE</span></span>
+        <span class="legend-item"><i></i><span data-i18n="legendSummarize">SUMMARIZE</span></span>
+      </div>
+      <div class="chart-wrap"><svg id="trendSvg" viewBox="0 0 760 180" role="img" aria-label="项目吞吐趋势图"></svg></div>
+      <div class="chart-axis"><span data-i18n="axis24h">24H AGO</span><span data-i18n="axis18">18H</span><span data-i18n="axis12">12H</span><span data-i18n="axis6">6H</span><span data-i18n="axisNow">NOW</span></div>
+    </div>
+
+    <aside class="panel capacity-panel" aria-labelledby="capacity-title">
+      <div class="capacity-head">
+        <span class="panel-kicker" data-i18n="capacityKicker">CAPACITY ENVELOPE / AGGREGATE</span>
+        <h3 id="capacity-title" data-i18n="capacityTitle">资源包络</h3>
+        <p data-i18n="capacityDesc">四个集群的显存、磁盘与网络余量</p>
+      </div>
+      <div class="capacity-list" id="capacityList"></div>
+      <div class="capacity-foot">
+        <div><span data-i18n="integrity">DATA INTEGRITY</span><b>99.97%</b></div>
+        <div><span data-i18n="artifactLag">ARTIFACT LAG</span><b>42s</b></div>
+        <div><span data-i18n="retryRate">RETRY RATE</span><b>0.12%</b></div>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<footer class="statusbar">
+  <div class="statusbar-inner">
+    <span class="foot-brand" data-i18n="footBrand">P2 / MULTI-CLUSTER</span>
+    <span class="foot-item"><span data-i18n="footClusters">CLUSTERS</span> <b id="foot-clusters">4</b></span>
+    <span class="foot-item"><span data-i18n="footWorkers">WORKERS</span> <b id="foot-workers">23/26</b></span>
+    <span class="foot-item"><span data-i18n="footQueue">QUEUE</span> <b id="foot-queue">3,728</b></span>
+    <span class="foot-item"><span data-i18n="footThroughput">THROUGHPUT</span> <b id="foot-tp">49.3</b></span>
+    <span class="foot-right">
+      <span class="foot-live"><i class="live-dot"></i><span data-i18n="live">LIVE</span></span>
+      <span class="foot-sync"><span data-i18n="sync">SYNC</span> <b id="foot-sync">0.4s</b></span>
+    </span>
+  </div>
+</footer>
+
+<script>
+/* =========================================================
+   P2 / multi-cluster operations console
+   Self-running demo data. Changes are deliberately staggered.
+   ========================================================= */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+const rand = (min, max) => min + Math.random() * (max - min);
+const randInt = (min, max) => Math.floor(rand(min, max + 1));
+const round1 = n => Math.round(n * 10) / 10;
+const fmt = n => Number(n).toLocaleString('en-US');
+const pad2 = n => String(n).padStart(2, '0');
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+function makeSeries(length, base, amp, phase) {
+  return Array.from({length}, (_, i) => round1(clamp(
+    base + Math.sin(i / 3.1 + phase) * amp + Math.sin(i / 7.7 + phase * .7) * amp * .38,
+    8, 98
+  )));
+}
+
+function nowClock() {
+  return new Date().toLocaleTimeString('en-GB', {hour12: false});
+}
+
+function eventTime(secondsAgo = 0) {
+  return new Date(Date.now() - secondsAgo * 1000).toLocaleTimeString('en-GB', {hour12: false});
+}
+
+function etaAt(minutes) {
+  const d = new Date(Date.now() + Number(minutes || 0) * 60000);
+  return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function fmtEta(minutes) {
+  const value = Math.max(0, Math.round(Number(minutes) || 0));
+  return `${Math.floor(value / 60)}h ${pad2(value % 60)}m`;
+}
+
+const CLUSTER_ACCENTS = {
+  p2:    {'gpu-a':'#0067c0','gpu-b':'#0f6cbd','edge':'#b75b00','burst':'#3a7abf'},
+  green: {'gpu-a':'#0a8ea3','gpu-b':'#3b5bc7','edge':'#a86515','burst':'#15805a'},
+  dark:  {'gpu-a':'#52d5e8','gpu-b':'#8ca9ff','edge':'#efb25f','burst':'#6ed6a6'}
+};
+const CAPACITY_COLORS = {
+  p2:    {gpu:'#0067c0',vram:'#0f6cbd',disk:'#b75b00',network:'#3a7abf'},
+  green: {gpu:'#0a8ea3',vram:'#3b5bc7',disk:'#a86515',network:'#15805a'},
+  dark:  {gpu:'#52d5e8',vram:'#8ca9ff',disk:'#efb25f',network:'#6ed6a6'}
+};
+function clusterAccentOf(id) {
+  return (CLUSTER_ACCENTS[THEME] || CLUSTER_ACCENTS.p2)[id] || '#0067c0';
+}
+function capacityColorOf(id) {
+  return (CAPACITY_COLORS[THEME] || CAPACITY_COLORS.p2)[id] || '#0067c0';
+}
+
+/* ---------- language / theme ---------- */
+const I18N = {
+  brandCrumb: ["PROJECT P2 / VIDEO INTELLIGENCE", "项目 P2 / 视频智能"],
+  brandTitle: ["VIDEO PIPELINE", "视频流水线"],
+  brandTag: ["MULTI-CLUSTER OPS", "多集群控制台"],
+  production: ["PRODUCTION", "生产环境"],
+  controlPlane: ["CONTROL PLANE", "控制面"],
+  clusterMeta: ["CN / 4 CLUSTERS", "CN / 4 个集群"],
+  live: ["LIVE", "实时"],
+  sync: ["SYNC", "同步"],
+  heroEyebrow: ["ONE PROJECT · FOUR EXECUTION POOLS", "一个项目 · 四个执行池"],
+  heroLine1: ["VIDEO", "视频"],
+  heroLine2: ["PIPELINE", "流水线"],
+  heroSub: ["One project, four execution clusters.", "一个项目，四个执行集群。"],
+  heroLede: [
+    "Transcription, vectorization, summarization and publishing are split across separate pools, while the control plane keeps one project-level view. Every worker's task, progress and heartbeat lands on the same status rail.",
+    "字幕转写、向量化、AI 总结和发布拆到不同的算力池，控制面只保留一套项目级口径。每一台 worker 的当前任务、进度和心跳，都汇入同一条状态轨道。"
+  ],
+  tagProject: ["1 PROJECT", "1 个项目"],
+  tagClusters: ["4 CLUSTERS", "4 个集群"],
+  tagLocations: ["CN-SHENZHEN / CN-QINGDAO", "深圳 / 青岛"],
+  tagBurst: ["CLOUD BURST ENABLED", "已启用云端突发"],
+  workersActive: ["workers active", "worker 活跃"],
+  workersAttention: ["workers need attention", "worker 需关注"],
+  healthStable: ["Control plane stable", "控制面稳定"],
+  healthHealthy: ["Control plane healthy", "控制面健康"],
+  statAssets: ["VIDEO ASSETS", "视频资产"],
+  statAssetsSub: ["project corpus", "项目语料"],
+  statSubtitled: ["SUBTITLED", "已转字幕"],
+  statSubtitledSub: ["ready for RAG", "可用于 RAG"],
+  statSummarized: ["SUMMARIZED", "已总结"],
+  statSummarizedSub: ["notes generated", "已生成笔记"],
+  statBatch: ["CURRENT BATCH", "当前批次"],
+  statBatchSub: ["240 min window", "240 分钟窗口"],
+  phase1: ["01 TRANSCRIBE", "01 转写"],
+  phase2: ["02 VECTORIZE", "02 向量化"],
+  phase3: ["03 SUMMARIZE", "03 总结"],
+  phase4: ["04 PUBLISH", "04 发布"],
+  topoProject: ["PROJECT → CLUSTERS", "项目 → 集群"],
+  topoControl: ["CONTROL PLANE", "控制面"],
+  topoCoreSub: ["orchestration · queue routing · health", "项目编排 · 队列分流 · 健康聚合"],
+  topoHealthy: ["HEALTHY", "健康"],
+  roleTranscribe: ["TRANSCRIBE", "转写"],
+  roleVectorize: ["VECTORIZE", "向量化"],
+  roleSummarize: ["SUMMARIZE", "总结"],
+  rolePublish: ["PUBLISH + OVERFLOW", "发布与溢出"],
+  projectClusters: ["1 project / 4 clusters", "1 项目 / 4 集群"],
+  workersOnline: ["workers online", "worker 在线"],
+  kpiWorkers: ["ACTIVE WORKERS", "活跃 WORKERS"],
+  kpiQueue: ["GLOBAL QUEUE", "全局队列"],
+  kpiThroughput: ["THROUGHPUT", "吞吐"],
+  kpiEta: ["PROJECT ETA", "项目 ETA"],
+  kpiHealth: ["PIPELINE HEALTH", "流水线健康"],
+  kpiDegrading: ["degrading", "降级中"],
+  kpiDraining: ["draining", "排空中"],
+  kpiJobs: ["jobs", "个任务"],
+  kpiOnTranscribe: ["on transcribe pool", "在转写池"],
+  kpiAudio: ["audio h/h", "音频 h/h"],
+  kpiRolling: ["rolling 10 min median", "滚动 10 分钟中位数"],
+  kpiExpected: ["expected", "预计"],
+  kpiDegradedCluster: ["degraded cluster · retry rate 0.12%", "个集群降级 · 重试率 0.12%"],
+  sectionClustersKicker: ["CLUSTER FABRIC / EXECUTION POOLS", "集群织体 / 执行池"],
+  sectionClusters: ["Execution clusters", "执行集群"],
+  sectionClustersDesc: [
+    "Four clusters each own one leg of the pipeline. Clicking a card filters the worker table to that cluster. Throughput, queue and temperature keep drifting; state follows the latest heartbeat.",
+    "四个集群各管一段链路；点击卡片会把 Worker 列表切到对应集群。吞吐、队列和温度持续抖动，状态以最近一次心跳为准。"
+  ],
+  workerKicker: ["WORKER FLEET / LIVE SAMPLE", "WORKER 集群 / 实时样本"],
+  workerTitle: ["Worker status", "Worker 状态"],
+  filterAll: ["ALL", "全部"],
+  filterRunning: ["RUNNING", "运行中"],
+  filterAttention: ["ATTENTION", "需关注"],
+  filterIdle: ["IDLE", "空闲"],
+  clearCluster: ["Clear cluster", "清除集群"],
+  thWorker: ["WORKER", "WORKER"],
+  thCluster: ["CLUSTER", "集群"],
+  thState: ["STATE", "状态"],
+  thTask: ["TASK", "当前任务"],
+  thProgress: ["PROGRESS", "进度"],
+  thRate: ["RATE", "速率"],
+  thHeartbeat: ["HEARTBEAT", "心跳"],
+  fleetScope: ["fleet scope", "集群范围"],
+  allClusters: ["all clusters", "全部集群"],
+  rowsInPlace: ["rows update in place · no reflow", "行原地更新 · 不回流"],
+  eventsKicker: ["EVENT STREAM / TAIL", "事件流 / 追踪"],
+  eventsTitle: ["Control plane events", "控制面事件"],
+  eventsDesc: ["task completion, heartbeat changes and queue rebalancing", "任务完成、心跳变化和队列再平衡"],
+  tailing: ["TAILING", "追踪中"],
+  retainEvents: ["retain last 9 events", "保留最近 9 条"],
+  pipelineKicker: ["PIPELINE MAP / TWO PARALLEL BRANCHES", "阶段图 / 两个并行分支"],
+  pipelineTitle: ["Stage dependencies", "阶段依赖"],
+  pipelineDesc: [
+    "After 01 transcription, 02 vectorization and 03 summarization run in parallel; 04 publishing waits for both branches to converge. Queue and rate follow their host cluster.",
+    "01 转写完成后，02 向量化和 03 总结并行；04 发布等两个分支都收敛。队列和速率跟随所在集群。"
+  ],
+  stageNote: [
+    "04 PUBLISH does not queue behind 03: it consumes both vector and summary artifacts, so either branch falling behind pushes the publish queue up.",
+    "04 发布不在 03 后面串行等待：它同时消费向量化与总结产物，任何一边落后都会把发布队列顶住。"
+  ],
+  trendKicker: ["THROUGHPUT / LAST 24H", "吞吐 / 最近 24 小时"],
+  trendTitle: ["Project throughput", "项目吞吐趋势"],
+  trendDesc: ["normalized output from three pools, 10-minute sliding window", "三个执行池的归一化产出，按 10 分钟滑动窗口"],
+  legendTranscribe: ["TRANSCRIBE", "转写"],
+  legendVectorize: ["VECTORIZE", "向量化"],
+  legendSummarize: ["SUMMARIZE", "总结"],
+  axis24h: ["24H AGO", "24 小时前"],
+  axis18: ["18H", "18 小时"],
+  axis12: ["12H", "12 小时"],
+  axis6: ["6H", "6 小时"],
+  axisNow: ["NOW", "现在"],
+  capacityKicker: ["CAPACITY ENVELOPE / AGGREGATE", "容量包络 / 聚合"],
+  capacityTitle: ["Resource envelope", "资源包络"],
+  capacityDesc: ["VRAM, disk and network headroom across four clusters", "四个集群的显存、磁盘与网络余量"],
+  integrity: ["DATA INTEGRITY", "数据完整性"],
+  artifactLag: ["ARTIFACT LAG", "产物延迟"],
+  retryRate: ["RETRY RATE", "重试率"],
+  footBrand: ["P2 / MULTI-CLUSTER", "P2 / 多集群"],
+  footClusters: ["CLUSTERS", "集群"],
+  footWorkers: ["WORKERS", "WORKER"],
+  footQueue: ["QUEUE", "队列"],
+  footThroughput: ["THROUGHPUT", "吞吐"],
+  themeLight: ["Switch to light", "切换到浅色"],
+  themeDark: ["Switch to dark", "切换到深色"],
+  themeP2: ["P2 palette", "P2 配色"],
+  themeGreen: ["Green palette", "绿色主题"],
+  themeNameDark: ["Dark palette", "深色主题"],
+  refresh: ["Refresh telemetry", "刷新遥测"],
+  fabricKicker: ["SERVER FABRIC / REQUEST TO STORAGE", "服务器架构 / 请求到落盘"],
+  fabricTitle: ["Server fabric & failover", "服务器架构与容灾"],
+  fabricDesc: [
+    "Requests enter at the edge gateway, pass through the control plane, fan out into four execution pools, then commit artifacts to shared storage. A warm standby keeps a replica and can absorb one pool during a drill.",
+    "请求从入口网关进入，经控制面调度分到四个执行池，产物最终写入共享存储；热备集群持续复制，演练时可接管一个执行池。"
+  ],
+  fabricFlowLabel: ["REQUEST → EXECUTION → OBJECT", "请求 → 执行 → 落盘"],
+  fabricModeNormal: ["NOMINAL", "正常"],
+  fabricModeFailover: ["FAILOVER", "切换中"],
+  fabricIngress: ["EDGE INGRESS", "入口网关"],
+  fabricIngressSub: ["TLS · upload · rate limit", "TLS · 上传 · 限流"],
+  fabricControl: ["CONTROL PLANE", "调度控制面"],
+  fabricControlSub: ["lease · queue · retry", "租约 · 队列 · 重试"],
+  fabricPools: ["EXECUTION POOLS", "执行池"],
+  fabricPoolsTitle: ["FOUR EXECUTION POOLS", "四个执行池"],
+  fabricPoolsSub: ["4 clusters · live workers", "4 个集群 · 实时 worker"],
+  fabricStorage: ["SHARED STORAGE", "共享存储"],
+  fabricStorageSub: ["S3 · PGVector · Redis", "S3 · PGVector · Redis"],
+  fabricEdgeFoot: ["2 edge nodes · 4 vCPU", "2 节点 · 4 vCPU"],
+  fabricControlFoot: ["3 replicas · raft leader", "3 副本 · 主节点"],
+  fabricStorageFoot: ["3 replicas · erasure 4+2", "3 副本 · EC 4+2"],
+  fabricTls: ["TLS 1.3", "TLS 1.3"],
+  fabricConn: ["CONN", "连接"],
+  fabricUplink: ["UPLINK Q", "上行队列"],
+  fabricTtl: ["LEASE TTL", "租约 TTL"],
+  fabricRetry: ["RETRY", "重试"],
+  fabricQueueLabel: ["QUEUE", "队列"],
+  fabricS3: ["S3", "S3"],
+  fabricPgv: ["PGVECTOR", "PGVector"],
+  fabricObjectsLabel: ["OBJECTS", "对象"],
+  fabricRequests: ["REQ / S", "请求/秒"],
+  fabricP99: ["P99", "P99"],
+  fabricLeases: ["LEASES", "租约"],
+  fabricSched: ["SCHED", "调度"],
+  fabricQueue: ["QUEUE", "队列"],
+  fabricWrite: ["WRITE", "写入"],
+  fabricReplLag: ["REPL LAG", "复制延迟"],
+  fabricObjects: ["OBJECTS", "对象"],
+  fabricDrKicker: ["HOT STANDBY / DR", "热备 / 容灾"],
+  fabricDrSub: ["continuous replication · manual drill", "持续复制 · 支持手动演练"],
+  fabricRouteNormal: ["REPLICATION PATH", "复制路径"],
+  fabricRouteFailover: ["FAILOVER PATH", "故障切换路径"],
+  fabricDrill: ["FAILOVER DRILL", "容灾演练"],
+  fabricRestore: ["RESTORE PRIMARY", "恢复主池"],
+  fabricWarm: ["WARM SYNC", "热备同步"],
+  fabricTakeover: ["TAKEOVER", "接管中"],
+  fabricActive: ["FAILOVER ACTIVE", "切换进行中"],
+  fabricNext: ["AUTO DRILL", "自动演练"],
+  fabricRpo: ["RPO", "RPO"],
+  fabricRto: ["RTO", "RTO"],
+  fabricReadiness: ["READY", "就绪"],
+  fabricWorkers: ["WORKERS", "WORKER"],
+  fabricFailed: ["LINK LOST", "链路失联"],
+  fabricNormalFlow: ["REQUEST FLOW", "请求流"],
+  fabricFailoverFlow: ["FAILOVER ROUTE", "容灾路径"],
+  fabricStandby: ["HOT STANDBY", "热备"]
+};
+
+let LANG = document.documentElement.dataset.lang === "en" ? "en" : "zh";
+let THEME = document.documentElement.dataset.palette || (document.documentElement.dataset.theme === "dark" ? "dark" : "p2");
+
+function t(key) {
+  const pair = I18N[key];
+  return pair ? pair[LANG === "zh" ? 1 : 0] : "";
+}
+function L(en, zh) {
+  return LANG === "zh" ? zh : en;
+}
+
+const ROLE_LABEL = {
+  Transcribe: ["Transcribe", "转写"],
+  Vectorize: ["Vectorize", "向量化"],
+  Summary: ["Summary", "总结"],
+  Publish: ["Publish", "发布"]
+};
+const CLUSTER_STATE_LABEL = {
+  online: ["ONLINE", "在线"],
+  degraded: ["DEGRADED", "降级"],
+  draining: ["DRAINING", "排空中"],
+  offline: ["OFFLINE", "离线"]
+};
+const WORKER_SUB_ZH = {
+  "large-v3-turbo · 1.9× RT": "large-v3-turbo · 1.9× RT",
+  "large-v3-turbo · 1.7× RT": "large-v3-turbo · 1.7× RT",
+  "large-v3-turbo · 2.1× RT": "large-v3-turbo · 2.1× RT",
+  "no heartbeat for 04:12": "04:12 无心跳",
+  "bge-m3 · 768d": "bge-m3 · 768d",
+  "Qwen · notes + topics": "Qwen · 笔记 + 主题",
+  "retrying after heartbeat gap": "心跳中断后重试",
+  "encode → object storage": "编码 → 对象存储",
+  "finishing current shard": "正在完成当前分片",
+  "ready for dispatch": "等待派发"
+};
+const LOCATION_EN = {
+  "深圳 · A5000 × 4": "Shenzhen · A5000 × 4",
+  "深圳 · 4090 × 3": "Shenzhen · 4090 × 3",
+  "青岛 · RTX 4090": "Qingdao · RTX 4090",
+  "腾讯云 · T4 × 6": "Tencent Cloud · T4 × 6"
+};
+const UNIT_ZH = {
+  "audio h/h": "音频 h/h",
+  "chunks / min": "chunks/min",
+  "assets / min": "资产/分钟"
+};
+
+const state = {
+  tick: 0,
+  taskSeq: 2418,
+  syncAge: 0.4,
+  project: {
+    assets: 14380,
+    subtitled: 12184,
+    summarized: 6321,
+    progress: 65.0,
+    queue: 3728,
+    active: 23,
+    total: 26,
+    health: 99.2,
+    throughput: 49.3,
+    tpDelta: 0.2,
+    etaMin: 1116,
+    baseEta: 1116,
+    baseQueue: 3728,
+    baseAssets: 14380
+  },
+  clusters: [
+    {
+      id: 'gpu-a', code: '01', name: 'SZ-GPU-01', role: 'TRANSCRIBE', roleCn: '字幕转写',
+      location: '深圳 · A5000 × 4', state: 'online', online: 6, total: 7,
+      gpu: 94, queue: 1996, throughput: 48.3, unit: 'audio h/h',
+      temp: 61, power: 300, latency: '0.4s', accent: clusterAccentOf('gpu-a'),
+      spark: makeSeries(24, 80, 9, .4)
+    },
+    {
+      id: 'gpu-b', code: '02', name: 'SZ-GPU-02', role: 'VECTORIZE', roleCn: '向量化',
+      location: '深圳 · 4090 × 3', state: 'online', online: 6, total: 6,
+      gpu: 88, queue: 388, throughput: 1842, unit: 'chunks / min',
+      temp: 57, power: 210, latency: '0.6s', accent: clusterAccentOf('gpu-b'),
+      spark: makeSeries(24, 67, 12, 2.4)
+    },
+    {
+      id: 'edge', code: '03', name: 'QD-EDGE-01', role: 'SUMMARIZE', roleCn: 'AI 总结',
+      location: '青岛 · RTX 4090', state: 'degraded', online: 3, total: 4,
+      gpu: 42, queue: 827, throughput: 14.3, unit: 'assets / min',
+      temp: 49, power: 96, latency: '1.2s', accent: clusterAccentOf('edge'),
+      spark: makeSeries(24, 52, 7, 4.4)
+    },
+    {
+      id: 'burst', code: '04', name: 'CLOUD-BURST', role: 'PUBLISH + OVERFLOW', roleCn: '发布与溢出',
+      location: '腾讯云 · T4 × 6', state: 'online', online: 8, total: 9,
+      gpu: 74, queue: 517, throughput: 9.8, unit: 'assets / min',
+      temp: 52, power: 168, latency: '0.5s', accent: clusterAccentOf('burst'),
+      spark: makeSeries(24, 71, 10, 6.8)
+    }
+  ],
+  workers: [
+    {id:'gpu-a-01', cluster:'gpu-a', role:'Transcribe', state:'running', task:'batch_2418 · video_09732', sub:'large-v3-turbo · 1.9× RT', progress:74.2, rate:'1.9× RT', hb:'0.4s', uptime:'3d 04h'},
+    {id:'gpu-a-02', cluster:'gpu-a', role:'Transcribe', state:'running', task:'batch_2418 · video_09688', sub:'large-v3-turbo · 1.7× RT', progress:61.4, rate:'1.7× RT', hb:'0.5s', uptime:'3d 04h'},
+    {id:'gpu-a-04', cluster:'gpu-a', role:'Transcribe', state:'running', task:'batch_2419 · video_09804', sub:'large-v3-turbo · 2.1× RT', progress:38.8, rate:'2.1× RT', hb:'0.3s', uptime:'2d 18h'},
+    {id:'gpu-a-07', cluster:'gpu-a', role:'Transcribe', state:'offline', task:'—', sub:'no heartbeat for 04:12', progress:0, rate:'—', hb:'04:12', uptime:'2d 08h'},
+    {id:'gpu-b-01', cluster:'gpu-b', role:'Vectorize', state:'running', task:'embed_7731 · chunk_0448', sub:'bge-m3 · 768d', progress:83.1, rate:'1,842/min', hb:'0.6s', uptime:'5d 01h'},
+    {id:'gpu-b-03', cluster:'gpu-b', role:'Vectorize', state:'running', task:'embed_7731 · chunk_0451', sub:'bge-m3 · 768d', progress:47.6, rate:'1,796/min', hb:'0.4s', uptime:'5d 01h'},
+    {id:'gpu-b-05', cluster:'gpu-b', role:'Vectorize', state:'running', task:'embed_7732 · chunk_0460', sub:'bge-m3 · 768d', progress:91.7, rate:'1,918/min', hb:'0.5s', uptime:'1d 12h'},
+    {id:'edge-01', cluster:'edge', role:'Summary', state:'running', task:'summary_2418 · video_09801', sub:'Qwen · notes + topics', progress:68.3, rate:'14.3/min', hb:'0.8s', uptime:'1d 06h'},
+    {id:'edge-02', cluster:'edge', role:'Summary', state:'degraded', task:'summary_retry · video_09721', sub:'retrying after heartbeat gap', progress:12.4, rate:'0.4× RT', hb:'2.6s', uptime:'1d 06h'},
+    {id:'burst-01', cluster:'burst', role:'Publish', state:'running', task:'publish_0441 · shard_03', sub:'encode → object storage', progress:54.8, rate:'9.8/min', hb:'0.5s', uptime:'4d 03h'},
+    {id:'burst-03', cluster:'burst', role:'Publish', state:'draining', task:'publish_0441 · shard_12', sub:'finishing current shard', progress:91.4, rate:'2.4/min', hb:'0.7s', uptime:'4d 03h'},
+    {id:'burst-06', cluster:'burst', role:'Publish', state:'idle', task:'—', sub:'ready for dispatch', progress:0, rate:'—', hb:'0.3s', uptime:'1d 00h'}
+  ],
+  stages: [
+    {id:'transcribe', code:'01', name:'TRANSCRIBE', cn:'字幕转写', cluster:'SZ-GPU-01', cid:'gpu-a', color:clusterAccentOf('gpu-a'), queue:1996, rateText:'48.3 audio h/h', pct:65, state:'running'},
+    {id:'vectorize', code:'02', name:'VECTORIZE', cn:'向量化', cluster:'SZ-GPU-02', cid:'gpu-b', color:clusterAccentOf('gpu-b'), queue:388, rateText:'1,842 chunks / min', pct:94, state:'running'},
+    {id:'summarize', code:'03', name:'SUMMARIZE', cn:'AI 总结', cluster:'QD-EDGE-01 + CLOUD', cid:'edge', color:clusterAccentOf('edge'), queue:827, rateText:'14.3 assets / min', pct:84, state:'degraded'},
+    {id:'publish', code:'04', name:'PUBLISH', cn:'发布', cluster:'CLOUD-BURST', cid:'burst', color:clusterAccentOf('burst'), queue:517, rateText:'9.8 assets / min', pct:42, state:'running'}
+  ],
+  events: [],
+  chart: {
+    transcribe: makeSeries(24, 72, 8, .7),
+    vectorize: makeSeries(24, 80, 7, 2.7),
+    summarize: makeSeries(24, 56, 9, 4.7)
+  },
+  capacity: [
+    {id:'gpu', label:'GPU UTILIZATION', value:88, color:capacityColorOf('gpu')},
+    {id:'vram', label:'VRAM FOOTPRINT', value:71, color:capacityColorOf('vram')},
+    {id:'disk', label:'DISK I/O', value:46, color:capacityColorOf('disk')},
+    {id:'network', label:'NETWORK EGRESS', value:34, color:capacityColorOf('network')}
+  ],
+  fabric: {
+    ingress: {rps: 128.4, p99: 42, errors: 0.02},
+    control: {sched: 18, leases: '4 / 4'},
+    storage: {write: 1.2, repl: 0.4, objects: 14380},
+    dr: {
+      name: 'QD-DR-02',
+      location: '青岛 · 热备 4 workers',
+      lag: 0.8,
+      rpo: 1,
+      rto: 28,
+      readiness: 96,
+      workers: 4,
+      active: false,
+      failed: null,
+      nextAt: 14,
+      timer: null
+    }
+  },
+  filter: {mode:'all', cluster:null}
+};
+
+state.workers.forEach(w => { w.subZh = WORKER_SUB_ZH[w.sub] || w.sub; });
+state.clusters.forEach(c => { c.locationEn = LOCATION_EN[c.location] || c.location; c.unitZh = UNIT_ZH[c.unit] || c.unit; });
+state.capacity[0].labelZh = "GPU 利用率";
+state.capacity[1].labelZh = "显存占用";
+state.capacity[2].labelZh = "磁盘 I/O";
+state.capacity[3].labelZh = "网络出口";
+
+const workerState = {
+  running: {labelEn:'Running', labelZh:'运行中', cls:'is-running', dot:'', track:''},
+  draining: {labelEn:'Draining', labelZh:'排空中', cls:'is-draining', dot:'is-amber', track:'is-blue'},
+  degraded: {labelEn:'Degraded', labelZh:'降级', cls:'is-degraded', dot:'is-amber', track:'is-amber'},
+  idle: {labelEn:'Idle', labelZh:'空闲', cls:'is-idle', dot:'is-muted', track:'is-muted'},
+  offline: {labelEn:'Offline', labelZh:'离线', cls:'is-offline', dot:'is-red', track:'is-muted'}
+};
+
+function clusterOf(id) {
+  return state.clusters.find(c => c.id === id);
+}
+
+function clusterName(id) {
+  if (id === 'control') return 'P2 / CONTROL';
+  return clusterOf(id)?.name || id;
+}
+
+function clusterStateLabel(value) {
+  const pair = CLUSTER_STATE_LABEL[value];
+  return pair ? pair[LANG === 'zh' ? 1 : 0] : String(value).toUpperCase();
+}
+function roleLabel(role) {
+  const pair = ROLE_LABEL[role];
+  return pair ? pair[LANG === 'zh' ? 1 : 0] : role;
+}
+function workerSub(w) {
+  return LANG === 'zh' ? (w.subZh || w.sub) : w.sub;
+}
+function clusterRoleMain(c) {
+  return LANG === 'zh' ? c.roleCn : c.role;
+}
+function clusterRoleSub(c) {
+  return LANG === 'zh' ? c.role : c.roleCn;
+}
+function clusterLocation(c) {
+  return LANG === 'zh' ? c.location : (c.locationEn || c.location);
+}
+function clusterUnit(c) {
+  return LANG === 'zh' ? (c.unitZh || c.unit) : c.unit;
+}
+
+function sparkPaths(values, width, height) {
+  const pad = 2;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(1, max - min);
+  const points = values.map((value, i) => {
+    const x = values.length === 1 ? width : i / (values.length - 1) * width;
+    const y = height - pad - (value - min) / span * (height - pad * 2);
+    return [round1(x), round1(y)];
+  });
+  const line = points.map(([x, y], i) => `${i ? 'L' : 'M'}${x},${y}`).join(' ');
+  const area = `M0,${height} L${points.map(([x, y]) => `${x},${y}`).join(' L')} L${width},${height} Z`;
+  return {line, area};
+}
+
+function renderFabric() {
+  const host = $('#fabricContent');
+  if (!host) return;
+  const f = state.fabric;
+  const dr = f.dr;
+  const failed = clusterOf(dr.failed);
+  const pool = c => {
+    const dead = dr.active && dr.failed === c.id;
+    return `<div class="fabric-pool${dead ? ' is-failed' : ''}" id="fabric-pool-${c.id}" style="--fc:${c.accent}">
+      <div class="fabric-pool-head"><span class="fabric-pool-name">${esc(c.name)}</span><span class="fabric-pool-state${dead ? ' is-failed' : ''}" id="fabric-pool-${c.id}-state">${esc(dead ? t('fabricFailed') : clusterStateLabel(c.state))}</span></div>
+      <div class="fabric-pool-meta">${esc(LANG === 'zh' ? `${c.roleCn} · ${c.role}` : c.role)}</div>
+      <div class="fabric-pool-metrics"><b id="fabric-pool-${c.id}-queue">${fmt(c.queue)}</b><span id="fabric-pool-${c.id}-online">${c.online}/${c.total}</span></div>
+    </div>`;
+  };
+  host.innerHTML = `
+    <div class="fabric-flow">
+      <article class="fabric-node" style="--fc:var(--accent)">
+        <div class="fabric-node-top"><span class="fabric-code">01 / EDGE</span><span class="fabric-label">${t('fabricIngress')}</span></div>
+        <b>API GATEWAY</b>
+        <small>${t('fabricIngressSub')}</small>
+        <div class="fabric-node-metrics">
+          <div class="fabric-metric"><span>${t('fabricRequests')}</span><b id="fabric-rps">128.4/s</b></div>
+          <div class="fabric-metric"><span>${t('fabricP99')}</span><b id="fabric-p99">42 ms</b></div>
+        </div>
+        <div class="fabric-node-details">
+          <span>${t('fabricTls')}</span><b>1.3</b>
+          <span>${t('fabricConn')}</span><b id="fabric-conn">50k</b>
+          <span>${t('fabricUplink')}</span><b id="fabric-edge-q">12</b>
+        </div>
+        <div class="fabric-node-foot"><span><i></i>${t('fabricEdgeFoot')}</span><b>${L('ACTIVE', '在线')}</b></div>
+      </article>
+      <div class="fabric-link" aria-hidden="true"><i class="fabric-link-line"></i><i class="fabric-link-bead"></i></div>
+      <article class="fabric-node" style="--fc:var(--blue)">
+        <div class="fabric-node-top"><span class="fabric-code">02 / ORCH</span><span class="fabric-label">${t('fabricControl')}</span></div>
+        <b>P2 CONTROL</b>
+        <small>${t('fabricControlSub')}</small>
+        <div class="fabric-node-metrics">
+          <div class="fabric-metric"><span>${t('fabricLeases')}</span><b id="fabric-leases">${f.control.leases}</b></div>
+          <div class="fabric-metric"><span>${t('fabricSched')}</span><b id="fabric-sched">${Math.round(f.control.sched)} ms</b></div>
+        </div>
+        <div class="fabric-node-details">
+          <span>${t('fabricTtl')}</span><b>30s</b>
+          <span>${t('fabricRetry')}</span><b>3x</b>
+          <span>${t('fabricQueueLabel')}</span><b id="fabric-control-q">3,724</b>
+        </div>
+        <div class="fabric-node-foot"><span><i></i>${t('fabricControlFoot')}</span><b>${L('2 / 3 QUORUM', '2/3 法定')}</b></div>
+      </article>
+      <div class="fabric-link" aria-hidden="true"><i class="fabric-link-line"></i><i class="fabric-link-bead"></i></div>
+      <article class="fabric-node fabric-pools" style="--fc:var(--amber)">
+        <div class="fabric-node-top"><span class="fabric-code">03 / DISPATCH</span><span class="fabric-label">${t('fabricPools')}</span></div>
+        <b>${t('fabricPoolsTitle')}</b>
+        <small>${t('fabricPoolsSub')}</small>
+        <div class="fabric-pool-grid">${state.clusters.map(pool).join('')}</div>
+      </article>
+      <div class="fabric-link" aria-hidden="true"><i class="fabric-link-line"></i><i class="fabric-link-bead"></i></div>
+      <article class="fabric-node" style="--fc:var(--green)">
+        <div class="fabric-node-top"><span class="fabric-code">04 / OBJECT</span><span class="fabric-label">${t('fabricStorage')}</span></div>
+        <b>OBJECT + META</b>
+        <small>${t('fabricStorageSub')}</small>
+        <div class="fabric-node-metrics">
+          <div class="fabric-metric"><span>${t('fabricWrite')}</span><b id="fabric-write">1.2 GB/s</b></div>
+          <div class="fabric-metric"><span>${t('fabricReplLag')}</span><b id="fabric-repl">0.4s</b></div>
+        </div>
+        <div class="fabric-node-details">
+          <span>${t('fabricS3')}</span><b>multipart</b>
+          <span>${t('fabricPgv')}</span><b>HNSW</b>
+          <span>${t('fabricObjectsLabel')}</span><b id="fabric-objects">14,380</b>
+        </div>
+        <div class="fabric-node-foot"><span><i></i>${t('fabricStorageFoot')}</span><b>${L('DURABLE', '持久化')}</b></div>
+      </article>
+    </div>
+    <div class="dr-strip${dr.active ? ' is-failover' : ''}" id="drStrip">
+      <div class="dr-copy">
+        <span class="dr-kicker">${t('fabricDrKicker')}</span>
+        <b id="dr-route-label">${dr.active ? t('fabricRouteFailover') : t('fabricRouteNormal')}</b>
+        <small id="dr-route-detail">${dr.active && failed ? `${esc(failed.name)} → ${esc(dr.name)}` : t('fabricDrSub')}</small>
+      </div>
+      <div class="dr-route">
+        <span class="dr-route-track" aria-hidden="true"><i></i><i></i><i></i></span>
+        <b id="dr-lag">${dr.active ? '0.2s' : `${dr.lag.toFixed(1)}s`} LAG</b>
+      </div>
+      <article class="dr-node${dr.active ? ' is-takeover' : ''}" id="drNode">
+        <div class="dr-node-head"><span class="dr-node-name">${esc(dr.name)}</span><span class="dr-node-state" id="dr-state">${dr.active ? t('fabricTakeover') : t('fabricWarm')}</span></div>
+        <div class="dr-node-metrics">
+          <div class="dr-node-metric"><span>${t('fabricReadiness')}</span><b id="dr-ready">${Math.round(dr.readiness)}%</b></div>
+          <div class="dr-node-metric"><span>${t('fabricRpo')}</span><b>${dr.rpo}s</b></div>
+          <div class="dr-node-metric"><span>${t('fabricRto')}</span><b>${dr.rto}s</b></div>
+        </div>
+      </article>
+      <div class="dr-actions">
+        <button class="dr-btn${dr.active ? ' is-restore' : ''}" id="failoverBtn" type="button">${dr.active ? t('fabricRestore') : t('fabricDrill')}</button>
+        <span class="dr-next" id="dr-next">${dr.active ? t('fabricActive') : `${t('fabricNext')} · ${Math.max(0, dr.nextAt - state.tick)}s`}</span>
+      </div>
+    </div>
+    <div class="fabric-legend">
+      <span><i></i>${t('fabricNormalFlow')}</span>
+      <span><i></i>${t('fabricFailoverFlow')}</span>
+      <span><i></i>${t('fabricStandby')}</span>
+    </div>`;
+  const btn = $('#failoverBtn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      if (state.fabric.dr.active) restoreFailover(true);
+      else triggerFailover();
+    });
+  }
+  updateFabric();
+}
+
+function updateFabric() {
+  const host = $('#fabricContent');
+  if (!host) return;
+  const f = state.fabric;
+  const dr = f.dr;
+  f.ingress.rps = clamp(f.ingress.rps + rand(-2.1, 2.1), 108, 158);
+  f.ingress.p99 = clamp(f.ingress.p99 + rand(-.7, .7), 35, 52);
+  f.control.sched = clamp(f.control.sched + rand(-.35, .35), 12, 25);
+  f.storage.write = clamp(f.storage.write + rand(-.025, .025), .9, 1.6);
+  f.storage.repl = clamp(f.storage.repl + rand(-.02, .02), .25, .8);
+  f.storage.objects += Math.max(1, Math.round(f.storage.write * 1.8));
+  dr.lag = dr.active ? .2 : clamp(dr.lag + rand(-.02, .02), .45, 1.05);
+  dr.readiness = dr.active ? 99 : clamp(dr.readiness + rand(-.25, .25), 94, 98);
+
+  const set = (id, value) => { const node = $(`#${id}`); if (node) node.textContent = value; };
+  set('fabric-rps', `${f.ingress.rps.toFixed(1)}/s`);
+  set('fabric-p99', `${Math.round(f.ingress.p99)} ms`);
+  set('fabric-leases', dr.active ? L('3 / 4 + DR', '3 / 4 + 热备') : f.control.leases);
+  set('fabric-sched', `${Math.round(f.control.sched)} ms`);
+  set('fabric-write', `${f.storage.write.toFixed(1)} GB/s`);
+  set('fabric-repl', `${f.storage.repl.toFixed(1)}s`);
+  set('fabric-conn', `${(f.ingress.rps * 0.36).toFixed(1)}k`);
+  set('fabric-edge-q', `${Math.round(f.ingress.rps * 0.1)}`);
+  set('fabric-control-q', fmt(state.clusters.reduce((sum, c) => sum + c.queue, 0)));
+  set('fabric-objects', fmt(f.storage.objects));
+  state.clusters.forEach(c => {
+    const dead = dr.active && dr.failed === c.id;
+    const card = $(`#fabric-pool-${c.id}`);
+    if (card) card.classList.toggle('is-failed', dead);
+    const stateNode = $(`#fabric-pool-${c.id}-state`);
+    if (stateNode) {
+      stateNode.textContent = dead ? t('fabricFailed') : clusterStateLabel(c.state);
+      stateNode.classList.toggle('is-failed', dead);
+    }
+    set(`fabric-pool-${c.id}-queue`, fmt(c.queue));
+    set(`fabric-pool-${c.id}-online`, `${c.online}/${c.total}`);
+  });
+
+  const board = $('#fabricBoard');
+  const mode = $('#fabric-mode');
+  const strip = $('#drStrip');
+  const node = $('#drNode');
+  const failed = clusterOf(dr.failed);
+  if (board) board.classList.toggle('is-failover', dr.active);
+  if (mode) {
+    mode.textContent = dr.active ? t('fabricModeFailover') : t('fabricModeNormal');
+    mode.classList.toggle('is-failover', dr.active);
+  }
+  if (strip) strip.classList.toggle('is-failover', dr.active);
+  if (node) node.classList.toggle('is-takeover', dr.active);
+  set('dr-route-label', dr.active ? t('fabricRouteFailover') : t('fabricRouteNormal'));
+  set('dr-route-detail', dr.active && failed ? `${failed.name} → ${dr.name}` : t('fabricDrSub'));
+  set('dr-lag', `${dr.active ? '0.2' : dr.lag.toFixed(1)}s LAG`);
+  set('dr-state', dr.active ? t('fabricTakeover') : t('fabricWarm'));
+  set('dr-ready', `${Math.round(dr.readiness)}%`);
+  set('dr-next', dr.active ? t('fabricActive') : `${t('fabricNext')} · ${Math.max(0, dr.nextAt - state.tick)}s`);
+  const btn = $('#failoverBtn');
+  if (btn) {
+    btn.textContent = dr.active ? t('fabricRestore') : t('fabricDrill');
+    btn.classList.toggle('is-restore', dr.active);
+  }
+}
+
+function triggerFailover() {
+  const dr = state.fabric.dr;
+  if (dr.active) return;
+  const c = clusterOf('edge') || state.clusters[0];
+  dr.active = true;
+  dr.failed = c.id;
+  dr.lag = .2;
+  dr.nextAt = state.tick + 30;
+  clearTimeout(dr.timer);
+  pushEvent(
+    c.id, 'warn',
+    `failover drill: ${c.name} marked unreachable; ${dr.name} is taking over ${roleLabel(c.role)}.`,
+    `容灾演练：${c.name} 标记为不可达；${dr.name} 正在接管 ${c.roleCn}。`
+  );
+  renderFabric();
+  dr.timer = setTimeout(() => restoreFailover(false), 7000);
+}
+
+function restoreFailover(manual = false) {
+  const dr = state.fabric.dr;
+  if (!dr.active) return;
+  const c = clusterOf(dr.failed);
+  dr.active = false;
+  dr.failed = null;
+  dr.lag = .8;
+  dr.nextAt = state.tick + 28;
+  clearTimeout(dr.timer);
+  pushEvent(
+    'control', 'info',
+    `failover drill complete; ${c?.name || 'primary pool'} link restored; ${dr.name} back to warm sync.`,
+    `容灾演练完成；${c?.name || '主池'} 链路已恢复，${dr.name} 回到热备同步。`
+  );
+  renderFabric();
+}
+
+function updateClock() {
+  const clock = $('#clock');
+  if (clock) clock.textContent = nowClock();
+  state.syncAge = 0.2 + (state.tick % 5) * 0.2;
+  const sync = `${state.syncAge.toFixed(1)}s`;
+  const syncAge = $('#sync-age');
+  const footSync = $('#foot-sync');
+  if (syncAge) syncAge.textContent = sync;
+  if (footSync) footSync.textContent = sync;
+}
+
+function updateProject() {
+  const p = state.project;
+  const transcribe = clusterOf('gpu-a');
+  const active = state.clusters.reduce((sum, c) => sum + c.online, 0);
+  const attention = state.workers.filter(w => w.state === 'degraded' || w.state === 'offline').length;
+
+  p.active = active;
+  p.queue = state.clusters.reduce((sum, c) => sum + c.queue, 0);
+  const queueDelta = p.queue - p.baseQueue;
+  const assetDelta = p.assets - p.baseAssets;
+  p.etaMin = clamp(p.baseEta + queueDelta / 5.6 - assetDelta / 9 + Math.sin(state.tick * .017) * 1.5, 1000, 1260);
+
+  const set = (id, value) => { const node = $(`#${id}`); if (node) node.textContent = value; };
+  set('project-assets', fmt(p.assets));
+  set('project-subtitled', fmt(p.subtitled));
+  set('project-summarized', fmt(p.summarized));
+  set('hero-workers', `${active} / ${p.total}`);
+  set('hero-attention', attention);
+  set('topo-online', active);
+  set('kpi-workers', active);
+  set('kpi-queue', fmt(p.queue));
+  set('kpi-queue-note', fmt(transcribe?.queue || 0));
+  set('kpi-tp', p.throughput.toFixed(1));
+  set('kpi-tp-delta', `${p.tpDelta >= 0 ? '+' : ''}${p.tpDelta.toFixed(1)}`);
+  set('kpi-eta', fmtEta(p.etaMin));
+  set('kpi-eta-at', etaAt(p.etaMin));
+  set('kpi-health', p.health.toFixed(1));
+  set('foot-workers', `${active}/${p.total}`);
+  set('foot-queue', fmt(p.queue));
+  set('foot-tp', p.throughput.toFixed(1));
+  set('trend-total', p.throughput.toFixed(1));
+  set('phase-1-pct', `${Math.round(state.stages[0].pct)}%`);
+  set('phase-2-pct', `${Math.round(state.stages[1].pct)}%`);
+  set('phase-3-pct', `${Math.round(state.stages[2].pct)}%`);
+  set('phase-4-pct', `${Math.round(state.stages[3].pct)}%`);
+  set('phase-1-bar', '');
+  ['phase-1-bar','phase-2-bar','phase-3-bar','phase-4-bar'].forEach((id, i) => {
+    const node = $(`#${id}`); if (node) node.style.width = `${state.stages[i].pct}%`;
+  });
+  const heroDot = $('#hero-state-dot');
+  if (heroDot) heroDot.className = `state-dot ${p.health < 99.35 || attention ? 'is-amber' : ''}`;
+  const healthText = $('#hero-health');
+  if (healthText) healthText.textContent = p.health < 99.35 || attention ? t('healthStable') : t('healthHealthy');
+  const healthNote = $('#kpi-health-note');
+  if (healthNote) healthNote.textContent = state.clusters.filter(c => c.state === 'degraded').length;
+
+  updateStages();
+}
+
+function renderClusters() {
+  const grid = $('#clusterGrid');
+  if (!grid) return;
+  grid.innerHTML = state.clusters.map(c => `
+    <article class="cluster-card" data-cluster="${c.id}" style="--c:${c.accent}" tabindex="0" role="button" aria-pressed="false" aria-label="${L('Filter ', '筛选 ')}${esc(c.name)}">
+      <div class="cluster-top">
+        <div class="cluster-id"><span class="cluster-no">${c.code}</span><span class="cluster-name">${esc(c.name)}</span></div>
+        <span class="cluster-state is-${c.state}" id="cluster-${c.id}-state"><i></i>${esc(clusterStateLabel(c.state))}</span>
+      </div>
+      <div class="cluster-role"><b>${esc(clusterRoleMain(c))}</b><span>${esc(clusterRoleSub(c))}</span></div>
+      <div class="cluster-loc">${esc(clusterLocation(c))}</div>
+      <div class="cluster-metrics">
+        <div class="cluster-metric"><span>WORKERS</span><strong id="cluster-${c.id}-workers">${c.online}<small>/ ${c.total}</small></strong></div>
+        <div class="cluster-metric"><span>GPU</span><strong id="cluster-${c.id}-gpu">${Math.round(c.gpu)}<small>%</small></strong></div>
+        <div class="cluster-metric"><span>${L('QUEUE', '队列')}</span><strong id="cluster-${c.id}-queue">${fmt(c.queue)}</strong></div>
+        <div class="cluster-metric"><span>${L('TEMP', '温度')}</span><strong id="cluster-${c.id}-temp">${Math.round(c.temp)}<small>°C</small></strong></div>
+      </div>
+      <div class="cluster-bar"><i id="cluster-${c.id}-gpu-fill"></i></div>
+      <div class="cluster-foot">
+        <div class="cluster-spark"><svg viewBox="0 0 104 26" preserveAspectRatio="none" aria-hidden="true"><path id="cluster-${c.id}-spark-area" fill="${c.accent}" fill-opacity=".08" d=""></path><path id="cluster-${c.id}-spark-line" fill="none" stroke="${c.accent}" stroke-width="1.2" stroke-linejoin="round" d=""></path></svg></div>
+        <div class="cluster-rate"><b id="cluster-${c.id}-tp">${fmt(c.throughput)}</b><span>${esc(clusterUnit(c))} · ${esc(c.latency)}</span></div>
+      </div>
+    </article>
+  `).join('');
+  state.clusters.forEach(updateClusterCard);
+  grid.querySelectorAll('.cluster-card').forEach(card => {
+    const id = card.dataset.cluster;
+    card.addEventListener('click', () => selectCluster(id));
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectCluster(id);
+      }
+    });
+  });
+  paintClusterSelection();
+}
+
+function updateClusterCard(c) {
+  const set = (id, value) => { const node = $(`#${id}`); if (node) node.textContent = value; };
+  set(`cluster-${c.id}-workers`, `${c.online} / ${c.total}`);
+  set(`cluster-${c.id}-gpu`, `${Math.round(c.gpu)}%`);
+  set(`cluster-${c.id}-queue`, fmt(c.queue));
+  set(`cluster-${c.id}-temp`, `${Math.round(c.temp)}°C`);
+  set(`cluster-${c.id}-tp`, fmt(c.throughput));
+  const fill = $(`#cluster-${c.id}-gpu-fill`);
+  if (fill) fill.style.width = `${clamp(c.gpu, 0, 100)}%`;
+  const stateNode = $(`#cluster-${c.id}-state`);
+  if (stateNode) stateNode.innerHTML = `<i></i>${esc(clusterStateLabel(c.state))}`;
+  const spark = sparkPaths(c.spark, 104, 26);
+  const line = $(`#cluster-${c.id}-spark-line`);
+  const area = $(`#cluster-${c.id}-spark-area`);
+  if (line) line.setAttribute('d', spark.line);
+  if (area) area.setAttribute('d', spark.area);
+}
+
+function paintClusterSelection() {
+  $$('.cluster-card').forEach(card => {
+    const selected = card.dataset.cluster === state.filter.cluster;
+    card.classList.toggle('is-selected', selected);
+    card.setAttribute('aria-pressed', String(selected));
+  });
+}
+
+function selectCluster(id) {
+  state.filter.cluster = state.filter.cluster === id ? null : id;
+  paintClusterSelection();
+  renderWorkers();
+  updateFilterUI();
+}
+
+function workerMatches(worker) {
+  if (state.filter.cluster && worker.cluster !== state.filter.cluster) return false;
+  if (state.filter.mode === 'running') return worker.state === 'running';
+  if (state.filter.mode === 'attention') return worker.state === 'degraded' || worker.state === 'offline';
+  if (state.filter.mode === 'idle') return worker.state === 'idle' || worker.state === 'draining';
+  return true;
+}
+
+function workerCounts() {
+  return {
+    all: state.workers.length,
+    running: state.workers.filter(w => w.state === 'running').length,
+    attention: state.workers.filter(w => w.state === 'degraded' || w.state === 'offline').length,
+    idle: state.workers.filter(w => w.state === 'idle' || w.state === 'draining').length
+  };
+}
+
+function renderWorkers() {
+  const body = $('#workerBody');
+  if (!body) return;
+  const list = state.workers.filter(workerMatches);
+  if (!list.length) {
+    body.innerHTML = `<tr><td colspan="7" style="padding:26px 12px;color:var(--ink-3);font-family:var(--mono);font-size:10px">${L('no workers match this filter', '没有匹配此筛选的 worker')}</td></tr>`;
+  } else {
+    body.innerHTML = list.map(w => {
+      const c = clusterOf(w.cluster);
+      const s = workerState[w.state] || workerState.idle;
+      const track = s.track ? ` ${s.track}` : '';
+      return `<tr id="worker-row-${w.id}">
+        <td><div class="worker-id"><i class="worker-dot ${s.dot}"></i><span><b>${esc(w.id)}</b><small>${esc(w.uptime)}</small></span></div></td>
+        <td><span class="cluster-badge" style="--c:${c?.accent || 'var(--ink-3)'}"><i></i>${esc(c?.name || w.cluster)}</span></td>
+        <td><span class="status-pill ${s.cls}"><i></i>${esc(L(s.labelEn, s.labelZh))}</span></td>
+        <td><div class="task-line">${esc(w.task)}</div><span class="task-sub">${esc(roleLabel(w.role))} · ${esc(workerSub(w))}</span></td>
+        <td><div class="progress-cell"><div class="progress-track"><i class="${s.track}" style="width:${w.state === 'offline' ? 0 : clamp(w.progress, 0, 100)}%"></i></div><span class="progress-pct">${w.state === 'offline' || w.state === 'idle' ? '—' : `${Math.round(w.progress)}%`}</span></div></td>
+        <td><span class="rate-cell">${esc(w.rate)}</span></td>
+        <td><span class="hb-cell ${w.state === 'offline' ? 'is-late' : ''}"><i></i>${esc(w.hb)}</span></td>
+      </tr>`;
+    }).join('');
+  }
+  updateCounts();
+}
+
+function updateWorkerRow(w) {
+  const row = $(`#worker-row-${w.id}`);
+  if (!row) return;
+  const s = workerState[w.state] || workerState.idle;
+  const track = row.querySelector('.progress-track i');
+  const pct = row.querySelector('.progress-pct');
+  const task = row.querySelector('.task-line');
+  const sub = row.querySelector('.task-sub');
+  if (track) {
+    track.style.width = `${w.state === 'offline' || w.state === 'idle' ? 0 : clamp(w.progress, 0, 100)}%`;
+    track.className = s.track || '';
+  }
+  if (pct) pct.textContent = w.state === 'offline' || w.state === 'idle' ? '—' : `${Math.round(w.progress)}%`;
+  if (task) task.textContent = w.task;
+  if (sub) sub.textContent = `${roleLabel(w.role)} · ${workerSub(w)}`;
+}
+
+function updateCounts() {
+  const counts = workerCounts();
+  const labels = {all:'count-all', running:'count-running', attention:'count-attention', idle:'count-idle'};
+  Object.entries(labels).forEach(([key, id]) => {
+    const node = $(`#${id}`);
+    if (node) node.textContent = counts[key];
+  });
+  const subtitle = $('#worker-subtitle');
+  if (subtitle) subtitle.textContent = L(
+    `${counts.all} sampled workers · ${state.project.active} live heartbeats`,
+    `${counts.all} 个抽样 worker · ${state.project.active} 个实时心跳`
+  );
+  const scope = $('#worker-scope');
+  if (scope) scope.textContent = state.filter.cluster ? clusterName(state.filter.cluster) : t('allClusters');
+}
+
+function updateFilterUI() {
+  $$('.filter-chip[data-filter]').forEach(btn => {
+    if (btn.dataset.filter === 'clear-cluster') return;
+    btn.classList.toggle('is-active', btn.dataset.filter === state.filter.mode);
+  });
+  const clear = $('#clearCluster');
+  if (clear) {
+    clear.hidden = !state.filter.cluster;
+    clear.textContent = state.filter.cluster ? L(`Clear ${clusterName(state.filter.cluster)}`, `清除 ${clusterName(state.filter.cluster)}`) : t('clearCluster');
+  }
+}
+
+function advanceWorker() {
+  const active = state.workers.filter(w => w.state === 'running' || w.state === 'draining');
+  if (!active.length) return;
+  const w = active[Math.floor(Math.random() * active.length)];
+  w.progress = clamp(w.progress + (w.state === 'draining' ? rand(.2, .7) : rand(.3, 1.0)), 0, 100);
+  if (w.progress >= 99.9) {
+    if (w.state === 'draining') {
+      w.state = 'idle';
+      w.progress = 0;
+      w.task = '—';
+      w.sub = 'ready for dispatch';
+      w.subZh = '等待派发';
+      w.rate = '—';
+      pushEvent(w.cluster, 'info', `${w.id} drained cleanly; shard handed to sibling worker.`, `${w.id} 已干净排空；分片已交给同级 worker。`);
+      renderWorkers();
+      updateCounts();
+    } else {
+      state.taskSeq += 1;
+      w.progress = rand(4, 12);
+      w.task = `${w.role === 'Publish' ? 'publish' : w.role === 'Summary' ? 'summary' : w.role === 'Vectorize' ? 'embed' : 'batch'}_${state.taskSeq} · video_${randInt(9400, 9999)}`;
+      w.sub = w.role === 'Vectorize' ? 'bge-m3 · 768d' : w.role === 'Summary' ? 'Qwen · notes + topics' : w.role === 'Publish' ? 'encode → object storage' : 'large-v3-turbo · 1.9× RT';
+      w.subZh = w.role === 'Vectorize' ? 'bge-m3 · 768d' : w.role === 'Summary' ? 'Qwen · 笔记 + 主题' : w.role === 'Publish' ? '编码 → 对象存储' : 'large-v3-turbo · 1.9× RT';
+      w.rate = w.role === 'Transcribe' ? `${(rand(1.7, 2.3)).toFixed(1)}× RT` : w.role === 'Vectorize' ? `${fmt(randInt(1760, 1920))}/min` : w.role === 'Summary' ? `${(rand(13.8, 14.8)).toFixed(1)}/min` : `${(rand(9.2, 10.4)).toFixed(1)}/min`;
+      if (w.role === 'Transcribe') state.project.subtitled = Math.min(state.project.assets, state.project.subtitled + 1);
+      if (w.role === 'Summary') state.project.summarized += 1;
+      if (Math.random() < .55) pushEvent(w.cluster, 'info', `${w.id} completed ${w.task.split(' · ')[1]}; next shard dispatched.`, `${w.id} 已完成 ${w.task.split(' · ')[1]}；下一分片已派发。`);
+      updateProject();
+    }
+  }
+  updateWorkerRow(w);
+}
+
+function renderStages() {
+  const grid = $('#stageGrid');
+  if (!grid) return;
+  grid.innerHTML = state.stages.map((s, i) => {
+    const st = s.state === 'degraded' ? 'is-degraded' : 'is-running';
+    const label = s.state === 'degraded' ? L('DEGRADED', '降级') : L('RUNNING', '运行中');
+    return `<div class="stage-card" style="--c:${s.color}">
+      <div class="stage-top">
+        <div><span class="stage-code">${s.code} / ${esc(s.cluster)}</span><div class="stage-name">${esc(L(s.name, s.cn))}</div></div>
+        <span class="stage-state ${st}" id="stage-${s.id}-state">${label}</span>
+      </div>
+      <div class="stage-metrics">
+        <div class="stage-metric"><span>${L('QUEUE', '队列')}</span><strong id="stage-${s.id}-queue">${fmt(s.queue)}</strong></div>
+        <div class="stage-metric"><span>${L('RATE', '速率')}</span><strong id="stage-${s.id}-rate">${s.rateText}</strong></div>
+      </div>
+      <div class="stage-bar"><i id="stage-${s.id}-bar"></i></div>
+      <div class="stage-cluster"><i></i>${esc(s.cluster)} · ${esc(L(s.name, s.cn))}</div>
+    </div>${i < state.stages.length - 1 ? '<div class="stage-arrow" aria-hidden="true"></div>' : ''}`;
+  }).join('');
+  updateStages();
+}
+
+function updateStages() {
+  state.stages.forEach(s => {
+    const c = clusterOf(s.cid);
+    if (!c) return;
+    s.queue = c.queue;
+    s.rateText = `${fmt(c.throughput)} ${clusterUnit(c)}`;
+    s.state = c.state === 'degraded' ? 'degraded' : 'running';
+    const set = (id, value) => { const node = $(`#${id}`); if (node) node.textContent = value; };
+    set(`stage-${s.id}-queue`, fmt(s.queue));
+    set(`stage-${s.id}-rate`, s.rateText);
+    const bar = $(`#stage-${s.id}-bar`);
+    if (bar) bar.style.width = `${s.pct}%`;
+    const stateNode = $(`#stage-${s.id}-state`);
+    if (stateNode) {
+      stateNode.textContent = s.state === 'degraded' ? L('DEGRADED', '降级') : L('RUNNING', '运行中');
+      stateNode.className = `stage-state ${s.state === 'degraded' ? 'is-degraded' : 'is-running'}`;
+    }
+  });
+}
+
+function driftCluster(index) {
+  const c = state.clusters[index % state.clusters.length];
+  if (!c) return;
+  c.gpu = clamp(c.gpu + rand(-1.1, 1.1), c.state === 'degraded' ? 32 : 48, c.state === 'degraded' ? 56 : 99);
+  c.temp = clamp(c.temp + rand(-.35, .35), 40, 73);
+  c.power = clamp(c.power + rand(-7, 7), 70, 330);
+  if (Math.random() < .72) c.queue = Math.max(0, c.queue - randInt(1, 3));
+  const throughputDrift = c.throughput > 100 ? rand(-24, 24) : rand(-.22, .22);
+  c.throughput = round1(clamp(c.throughput + throughputDrift, c.throughput > 100 ? 1700 : 8, c.throughput > 100 ? 1960 : c.id === 'gpu-a' ? 50 : 16));
+  c.spark.push(round1(c.gpu));
+  c.spark.shift();
+  updateClusterCard(c);
+  updateProject();
+}
+
+function advanceProject() {
+  const p = state.project;
+  const oldTp = p.throughput;
+  p.assets += 1;
+  p.subtitled = Math.min(p.assets, p.subtitled + (state.tick % 2 === 0 ? 1 : 2));
+  p.summarized += (state.tick % 2 === 0 ? 2 : 1);
+  p.progress = clamp(p.progress + rand(.02, .07), 0, 99.9);
+  p.health = clamp(p.health + rand(-.04, .04), 98.8, 99.8);
+  p.throughput = round1(clamp(p.throughput + (state.tick % 2 === 0 ? .1 : -.1), 48.5, 50.2));
+  p.tpDelta = round1(p.throughput - oldTp);
+  state.stages[0].pct = round1(clamp(state.stages[0].pct + rand(.18, .45), 0, 99));
+  state.stages[1].pct = round1(clamp(state.stages[1].pct + rand(.08, .22), 0, 99));
+  state.stages[2].pct = round1(clamp(state.stages[2].pct + rand(.08, .22), 0, 99));
+  state.stages[3].pct = round1(clamp(state.stages[3].pct + rand(.12, .30), 0, 99));
+  updateProject();
+}
+
+function advanceChart() {
+  const chart = state.chart;
+  chart.transcribe.push(round1(clamp(chart.transcribe.at(-1) + rand(-4, 4), 45, 94)));
+  chart.vectorize.push(round1(clamp(chart.vectorize.at(-1) + rand(-3.5, 3.5), 55, 96)));
+  chart.summarize.push(round1(clamp(chart.summarize.at(-1) + rand(-4, 4), 32, 82)));
+  chart.transcribe.shift();
+  chart.vectorize.shift();
+  chart.summarize.shift();
+  renderChart();
+}
+
+function renderChart() {
+  const svg = $('#trendSvg');
+  if (!svg) return;
+  const W = 760, H = 180, top = 12, bottom = 154;
+  const toY = v => top + (100 - clamp(v, 0, 100)) / 100 * (bottom - top);
+  const linePath = values => values.map((v, i) => `${i ? 'L' : 'M'}${round1(i / (values.length - 1) * W)},${round1(toY(v))}`).join(' ');
+  const areaPath = values => `M0,${bottom} L${values.map((v, i) => `${round1(i / (values.length - 1) * W)},${round1(toY(v))}`).join(' L')} L${W},${bottom} Z`;
+  const isDark = THEME === 'dark';
+  const isP2 = THEME === 'p2';
+  const gridStroke = isDark ? 'rgba(172,202,216,.08)' : (isP2 ? 'rgba(27,27,27,.10)' : 'rgba(16,33,43,.10)');
+  const verticalStroke = isDark ? 'rgba(172,202,216,.04)' : (isP2 ? 'rgba(27,27,27,.05)' : 'rgba(16,33,43,.05)');
+  const cTranscribe = isDark ? '#52d5e8' : (isP2 ? '#0067c0' : '#0a8ea3');
+  const cVectorize = isDark ? '#8ca9ff' : (isP2 ? '#0f6cbd' : '#3b5bc7');
+  const cSummarize = isDark ? '#efb25f' : (isP2 ? '#b75b00' : '#a86515');
+  const grid = [20, 60, 100, 140].map(y => `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${gridStroke}" stroke-width="1"/>`).join('');
+  const verticals = [0, 152, 304, 456, 608, 760].map(x => `<line x1="${x}" y1="0" x2="${x}" y2="${bottom}" stroke="${verticalStroke}" stroke-width="1"/>`).join('');
+  svg.innerHTML = `<defs>
+      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${cTranscribe}" stop-opacity=".24"/>
+        <stop offset="1" stop-color="${cTranscribe}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    ${grid}${verticals}
+    <path d="${areaPath(state.chart.transcribe)}" fill="url(#areaGrad)"></path>
+    <path d="${linePath(state.chart.transcribe)}" fill="none" stroke="${cTranscribe}" stroke-width="1.35" stroke-linejoin="round"></path>
+    <path d="${linePath(state.chart.vectorize)}" fill="none" stroke="${cVectorize}" stroke-width="1.1" stroke-linejoin="round" opacity=".8"></path>
+    <path d="${linePath(state.chart.summarize)}" fill="none" stroke="${cSummarize}" stroke-width="1.1" stroke-linejoin="round" opacity=".78"></path>
+    <circle cx="${W}" cy="${round1(toY(state.chart.transcribe.at(-1)))}" r="2.4" fill="${cTranscribe}"></circle>
+    <circle cx="${W}" cy="${round1(toY(state.chart.vectorize.at(-1)))}" r="2" fill="${cVectorize}"></circle>
+    <circle cx="${W}" cy="${round1(toY(state.chart.summarize.at(-1)))}" r="2" fill="${cSummarize}"></circle>`;
+}
+
+function renderCapacity() {
+  const list = $('#capacityList');
+  if (!list) return;
+  list.innerHTML = state.capacity.map(item => `
+    <div class="capacity-row" style="--c:${item.color}">
+      <div class="capacity-meta"><span>${esc(L(item.label, item.labelZh))}</span><b id="capacity-${item.id}-value">${item.value}%</b></div>
+      <div class="capacity-bar"><i id="capacity-${item.id}-bar"></i></div>
+    </div>`).join('');
+  updateCapacity();
+}
+
+function updateCapacity() {
+  state.capacity.forEach(item => {
+    const value = $(`#capacity-${item.id}-value`);
+    const bar = $(`#capacity-${item.id}-bar`);
+    if (value) value.textContent = `${Math.round(item.value)}%`;
+    if (bar) bar.style.width = `${clamp(item.value, 0, 100)}%`;
+  });
+}
+
+function driftCapacity() {
+  state.capacity.forEach(item => {
+    item.value = clamp(item.value + rand(-1.1, 1.1), item.id === 'gpu' ? 76 : 25, item.id === 'gpu' ? 96 : 88);
+  });
+  updateCapacity();
+}
+
+function eventClusterStyle(id) {
+  return id === 'control' ? '#52d5e8' : (clusterOf(id)?.accent || 'var(--ink-3)');
+}
+
+function renderEvents() {
+  const feed = $('#eventFeed');
+  if (!feed) return;
+  feed.innerHTML = state.events.map((e, index) => `
+    <div class="event-row ${index === 0 && e.fresh ? 'is-new' : ''}">
+      <span class="event-time">${esc(e.time)}</span>
+      <div class="event-copy ${e.type === 'warn' ? 'is-warn' : e.type === 'error' ? 'is-error' : ''}">
+        <b style="--c:${eventClusterStyle(e.cluster)}"><i></i>${esc(clusterName(e.cluster))}</b>
+        <span>${esc(L(e.text, e.textZh || e.text))}</span>
+      </div>
+    </div>`).join('');
+  const count = $('#event-count');
+  if (count) count.textContent = `${state.events.length} / 9`;
+}
+
+function pushEvent(cluster, type, text, textZh = text) {
+  state.events.unshift({cluster, type, text, textZh, time: eventTime(0), fresh: true});
+  state.events = state.events.slice(0, 9);
+  renderEvents();
+}
+
+function maybePushEvent() {
+  if (Math.random() > .55) return;
+  const choices = [
+    ['gpu-a', 'info', `queue rebalanced: ${fmt(randInt(1980, 2010))} audio items remain on SZ-GPU-01.`, `队列已再平衡：SZ-GPU-01 剩余 ${fmt(randInt(1980, 2010))} 条音频。`],
+    ['gpu-b', 'info', `vector index flushed; ${fmt(randInt(380, 396))} chunks waiting for next batch.`, `向量索引已刷盘；${fmt(randInt(380, 396))} 个 chunk 等待下一批。`],
+    ['edge', 'warn', 'edge-02 heartbeat still jittery; retry window kept open for one shard.', 'edge-02 心跳仍在抖动；为一个分片保留重试窗口。'],
+    ['burst', 'info', 'cloud burst pool acknowledged new publish shard; 8 workers online.', '云端突发池已接收新的发布分片；8 个 worker 在线。'],
+    ['control', 'info', 'control plane checkpoint saved; queue snapshot aged 0.4s.', '控制面检查点已保存；队列快照延迟 0.4s。']
+  ];
+  const item = choices[randInt(0, choices.length - 1)];
+  pushEvent(item[0], item[1], item[2], item[3]);
+}
+
+function bootEvents() {
+  state.events = [
+    {cluster:'edge', type:'warn', text:'edge-02 heartbeat gap 2.6s; retry scheduled on the same shard.', textZh:'edge-02 心跳中断 2.6s；已在同一分片上安排重试。', time:eventTime(18)},
+    {cluster:'gpu-a', type:'error', text:'gpu-a-07 missed heartbeat for 04:12; marked offline by control plane.', textZh:'gpu-a-07 已 04:12 无心跳；控制面将其标记为离线。', time:eventTime(42)},
+    {cluster:'burst', type:'info', text:'burst-03 draining; current publish shard is finishing before handoff.', textZh:'burst-03 正在排空；当前发布分片完成后交接。', time:eventTime(67)},
+    {cluster:'gpu-a', type:'info', text:'gpu-a-04 completed video_09688; next transcribe task dispatched.', textZh:'gpu-a-04 已完成 video_09688；下一转写任务已派发。', time:eventTime(93)},
+    {cluster:'gpu-b', type:'info', text:'queue rebalanced: SZ-GPU-02 received +18 chunks from retry pool.', textZh:'队列已再平衡：SZ-GPU-02 从重试池接收 +18 个 chunk。', time:eventTime(128)},
+    {cluster:'edge', type:'info', text:'summary batch 2419 started on QD-EDGE-01; Qwen context window 15k.', textZh:'QD-EDGE-01 已启动总结批次 2419；Qwen 上下文窗口 15k。', time:eventTime(173)},
+    {cluster:'gpu-b', type:'info', text:'gpu-b-05 flushed vector index; last chunk committed to object storage.', textZh:'gpu-b-05 已刷新向量索引；最后一个 chunk 已提交至对象存储。', time:eventTime(214)},
+    {cluster:'control', type:'info', text:'control plane checkpoint saved; all cluster leases valid.', textZh:'控制面检查点已保存；所有集群租约有效。', time:eventTime(268)},
+    {cluster:'gpu-a', type:'info', text:'GPU-A pool temp held at 61°C under sustained transcribe load.', textZh:'持续转写负载下，GPU-A 池温度稳定在 61°C。', time:eventTime(322)}
+  ];
+  renderEvents();
+}
+
+function bindFilters() {
+  const tools = $('.panel-tools');
+  if (tools) {
+    tools.addEventListener('click', event => {
+      const btn = event.target.closest('.filter-chip');
+      if (!btn) return;
+      const filter = btn.dataset.filter;
+      if (filter === 'clear-cluster') {
+        state.filter.cluster = null;
+        paintClusterSelection();
+        renderWorkers();
+        updateFilterUI();
+        return;
+      }
+      state.filter.mode = filter;
+      updateFilterUI();
+      renderWorkers();
+    });
+  }
+  const clear = $('#clearCluster');
+  if (clear) clear.addEventListener('click', () => {
+    state.filter.cluster = null;
+    paintClusterSelection();
+    renderWorkers();
+    updateFilterUI();
+  });
+  const refresh = $('#refreshBtn');
+  if (refresh) refresh.addEventListener('click', () => {
+    state.syncAge = 0.1;
+    const sync = $('#sync-age'); if (sync) sync.textContent = '0.1s';
+    refresh.classList.add('is-spinning');
+    setTimeout(() => refresh.classList.remove('is-spinning'), 700);
+    pushEvent('control', 'info', 'Telemetry snapshot refreshed by operator.', '操作员已刷新遥测快照。');
+    updateLangButtons();
+  });
+}
+
+function updateLangButtons() {
+  const toggle = $('#langToggle');
+  if (!toggle) return;
+  $$('[data-lang-opt]', toggle).forEach(node => {
+    node.classList.toggle('is-active', node.dataset.langOpt === LANG);
+  });
+  toggle.setAttribute('aria-label', L('Switch language', '切换语言'));
+  toggle.title = L('Switch language', '切换语言');
+  toggle.dataset.lang = LANG;
+}
+
+function updateThemeToggle() {
+  const names = {
+    p2: t('themeP2'),
+    green: t('themeGreen'),
+    dark: t('themeNameDark')
+  };
+  $$('[data-theme-opt]').forEach(btn => {
+    const active = btn.dataset.themeOpt === THEME;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    btn.title = names[btn.dataset.themeOpt] || '';
+    btn.setAttribute('aria-label', names[btn.dataset.themeOpt] || '');
+  });
+}
+
+function applyStatic() {
+  $$('[data-i18n]').forEach(node => {
+    const value = t(node.dataset.i18n);
+    if (value) node.textContent = value;
+  });
+  document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+  document.title = LANG === 'zh' ? 'P2 / 视频流水线 · 多集群控制台' : 'P2 / VIDEO PIPELINE · MULTI-CLUSTER OPS';
+  const refresh = $('#refreshBtn');
+  if (refresh) {
+    refresh.title = t('refresh');
+    refresh.setAttribute('aria-label', t('refresh'));
+  }
+  updateLangButtons();
+  updateThemeToggle();
+}
+
+function setLang(next) {
+  const lang = next === 'en' ? 'en' : 'zh';
+  if (lang === LANG) { updateLangButtons(); return; }
+  LANG = lang;
+  document.documentElement.dataset.lang = LANG;
+  try { localStorage.setItem('p2-multi-demo-lang', LANG); } catch (e) {}
+  applyStatic();
+  renderClusters();
+  renderWorkers();
+  renderStages();
+  renderFabric();
+  renderCapacity();
+  renderEvents();
+  renderChart();
+  updateProject();
+  updateCounts();
+  updateFilterUI();
+}
+
+function refreshPaletteAccents() {
+  state.clusters.forEach(c => { c.accent = clusterAccentOf(c.id); });
+  state.stages.forEach(s => { s.color = clusterAccentOf(s.cid); });
+  state.capacity.forEach(c => { c.color = capacityColorOf(c.id); });
+  renderClusters();
+  renderWorkers();
+  renderStages();
+  renderFabric();
+  renderCapacity();
+  renderEvents();
+}
+
+function setTheme(next) {
+  const allowed = ['p2', 'green', 'dark'];
+  const target = allowed.includes(next) ? next : 'p2';
+  THEME = target;
+  document.documentElement.dataset.theme = target === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.palette = target;
+  try { localStorage.setItem('p2-multi-demo-theme', THEME); } catch (e) {}
+  updateThemeToggle();
+  refreshPaletteAccents();
+  renderChart();
+}
+
+function bindSwitchers() {
+  const lang = $('#langToggle');
+  if (lang) lang.addEventListener('click', () => setLang(LANG === 'zh' ? 'en' : 'zh'));
+  $$('[data-theme-opt]').forEach(btn => {
+    btn.addEventListener('click', () => setTheme(btn.dataset.themeOpt));
+  });
+}
+
+function boot() {
+  LANG = document.documentElement.dataset.lang === 'en' ? 'en' : 'zh';
+  const savedTheme = document.documentElement.dataset.palette;
+  THEME = ['p2', 'green', 'dark'].includes(savedTheme) ? savedTheme : (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'p2');
+  document.documentElement.dataset.theme = THEME === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.palette = THEME;
+  applyStatic();
+  bindSwitchers();
+  renderClusters();
+  renderWorkers();
+  renderStages();
+  renderFabric();
+  renderChart();
+  renderCapacity();
+  bootEvents();
+  bindFilters();
+  updateProject();
+  updateClock();
+  setInterval(() => {
+    state.tick += 1;
+    updateClock();
+    advanceWorker();
+    driftCluster(state.tick % state.clusters.length);
+    advanceProject();
+    advanceChart();
+    driftCapacity();
+    updateFabric();
+    if (!state.fabric.dr.active && state.tick >= state.fabric.dr.nextAt) triggerFailover();
+    if (state.tick % 2 === 0) maybePushEvent();
+  }, 1000);
+}
+
+boot();
+</script>
+</body>
+</html>

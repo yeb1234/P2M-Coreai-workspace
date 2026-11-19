@@ -1,7 +1,7 @@
 {
   "name": "p2m",
   "private": true,
-  "version": "2.7.0",
+  "version": "5.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

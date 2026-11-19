@@ -9,7 +9,7 @@ const INITIAL_LIMIT = 5;
 
 export const PomodoroSessionList: React.FC = () => {
   const sessions = usePomodoroStore((s) => s.sessions);
-  const clearHistory = usePomodoroStore((s) => s.clearHistory);
+  const clearTodayHistory = usePomodoroStore((s) => s.clearTodayHistory);
   const todos = useScheduleStore((s) => s.items);
   const [expanded, setExpanded] = useState(false);
 
@@ -38,11 +38,11 @@ export const PomodoroSessionList: React.FC = () => {
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-[var(--text-primary)]">专注记录</h3>
         <button
-          onClick={() => { clearHistory(); playInteractionSound('delete'); }}
+          onClick={() => { clearTodayHistory(); playInteractionSound('delete'); }}
           className="flex items-center gap-1 text-xs text-[#9ca3af] hover:text-[#dc3545] transition-colors"
         >
           <Trash2 size={12} />
-          清空
+          清除当天
         </button>
       </div>
 

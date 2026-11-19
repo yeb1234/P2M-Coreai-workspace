@@ -1,0 +1,3286 @@
+{
+  "dataset": "C:\\SiteYeb\\docs\\eval\\p2_retrieval_cases.json",
+  "generated_at": "2026-11-16T23:33:01.621618+00:00",
+  "config": {
+    "top_k": 6,
+    "candidate_k": 30,
+    "rerank_enabled": true,
+    "rerank_min_score": 0.0,
+    "vector_coverage": 0.0,
+    "note": "final run: EVAL_MIN_SCORE=0.0; lexical and rerank both 18/27"
+  },
+  "lexical": {
+    "mode": "lexical",
+    "n": 27,
+    "hit_at_6": 18,
+    "hit_rate": 0.6667,
+    "mrr": 0.3963,
+    "empty_refs": 0,
+    "latency_ms": {
+      "mean": 2529.1,
+      "p50": 1753.0,
+      "p95": 5772.7,
+      "min": 548.5,
+      "max": 8093.5
+    },
+    "cases": [
+      {
+        "id": "p2-001",
+        "query": "Python 包管理器 uv 工具怎么用",
+        "hit_at_6": true,
+        "gold_rank": 3,
+        "n_refs": 6,
+        "latency_ms": 1753.0,
+        "titles": [
+          "03-掌柜问数-开发环境-UV使用说明",
+          "5_掌柜智库_导入模块_node_item_nameognition_前置准备工作 [itjc8.com]",
+          "4-2 Python包管理器：uv工具快速上手 [itjc8.com](1)",
+          "4-2 Python包管理器：uv工具快速上手 [itjc8.com](1)",
+          "4-2 Python包管理器：uv工具快速上手 [itjc8.com]",
+          "4-2 Python包管理器：uv工具快速上手 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "03-掌柜问数-开发环境-UV使用说明",
+            "start_sec": 1.98,
+            "rerank_score": 0.7484,
+            "score_hint": 1.3111111111111111,
+            "text": "那各位同学 我们继续往下进行 那接下来呢 我再花几分钟的时间呢 给大家简单的介绍一下 就是这个UV的具体用法 其实它作为一个工具呢 我们主要就是学它什么呀 因为它是一个虚拟环境的管理器 对吧 也是一个依赖的管理器"
+          },
+          {
+            "title": "5_掌柜智库_导入模块_node_item_nameognition_前置准备工作 [itjc8.com]",
+            "start_sec": 960.62,
+            "rerank_score": 0.7235,
+            "score_hint": 1.0,
+            "text": "大家这个装上就可以了 这我怎么记得装过来 兄弟们 这几个包是 当然我说这几个包是 UV 这几个包我们是不是都装过来 首先第一个我们要先装的是 Talk这几个包 像是模型底层需要的 这我们是UV爱的"
+          },
+          {
+            "title": "4-2 Python包管理器：uv工具快速上手 [itjc8.com](1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9864,
+            "score_hint": 4.482705865764242,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们一起学习 Python包管理器,UV工具快速上手 UV除了是一款高性能的包管理器 它还可以去创建以及管理Python虚拟环境 所以在课程以及项目中 我们会使用UV来去创建以及管理对应的依赖 如果使用U"
+          },
+          {
+            "title": "4-2 Python包管理器：uv工具快速上手 [itjc8.com](1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9864,
+            "score_hint": 4.0,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们一起学习 Python包管理器,UV工具快速上手 UV除了是一款高性能的包管理器 它还可以去创建以及管理Python虚拟环境 所以在课程以及项目中 我们会使用UV来去创建以及管理对应的依赖 如果使用U"
+          },
+          {
+            "title": "4-2 Python包管理器：uv工具快速上手 [itjc8.com]",
+            "start_sec": 0.0,
+            "rerank_score": 0.9864,
+            "score_hint": 4.0,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们一起学习 Python包管理器,UV工具快速上手 UV除了是一款高性能的包管理器 它还可以去创建以及管理Python虚拟环境 所以在课程以及项目中 我们会使用UV来去创建以及管理对应的依赖 如果使用U"
+          },
+          {
+            "title": "4-2 Python包管理器：uv工具快速上手 [itjc8.com]",
+            "start_sec": 0.0,
+            "rerank_score": 0.9862,
+            "score_hint": 4.482705865764242,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们一起学习 Python包管理器,UV工具快速上手 UV除了是一款高性能的包管理器 它还可以去创建以及管理Python虚拟环境 所以在课程以及项目中 我们会使用UV来去创建以及管理对应的依赖 如果使用U"
+          }
+        ]
+      },
+      {
+        "id": "p2-002",
+        "query": "FastAPI 依赖注入怎么实现",
+        "hit_at_6": true,
+        "gold_rank": 3,
+        "n_refs": 6,
+        "latency_ms": 3876.7,
+        "titles": [
+          "01-跨级组件通讯provide与inject函数【itjc8.com】",
+          "01-跨级组件通讯provide与inject函数【itjc8.com】",
+          "05-依赖注入数据说明【itjc8.com】",
+          "16-组合API-依赖注入【itjc8.com】",
+          "16-组合API-依赖注入【itjc8.com】",
+          "05-掌柜问数-API接口-QueryService依赖注入 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "01-跨级组件通讯provide与inject函数【itjc8.com】",
+            "start_sec": 374.28,
+            "rerank_score": 0.8148,
+            "score_hint": 1.0,
+            "text": "我有三里边 这种方式 实际上思想来源于之前的后台 比方说家伙是吧 有一个叫依赖注入 依赖注入 依赖注入这种概念 通过这种方式的话 咱们去比方说 还是把APP的数据 共享给是吧"
+          },
+          {
+            "title": "01-跨级组件通讯provide与inject函数【itjc8.com】",
+            "start_sec": 872.41,
+            "rerank_score": 0.9489,
+            "score_hint": 1.0,
+            "text": "隔代了啊 爷跟他孙子一个通信了 OK好 然后这个通信的话呢 咱们就可以这个通过这个叫依赖注入的方式 依赖注入 好 那这个第一步呢 那咱们就是他爷爷是吧 就是注入数据是吧 怎么注入呢"
+          },
+          {
+            "title": "05-依赖注入数据说明【itjc8.com】",
+            "start_sec": 72.4,
+            "rerank_score": 0.7712,
+            "score_hint": 1.8666666666666665,
+            "text": "订单详情里边的一些数据啊 对吧 这时候他中间跨了这么多组件啊 所以说呢 咱们提供这个数据的时候呢 是通过依赖注入的方式 是吧 provide是吧 注入了一个数据 一个改咱们数据的一个方法 叫completed是吧"
+          },
+          {
+            "title": "16-组合API-依赖注入【itjc8.com】",
+            "start_sec": 128.24,
+            "rerank_score": 0.7743,
+            "score_hint": 1.8666666666666665,
+            "text": "我想访问到 大组件的一个状态 能懂于什么 共享这个状态 此时可以用 依赖注入 就不用那么麻烦去 写个译文的话 或者导个VoEx进来 知道吧 这种方式更方便"
+          },
+          {
+            "title": "16-组合API-依赖注入【itjc8.com】",
+            "start_sec": 128.24,
+            "rerank_score": 0.7718,
+            "score_hint": 1.0,
+            "text": "我想访问到 大组件的一个状态 能懂于什么 共享这个状态 此时可以用 依赖注入 就不用那么麻烦去 写个译文的话 或者导个VoEx进来 知道吧 这种方式更方便"
+          },
+          {
+            "title": "05-掌柜问数-API接口-QueryService依赖注入 [itjc8.com]",
+            "start_sec": 0.53,
+            "rerank_score": 0.8608,
+            "score_hint": 1.8666666666666665,
+            "text": "好了各位 那Source刚才我们已经定义完毕了 那接下来我们去写一下 这个就是依赖注入的逻辑 好 那按照就是FastAPI 它官方的这个就是推荐 哪有推荐 我们找一下"
+          }
+        ]
+      },
+      {
+        "id": "p2-003",
+        "query": "JavaScript 闭包是什么",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 5772.7,
+        "titles": [
+          "9、闭包【itjc8.com】",
+          "9、闭包【itjc8.com】",
+          "9、闭包【itjc8.com】",
+          "10、闭包【itjc8.com】",
+          "16、闭包的问【itjc8.com】",
+          "18、闭包【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 72.45,
+            "rerank_score": 0.5674,
+            "score_hint": 1.0,
+            "text": "第一个是可以答应到的 第一次有 第二次就没有了 大家能理解吗 所以在那里边我们说 闭包 要学闭包 大家得先把这一点牢牢的记住 你一定要记住 一个函数里面盛美的局部变量 按照原则上来讲"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 72.45,
+            "rerank_score": 0.5604,
+            "score_hint": 0.5571428571428572,
+            "text": "第一个是可以答应到的 第一次有 第二次就没有了 大家能理解吗 所以在那里边我们说 闭包 要学闭包 大家得先把这一点牢牢的记住 你一定要记住 一个函数里面盛美的局部变量 按照原则上来讲"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 933.77,
+            "rerank_score": 0.9895,
+            "score_hint": 1.0,
+            "text": "这就称之为 OK吗对吗 只要别的数量无欲 反望到一个函数内部的局部变量了 就叫做什么 闭包 OK吗对吗 这就是闭包 代码形式上看 它就是干什么 就是一个止函数"
+          },
+          {
+            "title": "10、闭包【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.3971,
+            "score_hint": 0.5571428571428572,
+            "text": "我们是不是讲解了币包呀,所谓的币包 是不是就指代的是一个作用域 访问了另外一个作用域的局部变量呀 称为币包,OK吗,对吗 代表形式上看就是 负函数有一个谁"
+          },
+          {
+            "title": "16、闭包的问【itjc8.com】",
+            "start_sec": 493.65,
+            "rerank_score": 0.6359,
+            "score_hint": 0.5571428571428572,
+            "text": "盗墓的引用也就消失了 那这样的话就会释放 它所占用的一个内存 从而解决了内存泄漏的问题 好了关于这个 闭包的问题呢我们就剪到这"
+          },
+          {
+            "title": "18、闭包【itjc8.com】",
+            "start_sec": 20.13,
+            "rerank_score": 0.4896,
+            "score_hint": 0.5571428571428572,
+            "text": "这就是官方给出的臂包的概念 那我们怎么去理解这个概念呢 简单理解就是臂包 就是能够读取其他函数 内部变量的函数 在JavaScript的这个语言当中 只有函数内部的子函数 才能读取这个局部变量 因此我们可以把这个臂包 简单理解成定义在一个函"
+          }
+        ]
+      },
+      {
+        "id": "p2-004",
+        "query": "Python 装饰器原理",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 2917.7,
+        "titles": [
+          "09-02-函数嵌套和闭包（了解）",
+          "09-03-装饰器（了解）",
+          "6.函数基础 -2023-08-16-顾安",
+          "2 [itjc8.com]",
+          "12_创建提示词PromptTemplate下集 [itjc8.com]",
+          "12_创建提示词PromptTemplate下集 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "09-02-函数嵌套和闭包（了解）",
+            "start_sec": 691.54,
+            "rerank_score": 0.9491,
+            "score_hint": 2.0,
+            "text": "一会我们会讲装饰器 装饰器它就是这么个写法 它必须要函数嵌套 形成必保 才能够做装饰器 装饰器又是Python当中的一个语分 在其他语言当中可能没有这个东西 但是在Python当中 以后大家可能会见到装饰器的写法 所以我也会跟大家说一下 什"
+          },
+          {
+            "title": "09-03-装饰器（了解）",
+            "start_sec": 76.46,
+            "rerank_score": 0.9988,
+            "score_hint": 2.0,
+            "text": "我每一个函数后面 那我想加一个什么功能 或者我每个函数前面 想加个什么功能 那么就可以使用装饰器 所以Python的装饰器 它的作用就是在原函数的前 或者后加功能而已 有这么一个作用 但它不会改变原函数 如果你要改变原函数"
+          },
+          {
+            "title": "6.函数基础 -2023-08-16-顾安",
+            "start_sec": 7294.37,
+            "rerank_score": 0.9812,
+            "score_hint": 1.0,
+            "text": "透支一下啊 就是 嗯 提前给大家去说一下 装饰器的一个最主要的作用是什么 装饰器 最主要的作用是在不修改原有代码的情况下 可以 动态添加当前函数的功能 这个就是函数装饰器的一个最主要的作用 啊"
+          },
+          {
+            "title": "2 [itjc8.com]",
+            "start_sec": 1029.2,
+            "rerank_score": 0.8608,
+            "score_hint": 1.0,
+            "text": "接着我们实现第二个函数 好 我们这里可以定一个什么 可以定一个这个 装饰器 装饰器 Task Task 这里装饰器 定一个装饰器 Name的话就是"
+          },
+          {
+            "title": "12_创建提示词PromptTemplate下集 [itjc8.com]",
+            "start_sec": 257.01,
+            "rerank_score": 0.7351,
+            "score_hint": 2.0,
+            "text": "前置通知后置通知这些东道 所以说如果你是什么Python 如果你要是去大厂面试 人家根本不会问你那些什么基本语法 上来一言不会说 你说一下Python的装饰器函数 然后你要是一脸懵逼的 他可能会问你说 你家吧 是不是知道什么叫什么的AOP "
+          },
+          {
+            "title": "12_创建提示词PromptTemplate下集 [itjc8.com]",
+            "start_sec": 271.89,
+            "rerank_score": 0.8713,
+            "score_hint": 2.0,
+            "text": "你家吧 是不是知道什么叫什么的AOP 前置通知后的通知 你说懂懂懂懂 然后呢 让你说一下Python的装饰器函数 如果你一脸懵逼的话 那么几乎啊 你是不大可能的 请大家一定相信杨哥 所大部分啊"
+          }
+        ]
+      },
+      {
+        "id": "p2-005",
+        "query": "Vue 跨级组件通讯 provide inject 怎么用",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 646.1,
+        "titles": [
+          "3-3 第三方库的两种引入方式",
+          "04-vue3总结【itjc8.com】",
+          "05-context跨级组件通讯的使用【itjc8.com】",
+          "13-vue相关-组件通信-$attrs和$listeners【itjc8.com】",
+          "13-vue相关-组件通信-$attrs和$listeners【itjc8.com】",
+          "15-上午回顾【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "3-3 第三方库的两种引入方式",
+            "start_sec": 85.14,
+            "rerank_score": 0.4218,
+            "score_hint": 1.0,
+            "text": "每个模块都给我加载 这时候我们也可以 使用一个内置插件 来解决这个问题 这个插件叫 provide provide就是提供的意思 提供的意思 provide plugin 它的作用就是 为每一个模块的"
+          },
+          {
+            "title": "04-vue3总结【itjc8.com】",
+            "start_sec": 59.15,
+            "rerank_score": 0.9657,
+            "score_hint": 2.0,
+            "text": "VUE3组合式API 咱们学习的重点就是各种函数 是吧 各种函数 比方说咱们今天上午又学了两个函数 provide inject 做依赖注入 OK 这是咱们VIO3的一个特点 一个特色 可以这么理解"
+          },
+          {
+            "title": "05-context跨级组件通讯的使用【itjc8.com】",
+            "start_sec": 406.51,
+            "rerank_score": 0.6421,
+            "score_hint": 2.7,
+            "text": "可以 你只要把你所有数据都往哪里面放就行 是不是放到我们的副组件这个地方来啊 还有啊 其实一般的做法是什么 还有我的Provide Consumers 所以我一个项目中 其实只要Create一次就行 因为他们是不是得保证一对啊 其实Prov"
+          },
+          {
+            "title": "13-vue相关-组件通信-$attrs和$listeners【itjc8.com】",
+            "start_sec": 74.8,
+            "rerank_score": 0.7266,
+            "score_hint": 2.0,
+            "text": "孙呢将来也希望能够给复传数据 孙也能够给我们的复传数据 好 那这个怎么去玩呢 是这样的 肯定不是我们刚才的provide inject provide inject实际上是不是子后来都有 然后呢 也不太对 它只能实现的就是复给子传 但是呢"
+          },
+          {
+            "title": "13-vue相关-组件通信-$attrs和$listeners【itjc8.com】",
+            "start_sec": 77.06,
+            "rerank_score": 0.7934,
+            "score_hint": 2.0,
+            "text": "孙也能够给我们的复传数据 好 那这个怎么去玩呢 是这样的 肯定不是我们刚才的provide inject provide inject实际上是不是子后来都有 然后呢 也不太对 它只能实现的就是复给子传 但是呢 如果子应该叫孙给我们的复传"
+          },
+          {
+            "title": "15-上午回顾【itjc8.com】",
+            "start_sec": 512.52,
+            "rerank_score": 0.9675,
+            "score_hint": 2.0,
+            "text": "是不是可以拿到组件调方法 然后呢 Dollar Chojun和Dollar Parent 也可以拿子组件 拿我们的副组件 Provide Inject是 我们的父辈可以给子孙后代 是不是去提供某个数据 但这个用的不是那么常用 Dollar "
+          }
+        ]
+      },
+      {
+        "id": "p2-006",
+        "query": "jQuery 对象怎么获取",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 1157.3,
+        "titles": [
+          "04.02.表单_整体获取_对象形式_[itjc8.com]",
+          "05-Jquery对象【itjc8.com】",
+          "13.JSONP-使用jQuery发起JSONP数据请求【itjc8.com】",
+          "15.案例-实现发表评论的功能【itjc8.com】",
+          "38.包 - 从哪里下载包【itjc8.com】",
+          "38.包 - 从哪里下载包【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "04.02.表单_整体获取_对象形式_[itjc8.com]",
+            "start_sec": 65.42,
+            "rerank_score": 0.1318,
+            "score_hint": 0.4842850818946437,
+            "text": "那旭哥呀 昨天咱们传的请求题 可不是这样的呀 昨天咱们传的是 哎 这样手写的对象 然后参数名和一个一个的值 我是自己拼接的一个对象 对不对 我们刚才还用了呢 好"
+          },
+          {
+            "title": "05-Jquery对象【itjc8.com】",
+            "start_sec": 1.17,
+            "rerank_score": 0.251,
+            "score_hint": 0.6398406374501993,
+            "text": "好了,我的同学们好 这一节咱们学习的是gcari对象 gcari中利用选择器获取到的 并不是之前的DOM对象 而是gcari对象 所以上一节我们在学习gcari选择器的时候 再电用DOL的方法获取到的返回值"
+          },
+          {
+            "title": "13.JSONP-使用jQuery发起JSONP数据请求【itjc8.com】",
+            "start_sec": 95.52,
+            "rerank_score": 0.3896,
+            "score_hint": 1.0,
+            "text": "发起 jsonp数据 请求 .html 然后在里面我们先导入一下 jquery script src lib 目录下的 jquery"
+          },
+          {
+            "title": "15.案例-实现发表评论的功能【itjc8.com】",
+            "start_sec": 284.94,
+            "rerank_score": 0.5203,
+            "score_hint": 3.0,
+            "text": "评论发表成功了 同时咱们的表单是不是也被重置了 这是咱们重置表单的一个快捷方法 一定要记住 怎么去做 首先我们获取到表单的jQuery对象 就是通过选择器 是不是 然后咱们定用中括号0 把这个jQuery对象 转换成一个原生的dom对象"
+          },
+          {
+            "title": "38.包 - 从哪里下载包【itjc8.com】",
+            "start_sec": 85.94,
+            "rerank_score": 0.2439,
+            "score_hint": 1.0,
+            "text": "它提供了一个非常大的一个搜索框 通过这个搜索框 我们可以找到自己所需要的包 来咱们试着去找一下 找一下咱们曾经用的最多的一个包 Jquery Jquery 打打看是不是就有 还有咱们再来搜一下 art-template 看有没有"
+          },
+          {
+            "title": "38.包 - 从哪里下载包【itjc8.com】",
+            "start_sec": 88.62,
+            "rerank_score": 0.1529,
+            "score_hint": 1.0,
+            "text": "通过这个搜索框 我们可以找到自己所需要的包 来咱们试着去找一下 找一下咱们曾经用的最多的一个包 Jquery Jquery 打打看是不是就有 还有咱们再来搜一下 art-template 看有没有 来看是不是也有"
+          }
+        ]
+      },
+      {
+        "id": "p2-007",
+        "query": "MySQL 索引怎么优化",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 2807.6,
+        "titles": [
+          "07-01-字符串的基本操作 [itjc8.com]",
+          "09-商品详情-图片预览组件【itjc8.com】",
+          "19课堂案例-tab栏切换结束",
+          "31知识点-修改数组中的值[itjc8.com]",
+          "270.4-2从0到1打造推荐系统-搭建框架",
+          "04.仓库管理模块-完善代码"
+        ],
+        "scores": [
+          {
+            "title": "07-01-字符串的基本操作 [itjc8.com]",
+            "start_sec": 242.92,
+            "rerank_score": 0.7995,
+            "score_hint": 1.0,
+            "text": "大家就这么写就可以了 你写个单语号也可以 写单语号也可以 你看一样的啊 第二个 索引 索引也很简单 它跟类表一样 其实字符串大家就可以看成是一个类表 怎么看呢 里面的每一个字符或者每一个字"
+          },
+          {
+            "title": "09-商品详情-图片预览组件【itjc8.com】",
+            "start_sec": 401.24,
+            "rerank_score": 0.6187,
+            "score_hint": 1.0,
+            "text": "就是我们这个呢 Current Index 就是我们的当前 当前预览 图到什么呀 索引 OK 默论是预览第一张图 零 然后主标经过五张小图的时候 把五张图对应的索引"
+          },
+          {
+            "title": "19课堂案例-tab栏切换结束",
+            "start_sec": 111.84,
+            "rerank_score": 0.6824,
+            "score_hint": 1.0,
+            "text": "可不可以 自定义属性 各位大哥 各位大姐 data-开始后边写个属性名 里边写个值 索引 我就认为它是一 可不可以 可以吧 可以 第二个A标签"
+          },
+          {
+            "title": "31知识点-修改数组中的值[itjc8.com]",
+            "start_sec": 47.12,
+            "rerank_score": 0.5781,
+            "score_hint": 1.0,
+            "text": "但是我们可以这样去写 它的一个基本语法 就是宿主 中国号里面写索引 索引 索引 宿主加索引 这不叫取值吗 给它重新复值 加一个复值用算符 等号重新复值"
+          },
+          {
+            "title": "270.4-2从0到1打造推荐系统-搭建框架",
+            "start_sec": 600.38,
+            "rerank_score": 0.7994,
+            "score_hint": 1.0,
+            "text": "一个关键词 然后呢 这个继续关键词 他所在哪些内容里面 这样的话就建立了这样的一个 索引 好 三步啊 将搜索 关键词啊 转化为内容的结果"
+          },
+          {
+            "title": "04.仓库管理模块-完善代码",
+            "start_sec": 1617.54,
+            "rerank_score": 0.8162,
+            "score_hint": 1.0,
+            "text": "你数据库层面 你应该把它限制住 对 应该在这儿 再加一个啥 索引 是不是这意思 加一个索引 然后呢 这里边 看这"
+          }
+        ]
+      },
+      {
+        "id": "p2-008",
+        "query": "Redis Stream 消息队列怎么用",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 924.0,
+        "titles": [
+          "8-7 Redis-Stream消息队列应用与快速上手(1)",
+          "8-7 Redis-Stream消息队列应用与快速上手(1)",
+          "8-7 Redis-Stream消息队列应用与快速上手(1)",
+          "8-7 Redis-Stream消息队列应用与快速上手",
+          "8-7 Redis-Stream消息队列应用与快速上手",
+          "8-7 Redis-Stream消息队列应用与快速上手"
+        ],
+        "scores": [
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手(1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9719,
+            "score_hint": 3.017293233082707,
+            "text": "哈喽大家好,欢迎来到新一节课 在这课我们再学习一个新的知识点 RedisStream消息队列应用以快速散手 首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手(1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9719,
+            "score_hint": 3.0,
+            "text": "哈喽大家好,欢迎来到新一节课 在这课我们再学习一个新的知识点 RedisStream消息队列应用以快速散手 首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手(1)",
+            "start_sec": 6.42,
+            "rerank_score": 0.9616,
+            "score_hint": 3.0,
+            "text": "首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来看一下 如果基于RedisStream去构建一个消息队列 首先回到第一部分 加上是使用RedisStream"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手",
+            "start_sec": 0.0,
+            "rerank_score": 0.9716,
+            "score_hint": 3.0,
+            "text": "哈喽大家好,欢迎来到新一节课 在这课我们再学习一个新的知识点 RedisStream消息队列应用以快速散手 首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手",
+            "start_sec": 0.0,
+            "rerank_score": 0.9713,
+            "score_hint": 3.017293233082707,
+            "text": "哈喽大家好,欢迎来到新一节课 在这课我们再学习一个新的知识点 RedisStream消息队列应用以快速散手 首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手",
+            "start_sec": 6.42,
+            "rerank_score": 0.9615,
+            "score_hint": 3.0,
+            "text": "首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来看一下 如果基于RedisStream去构建一个消息队列 首先回到第一部分 加上是使用RedisStream"
+          }
+        ]
+      },
+      {
+        "id": "p2-009",
+        "query": "Docker 一键安装 PostgreSQL 和 Redis",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 730.9,
+        "titles": [
+          "4 [itjc8.com]",
+          "6-6 利用Docker一键安装Postgres与Redis [itjc8.com](1)",
+          "6-6 利用Docker一键安装Postgres与Redis [itjc8.com](1)",
+          "6-6 利用Docker一键安装Postgres与Redis [itjc8.com]",
+          "6-6 利用Docker一键安装Postgres与Redis [itjc8.com]",
+          "05.手动部署-部署后端"
+        ],
+        "scores": [
+          {
+            "title": "4 [itjc8.com]",
+            "start_sec": 1819.74,
+            "rerank_score": 0.2222,
+            "score_hint": 1.0,
+            "text": "你需要自己去摸索一下 这是第二个问题 第二个啊问题 这是第二个下载安装 而这个安装的话怎么安装啊 安装 你看这里我给大家详细安装不足了 你只需要83个文件 Ctrl C复制一下 复制放在哪里啊 复制到我们固定的安装目录啊"
+          },
+          {
+            "title": "6-6 利用Docker一键安装Postgres与Redis [itjc8.com](1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9887,
+            "score_hint": 0.9570175438596492,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们可以学习利用Docker一键安装Postgreed与Redis 首先打开客人听用电子书 这节课的内容被我划分成四个部分 第一部分我们会讲解一下软电子集装一下什么是Docker 第二部分我们来看一下Do"
+          },
+          {
+            "title": "6-6 利用Docker一键安装Postgres与Redis [itjc8.com](1)",
+            "start_sec": 338.76,
+            "rerank_score": 0.6498,
+            "score_hint": 1.0,
+            "text": "或者是会失败 我们可以稍等一会 好 可以看到这里提示我们经常有的安装成功 接下来我们来下载Redis的镜像 Docker Google Redis 不断下载这种版本号 就表示下载最新版 也就是Lask这个版本"
+          },
+          {
+            "title": "6-6 利用Docker一键安装Postgres与Redis [itjc8.com]",
+            "start_sec": 0.0,
+            "rerank_score": 0.9887,
+            "score_hint": 0.9570175438596492,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们可以学习利用Docker一键安装Postgreed与Redis 首先打开客人听用电子书 这节课的内容被我划分成四个部分 第一部分我们会讲解一下软电子集装一下什么是Docker 第二部分我们来看一下Do"
+          },
+          {
+            "title": "6-6 利用Docker一键安装Postgres与Redis [itjc8.com]",
+            "start_sec": 338.76,
+            "rerank_score": 0.6498,
+            "score_hint": 1.0,
+            "text": "或者是会失败 我们可以稍等一会 好 可以看到这里提示我们经常有的安装成功 接下来我们来下载Redis的镜像 Docker Google Redis 不断下载这种版本号 就表示下载最新版 也就是Lask这个版本"
+          },
+          {
+            "title": "05.手动部署-部署后端",
+            "start_sec": 1292.0,
+            "rerank_score": 0.2375,
+            "score_hint": 1.0,
+            "text": "你可以查看它的日志 查日志 这个命令 应该常用的命令都要有的 都要汇到 Docker 这是不是学过吧 logs-f 好 来 这个就是要"
+          }
+        ]
+      },
+      {
+        "id": "p2-010",
+        "query": "JWT 的工作原理",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 1267.1,
+        "titles": [
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "21.jwt - 了解jwt的使用方式【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 1.62,
+            "rerank_score": 0.9839,
+            "score_hint": 2.0,
+            "text": "朋友们好,这节课咱们来了解一下JWT的工作原理 首先咱们来看一张图 左侧是浏览器,右侧是服务器 然后我们来看一下JWT它在浏览器与服务器端之间到底是如何来进行工作的 首先咱们浏览器端可以发起一个登录的请求去提交登录的账号还有密码 当账号与密"
+          },
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 1.62,
+            "rerank_score": 0.9839,
+            "score_hint": 1.1777777777777778,
+            "text": "朋友们好,这节课咱们来了解一下JWT的工作原理 首先咱们来看一张图 左侧是浏览器,右侧是服务器 然后我们来看一下JWT它在浏览器与服务器端之间到底是如何来进行工作的 首先咱们浏览器端可以发起一个登录的请求去提交登录的账号还有密码 当账号与密"
+          },
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 138.98,
+            "rerank_score": 0.9935,
+            "score_hint": 2.0,
+            "text": "那服务器呢 就可以将这个token字符串 再还原成一个用户的信息对象 从而来对用户的身份进行验证 OK 那这一节课关于咱们JWT的工作原理 我们就为大家介绍完毕了 在这里一定要记住一点 咱们JWT工作原理的核心 就是服务器生成一个token"
+          },
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 144.88,
+            "rerank_score": 0.9938,
+            "score_hint": 2.0,
+            "text": "从而来对用户的身份进行验证 OK 那这一节课关于咱们JWT的工作原理 我们就为大家介绍完毕了 在这里一定要记住一点 咱们JWT工作原理的核心 就是服务器生成一个token 把用户的信息保存在这个token自围传里面 然后发送给客户端 今后客"
+          },
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 182.76,
+            "rerank_score": 0.9897,
+            "score_hint": 2.0,
+            "text": "在三层里面啊 我们是把用户的信息保存在了服务器端 这是这两者之间的一个很重要的区别 好 那这一节课啊 关于JWT的工作原理 我们就为大家介绍到这里"
+          },
+          {
+            "title": "21.jwt - 了解jwt的使用方式【itjc8.com】",
+            "start_sec": 3.34,
+            "rerank_score": 0.5437,
+            "score_hint": 0.8666666666666667,
+            "text": "朋友们好,这节课咱们来了解一下JWT的使用方式 当客户端收到服务器返回的JWT字符串之后 通常会把它存储在浏览器的local storage或session storage里面 今后咱们客户端每次与服务器通信都要带上JWT的字符串 从而对咱"
+          }
+        ]
+      },
+      {
+        "id": "p2-011",
+        "query": "React 虚拟 DOM 创建过程",
+        "hit_at_6": true,
+        "gold_rank": 4,
+        "n_refs": 6,
+        "latency_ms": 877.4,
+        "titles": [
+          "06-setState同步异步的问题【itjc8.com】",
+          "12-HashRouter和BrowserRouter的本质【itjc8.com】",
+          "12-讨论let和const的提升问题_[itjc8.com]",
+          "12、虚拟DOM创建过程【itjc8.com】",
+          "13-react生命周期-初始化阶段【itjc8.com】",
+          "16-项目初始化-配置路由【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "06-setState同步异步的问题【itjc8.com】",
+            "start_sec": 140.44,
+            "rerank_score": 0.6371,
+            "score_hint": 2.0,
+            "text": "那宣了一个div 好 就是he setState的问题 那我这下面用 react.dom 点rendor rendor的时候 选来一个东西 选来一个app就好了 给个gi"
+          },
+          {
+            "title": "12-HashRouter和BrowserRouter的本质【itjc8.com】",
+            "start_sec": 1179.89,
+            "rerank_score": 0.3971,
+            "score_hint": 2.0,
+            "text": "我们import谁啊 import一个就是花果号 就是hashi 就是我们的root hashi root from react-root-dom 这个hashi root hashi root 等价于root 等价于root 然后呢给它指"
+          },
+          {
+            "title": "12-讨论let和const的提升问题_[itjc8.com]",
+            "start_sec": 1246.77,
+            "rerank_score": 0.6335,
+            "score_hint": 1.0,
+            "text": "提升到最开头 所以这块有一个影视的创建 这里有一个 隐识的 这个创建过程 创建过程 会提升 会提升 到当前 这个作用的最开头 就是你看不见"
+          },
+          {
+            "title": "12、虚拟DOM创建过程【itjc8.com】",
+            "start_sec": 1.65,
+            "rerank_score": 0.7027,
+            "score_hint": 6.040705128205127,
+            "text": "通过前面对H函数以及Vnode函数的讲解 我们知道了 H函数以及Vnode函数 这两个函数呢 它是构成了我们整个虚拟DOM生成的过程 也就是整个虚拟DOM它的创建的过程啊 都是由这两个函数来完成的 那么下面呢 我们再通过一个例子来复习一下 "
+          },
+          {
+            "title": "13-react生命周期-初始化阶段【itjc8.com】",
+            "start_sec": 153.05,
+            "rerank_score": 0.3888,
+            "score_hint": 2.0,
+            "text": "然后和这个地方先来一个APP组件 然后这边用react.dom.random 先来一下这个APP组件 好 给上一个GI root 好 导一下它 input react.dom from react.dom 好 这个地方我们先来一下 就是我们"
+          },
+          {
+            "title": "16-项目初始化-配置路由【itjc8.com】",
+            "start_sec": 240.36,
+            "rerank_score": 0.353,
+            "score_hint": 2.0,
+            "text": "咱们找的app.js 在这个地方去配路由就行 那配路由的步骤 大家应该都还记得啊 in port导入 然后from react-root-dom 我们导一个browser-root add-root 那再导一个什么呢 再导一个叫root 还"
+          }
+        ]
+      },
+      {
+        "id": "p2-012",
+        "query": "Vue 生命周期钩子函数",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 924.3,
+        "titles": [
+          "02-应用级别生命周期",
+          "02-应用级别生命周期",
+          "05-layout-3-请求拦截器携带token",
+          "06-组合API-生命周期【itjc8.com】",
+          "14-1mixins混入【itjc8.com】",
+          "15-生命周期函数【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "02-应用级别生命周期",
+            "start_sec": 165.13,
+            "rerank_score": 0.9821,
+            "score_hint": 1.0,
+            "text": "然后呢 第四超义的 好 总共呢 对应的是八个什么 生命周期 勾字函数 这个咱们肯定要这个背下来的啊 一个基础性的一个问题 好 这是关于咱们这个VUE的啊"
+          },
+          {
+            "title": "02-应用级别生命周期",
+            "start_sec": 176.65,
+            "rerank_score": 0.9917,
+            "score_hint": 1.0,
+            "text": "一个基础性的一个问题 好 这是关于咱们这个VUE的啊 组件的啊 就是页面的 生命周期 分了四个阶段 对应的八个什么 勾字函数 然后呢 老师再扩展问一下"
+          },
+          {
+            "title": "05-layout-3-请求拦截器携带token",
+            "start_sec": 27.22,
+            "rerank_score": 0.4302,
+            "score_hint": 1.0,
+            "text": "成功的这个一级路由的这个大组件里面啊 咱们需要给他做一个数据的请求 怎么做信息请求啊 Created对不对 讲过啊 生命周期 我们在这要干啥呢 要获取我们的一个个人的一个就是管理员的信息 管理员的信息 怎么写啊 大家看接口在这啊"
+          },
+          {
+            "title": "06-组合API-生命周期【itjc8.com】",
+            "start_sec": 583.32,
+            "rerank_score": 0.5685,
+            "score_hint": 2.0,
+            "text": "能懂的意思吗 好意思 再来 我们可以注册 或者说定义 多个相同 叫什么样 钩子 函数 然后去实现不同的逻辑 去实现不同叫什么样 逻辑 这样的话代码就是分开的 比如说我在这里再写一个 OnMounted"
+          },
+          {
+            "title": "14-1mixins混入【itjc8.com】",
+            "start_sec": 565.48,
+            "rerank_score": 0.3548,
+            "score_hint": 1.0,
+            "text": "先打印的mixin 再打印的component是吧 所以说如果说这个mixin和组件里边 都有相同的组件中和mixin 中有相同的生命周期 钩子 会覆盖吗 不会覆盖 合并到一起 那合并的结果呢 是合并的一个数据"
+          },
+          {
+            "title": "15-生命周期函数【itjc8.com】",
+            "start_sec": 163.08,
+            "rerank_score": 0.7138,
+            "score_hint": 1.0,
+            "text": "开发的时候经常用的 打开OS Code 咱们在VUE下边再新建一个文件夹 然后咱们写一个生命周期 这边老师给大家演示一下 生命周期 然后新建文件index.voe voe3常用生命周期 好 然后呢把这个组件呢 咱们导入到入口"
+          }
+        ]
+      },
+      {
+        "id": "p2-013",
+        "query": "Python 生成器怎么用",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 1531.9,
+        "titles": [
+          "12.生成器-2023-8-30-顾安",
+          "12.生成器-2023-8-30-顾安",
+          "3 [itjc8.com]",
+          "08_模型调用方法6大方法",
+          "08_模型调用方法6大方法",
+          "08_模型调用方法6大方法"
+        ],
+        "scores": [
+          {
+            "title": "12.生成器-2023-8-30-顾安",
+            "start_sec": 95.43,
+            "rerank_score": 0.9127,
+            "score_hint": 2.0,
+            "text": "所以说这两块内容的话呢 对现在的大家来说啊应该是比较简单的好吧 好那么我们现在的话呢就正式开始了哈 那么首先的话呢我们先去讲一下 什么叫生成器啊 那么在Python当中的话呢使用咱们的这个生成器啊 它可以很方便的去支持迭代器协议啊 那么也就"
+          },
+          {
+            "title": "12.生成器-2023-8-30-顾安",
+            "start_sec": 2617.89,
+            "rerank_score": 0.9611,
+            "score_hint": 1.0,
+            "text": "其他都很简单 好 那么这样的话呢 就把我们的生成器讲完了 是不是很是不是很简单 生成器 他主要的一个不同点跟咱们的普通函数不同点是哪里 就一个样的 其他的都一样啊 然后第二第二点的话呢 就是说我们的函数可以直接被调用"
+          },
+          {
+            "title": "3 [itjc8.com]",
+            "start_sec": 224.58,
+            "rerank_score": 0.9453,
+            "score_hint": 1.0,
+            "text": "我写一下 啊 训练流行 流行 第一步 生成器 接收 随机造成 随机造成 生成 图像"
+          },
+          {
+            "title": "08_模型调用方法6大方法",
+            "start_sec": 957.81,
+            "rerank_score": 0.9285,
+            "score_hint": 1.0,
+            "text": "OK 就说来搁到这儿啊 来弟兄们 啪 那么你看 生成器 生成器是个什么动作 弟兄们知不知道这个是什么意思 在Python里面这个生成器是什么意思 生成器实质就是个迭代器对象 知不知道这个是什么意思"
+          },
+          {
+            "title": "08_模型调用方法6大方法",
+            "start_sec": 961.91,
+            "rerank_score": 0.9666,
+            "score_hint": 2.0,
+            "text": "啪 那么你看 生成器 生成器是个什么动作 弟兄们知不知道这个是什么意思 在Python里面这个生成器是什么意思 生成器实质就是个迭代器对象 知不知道这个是什么意思 不是不是不是 不是这个啊 不是这个啊稍等一下"
+          },
+          {
+            "title": "08_模型调用方法6大方法",
+            "start_sec": 1020.26,
+            "rerank_score": 0.9731,
+            "score_hint": 1.0,
+            "text": "请大家看 Genarator这个响应类型 也就是说在我们的流失数里 你要返回的是个什么鬼 Genarator是个什么 生成器 如果你的Python 你根本分不清这三个是什么 你真的是要好好地看一下上规谷 张天宇老师讲的Python高阶部分 "
+          }
+        ]
+      },
+      {
+        "id": "p2-014",
+        "query": "Python 迭代器是什么",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 4144.8,
+        "titles": [
+          "10-04-迭代器（了解）",
+          "24、Generator函数基本使用【itjc8.com】",
+          "26、Generator函数中的this问题【itjc8.com】",
+          "12.生成器-2023-8-30-顾安",
+          "11_提示词模板之构造方法",
+          "12_创建提示词PromptTemplate下集 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "10-04-迭代器（了解）",
+            "start_sec": 141.92,
+            "rerank_score": 0.9783,
+            "score_hint": 1.6285714285714283,
+            "text": "from 传了一个 我们需要先导一个包 我们需要先导一个包 这个包 这个是迭代器 我们叫做 右边这个叫可迭代对象 这个包在collections里面的ABC里面 这个老版本的是不写ABC 但是现在多挪到了ABC"
+          },
+          {
+            "title": "24、Generator函数基本使用【itjc8.com】",
+            "start_sec": 185.57,
+            "rerank_score": 0.5992,
+            "score_hint": 1.0,
+            "text": "他返回的是一个迭代器 所以说啊 在这呢 我们需要在这儿去接收一下 他返回的这个啊 迭代器 然后接下来的话 我们需要去调用这个迭代器当中的 nix的这个函数 才能够完成 对我们这个generator函数的一个"
+          },
+          {
+            "title": "26、Generator函数中的this问题【itjc8.com】",
+            "start_sec": 128.33,
+            "rerank_score": 0.8931,
+            "score_hint": 1.0,
+            "text": "好 当然我们在这儿 是不是也要去调用一下 拿到他的一个相应的 这个什么呀 迭代器 对吧 迭代了一个对象 好 然后紧跟着 我们去调用他的一个next"
+          },
+          {
+            "title": "12.生成器-2023-8-30-顾安",
+            "start_sec": 6823.66,
+            "rerank_score": 0.0862,
+            "score_hint": 1.0,
+            "text": "不是GitHub Git之灵 然后还有一个是什么呢 还有一个是 Python当然肯定有对吧 Python 然后还有一个叫 JavaScript 然后呢 我看到我们之前有一个同事啊 他那个衬衫啊"
+          },
+          {
+            "title": "11_提示词模板之构造方法",
+            "start_sec": 152.09,
+            "rerank_score": 0.8738,
+            "score_hint": 1.0,
+            "text": "那么 这个像什么Zip函数啊 这些 还有这个 推导式啊 迭代器 这些高阶知识的话 那么请同学们呢 还是下去呢 自己找资料呢 去看看啊"
+          },
+          {
+            "title": "12_创建提示词PromptTemplate下集 [itjc8.com]",
+            "start_sec": 61.98,
+            "rerank_score": 0.9681,
+            "score_hint": 1.0,
+            "text": "迭代式 生成式 那么也就是我们的 comprehension 推导式 迭代器 生成器 那么这些东东 各位同学 这些是非常非常重要的 Python高阶语法的"
+          }
+        ]
+      },
+      {
+        "id": "p2-015",
+        "query": "SQL 案例讲解",
+        "hit_at_6": true,
+        "gold_rank": 4,
+        "n_refs": 6,
+        "latency_ms": 1106.9,
+        "titles": [
+          "09_中断补充信息",
+          "12-06-作业答案讲解",
+          "15-首页主体-左侧分类-骨架效果【itjc8.com】",
+          "65.3-3SQL案例讲解",
+          "178.4-4手把手带你写FlinkSQL实现实时计算",
+          "1-2 串讲-大模型必备Python语言 2025-10-23 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "09_中断补充信息",
+            "start_sec": 662.32,
+            "rerank_score": 0.1193,
+            "score_hint": 1.0,
+            "text": "首先第一步 builder 对吧 这步一道熟练 标调点什么 sql 看什么 穿状态 那什么 状态叫reviewer state ok"
+          },
+          {
+            "title": "12-06-作业答案讲解",
+            "start_sec": 583.38,
+            "rerank_score": 0.0507,
+            "score_hint": 1.0,
+            "text": "我在下面这样子啊 我给它创建一个点创建一个圆 比如说我先创建一个圆 嗯 sql等于 sql 括号 这个圆呢我们是需要有半径 假设这个半径是6 然后需要给它个圆心 这个圆心呢"
+          },
+          {
+            "title": "15-首页主体-左侧分类-骨架效果【itjc8.com】",
+            "start_sec": 1703.96,
+            "rerank_score": 0.096,
+            "score_hint": 1.0,
+            "text": "没数据的时候就是再加载 好 主价用起来 怎么用 叫小物 先 sql e o n 两个 代表两个子分类"
+          },
+          {
+            "title": "65.3-3SQL案例讲解",
+            "start_sec": 0.28,
+            "rerank_score": 0.1,
+            "score_hint": 0.4449048343527805,
+            "text": "这小节我们来看一下Circle的案例小节 我们通过写Circle去实操一下 DDL DML 对于DML的部分呢 我们主要来讲啊"
+          },
+          {
+            "title": "178.4-4手把手带你写FlinkSQL实现实时计算",
+            "start_sec": 357.65,
+            "rerank_score": 0.7518,
+            "score_hint": 2.0,
+            "text": "刚才那个大屏的案例啊 啊 啊 我们来看了一下整个的 它这个用工具化配置的过程 然后我们再来看一个写SQL的案例啊 然后呢 这个场景是什么呢 我要统计最近十分钟活跃的用户数啊 大家知道最近十分钟啊 它肯定是从上一分钟开始啊"
+          },
+          {
+            "title": "1-2 串讲-大模型必备Python语言 2025-10-23 [itjc8.com]",
+            "start_sec": 5649.57,
+            "rerank_score": 0.054,
+            "score_hint": 1.0,
+            "text": "这个判断的综合案例 判断 判断结构的综合案例 案例 综合 案例 咱们通过这个带趋势性的小游戏 让大家对这个判断结构 做一个共同性格的一个理解和认识 好 这个"
+          }
+        ]
+      },
+      {
+        "id": "p2-016",
+        "query": "LoRA 微调介绍",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 965.4,
+        "titles": [
+          "大模型微调技术之数据清洗（二） [itjc8.com]",
+          "大模型微调技术之数据清洗（二） [itjc8.com]",
+          "大模型微调技术之数据清洗（二） [itjc8.com]",
+          "1 [itjc8.com]",
+          "1 [itjc8.com]",
+          "06_DU模块&LLM通用问题（重要） [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "大模型微调技术之数据清洗（二） [itjc8.com]",
+            "start_sec": 6228.28,
+            "rerank_score": 0.8232,
+            "score_hint": 2.0,
+            "text": "大家在实际过程中 基本上很难用到的 特别这个微调这个技术 理论则是一般很少用到的 好然后 Lora微调1.5G的显存不够 肯定1.5G显存太少了 然后 然后 这个9点16分或求续同学说 微调就是不动员的参数"
+          },
+          {
+            "title": "大模型微调技术之数据清洗（二） [itjc8.com]",
+            "start_sec": 6292.99,
+            "rerank_score": 0.844,
+            "score_hint": 2.0,
+            "text": "一般水平的至少30万几部 然后说再好一点的 50万左右 然后你是非常牛逼的 几百万都有 Lora微调一般就是1万左右吧 讲完代码 代码 课后面还会讲什么 我们会讲评估 大模型的评估"
+          },
+          {
+            "title": "大模型微调技术之数据清洗（二） [itjc8.com]",
+            "start_sec": 6313.25,
+            "rerank_score": 0.9534,
+            "score_hint": 2.0,
+            "text": "我们会讲评估 大模型的评估 然后讲完大模型的评估之后 我们会讲这个大模型的量化 大概就先讲到这里 Lora微调笔记本 最好你就是游戏本 307年那些16GB的显存 应该还OK 然后比例还是有的 就藤家藤同学就是说"
+          },
+          {
+            "title": "1 [itjc8.com]",
+            "start_sec": 1254.16,
+            "rerank_score": 0.318,
+            "score_hint": 1.0,
+            "text": "这里边有几个过程 预训练 一个是微调 微调 比如说 微调 看一下这里边 这里有个人 他就相当于包着很多书 代表了通过自监督学习 自监督学习"
+          },
+          {
+            "title": "1 [itjc8.com]",
+            "start_sec": 2641.22,
+            "rerank_score": 0.259,
+            "score_hint": 1.0,
+            "text": "有海量的 由自然语言指定 和对应输出 组成的数据 对模型微调 微调 并翻却理解 执行各种未建国的使用 好 那第三个阶段 就是目前"
+          },
+          {
+            "title": "06_DU模块&LLM通用问题（重要） [itjc8.com]",
+            "start_sec": 878.18,
+            "rerank_score": 0.4002,
+            "score_hint": 2.0,
+            "text": "一般来说看你是微调的场景 你是做高效微调还是全餐微调 正常情况下大家轻易不要尝试全餐 如果你不熟悉的话 先尝试那个LORA就行就好了 先LORA微调 如果你LORA怎么调效果都不好 再去做那个全餐 由小到大去试 然后多少数据呢 一般来说啊"
+          }
+        ]
+      },
+      {
+        "id": "p2-017",
+        "query": "产品经理 立项评审",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 2125.9,
+        "titles": [
+          "04.1-3产品全生命周期管理【itjc8.com】",
+          "5--[视频]4-5 立项评审",
+          "10.2-2竞品分析",
+          "12--[视频]12.第04周作业点评",
+          "21.4-1带你写好PRD【itjc8.com】",
+          "3 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "04.1-3产品全生命周期管理【itjc8.com】",
+            "start_sec": 442.74,
+            "rerank_score": 0.0436,
+            "score_hint": 1.0,
+            "text": "用户的心智 对吧 都需要我们 去深刻的去进行动场 那么在产品的阶约阶段的话 产品经理 务必进行体系化的思考 切不可跳过产品的 这个战略直接出方案 不然达到出来的产品 将缺乏这个系统性和整体性"
+          },
+          {
+            "title": "5--[视频]4-5 立项评审",
+            "start_sec": 21.46,
+            "rerank_score": 0.7195,
+            "score_hint": 5.2,
+            "text": "我们后面还要再继续完善 这个在工作当中呢 也是一个非常常见的啊 这个场景 每一个同学呢都要练习这个功能哈 那我们接下来看一下这个立项评审该怎么做啊 首先我们结合前面的这个内容 把这个立项说明书啊 主要去汇总整理一下 所以第一部分来看一下立项"
+          },
+          {
+            "title": "10.2-2竞品分析",
+            "start_sec": 931.81,
+            "rerank_score": 0.1109,
+            "score_hint": 1.0,
+            "text": "这个 这个四批理论啊 这个四批理论是 百度的啊 原来做搜索的 产品经理 于君啊 提出来的四批理论 那么 即一个产品 如果要成功的话"
+          },
+          {
+            "title": "12--[视频]12.第04周作业点评",
+            "start_sec": 10629.19,
+            "rerank_score": 0.897,
+            "score_hint": 1.0,
+            "text": "维度来写呢啊 那其实综合起来 其实就就一句话啊 就一句话 是吧 立项评审 我的简介就是 就是我这里说的这个立项啊 项目立项的一个简介 就是我 做这个是为了搞定这个"
+          },
+          {
+            "title": "21.4-1带你写好PRD【itjc8.com】",
+            "start_sec": 206.47,
+            "rerank_score": 0.1015,
+            "score_hint": 1.0,
+            "text": "设计师 测试 老板老板也会看 老板也会看 那么项目经理 产品经理 运营 比如说 有些 你这个PRD里面可能会涉及到运营相关的一些 这个"
+          },
+          {
+            "title": "3 [itjc8.com]",
+            "start_sec": 785.09,
+            "rerank_score": 0.2399,
+            "score_hint": 1.0,
+            "text": "要求我有金融行业背景 这个的话就是 你可以 你如果是产品经理肯定是的 产品经理 产品经理 经理 绝对需要 绝对需要 需要行业背景 这个毫无疑问"
+          }
+        ]
+      },
+      {
+        "id": "p2-018",
+        "query": "Less 变量和嵌套",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 950.3,
+        "titles": [
+          "01-初始化-2-构建项目",
+          "01-初始化-2-构建项目",
+          "09-原生css变量基本使用【itjc8.com】",
+          "10-导入【itjc8.com】",
+          "21-首页-less的自动化导入-02自动导入【itjc8.com】",
+          "未命名(41)【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "01-初始化-2-构建项目",
+            "start_sec": 109.92,
+            "rerank_score": 0.9866,
+            "score_hint": 2.0,
+            "text": "那么sass和less的一个 scss和less的语法很像 都支持嵌套 都支持嵌套变量 他俩就是大概的最不同的地方 就是less生命变量是at sus生命变量是dollar 仅此而已 所以说这一块呢 咱们就用的是谁呢 用的是sus"
+          },
+          {
+            "title": "01-初始化-2-构建项目",
+            "start_sec": 109.92,
+            "rerank_score": 0.9866,
+            "score_hint": 2.0,
+            "text": "那么sass和less的一个 scss和less的语法很像 都支持嵌套 都支持嵌套变量 他俩就是大概的最不同的地方 就是less生命变量是at sus生命变量是dollar 仅此而已 所以说这一块呢 咱们就用的是谁呢 用的是sus"
+          },
+          {
+            "title": "09-原生css变量基本使用【itjc8.com】",
+            "start_sec": 62.83,
+            "rerank_score": 0.7483,
+            "score_hint": 2.0,
+            "text": "在前边课程里边有没有学过啊 是在哪儿学的 如果学过的话 在哪儿学的 这是咱们浏览器原生支持的 就像LessSaaS定义变量一样 一种方式 这个没有关系 没有学过就说 没有学过 咱们可以再讲一讲"
+          },
+          {
+            "title": "10-导入【itjc8.com】",
+            "start_sec": 263.82,
+            "rerank_score": 0.7298,
+            "score_hint": 2.0,
+            "text": "点Less 好 看见这14了吗 好 此时注意来看 我想把咱们之前写过一个变量点Less 是不是有这个东西啊 我要给它怎么样呢 导入到我的十四当中 明白了吗 就把这两个less合成一个"
+          },
+          {
+            "title": "21-首页-less的自动化导入-02自动导入【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.9392,
+            "score_hint": 2.0,
+            "text": "变量和less的混入也使用了 但是使用时有一个痛点 就是使用前必须导入 那每个文件使用前都得导入 所以我们有一个解决方案 我们可以完成什么样"
+          },
+          {
+            "title": "未命名(41)【itjc8.com】",
+            "start_sec": 307.27,
+            "rerank_score": 0.7173,
+            "score_hint": 2.0,
+            "text": "重点这一块的话呢 Less的中文化导路 其实分为两个知识点 一个呢 是大家知道 怎样在Less里去读写变量 这个肯定知道 还有呢 Less的混路是什么意思 这是一个知识点 第二个知识点呢"
+          }
+        ]
+      },
+      {
+        "id": "p2-019",
+        "query": "Vue Router 基础使用",
+        "hit_at_6": true,
+        "gold_rank": 3,
+        "n_refs": 6,
+        "latency_ms": 669.6,
+        "titles": [
+          "01-路由-4-下载导入使用",
+          "03_如何使用路由【itjc8.com】",
+          "05_vue-router基础使用【itjc8.com】",
+          "20-项目复盘【itjc8.com】",
+          "23、复习VueRouter工作原理【itjc8.com】",
+          "38、组件创建测试【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "01-路由-4-下载导入使用",
+            "start_sec": 439.07,
+            "rerank_score": 0.356,
+            "score_hint": 2.0,
+            "text": "第零步 第零步 大家需要先下载 NPM I 空格 我们这个啥呢 VUE-Router Router 这个版本指不指定都行 咱们就按照人家PPT的来吧 3.5.3 第零步"
+          },
+          {
+            "title": "03_如何使用路由【itjc8.com】",
+            "start_sec": 122.76,
+            "rerank_score": 0.2841,
+            "score_hint": 2.0,
+            "text": "是不是非常的香啊 非常香 好了那其他的优点呢 大家可以自行查阅官网 好了那这就是我们要介绍的 Vue Router 好那我们来做一个小节 那小伙伴们 我们以后在Vue项目当中 如何实现路由呢 哎非常好"
+          },
+          {
+            "title": "05_vue-router基础使用【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.8688,
+            "score_hint": 1.0720059198542806,
+            "text": "那刚刚我们已经铺垫的够多了 那接下来我们就来开始学习一下 Viu-Router是如何在Viu项目中使用的 那我们带着这个问题一起来学习一下 那么我们要学习的呢 就是Viu-Router的语法规则 所以大家重点的是记住规则 那我们先来看一下右"
+          },
+          {
+            "title": "20-项目复盘【itjc8.com】",
+            "start_sec": 743.44,
+            "rerank_score": 0.6071,
+            "score_hint": 2.0,
+            "text": "最好的方式呢 就是尽量多写一点 尽量多写一点 然后这是技术方案 技术方案是不是Vue.js Vue.router Vue.x SaaS AXS Element UI WidePack"
+          },
+          {
+            "title": "23、复习VueRouter工作原理【itjc8.com】",
+            "start_sec": 136.88,
+            "rerank_score": 0.9789,
+            "score_hint": 0.8546448087431694,
+            "text": "再有呢 也是根据当前的这个路由地址 找到对应的组件 然后进行一个渲染就可以了 那么接下来呢 我们再来分析一下这个ViewRouter 先来看一下它的一个基本使用 那么我们在写它的这个核心代码之前啊 我们先看一下它的一个基本使用 那么我们把这"
+          },
+          {
+            "title": "38、组件创建测试【itjc8.com】",
+            "start_sec": 650.5,
+            "rerank_score": 0.5042,
+            "score_hint": 2.0,
+            "text": "我们在这怎么着 哎 我们也去新建这么一个GS文件 我直接把这个文件的名啊 把它复制一下 然后找到我们自己的这个买-vue-router 对吧 然后我们在这呢 去新建这样的一个GS文件 好 那这个GS文件当中"
+          }
+        ]
+      },
+      {
+        "id": "p2-020",
+        "query": "Webpack 配置代理",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 2575.6,
+        "titles": [
+          "4.2开发环境解决跨越代理【itjc8.com】",
+          "05.webpack_使用前_准备_[itjc8.com]",
+          "11-创建折线图项目_[itjc8.com]",
+          "12-1正向代理解释【itjc8.com】",
+          "12-webpack打包最基础的配置_[itjc8.com]",
+          "13.webpack_打包css文件和代码_[itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "4.2开发环境解决跨越代理【itjc8.com】",
+            "start_sec": 138.68,
+            "rerank_score": 0.9358,
+            "score_hint": 2.0,
+            "text": "中间层就是咱们的代理 我们代理 好 回到讲义 那么这个就是未有CLI配置 webpack的一个叫做反向代理 这个其实就是它的反向代理的原理 那么反向代理其实听上去很高级 实际上很简单 只是几个选项 一个选项"
+          },
+          {
+            "title": "05.webpack_使用前_准备_[itjc8.com]",
+            "start_sec": 333.01,
+            "rerank_score": 0.1726,
+            "score_hint": 1.0,
+            "text": "就是这两个包是开发环境使用 开发环境使用 OK那接下来我们再回到这边 好NPMI 那第一个包名别写错了啊 WebPack 那第二个包名用空格隔开 叫CRI 然后杠大D回车 好下完包 那是不是都在这个"
+          },
+          {
+            "title": "11-创建折线图项目_[itjc8.com]",
+            "start_sec": 775.04,
+            "rerank_score": 0.2824,
+            "score_hint": 1.0,
+            "text": "不行 所以我们才在路的环境下才用得 但现在我以后开发就这么用了 有问题咋办呢 用什么解决 Webpack 对了 这上一个说的 Webpack它可以处理浏览器的 这个GSI间的问题 现在它有问题"
+          },
+          {
+            "title": "12-1正向代理解释【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.2236,
+            "score_hint": 0.6347826086956522,
+            "text": "刚才咱们已经知道了解决跨越问题有三种对不对 咱们前面只需要掌握哪一种 配置反向代理对不对 而且仅仅需要掌握的是通过WirePath来配置代理 对不对 仅仅需要理解通过WirePath来配置代理是怎么配置的 好那在讲这个代理之前呢 配置之前呢"
+          },
+          {
+            "title": "12-webpack打包最基础的配置_[itjc8.com]",
+            "start_sec": 372.03,
+            "rerank_score": 0.8478,
+            "score_hint": 1.0,
+            "text": "没有多难 好了我们来说一下WebPack 最简单的配置 最简单的配置 没有之一了 WebPack 基本使用 第一呢就是你确保下载了那些包 确保下载了 这个WebPack 和WebPack"
+          },
+          {
+            "title": "13.webpack_打包css文件和代码_[itjc8.com]",
+            "start_sec": 656.16,
+            "rerank_score": 0.2403,
+            "score_hint": 1.0,
+            "text": "就可以了 好 代码提交一下 好 那刚刚我们讲的是 webpack 加载器 处理CSS文件 html是不是也在这里 还有一个是 插件"
+          }
+        ]
+      },
+      {
+        "id": "p2-021",
+        "query": "Vue 组件通信 父向子",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 3947.6,
+        "titles": [
+          "02-组件-1-导入",
+          "05_组件通信_父向子【itjc8.com】",
+          "07-小结",
+          "08-defineProps与Typescript【itjc8.com】",
+          "18-父传子【itjc8.com】",
+          "18-父传子【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "02-组件-1-导入",
+            "start_sec": 67.02,
+            "rerank_score": 0.8271,
+            "score_hint": 1.0,
+            "text": "那个主页面 我都能看得见 你这不行的 那么我们今天学完这个知识 就叫组件通信 组件通信 以及组件相关的基础 大家就清楚 原来VoE可以这样玩 我们可以让APP.Vo有啥 有子组件"
+          },
+          {
+            "title": "05_组件通信_父向子【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.2059,
+            "score_hint": 4.2596491228070175,
+            "text": "那接下来我们要学习的是第二个部分 叫做View的组件通信 那首先先问大家一个问题 那我想从一个组件内 给另外一个组件传值 那就比如像我们刚刚 是不是我想从APP.View这个组件"
+          },
+          {
+            "title": "07-小结",
+            "start_sec": 81.48,
+            "rerank_score": 0.1548,
+            "score_hint": 1.0,
+            "text": "好 再往后的话呢 就来到了啥呢 我们所谓的一个叫组件通信 我们今天的一个核心 组件通信 组件通信主要讲的两个 一个叫复给子 那么复给子用大白话来讲的话 其实就是所谓的我们的行餐食餐 大白话"
+          },
+          {
+            "title": "08-defineProps与Typescript【itjc8.com】",
+            "start_sec": 0.62,
+            "rerank_score": 0.6114,
+            "score_hint": 1.0,
+            "text": "好,下边的小伙伴们,咱们讲一下啊,咱们无优异里边啊,组件通信的时候呢,咱们之前学了几个函数是吧,比方说这个define props,define ms是吧,他们呢,在组件通信的时候呢,咱们这个接收数据啊,啊,触发自定义事件子传复的时候呢,需"
+          },
+          {
+            "title": "18-父传子【itjc8.com】",
+            "start_sec": 206.55,
+            "rerank_score": 0.9692,
+            "score_hint": 1.0,
+            "text": "接下来呢 咱们在VIO下边呢 再新建一个文件夹 比方说咱们就叫父子 这样咱们就叫组件通信吧 组件通信 然后下边呢 新建这个组件啊 这个index咱们叫 就相当于咱们这个副组件吧 因为是副子通信吧"
+          },
+          {
+            "title": "18-父传子【itjc8.com】",
+            "start_sec": 343.6,
+            "rerank_score": 0.8289,
+            "score_hint": 1.0,
+            "text": "导入咱们这个副组件 是吧 挂载渲染显示 import.gum 下边的 组件通信 是吧 gumindex.we 副渲染呢 咱们子跟着就选,是吧 保存"
+          }
+        ]
+      },
+      {
+        "id": "p2-022",
+        "query": "Docker Sandbox 沙箱怎么配置",
+        "hit_at_6": true,
+        "gold_rank": 5,
+        "n_refs": 6,
+        "latency_ms": 548.5,
+        "titles": [
+          "12-4 MoocManus沙箱扩展基础协议约定与设计 [itjc8.com](1)",
+          "12-4 MoocManus沙箱扩展基础协议约定与设计 [itjc8.com]",
+          "13-15 Dockerfile文件配置修正与镜像容器构建 [itjc8.com](1)",
+          "13-15 Dockerfile文件配置修正与镜像容器构建 [itjc8.com]",
+          "14-2 基于Docker的Sandbox扩展初始化与配置开发(1)",
+          "14-2 基于Docker的Sandbox扩展初始化与配置开发"
+        ],
+        "scores": [
+          {
+            "title": "12-4 MoocManus沙箱扩展基础协议约定与设计 [itjc8.com](1)",
+            "start_sec": 835.32,
+            "rerank_score": 0.2718,
+            "score_hint": 1.0,
+            "text": "或者是说 这个撒乡被人为关闭了 但是程序感知不到 所以我们必须写多一个函数去判断一下 就N书 Sandbox 反正性的就是NUM 确保当前撒乡存在 如果不存在 会创建 好"
+          },
+          {
+            "title": "12-4 MoocManus沙箱扩展基础协议约定与设计 [itjc8.com]",
+            "start_sec": 835.32,
+            "rerank_score": 0.2718,
+            "score_hint": 1.0,
+            "text": "或者是说 这个撒乡被人为关闭了 但是程序感知不到 所以我们必须写多一个函数去判断一下 就N书 Sandbox 反正性的就是NUM 确保当前撒乡存在 如果不存在 会创建 好"
+          },
+          {
+            "title": "13-15 Dockerfile文件配置修正与镜像容器构建 [itjc8.com](1)",
+            "start_sec": 252.83,
+            "rerank_score": 0.5264,
+            "score_hint": 1.0,
+            "text": "我们可以运行命令 DockerView -T表示我们这个镜像 它的一个名字 假设其名称 Sandbox -Dip 接下来我们需要告诉这个命令 我们当前构建环境的上下文 也都是当前目录 所以我们传递一点"
+          },
+          {
+            "title": "13-15 Dockerfile文件配置修正与镜像容器构建 [itjc8.com]",
+            "start_sec": 252.83,
+            "rerank_score": 0.5219,
+            "score_hint": 1.0,
+            "text": "我们可以运行命令 DockerView -T表示我们这个镜像 它的一个名字 假设其名称 Sandbox -Dip 接下来我们需要告诉这个命令 我们当前构建环境的上下文 也都是当前目录 所以我们传递一点"
+          },
+          {
+            "title": "14-2 基于Docker的Sandbox扩展初始化与配置开发(1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9463,
+            "score_hint": 2.575438596491228,
+            "text": "Hello,大家好,欢迎来到新一节课 这节课我们才完成 基于Docker的Sandbox扩展初始化以配置开发 首先打开ID编辑 首先找到APP 打开API找到call 找到config 这里呢,我们加多个配置"
+          },
+          {
+            "title": "14-2 基于Docker的Sandbox扩展初始化与配置开发",
+            "start_sec": 0.0,
+            "rerank_score": 0.9464,
+            "score_hint": 2.575438596491228,
+            "text": "Hello,大家好,欢迎来到新一节课 这节课我们才完成 基于Docker的Sandbox扩展初始化以配置开发 首先打开ID编辑 首先找到APP 打开API找到call 找到config 这里呢,我们加多个配置"
+          }
+        ]
+      },
+      {
+        "id": "p2-023",
+        "query": "闭包为什么能记住外部变量",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 5760.9,
+        "titles": [
+          "09-02-函数嵌套和闭包（了解）",
+          "9、闭包【itjc8.com】",
+          "9、闭包【itjc8.com】",
+          "9、闭包【itjc8.com】",
+          "10、闭包【itjc8.com】",
+          "6.函数基础 -2023-08-16-顾安"
+        ],
+        "scores": [
+          {
+            "title": "09-02-函数嵌套和闭包（了解）",
+            "start_sec": 22.88,
+            "rerank_score": 0.1128,
+            "score_hint": 0.5571428571428572,
+            "text": "因为会有一种臂包的结构 所以还是需要了解 那么函数名称 我们之前讲过 函数名它既是函数名称 也是指向该函数的变量 只要是指向该函数 就可以调用函数 好我们再来回顾一下 DEF我先写一个FN 写个F1"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 72.45,
+            "rerank_score": 0.9151,
+            "score_hint": 1.0,
+            "text": "第一个是可以答应到的 第一次有 第二次就没有了 大家能理解吗 所以在那里边我们说 闭包 要学闭包 大家得先把这一点牢牢的记住 你一定要记住 一个函数里面盛美的局部变量 按照原则上来讲"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 72.45,
+            "rerank_score": 0.9146,
+            "score_hint": 0.5571428571428572,
+            "text": "第一个是可以答应到的 第一次有 第二次就没有了 大家能理解吗 所以在那里边我们说 闭包 要学闭包 大家得先把这一点牢牢的记住 你一定要记住 一个函数里面盛美的局部变量 按照原则上来讲"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 933.77,
+            "rerank_score": 0.7928,
+            "score_hint": 1.0,
+            "text": "这就称之为 OK吗对吗 只要别的数量无欲 反望到一个函数内部的局部变量了 就叫做什么 闭包 OK吗对吗 这就是闭包 代码形式上看 它就是干什么 就是一个止函数"
+          },
+          {
+            "title": "10、闭包【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.0823,
+            "score_hint": 0.5571428571428572,
+            "text": "我们是不是讲解了币包呀,所谓的币包 是不是就指代的是一个作用域 访问了另外一个作用域的局部变量呀 称为币包,OK吗,对吗 代表形式上看就是 负函数有一个谁 负函数是不是有一个局部变量 我们返回一个谁"
+          },
+          {
+            "title": "6.函数基础 -2023-08-16-顾安",
+            "start_sec": 5051.47,
+            "rerank_score": 0.0421,
+            "score_hint": 1.0,
+            "text": "你在其他的函数当中去用第一个函数里面的这个值是用不了的 是用不了的 能明白吧 所以说这个地方它肯定是错的啊 这个叫无法调用 变量 变量 好能理解吗 那么如果大家 想要干嘛呢 在两个函数当中去使用同一个变量那么我们就需要去定义第二种变量形式了"
+          }
+        ]
+      },
+      {
+        "id": "p2-024",
+        "query": "接口鉴权时 token 怎么校验",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 8093.5,
+        "titles": [
+          "02-我的-个人中心-鉴权",
+          "08-处理修改部门时code重复的情况【itjc8.com】",
+          "16-准备表单内容【itjc8.com】",
+          "3",
+          "3",
+          "15-掌柜问数-问数智能体-流程图流式输出"
+        ],
+        "scores": [
+          {
+            "title": "02-我的-个人中心-鉴权",
+            "start_sec": 21.78,
+            "rerank_score": 0.6946,
+            "score_hint": 5.2,
+            "text": "比方说访问用户的页面 就是个人中心页面的时候 如果他没有登录 不让他访问 是怎么做的呢 通过token 对token是咱们判断的一个条件 是吧 是否有token 那你是在什么地方用token做这个判断的 好"
+          },
+          {
+            "title": "08-处理修改部门时code重复的情况【itjc8.com】",
+            "start_sec": 518.47,
+            "rerank_score": 0.1358,
+            "score_hint": 1.0,
+            "text": "接着回显 好 回显完之后 然后我点它 光标离开 应该是不是会校验的 校验 通过了吧 现在是不是跟我之前的一样 通过了 好 这是有点确定 是不是依然可以修改成功"
+          },
+          {
+            "title": "16-准备表单内容【itjc8.com】",
+            "start_sec": 201.74,
+            "rerank_score": 0.0878,
+            "score_hint": 1.0,
+            "text": "好 这是点组织架构 新加组织门 你看这里边是不是有表达 对吧 还有个表达 并且它点的时候是不是有 校验 这个没做校验是吧 那那个都教验了 它里边是不是应该有校验对吧 不管它有没有 咱们是不是都要做"
+          },
+          {
+            "title": "3",
+            "start_sec": 1460.26,
+            "rerank_score": 0.0465,
+            "score_hint": 1.0,
+            "text": "我们的这个 后段开发 就向我们的接口 来进行 发请求就行了 接口 发请求就行了 我们这里运行 这个接面 运行起来 这个接口"
+          },
+          {
+            "title": "3",
+            "start_sec": 1150.52,
+            "rerank_score": 0.013,
+            "score_hint": 1.0,
+            "text": "代码开发能力 能力 集成 将接口 将接口 接口 集成到 其他系统 API系统工 我们可以 使用这种方式"
+          },
+          {
+            "title": "15-掌柜问数-问数智能体-流程图流式输出",
+            "start_sec": 278.27,
+            "rerank_score": 0.4837,
+            "score_hint": 2.0,
+            "text": "你就可以通过这个 它的这个流适输出的框架 去输出大圆模型 给你返回的token 大致的逻辑就是什么呢 接口给你返回一个token 那graph就返回输出一个token 返回一个token输出一个token 这样一来就能够进行流适的传输了 对"
+          }
+        ]
+      },
+      {
+        "id": "p2-025",
+        "query": "用容器起数据库和缓存",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 7499.9,
+        "titles": [
+          "07-HTTP协议-http缓存的基本认知【itjc8.com】",
+          "15-hooks的复习【itjc8.com】",
+          "15-hooks的复习【itjc8.com】",
+          "23 redis 数据库-2023-09-25-顾安",
+          "05、03-【核心技术】RAG全流程详细拆解与问题优化",
+          "11、笔记点评-答疑-6-1 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "07-HTTP协议-http缓存的基本认知【itjc8.com】",
+            "start_sec": 913.52,
+            "rerank_score": 0.0664,
+            "score_hint": 1.0,
+            "text": "其他你会发现 是不是都是 基本上是迭斯克开选 只要带开选的 一般都是从哪里读 缓存 你看这么多都是缓存 是不是很效率 但是你只要怎么样 就不从缓存里面读 我们刚才是不是"
+          },
+          {
+            "title": "15-hooks的复习【itjc8.com】",
+            "start_sec": 837.12,
+            "rerank_score": 0.028,
+            "score_hint": 1.0,
+            "text": "缓存一个函数 除非依赖像干嘛呢 发生了变化 那如果变化了 它就会重新干嘛呢 缓存 如果依赖像没变 是不是就不缓存 但是对U字Codec不会单独用 而且单独用的话性能变低 为什么呢"
+          },
+          {
+            "title": "15-hooks的复习【itjc8.com】",
+            "start_sec": 893.53,
+            "rerank_score": 0.0256,
+            "score_hint": 1.0,
+            "text": "最后还有一个叫什么 use use谁 use memo 那他呢 缓存 类型的数据 包括是不是 它的用法有两种 还有它语法是怎么用的 conc的一个叫"
+          },
+          {
+            "title": "23 redis 数据库-2023-09-25-顾安",
+            "start_sec": 526.23,
+            "rerank_score": 0.1064,
+            "score_hint": 1.0,
+            "text": "什么缓存呢 就比如说页面缓存 那么还有什么呢 还有我们跟咱们爬虫相关的话呢 就是指纹 缓存 那么还有除了这样的一些信息之外呢 还有我们的验证码缓存是吧 等等 所以说像这个redis数据库 它一般用缓存用的比较多"
+          },
+          {
+            "title": "05、03-【核心技术】RAG全流程详细拆解与问题优化",
+            "start_sec": 2188.4,
+            "rerank_score": 0.0425,
+            "score_hint": 1.0,
+            "text": "大模型生成以外 不是应该直接回复给用户了吗 怎么还有一个节点 后置处理 这个里面封控 缓存 RAG指标上报 这些我都不理解 没关系 反正通过后置处理这个节点 最后一个节点走完了"
+          },
+          {
+            "title": "11、笔记点评-答疑-6-1 [itjc8.com]",
+            "start_sec": 7166.7,
+            "rerank_score": 0.0261,
+            "score_hint": 1.0,
+            "text": "对吧 这里回来要再补一下哈 重复的听再听三遍 后置处理 后置处理 缓存 可以 脱名可以 黑和白和这些都对的 到时候结合我们线下项目再去体会吧 没什么问题哈"
+          }
+        ]
+      },
+      {
+        "id": "p2-026",
+        "query": "父组件怎么把数据传给子组件",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 2486.1,
+        "titles": [
+          "00-回顾",
+          "02-商品案例-6-MyTag组件-控制标签的值",
+          "07-组件通讯-父传子说明【itjc8.com】",
+          "09-1实现el-button的写法_[itjc8.com]",
+          "09-小结",
+          "37.自定义组件 - 父子组件通信 - 了解父子组件【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "00-回顾",
+            "start_sec": 2597.73,
+            "rerank_score": 0.9918,
+            "score_hint": 1.0,
+            "text": "来怎么玩 怎么传 怎么传 打传来着 打传 子组件 首先我给你这写个子组件 然后呢 这个这写个件件号 紫组件 然后呢 同学们 打出来 是不是 直接在紫组件中间把你要放的HTML结构往这一怼 是不是就可以了"
+          },
+          {
+            "title": "02-商品案例-6-MyTag组件-控制标签的值",
+            "start_sec": 1313.65,
+            "rerank_score": 0.9501,
+            "score_hint": 1.0,
+            "text": "好我就给你标上啊 查页 首先查页 是 是组件 子组件 子组件外面的数据 同学们 第一步没有什么代码 大家认不认可 认不认可这件事"
+          },
+          {
+            "title": "07-组件通讯-父传子说明【itjc8.com】",
+            "start_sec": 33.22,
+            "rerank_score": 0.9994,
+            "score_hint": 2.0,
+            "text": "父传子我们要实现的思路是这样子 第一 你父组件去提供数据 因为要父传子嘛 所以一般都是由你父组件通过State去提供数据 第二步 父组件给子组件去添加属性 那添加属性的话 那值是不是就是我们state里面的这个值就可以了 接下来呢 再往下呢"
+          },
+          {
+            "title": "09-1实现el-button的写法_[itjc8.com]",
+            "start_sec": 500.88,
+            "rerank_score": 0.9914,
+            "score_hint": 2.0,
+            "text": "有没有回忆起来 回忆起来了 父子通信 对 就是父子通信 子组件向父组件通信 子组件必须处发一个自定义实践 然后父组件去监听这个自定义实践 对不对 监听这个自定义实践 OK"
+          },
+          {
+            "title": "09-小结",
+            "start_sec": 212.59,
+            "rerank_score": 0.899,
+            "score_hint": 1.0,
+            "text": "解写为 比如说这是我们的子组件 我这写一个 这还不能做这种注释 咱们就直接这样写吧 子组件 子组件咱们就可以解写为 V-model 后面直接把咱们这个 变量的名 给它写在这就可以了"
+          },
+          {
+            "title": "37.自定义组件 - 父子组件通信 - 了解父子组件【itjc8.com】",
+            "start_sec": 2.18,
+            "rerank_score": 0.9954,
+            "score_hint": 2.0,
+            "text": "朋友们好,从这一节课开始啊,咱们一起来学习父子组件之间的通信 那首先,我们来了解一下父子组件之间通信都有哪三种方式啊 分别是属性绑定,事件绑定,还有获取组件的实例 那属性绑定啊,用于父组件向子组件传递数据 而且呢,只能传递Json兼容的数据"
+          }
+        ]
+      },
+      {
+        "id": "p2-027",
+        "query": "装饰器会不会改变原函数",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 2225.0,
+        "titles": [
+          "09-03-装饰器（了解）",
+          "09-03-装饰器（了解）",
+          "09-04-作业答案讲解",
+          "6.函数基础 -2023-08-16-顾安",
+          "12_创建提示词PromptTemplate下集 [itjc8.com]",
+          "29_Tools实战天气查询"
+        ],
+        "scores": [
+          {
+            "title": "09-03-装饰器（了解）",
+            "start_sec": 347.24,
+            "rerank_score": 0.3444,
+            "score_hint": 2.0,
+            "text": "给它返回 返回哦 以后我再给他解释 他怎么去用 这个就是一个装饰器 装饰器我们叫装饰器函数啊 它是写写出来的话 它是一个函数啊 所以 然后我在下面的写一些别的函数吧 比如说"
+          },
+          {
+            "title": "09-03-装饰器（了解）",
+            "start_sec": 438.24,
+            "rerank_score": 0.388,
+            "score_hint": 2.0,
+            "text": "我们写在这个地方的一个函数啊 又套了一层吧 对不对 套了一层的目的是 我外面会把我要装饰的函数传进去 让它一直保存在这个装饰器的函数综域中间 这个也属于函数综域啊 让它不会释放 然后里面呢 我把inner返回返回到外部 大家可以重点看一下这"
+          },
+          {
+            "title": "09-04-作业答案讲解",
+            "start_sec": 1231.22,
+            "rerank_score": 0.9704,
+            "score_hint": 2.0,
+            "text": "只是说如果你将这个装饰器加在这里 它应该是没有什么功能的 对不对 它的功能没有啊 而且要考虑一个问题 我们这个装饰器我专门针对于这个函数 那么这里有个edge吧 装饰器加上去之后呢我们说现在去调 那就不是叫原来的函数 它调的是里面的1了 我"
+          },
+          {
+            "title": "6.函数基础 -2023-08-16-顾安",
+            "start_sec": 7298.37,
+            "rerank_score": 0.961,
+            "score_hint": 2.0,
+            "text": "装饰器的一个最主要的作用是什么 装饰器 最主要的作用是在不修改原有代码的情况下 可以 动态添加当前函数的功能 这个就是函数装饰器的一个最主要的作用 啊 这个其实就是他最主要的作用啊 25的时候 基础可以已经到装饰器了是吧 其实装饰器说难难说"
+          },
+          {
+            "title": "12_创建提示词PromptTemplate下集 [itjc8.com]",
+            "start_sec": 271.89,
+            "rerank_score": 0.6747,
+            "score_hint": 2.0,
+            "text": "你家吧 是不是知道什么叫什么的AOP 前置通知后的通知 你说懂懂懂懂 然后呢 让你说一下Python的装饰器函数 如果你一脸懵逼的话 那么几乎啊 你是不大可能的 请大家一定相信杨哥 所大部分啊"
+          },
+          {
+            "title": "29_Tools实战天气查询",
+            "start_sec": 8.04,
+            "rerank_score": 0.5233,
+            "score_hint": 2.0,
+            "text": "好那么接下来 来咱们呢 带大家玩真的啊 先来最简单的 使用什么 这装饰器就代表这是一个工具函数 请看官网 没毛病吧 一样的啊 就说来 设置database"
+          }
+        ]
+      }
+    ]
+  },
+  "rerank": {
+    "mode": "rerank",
+    "n": 27,
+    "hit_at_6": 18,
+    "hit_rate": 0.6667,
+    "mrr": 0.3963,
+    "empty_refs": 0,
+    "latency_ms": {
+      "mean": 2507.4,
+      "p50": 1699.8,
+      "p95": 5727.4,
+      "min": 488.1,
+      "max": 7754.4
+    },
+    "cases": [
+      {
+        "id": "p2-001",
+        "query": "Python 包管理器 uv 工具怎么用",
+        "hit_at_6": true,
+        "gold_rank": 3,
+        "n_refs": 6,
+        "latency_ms": 1699.8,
+        "titles": [
+          "03-掌柜问数-开发环境-UV使用说明",
+          "5_掌柜智库_导入模块_node_item_nameognition_前置准备工作 [itjc8.com]",
+          "4-2 Python包管理器：uv工具快速上手 [itjc8.com](1)",
+          "4-2 Python包管理器：uv工具快速上手 [itjc8.com](1)",
+          "4-2 Python包管理器：uv工具快速上手 [itjc8.com]",
+          "4-2 Python包管理器：uv工具快速上手 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "03-掌柜问数-开发环境-UV使用说明",
+            "start_sec": 1.98,
+            "rerank_score": 0.7463,
+            "score_hint": 1.3111111111111111,
+            "text": "那各位同学 我们继续往下进行 那接下来呢 我再花几分钟的时间呢 给大家简单的介绍一下 就是这个UV的具体用法 其实它作为一个工具呢 我们主要就是学它什么呀 因为它是一个虚拟环境的管理器 对吧 也是一个依赖的管理器"
+          },
+          {
+            "title": "5_掌柜智库_导入模块_node_item_nameognition_前置准备工作 [itjc8.com]",
+            "start_sec": 960.62,
+            "rerank_score": 0.729,
+            "score_hint": 1.0,
+            "text": "大家这个装上就可以了 这我怎么记得装过来 兄弟们 这几个包是 当然我说这几个包是 UV 这几个包我们是不是都装过来 首先第一个我们要先装的是 Talk这几个包 像是模型底层需要的 这我们是UV爱的"
+          },
+          {
+            "title": "4-2 Python包管理器：uv工具快速上手 [itjc8.com](1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9864,
+            "score_hint": 4.0,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们一起学习 Python包管理器,UV工具快速上手 UV除了是一款高性能的包管理器 它还可以去创建以及管理Python虚拟环境 所以在课程以及项目中 我们会使用UV来去创建以及管理对应的依赖 如果使用U"
+          },
+          {
+            "title": "4-2 Python包管理器：uv工具快速上手 [itjc8.com](1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9862,
+            "score_hint": 4.482705865764242,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们一起学习 Python包管理器,UV工具快速上手 UV除了是一款高性能的包管理器 它还可以去创建以及管理Python虚拟环境 所以在课程以及项目中 我们会使用UV来去创建以及管理对应的依赖 如果使用U"
+          },
+          {
+            "title": "4-2 Python包管理器：uv工具快速上手 [itjc8.com]",
+            "start_sec": 0.0,
+            "rerank_score": 0.9864,
+            "score_hint": 4.0,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们一起学习 Python包管理器,UV工具快速上手 UV除了是一款高性能的包管理器 它还可以去创建以及管理Python虚拟环境 所以在课程以及项目中 我们会使用UV来去创建以及管理对应的依赖 如果使用U"
+          },
+          {
+            "title": "4-2 Python包管理器：uv工具快速上手 [itjc8.com]",
+            "start_sec": 0.0,
+            "rerank_score": 0.9862,
+            "score_hint": 4.482705865764242,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们一起学习 Python包管理器,UV工具快速上手 UV除了是一款高性能的包管理器 它还可以去创建以及管理Python虚拟环境 所以在课程以及项目中 我们会使用UV来去创建以及管理对应的依赖 如果使用U"
+          }
+        ]
+      },
+      {
+        "id": "p2-002",
+        "query": "FastAPI 依赖注入怎么实现",
+        "hit_at_6": true,
+        "gold_rank": 3,
+        "n_refs": 6,
+        "latency_ms": 4284.6,
+        "titles": [
+          "01-跨级组件通讯provide与inject函数【itjc8.com】",
+          "01-跨级组件通讯provide与inject函数【itjc8.com】",
+          "05-依赖注入数据说明【itjc8.com】",
+          "16-组合API-依赖注入【itjc8.com】",
+          "16-组合API-依赖注入【itjc8.com】",
+          "05-掌柜问数-API接口-QueryService依赖注入 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "01-跨级组件通讯provide与inject函数【itjc8.com】",
+            "start_sec": 374.28,
+            "rerank_score": 0.8159,
+            "score_hint": 1.0,
+            "text": "我有三里边 这种方式 实际上思想来源于之前的后台 比方说家伙是吧 有一个叫依赖注入 依赖注入 依赖注入这种概念 通过这种方式的话 咱们去比方说 还是把APP的数据 共享给是吧"
+          },
+          {
+            "title": "01-跨级组件通讯provide与inject函数【itjc8.com】",
+            "start_sec": 872.41,
+            "rerank_score": 0.9486,
+            "score_hint": 1.0,
+            "text": "隔代了啊 爷跟他孙子一个通信了 OK好 然后这个通信的话呢 咱们就可以这个通过这个叫依赖注入的方式 依赖注入 好 那这个第一步呢 那咱们就是他爷爷是吧 就是注入数据是吧 怎么注入呢"
+          },
+          {
+            "title": "05-依赖注入数据说明【itjc8.com】",
+            "start_sec": 72.4,
+            "rerank_score": 0.7771,
+            "score_hint": 1.8666666666666665,
+            "text": "订单详情里边的一些数据啊 对吧 这时候他中间跨了这么多组件啊 所以说呢 咱们提供这个数据的时候呢 是通过依赖注入的方式 是吧 provide是吧 注入了一个数据 一个改咱们数据的一个方法 叫completed是吧"
+          },
+          {
+            "title": "16-组合API-依赖注入【itjc8.com】",
+            "start_sec": 128.24,
+            "rerank_score": 0.7728,
+            "score_hint": 1.8666666666666665,
+            "text": "我想访问到 大组件的一个状态 能懂于什么 共享这个状态 此时可以用 依赖注入 就不用那么麻烦去 写个译文的话 或者导个VoEx进来 知道吧 这种方式更方便"
+          },
+          {
+            "title": "16-组合API-依赖注入【itjc8.com】",
+            "start_sec": 128.24,
+            "rerank_score": 0.7722,
+            "score_hint": 1.0,
+            "text": "我想访问到 大组件的一个状态 能懂于什么 共享这个状态 此时可以用 依赖注入 就不用那么麻烦去 写个译文的话 或者导个VoEx进来 知道吧 这种方式更方便"
+          },
+          {
+            "title": "05-掌柜问数-API接口-QueryService依赖注入 [itjc8.com]",
+            "start_sec": 0.53,
+            "rerank_score": 0.8627,
+            "score_hint": 1.8666666666666665,
+            "text": "好了各位 那Source刚才我们已经定义完毕了 那接下来我们去写一下 这个就是依赖注入的逻辑 好 那按照就是FastAPI 它官方的这个就是推荐 哪有推荐 我们找一下"
+          }
+        ]
+      },
+      {
+        "id": "p2-003",
+        "query": "JavaScript 闭包是什么",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 5727.4,
+        "titles": [
+          "9、闭包【itjc8.com】",
+          "9、闭包【itjc8.com】",
+          "9、闭包【itjc8.com】",
+          "10、闭包【itjc8.com】",
+          "16、闭包的问【itjc8.com】",
+          "18、闭包【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 72.45,
+            "rerank_score": 0.5674,
+            "score_hint": 1.0,
+            "text": "第一个是可以答应到的 第一次有 第二次就没有了 大家能理解吗 所以在那里边我们说 闭包 要学闭包 大家得先把这一点牢牢的记住 你一定要记住 一个函数里面盛美的局部变量 按照原则上来讲"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 72.45,
+            "rerank_score": 0.5604,
+            "score_hint": 0.5571428571428572,
+            "text": "第一个是可以答应到的 第一次有 第二次就没有了 大家能理解吗 所以在那里边我们说 闭包 要学闭包 大家得先把这一点牢牢的记住 你一定要记住 一个函数里面盛美的局部变量 按照原则上来讲"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 933.77,
+            "rerank_score": 0.9895,
+            "score_hint": 1.0,
+            "text": "这就称之为 OK吗对吗 只要别的数量无欲 反望到一个函数内部的局部变量了 就叫做什么 闭包 OK吗对吗 这就是闭包 代码形式上看 它就是干什么 就是一个止函数"
+          },
+          {
+            "title": "10、闭包【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.3971,
+            "score_hint": 0.5571428571428572,
+            "text": "我们是不是讲解了币包呀,所谓的币包 是不是就指代的是一个作用域 访问了另外一个作用域的局部变量呀 称为币包,OK吗,对吗 代表形式上看就是 负函数有一个谁"
+          },
+          {
+            "title": "16、闭包的问【itjc8.com】",
+            "start_sec": 493.65,
+            "rerank_score": 0.6359,
+            "score_hint": 0.5571428571428572,
+            "text": "盗墓的引用也就消失了 那这样的话就会释放 它所占用的一个内存 从而解决了内存泄漏的问题 好了关于这个 闭包的问题呢我们就剪到这"
+          },
+          {
+            "title": "18、闭包【itjc8.com】",
+            "start_sec": 20.13,
+            "rerank_score": 0.4896,
+            "score_hint": 0.5571428571428572,
+            "text": "这就是官方给出的臂包的概念 那我们怎么去理解这个概念呢 简单理解就是臂包 就是能够读取其他函数 内部变量的函数 在JavaScript的这个语言当中 只有函数内部的子函数 才能读取这个局部变量 因此我们可以把这个臂包 简单理解成定义在一个函"
+          }
+        ]
+      },
+      {
+        "id": "p2-004",
+        "query": "Python 装饰器原理",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 3239.4,
+        "titles": [
+          "09-02-函数嵌套和闭包（了解）",
+          "09-03-装饰器（了解）",
+          "6.函数基础 -2023-08-16-顾安",
+          "2 [itjc8.com]",
+          "12_创建提示词PromptTemplate下集 [itjc8.com]",
+          "12_创建提示词PromptTemplate下集 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "09-02-函数嵌套和闭包（了解）",
+            "start_sec": 691.54,
+            "rerank_score": 0.9491,
+            "score_hint": 2.0,
+            "text": "一会我们会讲装饰器 装饰器它就是这么个写法 它必须要函数嵌套 形成必保 才能够做装饰器 装饰器又是Python当中的一个语分 在其他语言当中可能没有这个东西 但是在Python当中 以后大家可能会见到装饰器的写法 所以我也会跟大家说一下 什"
+          },
+          {
+            "title": "09-03-装饰器（了解）",
+            "start_sec": 76.46,
+            "rerank_score": 0.9988,
+            "score_hint": 2.0,
+            "text": "我每一个函数后面 那我想加一个什么功能 或者我每个函数前面 想加个什么功能 那么就可以使用装饰器 所以Python的装饰器 它的作用就是在原函数的前 或者后加功能而已 有这么一个作用 但它不会改变原函数 如果你要改变原函数"
+          },
+          {
+            "title": "6.函数基础 -2023-08-16-顾安",
+            "start_sec": 7294.37,
+            "rerank_score": 0.9813,
+            "score_hint": 1.0,
+            "text": "透支一下啊 就是 嗯 提前给大家去说一下 装饰器的一个最主要的作用是什么 装饰器 最主要的作用是在不修改原有代码的情况下 可以 动态添加当前函数的功能 这个就是函数装饰器的一个最主要的作用 啊"
+          },
+          {
+            "title": "2 [itjc8.com]",
+            "start_sec": 1029.2,
+            "rerank_score": 0.8623,
+            "score_hint": 1.0,
+            "text": "接着我们实现第二个函数 好 我们这里可以定一个什么 可以定一个这个 装饰器 装饰器 Task Task 这里装饰器 定一个装饰器 Name的话就是"
+          },
+          {
+            "title": "12_创建提示词PromptTemplate下集 [itjc8.com]",
+            "start_sec": 257.01,
+            "rerank_score": 0.7281,
+            "score_hint": 2.0,
+            "text": "前置通知后置通知这些东道 所以说如果你是什么Python 如果你要是去大厂面试 人家根本不会问你那些什么基本语法 上来一言不会说 你说一下Python的装饰器函数 然后你要是一脸懵逼的 他可能会问你说 你家吧 是不是知道什么叫什么的AOP "
+          },
+          {
+            "title": "12_创建提示词PromptTemplate下集 [itjc8.com]",
+            "start_sec": 271.89,
+            "rerank_score": 0.8687,
+            "score_hint": 2.0,
+            "text": "你家吧 是不是知道什么叫什么的AOP 前置通知后的通知 你说懂懂懂懂 然后呢 让你说一下Python的装饰器函数 如果你一脸懵逼的话 那么几乎啊 你是不大可能的 请大家一定相信杨哥 所大部分啊"
+          }
+        ]
+      },
+      {
+        "id": "p2-005",
+        "query": "Vue 跨级组件通讯 provide inject 怎么用",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 488.1,
+        "titles": [
+          "3-3 第三方库的两种引入方式",
+          "04-vue3总结【itjc8.com】",
+          "05-context跨级组件通讯的使用【itjc8.com】",
+          "13-vue相关-组件通信-$attrs和$listeners【itjc8.com】",
+          "13-vue相关-组件通信-$attrs和$listeners【itjc8.com】",
+          "15-上午回顾【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "3-3 第三方库的两种引入方式",
+            "start_sec": 85.14,
+            "rerank_score": 0.4218,
+            "score_hint": 1.0,
+            "text": "每个模块都给我加载 这时候我们也可以 使用一个内置插件 来解决这个问题 这个插件叫 provide provide就是提供的意思 提供的意思 provide plugin 它的作用就是 为每一个模块的"
+          },
+          {
+            "title": "04-vue3总结【itjc8.com】",
+            "start_sec": 59.15,
+            "rerank_score": 0.9661,
+            "score_hint": 2.0,
+            "text": "VUE3组合式API 咱们学习的重点就是各种函数 是吧 各种函数 比方说咱们今天上午又学了两个函数 provide inject 做依赖注入 OK 这是咱们VIO3的一个特点 一个特色 可以这么理解"
+          },
+          {
+            "title": "05-context跨级组件通讯的使用【itjc8.com】",
+            "start_sec": 406.51,
+            "rerank_score": 0.6387,
+            "score_hint": 2.7,
+            "text": "可以 你只要把你所有数据都往哪里面放就行 是不是放到我们的副组件这个地方来啊 还有啊 其实一般的做法是什么 还有我的Provide Consumers 所以我一个项目中 其实只要Create一次就行 因为他们是不是得保证一对啊 其实Prov"
+          },
+          {
+            "title": "13-vue相关-组件通信-$attrs和$listeners【itjc8.com】",
+            "start_sec": 74.8,
+            "rerank_score": 0.7288,
+            "score_hint": 2.0,
+            "text": "孙呢将来也希望能够给复传数据 孙也能够给我们的复传数据 好 那这个怎么去玩呢 是这样的 肯定不是我们刚才的provide inject provide inject实际上是不是子后来都有 然后呢 也不太对 它只能实现的就是复给子传 但是呢"
+          },
+          {
+            "title": "13-vue相关-组件通信-$attrs和$listeners【itjc8.com】",
+            "start_sec": 77.06,
+            "rerank_score": 0.7922,
+            "score_hint": 2.0,
+            "text": "孙也能够给我们的复传数据 好 那这个怎么去玩呢 是这样的 肯定不是我们刚才的provide inject provide inject实际上是不是子后来都有 然后呢 也不太对 它只能实现的就是复给子传 但是呢 如果子应该叫孙给我们的复传"
+          },
+          {
+            "title": "15-上午回顾【itjc8.com】",
+            "start_sec": 512.52,
+            "rerank_score": 0.9675,
+            "score_hint": 2.0,
+            "text": "是不是可以拿到组件调方法 然后呢 Dollar Chojun和Dollar Parent 也可以拿子组件 拿我们的副组件 Provide Inject是 我们的父辈可以给子孙后代 是不是去提供某个数据 但这个用的不是那么常用 Dollar "
+          }
+        ]
+      },
+      {
+        "id": "p2-006",
+        "query": "jQuery 对象怎么获取",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 885.3,
+        "titles": [
+          "04.02.表单_整体获取_对象形式_[itjc8.com]",
+          "05-Jquery对象【itjc8.com】",
+          "13.JSONP-使用jQuery发起JSONP数据请求【itjc8.com】",
+          "15.案例-实现发表评论的功能【itjc8.com】",
+          "38.包 - 从哪里下载包【itjc8.com】",
+          "38.包 - 从哪里下载包【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "04.02.表单_整体获取_对象形式_[itjc8.com]",
+            "start_sec": 65.42,
+            "rerank_score": 0.1311,
+            "score_hint": 0.4842850818946437,
+            "text": "那旭哥呀 昨天咱们传的请求题 可不是这样的呀 昨天咱们传的是 哎 这样手写的对象 然后参数名和一个一个的值 我是自己拼接的一个对象 对不对 我们刚才还用了呢 好"
+          },
+          {
+            "title": "05-Jquery对象【itjc8.com】",
+            "start_sec": 1.17,
+            "rerank_score": 0.2487,
+            "score_hint": 0.6398406374501993,
+            "text": "好了,我的同学们好 这一节咱们学习的是gcari对象 gcari中利用选择器获取到的 并不是之前的DOM对象 而是gcari对象 所以上一节我们在学习gcari选择器的时候 再电用DOL的方法获取到的返回值"
+          },
+          {
+            "title": "13.JSONP-使用jQuery发起JSONP数据请求【itjc8.com】",
+            "start_sec": 95.52,
+            "rerank_score": 0.3909,
+            "score_hint": 1.0,
+            "text": "发起 jsonp数据 请求 .html 然后在里面我们先导入一下 jquery script src lib 目录下的 jquery"
+          },
+          {
+            "title": "15.案例-实现发表评论的功能【itjc8.com】",
+            "start_sec": 284.94,
+            "rerank_score": 0.5284,
+            "score_hint": 3.0,
+            "text": "评论发表成功了 同时咱们的表单是不是也被重置了 这是咱们重置表单的一个快捷方法 一定要记住 怎么去做 首先我们获取到表单的jQuery对象 就是通过选择器 是不是 然后咱们定用中括号0 把这个jQuery对象 转换成一个原生的dom对象"
+          },
+          {
+            "title": "38.包 - 从哪里下载包【itjc8.com】",
+            "start_sec": 85.94,
+            "rerank_score": 0.2375,
+            "score_hint": 1.0,
+            "text": "它提供了一个非常大的一个搜索框 通过这个搜索框 我们可以找到自己所需要的包 来咱们试着去找一下 找一下咱们曾经用的最多的一个包 Jquery Jquery 打打看是不是就有 还有咱们再来搜一下 art-template 看有没有"
+          },
+          {
+            "title": "38.包 - 从哪里下载包【itjc8.com】",
+            "start_sec": 88.62,
+            "rerank_score": 0.151,
+            "score_hint": 1.0,
+            "text": "通过这个搜索框 我们可以找到自己所需要的包 来咱们试着去找一下 找一下咱们曾经用的最多的一个包 Jquery Jquery 打打看是不是就有 还有咱们再来搜一下 art-template 看有没有 来看是不是也有"
+          }
+        ]
+      },
+      {
+        "id": "p2-007",
+        "query": "MySQL 索引怎么优化",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 2547.1,
+        "titles": [
+          "07-01-字符串的基本操作 [itjc8.com]",
+          "09-商品详情-图片预览组件【itjc8.com】",
+          "19课堂案例-tab栏切换结束",
+          "31知识点-修改数组中的值[itjc8.com]",
+          "270.4-2从0到1打造推荐系统-搭建框架",
+          "04.仓库管理模块-完善代码"
+        ],
+        "scores": [
+          {
+            "title": "07-01-字符串的基本操作 [itjc8.com]",
+            "start_sec": 242.92,
+            "rerank_score": 0.7995,
+            "score_hint": 1.0,
+            "text": "大家就这么写就可以了 你写个单语号也可以 写单语号也可以 你看一样的啊 第二个 索引 索引也很简单 它跟类表一样 其实字符串大家就可以看成是一个类表 怎么看呢 里面的每一个字符或者每一个字"
+          },
+          {
+            "title": "09-商品详情-图片预览组件【itjc8.com】",
+            "start_sec": 401.24,
+            "rerank_score": 0.6187,
+            "score_hint": 1.0,
+            "text": "就是我们这个呢 Current Index 就是我们的当前 当前预览 图到什么呀 索引 OK 默论是预览第一张图 零 然后主标经过五张小图的时候 把五张图对应的索引"
+          },
+          {
+            "title": "19课堂案例-tab栏切换结束",
+            "start_sec": 111.84,
+            "rerank_score": 0.6824,
+            "score_hint": 1.0,
+            "text": "可不可以 自定义属性 各位大哥 各位大姐 data-开始后边写个属性名 里边写个值 索引 我就认为它是一 可不可以 可以吧 可以 第二个A标签"
+          },
+          {
+            "title": "31知识点-修改数组中的值[itjc8.com]",
+            "start_sec": 47.12,
+            "rerank_score": 0.5781,
+            "score_hint": 1.0,
+            "text": "但是我们可以这样去写 它的一个基本语法 就是宿主 中国号里面写索引 索引 索引 宿主加索引 这不叫取值吗 给它重新复值 加一个复值用算符 等号重新复值"
+          },
+          {
+            "title": "270.4-2从0到1打造推荐系统-搭建框架",
+            "start_sec": 600.38,
+            "rerank_score": 0.7985,
+            "score_hint": 1.0,
+            "text": "一个关键词 然后呢 这个继续关键词 他所在哪些内容里面 这样的话就建立了这样的一个 索引 好 三步啊 将搜索 关键词啊 转化为内容的结果"
+          },
+          {
+            "title": "04.仓库管理模块-完善代码",
+            "start_sec": 1617.54,
+            "rerank_score": 0.8162,
+            "score_hint": 1.0,
+            "text": "你数据库层面 你应该把它限制住 对 应该在这儿 再加一个啥 索引 是不是这意思 加一个索引 然后呢 这里边 看这"
+          }
+        ]
+      },
+      {
+        "id": "p2-008",
+        "query": "Redis Stream 消息队列怎么用",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 1008.8,
+        "titles": [
+          "8-7 Redis-Stream消息队列应用与快速上手(1)",
+          "8-7 Redis-Stream消息队列应用与快速上手(1)",
+          "8-7 Redis-Stream消息队列应用与快速上手(1)",
+          "8-7 Redis-Stream消息队列应用与快速上手",
+          "8-7 Redis-Stream消息队列应用与快速上手",
+          "8-7 Redis-Stream消息队列应用与快速上手"
+        ],
+        "scores": [
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手(1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9719,
+            "score_hint": 3.017293233082707,
+            "text": "哈喽大家好,欢迎来到新一节课 在这课我们再学习一个新的知识点 RedisStream消息队列应用以快速散手 首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手(1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9719,
+            "score_hint": 3.0,
+            "text": "哈喽大家好,欢迎来到新一节课 在这课我们再学习一个新的知识点 RedisStream消息队列应用以快速散手 首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手(1)",
+            "start_sec": 6.42,
+            "rerank_score": 0.9616,
+            "score_hint": 3.0,
+            "text": "首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来看一下 如果基于RedisStream去构建一个消息队列 首先回到第一部分 加上是使用RedisStream"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手",
+            "start_sec": 0.0,
+            "rerank_score": 0.9713,
+            "score_hint": 3.017293233082707,
+            "text": "哈喽大家好,欢迎来到新一节课 在这课我们再学习一个新的知识点 RedisStream消息队列应用以快速散手 首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手",
+            "start_sec": 0.0,
+            "rerank_score": 0.9713,
+            "score_hint": 3.0,
+            "text": "哈喽大家好,欢迎来到新一节课 在这课我们再学习一个新的知识点 RedisStream消息队列应用以快速散手 首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来"
+          },
+          {
+            "title": "8-7 Redis-Stream消息队列应用与快速上手",
+            "start_sec": 6.42,
+            "rerank_score": 0.9614,
+            "score_hint": 3.0,
+            "text": "首先打开客人提供电准书 这节课内容被我画面的两个部分 第一部分我们先来介绍一下 RedisStream初始以禅定命令 第二部分我们来看一下 如果基于RedisStream去构建一个消息队列 首先回到第一部分 加上是使用RedisStream"
+          }
+        ]
+      },
+      {
+        "id": "p2-009",
+        "query": "Docker 一键安装 PostgreSQL 和 Redis",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 572.0,
+        "titles": [
+          "4 [itjc8.com]",
+          "6-6 利用Docker一键安装Postgres与Redis [itjc8.com](1)",
+          "6-6 利用Docker一键安装Postgres与Redis [itjc8.com](1)",
+          "6-6 利用Docker一键安装Postgres与Redis [itjc8.com]",
+          "6-6 利用Docker一键安装Postgres与Redis [itjc8.com]",
+          "05.手动部署-部署后端"
+        ],
+        "scores": [
+          {
+            "title": "4 [itjc8.com]",
+            "start_sec": 1819.74,
+            "rerank_score": 0.2222,
+            "score_hint": 1.0,
+            "text": "你需要自己去摸索一下 这是第二个问题 第二个啊问题 这是第二个下载安装 而这个安装的话怎么安装啊 安装 你看这里我给大家详细安装不足了 你只需要83个文件 Ctrl C复制一下 复制放在哪里啊 复制到我们固定的安装目录啊"
+          },
+          {
+            "title": "6-6 利用Docker一键安装Postgres与Redis [itjc8.com](1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.9888,
+            "score_hint": 0.9570175438596492,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们可以学习利用Docker一键安装Postgreed与Redis 首先打开客人听用电子书 这节课的内容被我划分成四个部分 第一部分我们会讲解一下软电子集装一下什么是Docker 第二部分我们来看一下Do"
+          },
+          {
+            "title": "6-6 利用Docker一键安装Postgres与Redis [itjc8.com](1)",
+            "start_sec": 338.76,
+            "rerank_score": 0.6498,
+            "score_hint": 1.0,
+            "text": "或者是会失败 我们可以稍等一会 好 可以看到这里提示我们经常有的安装成功 接下来我们来下载Redis的镜像 Docker Google Redis 不断下载这种版本号 就表示下载最新版 也就是Lask这个版本"
+          },
+          {
+            "title": "6-6 利用Docker一键安装Postgres与Redis [itjc8.com]",
+            "start_sec": 0.0,
+            "rerank_score": 0.9888,
+            "score_hint": 0.9570175438596492,
+            "text": "哈喽大家好,欢迎来到新一节课 这节课我们可以学习利用Docker一键安装Postgreed与Redis 首先打开客人听用电子书 这节课的内容被我划分成四个部分 第一部分我们会讲解一下软电子集装一下什么是Docker 第二部分我们来看一下Do"
+          },
+          {
+            "title": "6-6 利用Docker一键安装Postgres与Redis [itjc8.com]",
+            "start_sec": 338.76,
+            "rerank_score": 0.6498,
+            "score_hint": 1.0,
+            "text": "或者是会失败 我们可以稍等一会 好 可以看到这里提示我们经常有的安装成功 接下来我们来下载Redis的镜像 Docker Google Redis 不断下载这种版本号 就表示下载最新版 也就是Lask这个版本"
+          },
+          {
+            "title": "05.手动部署-部署后端",
+            "start_sec": 1292.0,
+            "rerank_score": 0.2375,
+            "score_hint": 1.0,
+            "text": "你可以查看它的日志 查日志 这个命令 应该常用的命令都要有的 都要汇到 Docker 这是不是学过吧 logs-f 好 来 这个就是要"
+          }
+        ]
+      },
+      {
+        "id": "p2-010",
+        "query": "JWT 的工作原理",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 1208.1,
+        "titles": [
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "19.jwt - 了解jwt的工作原理【itjc8.com】",
+          "21.jwt - 了解jwt的使用方式【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 1.62,
+            "rerank_score": 0.984,
+            "score_hint": 2.0,
+            "text": "朋友们好,这节课咱们来了解一下JWT的工作原理 首先咱们来看一张图 左侧是浏览器,右侧是服务器 然后我们来看一下JWT它在浏览器与服务器端之间到底是如何来进行工作的 首先咱们浏览器端可以发起一个登录的请求去提交登录的账号还有密码 当账号与密"
+          },
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 1.62,
+            "rerank_score": 0.984,
+            "score_hint": 1.1777777777777778,
+            "text": "朋友们好,这节课咱们来了解一下JWT的工作原理 首先咱们来看一张图 左侧是浏览器,右侧是服务器 然后我们来看一下JWT它在浏览器与服务器端之间到底是如何来进行工作的 首先咱们浏览器端可以发起一个登录的请求去提交登录的账号还有密码 当账号与密"
+          },
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 138.98,
+            "rerank_score": 0.9935,
+            "score_hint": 2.0,
+            "text": "那服务器呢 就可以将这个token字符串 再还原成一个用户的信息对象 从而来对用户的身份进行验证 OK 那这一节课关于咱们JWT的工作原理 我们就为大家介绍完毕了 在这里一定要记住一点 咱们JWT工作原理的核心 就是服务器生成一个token"
+          },
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 144.88,
+            "rerank_score": 0.9938,
+            "score_hint": 2.0,
+            "text": "从而来对用户的身份进行验证 OK 那这一节课关于咱们JWT的工作原理 我们就为大家介绍完毕了 在这里一定要记住一点 咱们JWT工作原理的核心 就是服务器生成一个token 把用户的信息保存在这个token自围传里面 然后发送给客户端 今后客"
+          },
+          {
+            "title": "19.jwt - 了解jwt的工作原理【itjc8.com】",
+            "start_sec": 182.76,
+            "rerank_score": 0.9897,
+            "score_hint": 2.0,
+            "text": "在三层里面啊 我们是把用户的信息保存在了服务器端 这是这两者之间的一个很重要的区别 好 那这一节课啊 关于JWT的工作原理 我们就为大家介绍到这里"
+          },
+          {
+            "title": "21.jwt - 了解jwt的使用方式【itjc8.com】",
+            "start_sec": 3.34,
+            "rerank_score": 0.549,
+            "score_hint": 0.8666666666666667,
+            "text": "朋友们好,这节课咱们来了解一下JWT的使用方式 当客户端收到服务器返回的JWT字符串之后 通常会把它存储在浏览器的local storage或session storage里面 今后咱们客户端每次与服务器通信都要带上JWT的字符串 从而对咱"
+          }
+        ]
+      },
+      {
+        "id": "p2-011",
+        "query": "React 虚拟 DOM 创建过程",
+        "hit_at_6": true,
+        "gold_rank": 4,
+        "n_refs": 6,
+        "latency_ms": 709.6,
+        "titles": [
+          "06-setState同步异步的问题【itjc8.com】",
+          "12-HashRouter和BrowserRouter的本质【itjc8.com】",
+          "12-讨论let和const的提升问题_[itjc8.com]",
+          "12、虚拟DOM创建过程【itjc8.com】",
+          "13-react生命周期-初始化阶段【itjc8.com】",
+          "16-项目初始化-配置路由【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "06-setState同步异步的问题【itjc8.com】",
+            "start_sec": 140.44,
+            "rerank_score": 0.6312,
+            "score_hint": 2.0,
+            "text": "那宣了一个div 好 就是he setState的问题 那我这下面用 react.dom 点rendor rendor的时候 选来一个东西 选来一个app就好了 给个gi"
+          },
+          {
+            "title": "12-HashRouter和BrowserRouter的本质【itjc8.com】",
+            "start_sec": 1179.89,
+            "rerank_score": 0.3375,
+            "score_hint": 2.0,
+            "text": "我们import谁啊 import一个就是花果号 就是hashi 就是我们的root hashi root from react-root-dom 这个hashi root hashi root 等价于root 等价于root 然后呢给它指"
+          },
+          {
+            "title": "12-讨论let和const的提升问题_[itjc8.com]",
+            "start_sec": 1246.77,
+            "rerank_score": 0.624,
+            "score_hint": 1.0,
+            "text": "提升到最开头 所以这块有一个影视的创建 这里有一个 隐识的 这个创建过程 创建过程 会提升 会提升 到当前 这个作用的最开头 就是你看不见"
+          },
+          {
+            "title": "12、虚拟DOM创建过程【itjc8.com】",
+            "start_sec": 1.65,
+            "rerank_score": 0.702,
+            "score_hint": 6.040705128205127,
+            "text": "通过前面对H函数以及Vnode函数的讲解 我们知道了 H函数以及Vnode函数 这两个函数呢 它是构成了我们整个虚拟DOM生成的过程 也就是整个虚拟DOM它的创建的过程啊 都是由这两个函数来完成的 那么下面呢 我们再通过一个例子来复习一下 "
+          },
+          {
+            "title": "13-react生命周期-初始化阶段【itjc8.com】",
+            "start_sec": 153.05,
+            "rerank_score": 0.3888,
+            "score_hint": 2.0,
+            "text": "然后和这个地方先来一个APP组件 然后这边用react.dom.random 先来一下这个APP组件 好 给上一个GI root 好 导一下它 input react.dom from react.dom 好 这个地方我们先来一下 就是我们"
+          },
+          {
+            "title": "16-项目初始化-配置路由【itjc8.com】",
+            "start_sec": 240.36,
+            "rerank_score": 0.3542,
+            "score_hint": 2.0,
+            "text": "咱们找的app.js 在这个地方去配路由就行 那配路由的步骤 大家应该都还记得啊 in port导入 然后from react-root-dom 我们导一个browser-root add-root 那再导一个什么呢 再导一个叫root 还"
+          }
+        ]
+      },
+      {
+        "id": "p2-012",
+        "query": "Vue 生命周期钩子函数",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 728.3,
+        "titles": [
+          "02-应用级别生命周期",
+          "02-应用级别生命周期",
+          "05-layout-3-请求拦截器携带token",
+          "06-组合API-生命周期【itjc8.com】",
+          "14-1mixins混入【itjc8.com】",
+          "15-生命周期函数【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "02-应用级别生命周期",
+            "start_sec": 165.13,
+            "rerank_score": 0.9821,
+            "score_hint": 1.0,
+            "text": "然后呢 第四超义的 好 总共呢 对应的是八个什么 生命周期 勾字函数 这个咱们肯定要这个背下来的啊 一个基础性的一个问题 好 这是关于咱们这个VUE的啊"
+          },
+          {
+            "title": "02-应用级别生命周期",
+            "start_sec": 176.65,
+            "rerank_score": 0.9917,
+            "score_hint": 1.0,
+            "text": "一个基础性的一个问题 好 这是关于咱们这个VUE的啊 组件的啊 就是页面的 生命周期 分了四个阶段 对应的八个什么 勾字函数 然后呢 老师再扩展问一下"
+          },
+          {
+            "title": "05-layout-3-请求拦截器携带token",
+            "start_sec": 27.22,
+            "rerank_score": 0.4302,
+            "score_hint": 1.0,
+            "text": "成功的这个一级路由的这个大组件里面啊 咱们需要给他做一个数据的请求 怎么做信息请求啊 Created对不对 讲过啊 生命周期 我们在这要干啥呢 要获取我们的一个个人的一个就是管理员的信息 管理员的信息 怎么写啊 大家看接口在这啊"
+          },
+          {
+            "title": "06-组合API-生命周期【itjc8.com】",
+            "start_sec": 583.32,
+            "rerank_score": 0.5642,
+            "score_hint": 2.0,
+            "text": "能懂的意思吗 好意思 再来 我们可以注册 或者说定义 多个相同 叫什么样 钩子 函数 然后去实现不同的逻辑 去实现不同叫什么样 逻辑 这样的话代码就是分开的 比如说我在这里再写一个 OnMounted"
+          },
+          {
+            "title": "14-1mixins混入【itjc8.com】",
+            "start_sec": 565.48,
+            "rerank_score": 0.3548,
+            "score_hint": 1.0,
+            "text": "先打印的mixin 再打印的component是吧 所以说如果说这个mixin和组件里边 都有相同的组件中和mixin 中有相同的生命周期 钩子 会覆盖吗 不会覆盖 合并到一起 那合并的结果呢 是合并的一个数据"
+          },
+          {
+            "title": "15-生命周期函数【itjc8.com】",
+            "start_sec": 163.08,
+            "rerank_score": 0.7138,
+            "score_hint": 1.0,
+            "text": "开发的时候经常用的 打开OS Code 咱们在VUE下边再新建一个文件夹 然后咱们写一个生命周期 这边老师给大家演示一下 生命周期 然后新建文件index.voe voe3常用生命周期 好 然后呢把这个组件呢 咱们导入到入口"
+          }
+        ]
+      },
+      {
+        "id": "p2-013",
+        "query": "Python 生成器怎么用",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 1457.8,
+        "titles": [
+          "12.生成器-2023-8-30-顾安",
+          "12.生成器-2023-8-30-顾安",
+          "3 [itjc8.com]",
+          "08_模型调用方法6大方法",
+          "08_模型调用方法6大方法",
+          "08_模型调用方法6大方法"
+        ],
+        "scores": [
+          {
+            "title": "12.生成器-2023-8-30-顾安",
+            "start_sec": 95.43,
+            "rerank_score": 0.912,
+            "score_hint": 2.0,
+            "text": "所以说这两块内容的话呢 对现在的大家来说啊应该是比较简单的好吧 好那么我们现在的话呢就正式开始了哈 那么首先的话呢我们先去讲一下 什么叫生成器啊 那么在Python当中的话呢使用咱们的这个生成器啊 它可以很方便的去支持迭代器协议啊 那么也就"
+          },
+          {
+            "title": "12.生成器-2023-8-30-顾安",
+            "start_sec": 2617.89,
+            "rerank_score": 0.9611,
+            "score_hint": 1.0,
+            "text": "其他都很简单 好 那么这样的话呢 就把我们的生成器讲完了 是不是很是不是很简单 生成器 他主要的一个不同点跟咱们的普通函数不同点是哪里 就一个样的 其他的都一样啊 然后第二第二点的话呢 就是说我们的函数可以直接被调用"
+          },
+          {
+            "title": "3 [itjc8.com]",
+            "start_sec": 224.58,
+            "rerank_score": 0.9453,
+            "score_hint": 1.0,
+            "text": "我写一下 啊 训练流行 流行 第一步 生成器 接收 随机造成 随机造成 生成 图像"
+          },
+          {
+            "title": "08_模型调用方法6大方法",
+            "start_sec": 957.81,
+            "rerank_score": 0.9285,
+            "score_hint": 1.0,
+            "text": "OK 就说来搁到这儿啊 来弟兄们 啪 那么你看 生成器 生成器是个什么动作 弟兄们知不知道这个是什么意思 在Python里面这个生成器是什么意思 生成器实质就是个迭代器对象 知不知道这个是什么意思"
+          },
+          {
+            "title": "08_模型调用方法6大方法",
+            "start_sec": 961.91,
+            "rerank_score": 0.9663,
+            "score_hint": 2.0,
+            "text": "啪 那么你看 生成器 生成器是个什么动作 弟兄们知不知道这个是什么意思 在Python里面这个生成器是什么意思 生成器实质就是个迭代器对象 知不知道这个是什么意思 不是不是不是 不是这个啊 不是这个啊稍等一下"
+          },
+          {
+            "title": "08_模型调用方法6大方法",
+            "start_sec": 1020.26,
+            "rerank_score": 0.9739,
+            "score_hint": 1.0,
+            "text": "请大家看 Genarator这个响应类型 也就是说在我们的流失数里 你要返回的是个什么鬼 Genarator是个什么 生成器 如果你的Python 你根本分不清这三个是什么 你真的是要好好地看一下上规谷 张天宇老师讲的Python高阶部分 "
+          }
+        ]
+      },
+      {
+        "id": "p2-014",
+        "query": "Python 迭代器是什么",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 4446.2,
+        "titles": [
+          "10-04-迭代器（了解）",
+          "24、Generator函数基本使用【itjc8.com】",
+          "26、Generator函数中的this问题【itjc8.com】",
+          "12.生成器-2023-8-30-顾安",
+          "11_提示词模板之构造方法",
+          "12_创建提示词PromptTemplate下集 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "10-04-迭代器（了解）",
+            "start_sec": 141.92,
+            "rerank_score": 0.9783,
+            "score_hint": 1.6285714285714283,
+            "text": "from 传了一个 我们需要先导一个包 我们需要先导一个包 这个包 这个是迭代器 我们叫做 右边这个叫可迭代对象 这个包在collections里面的ABC里面 这个老版本的是不写ABC 但是现在多挪到了ABC"
+          },
+          {
+            "title": "24、Generator函数基本使用【itjc8.com】",
+            "start_sec": 185.57,
+            "rerank_score": 0.5992,
+            "score_hint": 1.0,
+            "text": "他返回的是一个迭代器 所以说啊 在这呢 我们需要在这儿去接收一下 他返回的这个啊 迭代器 然后接下来的话 我们需要去调用这个迭代器当中的 nix的这个函数 才能够完成 对我们这个generator函数的一个"
+          },
+          {
+            "title": "26、Generator函数中的this问题【itjc8.com】",
+            "start_sec": 128.33,
+            "rerank_score": 0.8931,
+            "score_hint": 1.0,
+            "text": "好 当然我们在这儿 是不是也要去调用一下 拿到他的一个相应的 这个什么呀 迭代器 对吧 迭代了一个对象 好 然后紧跟着 我们去调用他的一个next"
+          },
+          {
+            "title": "12.生成器-2023-8-30-顾安",
+            "start_sec": 6823.66,
+            "rerank_score": 0.0862,
+            "score_hint": 1.0,
+            "text": "不是GitHub Git之灵 然后还有一个是什么呢 还有一个是 Python当然肯定有对吧 Python 然后还有一个叫 JavaScript 然后呢 我看到我们之前有一个同事啊 他那个衬衫啊"
+          },
+          {
+            "title": "11_提示词模板之构造方法",
+            "start_sec": 152.09,
+            "rerank_score": 0.8738,
+            "score_hint": 1.0,
+            "text": "那么 这个像什么Zip函数啊 这些 还有这个 推导式啊 迭代器 这些高阶知识的话 那么请同学们呢 还是下去呢 自己找资料呢 去看看啊"
+          },
+          {
+            "title": "12_创建提示词PromptTemplate下集 [itjc8.com]",
+            "start_sec": 61.98,
+            "rerank_score": 0.9681,
+            "score_hint": 1.0,
+            "text": "迭代式 生成式 那么也就是我们的 comprehension 推导式 迭代器 生成器 那么这些东东 各位同学 这些是非常非常重要的 Python高阶语法的"
+          }
+        ]
+      },
+      {
+        "id": "p2-015",
+        "query": "SQL 案例讲解",
+        "hit_at_6": true,
+        "gold_rank": 4,
+        "n_refs": 6,
+        "latency_ms": 1013.0,
+        "titles": [
+          "09_中断补充信息",
+          "12-06-作业答案讲解",
+          "15-首页主体-左侧分类-骨架效果【itjc8.com】",
+          "65.3-3SQL案例讲解",
+          "178.4-4手把手带你写FlinkSQL实现实时计算",
+          "1-2 串讲-大模型必备Python语言 2025-10-23 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "09_中断补充信息",
+            "start_sec": 662.32,
+            "rerank_score": 0.1193,
+            "score_hint": 1.0,
+            "text": "首先第一步 builder 对吧 这步一道熟练 标调点什么 sql 看什么 穿状态 那什么 状态叫reviewer state ok"
+          },
+          {
+            "title": "12-06-作业答案讲解",
+            "start_sec": 583.38,
+            "rerank_score": 0.0517,
+            "score_hint": 1.0,
+            "text": "我在下面这样子啊 我给它创建一个点创建一个圆 比如说我先创建一个圆 嗯 sql等于 sql 括号 这个圆呢我们是需要有半径 假设这个半径是6 然后需要给它个圆心 这个圆心呢"
+          },
+          {
+            "title": "15-首页主体-左侧分类-骨架效果【itjc8.com】",
+            "start_sec": 1703.96,
+            "rerank_score": 0.0963,
+            "score_hint": 1.0,
+            "text": "没数据的时候就是再加载 好 主价用起来 怎么用 叫小物 先 sql e o n 两个 代表两个子分类"
+          },
+          {
+            "title": "65.3-3SQL案例讲解",
+            "start_sec": 0.28,
+            "rerank_score": 0.1,
+            "score_hint": 0.4449048343527805,
+            "text": "这小节我们来看一下Circle的案例小节 我们通过写Circle去实操一下 DDL DML 对于DML的部分呢 我们主要来讲啊"
+          },
+          {
+            "title": "178.4-4手把手带你写FlinkSQL实现实时计算",
+            "start_sec": 357.65,
+            "rerank_score": 0.7518,
+            "score_hint": 2.0,
+            "text": "刚才那个大屏的案例啊 啊 啊 我们来看了一下整个的 它这个用工具化配置的过程 然后我们再来看一个写SQL的案例啊 然后呢 这个场景是什么呢 我要统计最近十分钟活跃的用户数啊 大家知道最近十分钟啊 它肯定是从上一分钟开始啊"
+          },
+          {
+            "title": "1-2 串讲-大模型必备Python语言 2025-10-23 [itjc8.com]",
+            "start_sec": 5649.57,
+            "rerank_score": 0.0549,
+            "score_hint": 1.0,
+            "text": "这个判断的综合案例 判断 判断结构的综合案例 案例 综合 案例 咱们通过这个带趋势性的小游戏 让大家对这个判断结构 做一个共同性格的一个理解和认识 好 这个"
+          }
+        ]
+      },
+      {
+        "id": "p2-016",
+        "query": "LoRA 微调介绍",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 898.9,
+        "titles": [
+          "大模型微调技术之数据清洗（二） [itjc8.com]",
+          "大模型微调技术之数据清洗（二） [itjc8.com]",
+          "大模型微调技术之数据清洗（二） [itjc8.com]",
+          "1 [itjc8.com]",
+          "1 [itjc8.com]",
+          "06_DU模块&LLM通用问题（重要） [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "大模型微调技术之数据清洗（二） [itjc8.com]",
+            "start_sec": 6228.28,
+            "rerank_score": 0.8232,
+            "score_hint": 2.0,
+            "text": "大家在实际过程中 基本上很难用到的 特别这个微调这个技术 理论则是一般很少用到的 好然后 Lora微调1.5G的显存不够 肯定1.5G显存太少了 然后 然后 这个9点16分或求续同学说 微调就是不动员的参数"
+          },
+          {
+            "title": "大模型微调技术之数据清洗（二） [itjc8.com]",
+            "start_sec": 6292.99,
+            "rerank_score": 0.844,
+            "score_hint": 2.0,
+            "text": "一般水平的至少30万几部 然后说再好一点的 50万左右 然后你是非常牛逼的 几百万都有 Lora微调一般就是1万左右吧 讲完代码 代码 课后面还会讲什么 我们会讲评估 大模型的评估"
+          },
+          {
+            "title": "大模型微调技术之数据清洗（二） [itjc8.com]",
+            "start_sec": 6313.25,
+            "rerank_score": 0.9534,
+            "score_hint": 2.0,
+            "text": "我们会讲评估 大模型的评估 然后讲完大模型的评估之后 我们会讲这个大模型的量化 大概就先讲到这里 Lora微调笔记本 最好你就是游戏本 307年那些16GB的显存 应该还OK 然后比例还是有的 就藤家藤同学就是说"
+          },
+          {
+            "title": "1 [itjc8.com]",
+            "start_sec": 1254.16,
+            "rerank_score": 0.3151,
+            "score_hint": 1.0,
+            "text": "这里边有几个过程 预训练 一个是微调 微调 比如说 微调 看一下这里边 这里有个人 他就相当于包着很多书 代表了通过自监督学习 自监督学习"
+          },
+          {
+            "title": "1 [itjc8.com]",
+            "start_sec": 2641.22,
+            "rerank_score": 0.26,
+            "score_hint": 1.0,
+            "text": "有海量的 由自然语言指定 和对应输出 组成的数据 对模型微调 微调 并翻却理解 执行各种未建国的使用 好 那第三个阶段 就是目前"
+          },
+          {
+            "title": "06_DU模块&LLM通用问题（重要） [itjc8.com]",
+            "start_sec": 878.18,
+            "rerank_score": 0.3905,
+            "score_hint": 2.0,
+            "text": "一般来说看你是微调的场景 你是做高效微调还是全餐微调 正常情况下大家轻易不要尝试全餐 如果你不熟悉的话 先尝试那个LORA就行就好了 先LORA微调 如果你LORA怎么调效果都不好 再去做那个全餐 由小到大去试 然后多少数据呢 一般来说啊"
+          }
+        ]
+      },
+      {
+        "id": "p2-017",
+        "query": "产品经理 立项评审",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 2102.0,
+        "titles": [
+          "04.1-3产品全生命周期管理【itjc8.com】",
+          "5--[视频]4-5 立项评审",
+          "10.2-2竞品分析",
+          "12--[视频]12.第04周作业点评",
+          "21.4-1带你写好PRD【itjc8.com】",
+          "3 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "04.1-3产品全生命周期管理【itjc8.com】",
+            "start_sec": 442.74,
+            "rerank_score": 0.0433,
+            "score_hint": 1.0,
+            "text": "用户的心智 对吧 都需要我们 去深刻的去进行动场 那么在产品的阶约阶段的话 产品经理 务必进行体系化的思考 切不可跳过产品的 这个战略直接出方案 不然达到出来的产品 将缺乏这个系统性和整体性"
+          },
+          {
+            "title": "5--[视频]4-5 立项评审",
+            "start_sec": 21.46,
+            "rerank_score": 0.7239,
+            "score_hint": 5.2,
+            "text": "我们后面还要再继续完善 这个在工作当中呢 也是一个非常常见的啊 这个场景 每一个同学呢都要练习这个功能哈 那我们接下来看一下这个立项评审该怎么做啊 首先我们结合前面的这个内容 把这个立项说明书啊 主要去汇总整理一下 所以第一部分来看一下立项"
+          },
+          {
+            "title": "10.2-2竞品分析",
+            "start_sec": 931.81,
+            "rerank_score": 0.1108,
+            "score_hint": 1.0,
+            "text": "这个 这个四批理论啊 这个四批理论是 百度的啊 原来做搜索的 产品经理 于君啊 提出来的四批理论 那么 即一个产品 如果要成功的话"
+          },
+          {
+            "title": "12--[视频]12.第04周作业点评",
+            "start_sec": 10629.19,
+            "rerank_score": 0.9019,
+            "score_hint": 1.0,
+            "text": "维度来写呢啊 那其实综合起来 其实就就一句话啊 就一句话 是吧 立项评审 我的简介就是 就是我这里说的这个立项啊 项目立项的一个简介 就是我 做这个是为了搞定这个"
+          },
+          {
+            "title": "21.4-1带你写好PRD【itjc8.com】",
+            "start_sec": 206.47,
+            "rerank_score": 0.1015,
+            "score_hint": 1.0,
+            "text": "设计师 测试 老板老板也会看 老板也会看 那么项目经理 产品经理 运营 比如说 有些 你这个PRD里面可能会涉及到运营相关的一些 这个"
+          },
+          {
+            "title": "3 [itjc8.com]",
+            "start_sec": 785.09,
+            "rerank_score": 0.2441,
+            "score_hint": 1.0,
+            "text": "要求我有金融行业背景 这个的话就是 你可以 你如果是产品经理肯定是的 产品经理 产品经理 经理 绝对需要 绝对需要 需要行业背景 这个毫无疑问"
+          }
+        ]
+      },
+      {
+        "id": "p2-018",
+        "query": "Less 变量和嵌套",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 856.3,
+        "titles": [
+          "01-初始化-2-构建项目",
+          "01-初始化-2-构建项目",
+          "09-原生css变量基本使用【itjc8.com】",
+          "10-导入【itjc8.com】",
+          "21-首页-less的自动化导入-02自动导入【itjc8.com】",
+          "未命名(41)【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "01-初始化-2-构建项目",
+            "start_sec": 109.92,
+            "rerank_score": 0.9866,
+            "score_hint": 2.0,
+            "text": "那么sass和less的一个 scss和less的语法很像 都支持嵌套 都支持嵌套变量 他俩就是大概的最不同的地方 就是less生命变量是at sus生命变量是dollar 仅此而已 所以说这一块呢 咱们就用的是谁呢 用的是sus"
+          },
+          {
+            "title": "01-初始化-2-构建项目",
+            "start_sec": 109.92,
+            "rerank_score": 0.9866,
+            "score_hint": 2.0,
+            "text": "那么sass和less的一个 scss和less的语法很像 都支持嵌套 都支持嵌套变量 他俩就是大概的最不同的地方 就是less生命变量是at sus生命变量是dollar 仅此而已 所以说这一块呢 咱们就用的是谁呢 用的是sus"
+          },
+          {
+            "title": "09-原生css变量基本使用【itjc8.com】",
+            "start_sec": 62.83,
+            "rerank_score": 0.7483,
+            "score_hint": 2.0,
+            "text": "在前边课程里边有没有学过啊 是在哪儿学的 如果学过的话 在哪儿学的 这是咱们浏览器原生支持的 就像LessSaaS定义变量一样 一种方式 这个没有关系 没有学过就说 没有学过 咱们可以再讲一讲"
+          },
+          {
+            "title": "10-导入【itjc8.com】",
+            "start_sec": 263.82,
+            "rerank_score": 0.7221,
+            "score_hint": 2.0,
+            "text": "点Less 好 看见这14了吗 好 此时注意来看 我想把咱们之前写过一个变量点Less 是不是有这个东西啊 我要给它怎么样呢 导入到我的十四当中 明白了吗 就把这两个less合成一个"
+          },
+          {
+            "title": "21-首页-less的自动化导入-02自动导入【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.9399,
+            "score_hint": 2.0,
+            "text": "变量和less的混入也使用了 但是使用时有一个痛点 就是使用前必须导入 那每个文件使用前都得导入 所以我们有一个解决方案 我们可以完成什么样"
+          },
+          {
+            "title": "未命名(41)【itjc8.com】",
+            "start_sec": 307.27,
+            "rerank_score": 0.7124,
+            "score_hint": 2.0,
+            "text": "重点这一块的话呢 Less的中文化导路 其实分为两个知识点 一个呢 是大家知道 怎样在Less里去读写变量 这个肯定知道 还有呢 Less的混路是什么意思 这是一个知识点 第二个知识点呢"
+          }
+        ]
+      },
+      {
+        "id": "p2-019",
+        "query": "Vue Router 基础使用",
+        "hit_at_6": true,
+        "gold_rank": 3,
+        "n_refs": 6,
+        "latency_ms": 630.0,
+        "titles": [
+          "01-路由-4-下载导入使用",
+          "03_如何使用路由【itjc8.com】",
+          "05_vue-router基础使用【itjc8.com】",
+          "20-项目复盘【itjc8.com】",
+          "23、复习VueRouter工作原理【itjc8.com】",
+          "38、组件创建测试【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "01-路由-4-下载导入使用",
+            "start_sec": 439.07,
+            "rerank_score": 0.3621,
+            "score_hint": 2.0,
+            "text": "第零步 第零步 大家需要先下载 NPM I 空格 我们这个啥呢 VUE-Router Router 这个版本指不指定都行 咱们就按照人家PPT的来吧 3.5.3 第零步"
+          },
+          {
+            "title": "03_如何使用路由【itjc8.com】",
+            "start_sec": 122.76,
+            "rerank_score": 0.2841,
+            "score_hint": 2.0,
+            "text": "是不是非常的香啊 非常香 好了那其他的优点呢 大家可以自行查阅官网 好了那这就是我们要介绍的 Vue Router 好那我们来做一个小节 那小伙伴们 我们以后在Vue项目当中 如何实现路由呢 哎非常好"
+          },
+          {
+            "title": "05_vue-router基础使用【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.8696,
+            "score_hint": 1.0720059198542806,
+            "text": "那刚刚我们已经铺垫的够多了 那接下来我们就来开始学习一下 Viu-Router是如何在Viu项目中使用的 那我们带着这个问题一起来学习一下 那么我们要学习的呢 就是Viu-Router的语法规则 所以大家重点的是记住规则 那我们先来看一下右"
+          },
+          {
+            "title": "20-项目复盘【itjc8.com】",
+            "start_sec": 743.44,
+            "rerank_score": 0.6007,
+            "score_hint": 2.0,
+            "text": "最好的方式呢 就是尽量多写一点 尽量多写一点 然后这是技术方案 技术方案是不是Vue.js Vue.router Vue.x SaaS AXS Element UI WidePack"
+          },
+          {
+            "title": "23、复习VueRouter工作原理【itjc8.com】",
+            "start_sec": 136.88,
+            "rerank_score": 0.979,
+            "score_hint": 0.8546448087431694,
+            "text": "再有呢 也是根据当前的这个路由地址 找到对应的组件 然后进行一个渲染就可以了 那么接下来呢 我们再来分析一下这个ViewRouter 先来看一下它的一个基本使用 那么我们在写它的这个核心代码之前啊 我们先看一下它的一个基本使用 那么我们把这"
+          },
+          {
+            "title": "38、组件创建测试【itjc8.com】",
+            "start_sec": 650.5,
+            "rerank_score": 0.5042,
+            "score_hint": 2.0,
+            "text": "我们在这怎么着 哎 我们也去新建这么一个GS文件 我直接把这个文件的名啊 把它复制一下 然后找到我们自己的这个买-vue-router 对吧 然后我们在这呢 去新建这样的一个GS文件 好 那这个GS文件当中"
+          }
+        ]
+      },
+      {
+        "id": "p2-020",
+        "query": "Webpack 配置代理",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 2481.3,
+        "titles": [
+          "4.2开发环境解决跨越代理【itjc8.com】",
+          "05.webpack_使用前_准备_[itjc8.com]",
+          "11-创建折线图项目_[itjc8.com]",
+          "12-1正向代理解释【itjc8.com】",
+          "12-webpack打包最基础的配置_[itjc8.com]",
+          "13.webpack_打包css文件和代码_[itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "4.2开发环境解决跨越代理【itjc8.com】",
+            "start_sec": 138.68,
+            "rerank_score": 0.9359,
+            "score_hint": 2.0,
+            "text": "中间层就是咱们的代理 我们代理 好 回到讲义 那么这个就是未有CLI配置 webpack的一个叫做反向代理 这个其实就是它的反向代理的原理 那么反向代理其实听上去很高级 实际上很简单 只是几个选项 一个选项"
+          },
+          {
+            "title": "05.webpack_使用前_准备_[itjc8.com]",
+            "start_sec": 333.01,
+            "rerank_score": 0.1711,
+            "score_hint": 1.0,
+            "text": "就是这两个包是开发环境使用 开发环境使用 OK那接下来我们再回到这边 好NPMI 那第一个包名别写错了啊 WebPack 那第二个包名用空格隔开 叫CRI 然后杠大D回车 好下完包 那是不是都在这个"
+          },
+          {
+            "title": "11-创建折线图项目_[itjc8.com]",
+            "start_sec": 775.04,
+            "rerank_score": 0.288,
+            "score_hint": 1.0,
+            "text": "不行 所以我们才在路的环境下才用得 但现在我以后开发就这么用了 有问题咋办呢 用什么解决 Webpack 对了 这上一个说的 Webpack它可以处理浏览器的 这个GSI间的问题 现在它有问题"
+          },
+          {
+            "title": "12-1正向代理解释【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.2267,
+            "score_hint": 0.6347826086956522,
+            "text": "刚才咱们已经知道了解决跨越问题有三种对不对 咱们前面只需要掌握哪一种 配置反向代理对不对 而且仅仅需要掌握的是通过WirePath来配置代理 对不对 仅仅需要理解通过WirePath来配置代理是怎么配置的 好那在讲这个代理之前呢 配置之前呢"
+          },
+          {
+            "title": "12-webpack打包最基础的配置_[itjc8.com]",
+            "start_sec": 372.03,
+            "rerank_score": 0.8478,
+            "score_hint": 1.0,
+            "text": "没有多难 好了我们来说一下WebPack 最简单的配置 最简单的配置 没有之一了 WebPack 基本使用 第一呢就是你确保下载了那些包 确保下载了 这个WebPack 和WebPack"
+          },
+          {
+            "title": "13.webpack_打包css文件和代码_[itjc8.com]",
+            "start_sec": 656.16,
+            "rerank_score": 0.2398,
+            "score_hint": 1.0,
+            "text": "就可以了 好 代码提交一下 好 那刚刚我们讲的是 webpack 加载器 处理CSS文件 html是不是也在这里 还有一个是 插件"
+          }
+        ]
+      },
+      {
+        "id": "p2-021",
+        "query": "Vue 组件通信 父向子",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 4287.2,
+        "titles": [
+          "02-组件-1-导入",
+          "05_组件通信_父向子【itjc8.com】",
+          "07-小结",
+          "08-defineProps与Typescript【itjc8.com】",
+          "18-父传子【itjc8.com】",
+          "18-父传子【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "02-组件-1-导入",
+            "start_sec": 67.02,
+            "rerank_score": 0.8271,
+            "score_hint": 1.0,
+            "text": "那个主页面 我都能看得见 你这不行的 那么我们今天学完这个知识 就叫组件通信 组件通信 以及组件相关的基础 大家就清楚 原来VoE可以这样玩 我们可以让APP.Vo有啥 有子组件"
+          },
+          {
+            "title": "05_组件通信_父向子【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.2059,
+            "score_hint": 4.2596491228070175,
+            "text": "那接下来我们要学习的是第二个部分 叫做View的组件通信 那首先先问大家一个问题 那我想从一个组件内 给另外一个组件传值 那就比如像我们刚刚 是不是我想从APP.View这个组件"
+          },
+          {
+            "title": "07-小结",
+            "start_sec": 81.48,
+            "rerank_score": 0.1548,
+            "score_hint": 1.0,
+            "text": "好 再往后的话呢 就来到了啥呢 我们所谓的一个叫组件通信 我们今天的一个核心 组件通信 组件通信主要讲的两个 一个叫复给子 那么复给子用大白话来讲的话 其实就是所谓的我们的行餐食餐 大白话"
+          },
+          {
+            "title": "08-defineProps与Typescript【itjc8.com】",
+            "start_sec": 0.62,
+            "rerank_score": 0.6114,
+            "score_hint": 1.0,
+            "text": "好,下边的小伙伴们,咱们讲一下啊,咱们无优异里边啊,组件通信的时候呢,咱们之前学了几个函数是吧,比方说这个define props,define ms是吧,他们呢,在组件通信的时候呢,咱们这个接收数据啊,啊,触发自定义事件子传复的时候呢,需"
+          },
+          {
+            "title": "18-父传子【itjc8.com】",
+            "start_sec": 206.55,
+            "rerank_score": 0.9692,
+            "score_hint": 1.0,
+            "text": "接下来呢 咱们在VIO下边呢 再新建一个文件夹 比方说咱们就叫父子 这样咱们就叫组件通信吧 组件通信 然后下边呢 新建这个组件啊 这个index咱们叫 就相当于咱们这个副组件吧 因为是副子通信吧"
+          },
+          {
+            "title": "18-父传子【itjc8.com】",
+            "start_sec": 343.6,
+            "rerank_score": 0.8289,
+            "score_hint": 1.0,
+            "text": "导入咱们这个副组件 是吧 挂载渲染显示 import.gum 下边的 组件通信 是吧 gumindex.we 副渲染呢 咱们子跟着就选,是吧 保存"
+          }
+        ]
+      },
+      {
+        "id": "p2-022",
+        "query": "Docker Sandbox 沙箱怎么配置",
+        "hit_at_6": true,
+        "gold_rank": 5,
+        "n_refs": 6,
+        "latency_ms": 517.8,
+        "titles": [
+          "12-4 MoocManus沙箱扩展基础协议约定与设计 [itjc8.com](1)",
+          "12-4 MoocManus沙箱扩展基础协议约定与设计 [itjc8.com]",
+          "13-15 Dockerfile文件配置修正与镜像容器构建 [itjc8.com](1)",
+          "13-15 Dockerfile文件配置修正与镜像容器构建 [itjc8.com]",
+          "14-2 基于Docker的Sandbox扩展初始化与配置开发(1)",
+          "14-2 基于Docker的Sandbox扩展初始化与配置开发"
+        ],
+        "scores": [
+          {
+            "title": "12-4 MoocManus沙箱扩展基础协议约定与设计 [itjc8.com](1)",
+            "start_sec": 835.32,
+            "rerank_score": 0.263,
+            "score_hint": 1.0,
+            "text": "或者是说 这个撒乡被人为关闭了 但是程序感知不到 所以我们必须写多一个函数去判断一下 就N书 Sandbox 反正性的就是NUM 确保当前撒乡存在 如果不存在 会创建 好"
+          },
+          {
+            "title": "12-4 MoocManus沙箱扩展基础协议约定与设计 [itjc8.com]",
+            "start_sec": 835.32,
+            "rerank_score": 0.263,
+            "score_hint": 1.0,
+            "text": "或者是说 这个撒乡被人为关闭了 但是程序感知不到 所以我们必须写多一个函数去判断一下 就N书 Sandbox 反正性的就是NUM 确保当前撒乡存在 如果不存在 会创建 好"
+          },
+          {
+            "title": "13-15 Dockerfile文件配置修正与镜像容器构建 [itjc8.com](1)",
+            "start_sec": 252.83,
+            "rerank_score": 0.5187,
+            "score_hint": 1.0,
+            "text": "我们可以运行命令 DockerView -T表示我们这个镜像 它的一个名字 假设其名称 Sandbox -Dip 接下来我们需要告诉这个命令 我们当前构建环境的上下文 也都是当前目录 所以我们传递一点"
+          },
+          {
+            "title": "13-15 Dockerfile文件配置修正与镜像容器构建 [itjc8.com]",
+            "start_sec": 252.83,
+            "rerank_score": 0.5219,
+            "score_hint": 1.0,
+            "text": "我们可以运行命令 DockerView -T表示我们这个镜像 它的一个名字 假设其名称 Sandbox -Dip 接下来我们需要告诉这个命令 我们当前构建环境的上下文 也都是当前目录 所以我们传递一点"
+          },
+          {
+            "title": "14-2 基于Docker的Sandbox扩展初始化与配置开发(1)",
+            "start_sec": 0.0,
+            "rerank_score": 0.946,
+            "score_hint": 2.575438596491228,
+            "text": "Hello,大家好,欢迎来到新一节课 这节课我们才完成 基于Docker的Sandbox扩展初始化以配置开发 首先打开ID编辑 首先找到APP 打开API找到call 找到config 这里呢,我们加多个配置"
+          },
+          {
+            "title": "14-2 基于Docker的Sandbox扩展初始化与配置开发",
+            "start_sec": 0.0,
+            "rerank_score": 0.946,
+            "score_hint": 2.575438596491228,
+            "text": "Hello,大家好,欢迎来到新一节课 这节课我们才完成 基于Docker的Sandbox扩展初始化以配置开发 首先打开ID编辑 首先找到APP 打开API找到call 找到config 这里呢,我们加多个配置"
+          }
+        ]
+      },
+      {
+        "id": "p2-023",
+        "query": "闭包为什么能记住外部变量",
+        "hit_at_6": true,
+        "gold_rank": 2,
+        "n_refs": 6,
+        "latency_ms": 5622.8,
+        "titles": [
+          "09-02-函数嵌套和闭包（了解）",
+          "9、闭包【itjc8.com】",
+          "9、闭包【itjc8.com】",
+          "9、闭包【itjc8.com】",
+          "10、闭包【itjc8.com】",
+          "6.函数基础 -2023-08-16-顾安"
+        ],
+        "scores": [
+          {
+            "title": "09-02-函数嵌套和闭包（了解）",
+            "start_sec": 22.88,
+            "rerank_score": 0.1121,
+            "score_hint": 0.5571428571428572,
+            "text": "因为会有一种臂包的结构 所以还是需要了解 那么函数名称 我们之前讲过 函数名它既是函数名称 也是指向该函数的变量 只要是指向该函数 就可以调用函数 好我们再来回顾一下 DEF我先写一个FN 写个F1"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 72.45,
+            "rerank_score": 0.9151,
+            "score_hint": 0.5571428571428572,
+            "text": "第一个是可以答应到的 第一次有 第二次就没有了 大家能理解吗 所以在那里边我们说 闭包 要学闭包 大家得先把这一点牢牢的记住 你一定要记住 一个函数里面盛美的局部变量 按照原则上来讲"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 72.45,
+            "rerank_score": 0.914,
+            "score_hint": 1.0,
+            "text": "第一个是可以答应到的 第一次有 第二次就没有了 大家能理解吗 所以在那里边我们说 闭包 要学闭包 大家得先把这一点牢牢的记住 你一定要记住 一个函数里面盛美的局部变量 按照原则上来讲"
+          },
+          {
+            "title": "9、闭包【itjc8.com】",
+            "start_sec": 933.77,
+            "rerank_score": 0.7944,
+            "score_hint": 1.0,
+            "text": "这就称之为 OK吗对吗 只要别的数量无欲 反望到一个函数内部的局部变量了 就叫做什么 闭包 OK吗对吗 这就是闭包 代码形式上看 它就是干什么 就是一个止函数"
+          },
+          {
+            "title": "10、闭包【itjc8.com】",
+            "start_sec": 0.0,
+            "rerank_score": 0.0837,
+            "score_hint": 0.5571428571428572,
+            "text": "我们是不是讲解了币包呀,所谓的币包 是不是就指代的是一个作用域 访问了另外一个作用域的局部变量呀 称为币包,OK吗,对吗 代表形式上看就是 负函数有一个谁 负函数是不是有一个局部变量 我们返回一个谁"
+          },
+          {
+            "title": "6.函数基础 -2023-08-16-顾安",
+            "start_sec": 5051.47,
+            "rerank_score": 0.0421,
+            "score_hint": 1.0,
+            "text": "你在其他的函数当中去用第一个函数里面的这个值是用不了的 是用不了的 能明白吧 所以说这个地方它肯定是错的啊 这个叫无法调用 变量 变量 好能理解吗 那么如果大家 想要干嘛呢 在两个函数当中去使用同一个变量那么我们就需要去定义第二种变量形式了"
+          }
+        ]
+      },
+      {
+        "id": "p2-024",
+        "query": "接口鉴权时 token 怎么校验",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 7711.1,
+        "titles": [
+          "02-我的-个人中心-鉴权",
+          "08-处理修改部门时code重复的情况【itjc8.com】",
+          "16-准备表单内容【itjc8.com】",
+          "3",
+          "3",
+          "15-掌柜问数-问数智能体-流程图流式输出"
+        ],
+        "scores": [
+          {
+            "title": "02-我的-个人中心-鉴权",
+            "start_sec": 21.78,
+            "rerank_score": 0.6939,
+            "score_hint": 5.2,
+            "text": "比方说访问用户的页面 就是个人中心页面的时候 如果他没有登录 不让他访问 是怎么做的呢 通过token 对token是咱们判断的一个条件 是吧 是否有token 那你是在什么地方用token做这个判断的 好"
+          },
+          {
+            "title": "08-处理修改部门时code重复的情况【itjc8.com】",
+            "start_sec": 518.47,
+            "rerank_score": 0.1344,
+            "score_hint": 1.0,
+            "text": "接着回显 好 回显完之后 然后我点它 光标离开 应该是不是会校验的 校验 通过了吧 现在是不是跟我之前的一样 通过了 好 这是有点确定 是不是依然可以修改成功"
+          },
+          {
+            "title": "16-准备表单内容【itjc8.com】",
+            "start_sec": 201.74,
+            "rerank_score": 0.0875,
+            "score_hint": 1.0,
+            "text": "好 这是点组织架构 新加组织门 你看这里边是不是有表达 对吧 还有个表达 并且它点的时候是不是有 校验 这个没做校验是吧 那那个都教验了 它里边是不是应该有校验对吧 不管它有没有 咱们是不是都要做"
+          },
+          {
+            "title": "3",
+            "start_sec": 1460.26,
+            "rerank_score": 0.0485,
+            "score_hint": 1.0,
+            "text": "我们的这个 后段开发 就向我们的接口 来进行 发请求就行了 接口 发请求就行了 我们这里运行 这个接面 运行起来 这个接口"
+          },
+          {
+            "title": "3",
+            "start_sec": 1150.52,
+            "rerank_score": 0.0127,
+            "score_hint": 1.0,
+            "text": "代码开发能力 能力 集成 将接口 将接口 接口 集成到 其他系统 API系统工 我们可以 使用这种方式"
+          },
+          {
+            "title": "15-掌柜问数-问数智能体-流程图流式输出",
+            "start_sec": 278.27,
+            "rerank_score": 0.4852,
+            "score_hint": 2.0,
+            "text": "你就可以通过这个 它的这个流适输出的框架 去输出大圆模型 给你返回的token 大致的逻辑就是什么呢 接口给你返回一个token 那graph就返回输出一个token 返回一个token输出一个token 这样一来就能够进行流适的传输了 对"
+          }
+        ]
+      },
+      {
+        "id": "p2-025",
+        "query": "用容器起数据库和缓存",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 7754.4,
+        "titles": [
+          "07-HTTP协议-http缓存的基本认知【itjc8.com】",
+          "15-hooks的复习【itjc8.com】",
+          "15-hooks的复习【itjc8.com】",
+          "23 redis 数据库-2023-09-25-顾安",
+          "05、03-【核心技术】RAG全流程详细拆解与问题优化",
+          "11、笔记点评-答疑-6-1 [itjc8.com]"
+        ],
+        "scores": [
+          {
+            "title": "07-HTTP协议-http缓存的基本认知【itjc8.com】",
+            "start_sec": 913.52,
+            "rerank_score": 0.069,
+            "score_hint": 1.0,
+            "text": "其他你会发现 是不是都是 基本上是迭斯克开选 只要带开选的 一般都是从哪里读 缓存 你看这么多都是缓存 是不是很效率 但是你只要怎么样 就不从缓存里面读 我们刚才是不是"
+          },
+          {
+            "title": "15-hooks的复习【itjc8.com】",
+            "start_sec": 837.12,
+            "rerank_score": 0.0277,
+            "score_hint": 1.0,
+            "text": "缓存一个函数 除非依赖像干嘛呢 发生了变化 那如果变化了 它就会重新干嘛呢 缓存 如果依赖像没变 是不是就不缓存 但是对U字Codec不会单独用 而且单独用的话性能变低 为什么呢"
+          },
+          {
+            "title": "15-hooks的复习【itjc8.com】",
+            "start_sec": 893.53,
+            "rerank_score": 0.0255,
+            "score_hint": 1.0,
+            "text": "最后还有一个叫什么 use use谁 use memo 那他呢 缓存 类型的数据 包括是不是 它的用法有两种 还有它语法是怎么用的 conc的一个叫"
+          },
+          {
+            "title": "23 redis 数据库-2023-09-25-顾安",
+            "start_sec": 526.23,
+            "rerank_score": 0.1064,
+            "score_hint": 1.0,
+            "text": "什么缓存呢 就比如说页面缓存 那么还有什么呢 还有我们跟咱们爬虫相关的话呢 就是指纹 缓存 那么还有除了这样的一些信息之外呢 还有我们的验证码缓存是吧 等等 所以说像这个redis数据库 它一般用缓存用的比较多"
+          },
+          {
+            "title": "05、03-【核心技术】RAG全流程详细拆解与问题优化",
+            "start_sec": 2188.4,
+            "rerank_score": 0.0419,
+            "score_hint": 1.0,
+            "text": "大模型生成以外 不是应该直接回复给用户了吗 怎么还有一个节点 后置处理 这个里面封控 缓存 RAG指标上报 这些我都不理解 没关系 反正通过后置处理这个节点 最后一个节点走完了"
+          },
+          {
+            "title": "11、笔记点评-答疑-6-1 [itjc8.com]",
+            "start_sec": 7166.7,
+            "rerank_score": 0.0254,
+            "score_hint": 1.0,
+            "text": "对吧 这里回来要再补一下哈 重复的听再听三遍 后置处理 后置处理 缓存 可以 脱名可以 黑和白和这些都对的 到时候结合我们线下项目再去体会吧 没什么问题哈"
+          }
+        ]
+      },
+      {
+        "id": "p2-026",
+        "query": "父组件怎么把数据传给子组件",
+        "hit_at_6": false,
+        "gold_rank": null,
+        "n_refs": 6,
+        "latency_ms": 2581.4,
+        "titles": [
+          "00-回顾",
+          "02-商品案例-6-MyTag组件-控制标签的值",
+          "07-组件通讯-父传子说明【itjc8.com】",
+          "09-1实现el-button的写法_[itjc8.com]",
+          "09-小结",
+          "37.自定义组件 - 父子组件通信 - 了解父子组件【itjc8.com】"
+        ],
+        "scores": [
+          {
+            "title": "00-回顾",
+            "start_sec": 2597.73,
+            "rerank_score": 0.9919,
+            "score_hint": 1.0,
+            "text": "来怎么玩 怎么传 怎么传 打传来着 打传 子组件 首先我给你这写个子组件 然后呢 这个这写个件件号 紫组件 然后呢 同学们 打出来 是不是 直接在紫组件中间把你要放的HTML结构往这一怼 是不是就可以了"
+          },
+          {
+            "title": "02-商品案例-6-MyTag组件-控制标签的值",
+            "start_sec": 1313.65,
+            "rerank_score": 0.9509,
+            "score_hint": 1.0,
+            "text": "好我就给你标上啊 查页 首先查页 是 是组件 子组件 子组件外面的数据 同学们 第一步没有什么代码 大家认不认可 认不认可这件事"
+          },
+          {
+            "title": "07-组件通讯-父传子说明【itjc8.com】",
+            "start_sec": 33.22,
+            "rerank_score": 0.9994,
+            "score_hint": 2.0,
+            "text": "父传子我们要实现的思路是这样子 第一 你父组件去提供数据 因为要父传子嘛 所以一般都是由你父组件通过State去提供数据 第二步 父组件给子组件去添加属性 那添加属性的话 那值是不是就是我们state里面的这个值就可以了 接下来呢 再往下呢"
+          },
+          {
+            "title": "09-1实现el-button的写法_[itjc8.com]",
+            "start_sec": 500.88,
+            "rerank_score": 0.9914,
+            "score_hint": 2.0,
+            "text": "有没有回忆起来 回忆起来了 父子通信 对 就是父子通信 子组件向父组件通信 子组件必须处发一个自定义实践 然后父组件去监听这个自定义实践 对不对 监听这个自定义实践 OK"
+          },
+          {
+            "title": "09-小结",
+            "start_sec": 212.59,
+            "rerank_score": 0.9004,
+            "score_hint": 1.0,
+            "text": "解写为 比如说这是我们的子组件 我这写一个 这还不能做这种注释 咱们就直接这样写吧 子组件 子组件咱们就可以解写为 V-model 后面直接把咱们这个 变量的名 给它写在这就可以了"
+          },
+          {
+            "title": "37.自定义组件 - 父子组件通信 - 了解父子组件【itjc8.com】",
+            "start_sec": 2.18,
+            "rerank_score": 0.9954,
+            "score_hint": 2.0,
+            "text": "朋友们好,从这一节课开始啊,咱们一起来学习父子组件之间的通信 那首先,我们来了解一下父子组件之间通信都有哪三种方式啊 分别是属性绑定,事件绑定,还有获取组件的实例 那属性绑定啊,用于父组件向子组件传递数据 而且呢,只能传递Json兼容的数据"
+          }
+        ]
+      },
+      {
+        "id": "p2-027",
+        "query": "装饰器会不会改变原函数",
+        "hit_at_6": true,
+        "gold_rank": 1,
+        "n_refs": 6,
+        "latency_ms": 2241.1,
+        "titles": [
+          "09-03-装饰器（了解）",
+          "09-03-装饰器（了解）",
+          "09-04-作业答案讲解",
+          "6.函数基础 -2023-08-16-顾安",
+          "12_创建提示词PromptTemplate下集 [itjc8.com]",
+          "29_Tools实战天气查询"
+        ],
+        "scores": [
+          {
+            "title": "09-03-装饰器（了解）",
+            "start_sec": 347.24,
+            "rerank_score": 0.3427,
+            "score_hint": 2.0,
+            "text": "给它返回 返回哦 以后我再给他解释 他怎么去用 这个就是一个装饰器 装饰器我们叫装饰器函数啊 它是写写出来的话 它是一个函数啊 所以 然后我在下面的写一些别的函数吧 比如说"
+          },
+          {
+            "title": "09-03-装饰器（了解）",
+            "start_sec": 438.24,
+            "rerank_score": 0.3907,
+            "score_hint": 2.0,
+            "text": "我们写在这个地方的一个函数啊 又套了一层吧 对不对 套了一层的目的是 我外面会把我要装饰的函数传进去 让它一直保存在这个装饰器的函数综域中间 这个也属于函数综域啊 让它不会释放 然后里面呢 我把inner返回返回到外部 大家可以重点看一下这"
+          },
+          {
+            "title": "09-04-作业答案讲解",
+            "start_sec": 1231.22,
+            "rerank_score": 0.9715,
+            "score_hint": 2.0,
+            "text": "只是说如果你将这个装饰器加在这里 它应该是没有什么功能的 对不对 它的功能没有啊 而且要考虑一个问题 我们这个装饰器我专门针对于这个函数 那么这里有个edge吧 装饰器加上去之后呢我们说现在去调 那就不是叫原来的函数 它调的是里面的1了 我"
+          },
+          {
+            "title": "6.函数基础 -2023-08-16-顾安",
+            "start_sec": 7298.37,
+            "rerank_score": 0.962,
+            "score_hint": 2.0,
+            "text": "装饰器的一个最主要的作用是什么 装饰器 最主要的作用是在不修改原有代码的情况下 可以 动态添加当前函数的功能 这个就是函数装饰器的一个最主要的作用 啊 这个其实就是他最主要的作用啊 25的时候 基础可以已经到装饰器了是吧 其实装饰器说难难说"
+          },
+          {
+            "title": "12_创建提示词PromptTemplate下集 [itjc8.com]",
+            "start_sec": 271.89,
+            "rerank_score": 0.6797,
+            "score_hint": 2.0,
+            "text": "你家吧 是不是知道什么叫什么的AOP 前置通知后的通知 你说懂懂懂懂 然后呢 让你说一下Python的装饰器函数 如果你一脸懵逼的话 那么几乎啊 你是不大可能的 请大家一定相信杨哥 所大部分啊"
+          },
+          {
+            "title": "29_Tools实战天气查询",
+            "start_sec": 8.04,
+            "rerank_score": 0.5308,
+            "score_hint": 2.0,
+            "text": "好那么接下来 来咱们呢 带大家玩真的啊 先来最简单的 使用什么 这装饰器就代表这是一个工具函数 请看官网 没毛病吧 一样的啊 就说来 设置database"
+          }
+        ]
+      }
+    ]
+  }
+}

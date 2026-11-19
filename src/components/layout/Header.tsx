@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Settings, Clock, LogOut, Bot, Palette } from 'lucide-react';
-import { usePomodoroStore, useScheduleStore, useUIStore, useNotificationStore, useAuthStore, useAIStore } from '../../stores';
+import { Bell, Settings, Clock, LogOut, Bot, Palette, Star, Folder, Film, X } from 'lucide-react';
+import { usePomodoroStore, useScheduleStore, useUIStore, useNotificationStore, useAuthStore, useAIStore, useVideoStore } from '../../stores';
 import { BUILT_IN_THEME_IDS, THEME_PRESETS, applyTheme } from '../../lib/themes';
 import { NotificationPanel } from './NotificationPanel';
 import { toLocalDateString } from '../../lib/date';
@@ -53,6 +53,17 @@ export const Header: React.FC = () => {
   const themePickerRef = useRef<HTMLDivElement>(null);
   const themeButtonRef = useRef<HTMLButtonElement>(null);
 
+  const [showFavorites, setShowFavorites] = useState(false);
+  const favoritesRef = useRef<HTMLDivElement>(null);
+  const favoritesButtonRef = useRef<HTMLButtonElement>(null);
+  const favoriteCategoryIds = useVideoStore((s) => s.favoriteCategoryIds);
+  const categoryTree = useVideoStore((s) => s.categoryTree);
+  const loadFavoriteVideos = useVideoStore((s) => s.loadFavoriteVideos);
+  const favoriteVideos = useVideoStore((s) => s.favoriteVideos);
+  const favLoading = useVideoStore((s) => s.favLoading);
+  const toggleFavorite = useVideoStore((s) => s.toggleFavorite);
+  const toggleFavoriteCategory = useVideoStore((s) => s.toggleFavoriteCategory);
+
   // 点击外部关闭主题选择器
   useEffect(() => {
     if (!showThemePicker) return;
@@ -71,6 +82,30 @@ export const Header: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [showThemePicker]);
 
+  // 点击外部关闭收藏面板
+  useEffect(() => {
+    if (!showFavorites) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        favoritesRef.current &&
+        !favoritesRef.current.contains(target) &&
+        favoritesButtonRef.current &&
+        !favoritesButtonRef.current.contains(target)
+      ) {
+        setShowFavorites(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showFavorites]);
+
+  // 打开收藏面板时加载收藏视频
+  useEffect(() => {
+    if (!showFavorites) return;
+    void loadFavoriteVideos();
+  }, [showFavorites, loadFavoriteVideos]);
+
   // Today stats
   const today = toLocalDateString(new Date());
   const todaySessions = Object.values(sessions || {}).filter(
@@ -86,6 +121,33 @@ export const Header: React.FC = () => {
   const handleToggleSettings = useCallback(() => {
     toggleSettingsView();
   }, [toggleSettingsView]);
+
+  const findCategoryName = useCallback((id: number): string | null => {
+    const walk = (nodes: typeof categoryTree): string | null => {
+      for (const n of nodes) {
+        if (n.id === id) return n.name.includes(' / ') ? n.name.split(' / ').pop()! : n.name;
+        const found = walk(n.children);
+        if (found) return found;
+      }
+      return null;
+    };
+    return walk(categoryTree);
+  }, [categoryTree]);
+
+  const enterFavoriteFolder = useCallback((id: number, name: string) => {
+    setShowFavorites(false);
+    setActiveView('video');
+    useVideoStore.getState().clearSelection();
+    useVideoStore.getState().enterCategory(id, name);
+  }, [setActiveView]);
+
+  const playFavoriteVideo = useCallback((videoId: number) => {
+    setShowFavorites(false);
+    setActiveView('video');
+    useVideoStore.getState().loadCurrentVideo(videoId);
+  }, [setActiveView]);
+
+  const favCount = favoriteCategoryIds.length + favoriteVideos.length;
 
   return (
     <header className="rounded-t-2xl border-b border-[var(--border-light)] px-4 py-3 backdrop-blur-sm md:px-6" style={{ background: 'var(--header-bg)' }}>
@@ -120,6 +182,102 @@ export const Header: React.FC = () => {
           </div>
 
           <div className="relative flex items-center gap-1">
+            <button
+              ref={favoritesButtonRef}
+              onClick={() => setShowFavorites((v) => !v)}
+              className={`relative rounded-lg p-2 transition-colors ${showFavorites ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--text-primary)]'}`}
+              title="观看收藏"
+            >
+              <Star size={18} />
+              {favCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[8px] font-medium text-white">
+                  {favCount > 9 ? '9+' : favCount}
+                </span>
+              )}
+            </button>
+
+            {showFavorites &&
+              createPortal(
+                <div
+                  ref={favoritesRef}
+                  className="fixed z-[9999] mt-2 w-72 max-h-[70vh] overflow-y-auto rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] p-3 shadow-lg"
+                  style={{
+                    top: (favoritesButtonRef.current?.getBoundingClientRect().bottom ?? 0) + 8,
+                    right: window.innerWidth - (favoritesButtonRef.current?.getBoundingClientRect().right ?? 0),
+                  }}
+                >
+                  <p className="mb-2 text-xs font-semibold text-[var(--text-primary)]">观看收藏</p>
+
+                  {favoriteCategoryIds.length > 0 && (
+                    <div className="mb-3">
+                      <p className="mb-1.5 text-[11px] font-medium text-[var(--text-secondary)]">收藏的文件夹</p>
+                      <div className="space-y-1">
+                        {favoriteCategoryIds.map((id) => {
+                          const name = findCategoryName(id) ?? `文件夹 ${id}`;
+                          return (
+                            <div key={`cat-${id}`} className="group flex items-center gap-1">
+                              <button
+                                onClick={() => enterFavoriteFolder(id, name)}
+                                className="flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-accent)]"
+                              >
+                                <Folder size={14} className="text-[#c87d2f] shrink-0" />
+                                <span className="truncate">{name}</span>
+                              </button>
+                              <button
+                                onClick={() => toggleFavoriteCategory(id)}
+                                className="rounded-md p-1 text-[var(--text-muted)] opacity-0 transition-colors hover:text-[var(--danger)] group-hover:opacity-100"
+                                title="删除收藏"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {favoriteVideos.length > 0 && (
+                    <div className="mb-2">
+                      <p className="mb-1.5 text-[11px] font-medium text-[var(--text-secondary)]">收藏的视频</p>
+                      <div className="space-y-1">
+                        {favoriteVideos.map((v) => (
+                          <div key={`vid-${v.id}`} className="group flex items-center gap-1">
+                            <button
+                              onClick={() => playFavoriteVideo(v.id)}
+                              className="flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-accent)]"
+                            >
+                              <Film size={14} className="text-[var(--accent)] shrink-0" />
+                              <span className="truncate">{v.title}</span>
+                            </button>
+                            <button
+                              onClick={() => toggleFavorite(v.id, false)}
+                              className="rounded-md p-1 text-[var(--text-muted)] opacity-0 transition-colors hover:text-[var(--danger)] group-hover:opacity-100"
+                              title="删除收藏"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {favLoading && (
+                    <p className="py-2 text-center text-xs text-[var(--text-muted)]">加载中...</p>
+                  )}
+
+                  {favCount === 0 && !favLoading && (
+                    <div className="py-4 text-center">
+                      <Star size={20} className="mx-auto mb-1 text-[var(--text-muted)] opacity-40" />
+                      <p className="text-xs text-[var(--text-muted)]">暂无收藏</p>
+                      <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">在视频站收藏文件夹或视频即可在此查看</p>
+                    </div>
+                  )}
+                </div>,
+                document.body
+              )}
+
             <button
               ref={themeButtonRef}
               onClick={() => setShowThemePicker((v) => !v)}

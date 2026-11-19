@@ -1,0 +1,76 @@
+p5-kb-infra-postgres-1|Up 9 minutes (healthy)|docker.m.daocloud.io/pgvector/pgvector:pg16
+p5-kb-infra-redis-1|Up 9 minutes (healthy)|docker.m.daocloud.io/library/redis:7-alpine
+p2-siteyeb-audio-prep-1|Up 3 hours|p2-siteyeb-backend:3.0-batch
+p2-siteyeb-backend-1|Up 3 hours (healthy)|p2-siteyeb-backend:3.0
+p2-siteyeb-summary-worker-laptop-1|Up 11 hours|p2-siteyeb-backend:3.0-batch
+p2-siteyeb-vector-worker-1|Exited (137) 11 hours ago|60b8e9cd8637
+p2-siteyeb-worker2-1|Up 13 hours|22325266ad41
+p2-siteyeb-worker-1|Up 13 hours|22325266ad41
+p2-whisper-test|Exited (137) 14 hours ago|0376f0894e83
+p3v2-mcp|Exited (0) 21 hours ago|p3v2-backend:1.0
+p3v2-backend|Exited (0) 21 hours ago|p3v2-backend:1.0
+zb02-deepresearch-frontend-1|Exited (0) 21 hours ago|zb02-deepresearch-frontend
+zb02-deepresearch-backend-1|Exited (137) 21 hours ago|zb02-deepresearch-backend
+p4-main-app|Exited (0) 21 hours ago|p4-agent:local
+p3v2-pg|Exited (0) 21 hours ago|docker.m.daocloud.io/pgvector/pgvector:pg16
+p3-compare-frontend|Exited (0) 21 hours ago|p3-compare-frontend:1.0
+p3-compare-backend|Exited (0) 21 hours ago|p3-compare-backend:1.0
+slimtrack-mcp|Exited (0) 21 hours ago|p1d-slimtrack-mcp:latest
+p8-frontdesignpicker-review-1|Exited (137) 21 hours ago|p8-frontdesignpicker-review
+p5-nginx-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/nginx:alpine
+p5-frontend-1|Exited (0) 21 hours ago|p5-frontend
+p7-harness-api|Exited (0) 21 hours ago|p7-harness-api:0.6.1
+p5fe-beat-1|Exited (0) 32 hours ago|p5-api:latest
+p5fe-worker-light-1|Exited (137) 21 hours ago|p5-api:latest
+p5fe-api-1|Exited (0) 21 hours ago|p5-api:latest
+p5fe-milvus-1|Exited (1) 21 hours ago|milvusdb/milvus:v2.6.2
+p5fe-minio-1|Exited (0) 21 hours ago|minio/minio:latest
+p5fe-redis-1|Exited (0) 21 hours ago|redis:7-alpine
+p5fe-postgres-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/postgres:16-alpine
+p5fe-etcd-1|Exited (0) 21 hours ago|quay.io/coreos/etcd:v3.5.16
+p5-worker-light-1|Exited (137) 21 hours ago|p5-worker-light
+p5-worker-heavy-1|Exited (137) 21 hours ago|p5-worker-heavy
+p5-beat-1|Exited (137) 21 hours ago|p5-beat
+p5-api-1|Exited (0) 21 hours ago|p5-api
+zb02-deepresearch-milvus-1|Exited (1) 21 hours ago|milvusdb/milvus:v2.6.2
+zb02-deepresearch-redis-1|Exited (137) 21 hours ago|docker.m.daocloud.io/redis/redis-stack-server:7.4.0-v3
+zb02-deepresearch-postgres-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/postgres:16-alpine
+zb02-deepresearch-etcd-1|Exited (0) 21 hours ago|quay.io/coreos/etcd:v3.5.18
+zb02-deepresearch-minio-1|Exited (0) 21 hours ago|minio/minio:latest
+p5-monitor-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/nginx:alpine
+p5-milvus-1|Exited (1) 21 hours ago|milvusdb/milvus:v2.6.2
+p5-etcd-1|Exited (0) 21 hours ago|quay.io/coreos/etcd:v3.5.16
+p5-postgres-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/postgres:16-alpine
+p5-redis-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/redis:7-alpine
+p5-minio-1|Exited (0) 21 hours ago|minio/minio:latest
+deepresearch-backend-1|Exited (137) 21 hours ago|deepresearch-backend
+p8-frontdesignpicker-web-1|Exited (143) 21 hours ago|cf2a892452b2
+agent-copilot-app|Exited (137) 21 hours ago|agent-copilot-app
+p8-frontdesignpicker-api-1|Exited (137) 21 hours ago|601715f3f35e
+deepresearch-frontend-1|Exited (0) 21 hours ago|deepresearch-frontend
+hr_agent_backend|Exited (137) 21 hours ago|hr-agent-backend:latest
+hr_agent_init_roles|Exited (0) 36 hours ago|54f3dadc0ca1
+deepresearch-redis-1|Exited (137) 21 hours ago|docker.m.daocloud.io/redis/redis-stack-server:7.4.0-v3
+agent-copilot-milvus|Exited (1) 21 hours ago|milvusdb/milvus:v2.6.2
+agent-copilot-mongo|Exited (0) 21 hours ago|mongo:7
+agent-copilot-etcd|Exited (0) 21 hours ago|quay.io/coreos/etcd:v3.5.18
+agent-copilot-minio|Exited (0) 21 hours ago|minio/minio:latest
+deepresearch-postgres-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/postgres:16-alpine
+tmp-p1-test-test-app-1|Exited (137) 21 hours ago|p1d-test-app:latest
+hr_agent_frontend|Exited (0) 21 hours ago|hr-agent-frontend
+hr_agent_postgres|Exited (0) 21 hours ago|docker.m.daocloud.io/pgvector/pgvector:pg16
+tmp-p1-test-test-pg-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/postgres:16-alpine
+tmp-p1-test-test-redis-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/redis:7-alpine
+slimtrack-web|Exited (0) 21 hours ago|docker.m.daocloud.io/library/nginx:alpine
+slimtrack-monitor|Exited (0) 21 hours ago|docker.m.daocloud.io/library/nginx:alpine
+slimtrack-pg|Exited (0) 21 hours ago|docker.m.daocloud.io/library/postgres:16-alpine
+slimtrack-redis|Exited (0) 21 hours ago|docker.m.daocloud.io/library/redis:7-alpine
+p2-siteyeb-frontend-1|Up 36 hours (healthy)|p2-siteyeb-frontend:3.0
+p7-harness-web|Exited (0) 21 hours ago|docker.m.daocloud.io/library/nginx:alpine
+p2-siteyeb-redis-1|Up 39 hours (healthy)|docker.m.daocloud.io/library/redis:7-alpine
+p2-siteyeb-postgres-1|Up 39 hours (healthy)|docker.m.daocloud.io/pgvector/pgvector:pg17
+kb-webapp|Exited (0) 21 hours ago|kb-webapp:dev
+p1-slimtrack-slimtrack-1|Exited (137) 21 hours ago|p1-slimtrack:latest
+kb-showcase|Exited (0) 21 hours ago|kb-showcase:dev
+p4-agent-db-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/postgres:16-alpine
+p4-agent-redis-1|Exited (0) 21 hours ago|docker.m.daocloud.io/library/redis:7-alpine

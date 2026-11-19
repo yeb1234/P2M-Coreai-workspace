@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-react';
 import type { CategoryTreeWithVideos } from '../../lib/videoApi';
 
@@ -8,12 +8,28 @@ interface CategoryTreeProps {
   onToggle: (node: CategoryTreeWithVideos) => void;
 }
 
-function getDescendantIds(node: CategoryTreeWithVideos): number[] {
+export function getDescendantIds(node: CategoryTreeWithVideos): number[] {
   const ids: number[] = [node.id];
   for (const child of node.children as CategoryTreeWithVideos[]) {
-    ids.push(...getDescendantIds(child));
+    const childIds = getDescendantIds(child);
+    for (const id of childIds) ids.push(id);
   }
   return ids;
+}
+
+export function buildDescendantMap(nodes: CategoryTreeWithVideos[]): Map<number, number[]> {
+  const map = new Map<number, number[]>();
+  function walk(node: CategoryTreeWithVideos): number[] {
+    const ids: number[] = [node.id];
+    for (const child of node.children as CategoryTreeWithVideos[]) {
+      const childIds = walk(child);
+      for (const id of childIds) ids.push(id);
+    }
+    map.set(node.id, ids);
+    return ids;
+  }
+  for (const node of nodes) walk(node);
+  return map;
 }
 
 const TreeNodeRow = memo(function TreeNodeRow({
@@ -21,17 +37,19 @@ const TreeNodeRow = memo(function TreeNodeRow({
   level,
   selectedIds,
   onToggle,
+  descendantMap,
 }: {
   node: CategoryTreeWithVideos;
   level: number;
   selectedIds: Set<number>;
   onToggle: (node: CategoryTreeWithVideos) => void;
+  descendantMap: Map<number, number[]>;
 }) {
   // Default collapse nodes deeper than level 1 to avoid rendering too many DOM nodes at once
   const [expanded, setExpanded] = useState(level < 1);
   const hasChildren = node.children.length > 0;
 
-  const descendantIds = useMemo(() => getDescendantIds(node), [node]);
+  const descendantIds = descendantMap.get(node.id) ?? [node.id];
   const allChecked = useMemo(
     () => descendantIds.every((id) => selectedIds.has(id)),
     [descendantIds, selectedIds]
@@ -40,6 +58,12 @@ const TreeNodeRow = memo(function TreeNodeRow({
     () => !allChecked && descendantIds.some((id) => selectedIds.has(id)),
     [allChecked, descendantIds, selectedIds]
   );
+  const checkboxRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = someChecked;
+    }
+  }, [someChecked]);
 
   return (
     <div>
@@ -59,9 +83,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
           <input
             type="checkbox"
             checked={allChecked}
-            ref={(el) => {
-              if (el) el.indeterminate = someChecked;
-            }}
+            ref={checkboxRef}
             onChange={() => onToggle(node)}
             className="h-3.5 w-3.5 shrink-0 accent-[var(--accent)]"
           />
@@ -75,7 +97,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
       {hasChildren && expanded && (
         <div>
           {(node.children as CategoryTreeWithVideos[]).map((child) => (
-            <TreeNodeRow key={child.id} node={child} level={level + 1} selectedIds={selectedIds} onToggle={onToggle} />
+            <TreeNodeRow key={child.id} node={child} level={level + 1} selectedIds={selectedIds} onToggle={onToggle} descendantMap={descendantMap} />
           ))}
         </div>
       )}
@@ -106,12 +128,16 @@ export function CategoryTree({ nodes, selectedIds, onToggle }: CategoryTreeProps
     );
   }
 
-  const uniqueNodes = deduplicateTree(nodes);
+  const { uniqueNodes, descendantMap } = useMemo(() => {
+    const unique = deduplicateTree(nodes);
+    const map = buildDescendantMap(unique);
+    return { uniqueNodes: unique, descendantMap: map };
+  }, [nodes]);
 
   return (
     <div className="min-w-0 space-y-0.5">
       {uniqueNodes.map((node) => (
-        <TreeNodeRow key={node.id} node={node} level={0} selectedIds={selectedIds} onToggle={onToggle} />
+        <TreeNodeRow key={node.id} node={node} level={0} selectedIds={selectedIds} onToggle={onToggle} descendantMap={descendantMap} />
       ))}
     </div>
   );

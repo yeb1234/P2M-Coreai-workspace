@@ -26,7 +26,7 @@ import { useVideoSelection } from './useVideoSelection';
 import { useIsMobile, useWindowWidth } from '../../hooks/useMediaQuery';
 
 function VideoPlayerView() {
-  const { currentVideo, currentSegments, jobStatus, jobStage, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
+  const { currentVideo, currentSegments, jobStatus, jobStage, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId, toggleFavorite } = useVideoStore();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
@@ -289,7 +289,9 @@ function VideoPlayerView() {
         </button>
         <div className="flex-1 min-w-0">
           <h2 className="text-lg font-semibold text-[#1a1a1a] truncate">{currentVideo.title}</h2>
-          <p className="text-xs text-[#9ca3af]">{currentVideo.filename}</p>
+          <p className="text-xs text-[#9ca3af] truncate">
+            {currentVideo.category_path || currentVideo.filepath || currentVideo.filename}
+          </p>
         </div>
       </div>
 
@@ -377,6 +379,10 @@ function VideoPlayerView() {
               }}
               onTogglePip={togglePip}
               onToggleFullscreen={toggleFullscreen}
+              isFavorite={currentVideo?.is_favorite ?? false}
+              onToggleFavorite={() => {
+                if (currentVideo) void toggleFavorite(currentVideo.id, !currentVideo.is_favorite);
+              }}
             />
           </div>
 

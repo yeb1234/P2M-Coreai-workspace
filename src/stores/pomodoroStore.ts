@@ -61,6 +61,7 @@ interface PomodoroState {
   getWeekSessions: () => Record<string, PomodoroSession[]>;
   getPhaseDuration: (phase: PomodoroPhase) => number;
   clearHistory: () => void;
+  clearTodayHistory: () => void;
   restoreTimer: () => void;
   restoreRemoteState: () => Promise<void>;
   restoreRemoteRuntime: () => Promise<void>;
@@ -403,7 +404,7 @@ export const usePomodoroStore = create<PomodoroState>()(
               }
             } else {
               const todo = linkedTodoId ? useScheduleStore.getState().items[linkedTodoId] : null;
-              const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : 0;
+              const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : state.config.longBreakInterval;
               if (!linkedTodoId || plannedPomodoros === 0 || sessionsCompleted >= plannedPomodoros) {
                 const nextState = {
                   sessions: { ...state.sessions, [currentSessionId]: updatedSession },
@@ -510,7 +511,7 @@ export const usePomodoroStore = create<PomodoroState>()(
           nextTimeRemaining = state.config.workDuration * 60;
         } else {
           const todo = linkedTodoId ? useScheduleStore.getState().items[linkedTodoId] : null;
-          const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : 0;
+          const plannedPomodoros = todo ? calculateSchedulePomodoroRounds(todo, state.config) : state.config.longBreakInterval;
           if (!linkedTodoId || plannedPomodoros === 0 || sessionsCompleted >= plannedPomodoros) {
             const nextState = {
               sessions,
@@ -743,6 +744,24 @@ export const usePomodoroStore = create<PomodoroState>()(
                 Object.entries(state.sessions).filter(([id]) => id === state.timer.currentSessionId),
               )
             : {};
+          return {
+            sessions,
+            _historyUpdatedAt: syncPomodoroHistory(sessions),
+          };
+        });
+      },
+
+      clearTodayHistory: () => {
+        set((state) => {
+          const today = toLocalDateString(new Date());
+          const sessions: Record<ID, PomodoroSession> = {};
+          for (const [id, session] of Object.entries(state.sessions)) {
+            if (id === state.timer.currentSessionId) {
+              sessions[id] = session;
+            } else if (toLocalDateString(session.startTime) !== today) {
+              sessions[id] = session;
+            }
+          }
           return {
             sessions,
             _historyUpdatedAt: syncPomodoroHistory(sessions),

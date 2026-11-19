@@ -7,6 +7,7 @@ import {
   Play,
   SkipBack,
   SkipForward,
+  Star,
   Subtitles,
   Volume2,
   VolumeX,
@@ -58,6 +59,8 @@ interface VideoPlayerControlsProps {
   onPlaybackRateChange: (rate: number) => void;
   onTogglePip: () => void;
   onToggleFullscreen: () => void;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
 }
 
 export function VideoPlayerControls({
@@ -100,6 +103,8 @@ export function VideoPlayerControls({
   onPlaybackRateChange,
   onTogglePip,
   onToggleFullscreen,
+  isFavorite,
+  onToggleFavorite,
 }: VideoPlayerControlsProps) {
   return (
     <div
@@ -188,6 +193,14 @@ export function VideoPlayerControls({
               )}
             </div>
           )}
+
+          <button
+            onClick={() => { onToggleFavorite(); playInteractionSound('tap'); }}
+            className={`${isMobile ? 'p-1' : 'p-1.5'} transition-colors ${isFavorite ? 'text-[#fbbf24]' : 'text-white/80 hover:text-white'}`}
+            title={isFavorite ? '取消收藏' : '收藏视频'}
+          >
+            <Star size={isMobile ? 14 : 16} fill={isFavorite ? 'currentColor' : 'none'} />
+          </button>
 
           <div className="relative">
             <button data-speed-btn onClick={() => { onToggleSpeedMenu(); playInteractionSound('tap'); }} className={`${isMobile ? 'px-1.5 py-1 text-[10px]' : 'px-1.5 py-1 text-[11px]'} text-white/80 hover:text-white transition-colors font-medium`} title="倍速">

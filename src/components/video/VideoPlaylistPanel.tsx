@@ -48,6 +48,12 @@ function PlaylistRow({ item, currentVideo, isPlaying, onSelectItem }: PlaylistRo
         ) : (
           <PlayCircle size={16} className="absolute inset-0 m-auto text-[#b8b4ac]" />
         )}
+        {item.completed && (
+          <div className="absolute left-0.5 top-0.5 z-10 flex items-center gap-0.5 rounded bg-[#16a34a] px-1 py-0.5 text-white shadow-sm">
+            <CheckCircle2 size={9} />
+            <span className="text-[8px] font-medium">已看完</span>
+          </div>
+        )}
         {isCurrent && isPlaying && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
             <div className="flex gap-0.5">
@@ -59,11 +65,13 @@ function PlaylistRow({ item, currentVideo, isPlaying, onSelectItem }: PlaylistRo
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-xs ${isCurrent ? 'font-medium text-[var(--accent)]' : 'theme-text-primary'}`}>
-          {item.title}
-        </p>
-        {item.completed && <span className="text-[9px] text-[#16a34a]">已看完</span>}
-        {progressPercent !== null && !item.completed && (
+        <div className="flex items-center gap-1">
+          {item.completed && <CheckCircle2 size={11} className="shrink-0 text-[#16a34a]" />}
+          <p className={`truncate text-xs ${isCurrent ? 'font-medium text-[var(--accent)]' : 'theme-text-primary'} ${item.completed ? 'line-through opacity-60' : ''}`}>
+            {item.title}
+          </p>
+        </div>
+        {!item.completed && progressPercent !== null && (
           <div className="theme-progress-track mt-1 h-0.5 overflow-hidden rounded-full">
             <div className="theme-progress-fill h-full rounded-full" style={{ width: `${progressPercent}%` }} />
           </div>

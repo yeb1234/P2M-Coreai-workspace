@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SiteYeb 学习与面试冲刺手册 · AI Agent / RAG 全栈</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230e141b'/%3E%3Cpath d='M6 16V8l6 5 6-5v8' stroke='%23e0a030' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://miaoda.feishu.cn">
+<link href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap"></noscript>
+<style>
+:root{
+  --bg:#0d131a;
+  --bg2:#101823;
+  --panel:#151f2b;
+  --panel2:#1a2634;
+  --line:#24313f;
+  --line2:#31404f;
+  --ink:#e9eef3;
+  --muted:#97a4b2;
+  --dim:#6b7988;
+  --accent:#e2a13a;
+  --accent-soft:rgba(226,161,58,.14);
+  --teal:#35b8a0;
+  --teal-soft:rgba(53,184,160,.14);
+  --red:#d4614f;
+  --red-soft:rgba(212,97,79,.14);
+  --green:#5fbf6a;
+  --green-soft:rgba(95,191,106,.14);
+  --blue:#5b9bd5;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
+  --sans:"Noto Sans SC",-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  --radius:12px;
+  --maxw:980px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:.86em;background:rgba(226,161,58,.10);color:#f0c678;padding:.12em .4em;border-radius:5px;white-space:nowrap}
+pre{font-family:var(--mono);background:#0a0f15;border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;font-size:12.6px;line-height:1.6;color:#cdd7e0}
+pre code{background:none;padding:0;color:inherit;white-space:pre}
+pre .c{color:#5f7184}
+pre .k{color:#e2a13a}
+pre .s{color:#7fc79e}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ===== 侧边导航 ===== */
+#sidebar{position:fixed;top:0;left:0;bottom:0;width:248px;background:var(--bg2);border-right:1px solid var(--line);padding:26px 16px;overflow-y:auto;z-index:50}
+#sidebar .brand{display:flex;align-items:center;gap:10px;padding:0 8px 18px;border-bottom:1px solid var(--line);margin-bottom:14px}
+#sidebar .brand svg{flex:none}
+#sidebar .brand .bt{font-weight:700;font-size:14px;line-height:1.25}
+#sidebar .brand .bs{font-size:11px;color:var(--muted)}
+#sidebar nav a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;color:var(--muted);font-size:13.2px;font-weight:500;margin:1px 0;border-left:3px solid transparent;transition:all .15s}
+#sidebar nav a .num{font-family:var(--mono);font-size:10.5px;color:var(--dim);width:16px}
+#sidebar nav a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+#sidebar nav a.active{color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent)}
+#sidebar nav a.active .num{color:var(--accent)}
+#sidebar .side-note{margin-top:16px;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:var(--muted);line-height:1.6}
+
+/* ===== 主体 ===== */
+#main{margin-left:248px;max-width:var(--maxw);padding:0 44px 90px}
+section{scroll-margin-top:18px;padding-top:56px}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+.sec-head .chip{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid rgba(226,161,58,.35);padding:3px 10px;border-radius:20px;flex:none}
+.sec-head h2{font-size:26px;font-weight:700;letter-spacing:.3px}
+.sec-sub{color:var(--muted);font-size:14px;margin-bottom:26px}
+h3{font-size:19px;font-weight:700;margin:34px 0 12px;padding-top:6px}
+h4{font-size:15.5px;font-weight:600;margin:22px 0 8px;color:var(--ink)}
+p{margin:9px 0}
+ul,ol{margin:9px 0 9px 0;padding-left:22px}
+li{margin:5px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin:16px 0}
+.card h4{margin-top:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid2>*,.grid3>*{min-width:0}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid var(--line2);color:var(--muted);margin:0 4px 4px 0}
+.pill.g{color:var(--green);border-color:rgba(95,191,106,.4);background:var(--green-soft)}
+.pill.a{color:var(--accent);border-color:rgba(226,161,58,.4);background:var(--accent-soft)}
+.pill.r{color:var(--red);border-color:rgba(212,97,79,.4);background:var(--red-soft)}
+.pill.t{color:var(--teal);border-color:rgba(53,184,160,.4);background:var(--teal-soft)}
+.pill.b{color:var(--blue);border-color:rgba(91,155,213,.4);background:rgba(91,155,213,.12)}
+.tag{font-size:12px;font-weight:600;letter-spacing:.3px;padding:2px 9px;border-radius:6px;text-transform:none}
+.tag.g{background:var(--green-soft);color:var(--green)}
+.tag.r{background:var(--red-soft);color:var(--red)}
+.tag.a{background:var(--accent-soft);color:var(--accent)}
+.tag.t{background:var(--teal-soft);color:var(--teal)}
+.mono{font-family:var(--mono);overflow-wrap:anywhere}
+.muted{color:var(--muted)}
+.dim{color:var(--dim)}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0}
+.callout.t{border-color:var(--teal);background:var(--teal-soft)}
+.callout.r{border-color:var(--red);background:var(--red-soft)}
+.callout.g{border-color:var(--green);background:var(--green-soft)}
+.callout p{margin:4px 0}
+table{width:100%;border-collapse:collapse;margin:14px 0;table-layout:fixed;font-size:13.6px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top;overflow-wrap:break-word}
+th{background:var(--panel2);font-weight:600;color:var(--ink);font-size:12.6px}
+tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+.col-1{width:14%}.col-2{width:22%}.col-3{width:38%}.col-4{width:26%}
+strong{color:var(--ink)}
+
+/* ===== Hero ===== */
+#hero{padding-top:74px;padding-bottom:20px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--teal);border:1px solid rgba(53,184,160,.4);background:var(--teal-soft);padding:4px 12px;border-radius:30px;margin-bottom:20px}
+#hero h1{font-size:38px;font-weight:900;line-height:1.2;letter-spacing:.3px}
+#hero h1 .amp{color:var(--accent)}
+#hero .lede{font-size:16.5px;color:var(--muted);max-width:700px;margin:16px 0 26px}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0 30px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.stat .n{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--accent);line-height:1.1}
+.stat .l{font-size:12px;color:var(--muted);margin-top:3px}
+.hero-cmd{background:#0a0f15;border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;font-family:var(--mono);font-size:12.8px;line-height:1.7;color:#cdd7e0;overflow-x:auto}
+.hero-cmd .p{color:#5f7184}
+.hero-cmd .c1{color:#35b8a0}
+.hero-cmd .c2{color:#f0c678}
+
+/* ===== 折叠面试问答 ===== */
+details.qa{border:1px solid var(--line);border-radius:10px;margin:10px 0;background:var(--panel);overflow:hidden}
+details.qa summary{cursor:pointer;padding:13px 18px;font-weight:600;font-size:14.5px;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary .q-tag{margin-right:8px}
+details.qa summary::after{content:'+';font-family:var(--mono);color:var(--accent);font-size:18px;flex:none;transition:transform .2s}
+details.qa[open] summary::after{transform:rotate(45deg)}
+details.qa .ans{padding:4px 18px 16px;border-top:1px solid var(--line);font-size:14px}
+details.qa .ans p{margin:8px 0}
+details.qa .ans pre{margin:8px 0}
+details.qa .ans .hint{font-size:12.5px;color:var(--teal);margin-top:8px}
+
+/* ===== 打卡 ===== */
+.check{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin:7px 0;background:var(--panel);cursor:pointer;transition:border .15s}
+.check:hover{border-color:var(--line2)}
+.check input{appearance:none;width:22px;height:22px;flex:none;border:2px solid var(--line2);border-radius:6px;margin-top:2px;cursor:pointer;position:relative;background:transparent}
+.check input:checked{background:var(--teal);border-color:var(--teal)}
+.check input:checked::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#061014;font-size:13px;font-weight:900}
+.check .c-body{flex:1}
+.check .c-title{font-weight:600;font-size:14px}
+.check .c-sub{font-size:12.6px;color:var(--muted)}
+.check.done{border-color:rgba(53,184,160,.45);background:var(--teal-soft)}
+.check.done .c-title{color:var(--teal)}
+.progressbar{height:9px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin:10px 0 6px}
+.progressbar .fill{height:100%;width:0;background:linear-gradient(90deg,var(--teal),#5fd6bd);border-radius:20px;transition:width .3s}
+
+/* ===== 时间轴 ===== */
+.timeline{display:grid;grid-template-columns:88px 26px 1fr;gap:0;margin:18px 0}
+.tl-date{font-family:var(--mono);font-size:12.3px;color:var(--muted);text-align:right;padding:10px 12px 10px 0;font-weight:600}
+.tl-axis{position:relative}
+.tl-axis::before{content:'';position:absolute;left:calc(50% - 1px);top:0;bottom:0;width:2px;background:var(--line2)}
+.tl-dot{position:relative;z-index:1;width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid var(--accent);margin:14px 0 0;justify-self:center;align-self:start;display:block;box-shadow:0 0 0 3px var(--accent-soft)}
+.tl-dot.t{background:var(--bg);border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.tl-dot.g{background:var(--bg);border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.tl-dot.r{background:var(--bg);border-color:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
+.tl-body{padding:4px 0 22px 14px}
+.tl-body .t{font-weight:700;font-size:15px;line-height:1.4}
+.tl-body .s{font-size:13.2px;color:var(--muted);margin-top:3px}
+
+/* ===== 侧栏小组件 ===== */
+.block-label{font-size:11px;text-transform:none;letter-spacing:1px;color:var(--dim);font-weight:600;margin:20px 0 8px}
+.mini-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:12.6px;color:var(--muted);line-height:1.6}
+.mini-panel b{color:var(--ink)}
+
+/* ===== 顶部移动导航 ===== */
+#topnav{display:none;position:sticky;top:0;z-index:60;background:rgba(13,19,26,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 16px;align-items:center;gap:8px;overflow-x:auto}
+#topnav a{white-space:nowrap;font-size:12.6px;color:var(--muted);font-weight:600;padding:10px 12px;border-radius:8px;min-height:40px;display:inline-flex;align-items:center}
+#topnav a.active{color:var(--accent);background:var(--accent-soft)}
+
+/* ===== 响应式 ===== */
+@media (max-width:1000px){
+  #sidebar{display:none}
+  #main{margin-left:0;padding:0 20px 70px}
+  #topnav{display:flex}
+  #hero h1{font-size:30px}
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .timeline{grid-template-columns:64px 20px 1fr}
+  .tl-date{font-size:11px}
+}
+@media (max-width:520px){
+  body{font-size:14.5px}
+  #hero{padding-top:34px}
+  #hero h1{font-size:25px}
+  .sec-head h2{font-size:21px}
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+  .col-1{width:18%}.col-2{width:26%}.col-3{width:34%}.col-4{width:22%}
+  pre{font-size:11.4px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 顶部移动导航 ===== -->
+<div id="topnav" aria-label="章节导航"></div>
+
+<!-- ===== 侧边导航 ===== -->
+<aside id="sidebar">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="#1a2634"/><path d="M6 16V8l6 5 6-5v8" stroke="#e2a13a" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div><div class="bt">学习 · 面试 · 冲刺</div><div class="bs">SiteYeb / P2M · v2.94</div></div>
+  </div>
+  <nav id="sidenav">
+    <a href="#hero"><span class="num">00</span>总览</a>
+    <a href="#analysis"><span class="num">01</span>项目全景分析</a>
+    <a href="#rag"><span class="num">02</span>RAG 全链路深挖</a>
+    <a href="#learn"><span class="num">03</span>学习材料 · 精读地图</a>
+    <a href="#interview"><span class="num">04</span>面试材料 · 30 问</a>
+    <a href="#plan"><span class="num">05</span>14 天冲刺计划</a>
+    <a href="#refine"><span class="num">06</span>长期精进路线</a>
+  </nav>
+  <div class="side-note">这是围绕你自建项目的「面试弹药库」：先读 01–02 看懂自己在做什么，用 03 学习补齐盲区，用 04 把技术讲成故事，按 05 的节奏冲刺，最后用 06 决定长期方向。</div>
+</aside>
+
+<main id="main">
+
+<!-- ===== 视图：hero ===== -->
+<section id="hero">
+  <span class="hero-badge">LOCAL-FIRST · COREAI · PERSONAL PROJECT</span>
+  <h1>用你自己的项目，<span class="amp">把 Agent / RAG 讲透</span></h1>
+  <p class="lede">SiteYeb 不是一个玩具：它是一台跑在真实代码里的「本地优先 AI 工作台」——React 19 + FastAPI + SQLite + 本地/云端 LLM，含一条完整的混合检索 RAG 管线、一套异步任务系统、一个可扩展插件体系。这份手册帮你把它的每一层挖成面试加分项。</p>
+  <div class="stat-row">
+    <div class="stat"><div class="n">190</div><div class="l">Vitest 全量通过用例</div></div>
+    <div class="stat"><div class="n">6</div><div class="l">RAG 检索全链路阶段</div></div>
+    <div class="stat"><div class="n">10+</div><div class="l">FastAPI 路由模块</div></div>
+    <div class="stat"><div class="n">40+</div><div class="l">前端组件/页面单元</div></div>
+  </div>
+  <div class="hero-cmd">
+    <span class="p"># 这就是你做了很久的东西 —— 把它当成你的"系统设计作品集"</span><br>
+    $ git log --oneline | head -40<br>
+    <span class="c1">2.94</span>  RAG 全链路增强：查询改写 / 意图识别 / Reranker / Filter+Compressor<br>
+    <span class="c1">2.93</span>  灵境小助手：正则意图识别 + 自动模板切换<br>
+    <span class="c1">2.91</span>  字幕转录王 / AI 任务中心 / 模型下载可视化<br>
+    <span class="c1">2.7</span>   持久化、时区、跨模块同步体系重构<br>
+    <span class="c1">2.6</span>   番茄钟混合同步 / 雪碧图预览 / 主题调度<br>
+    <span class="c2">stack</span>: React19 · TS6 · Zustand · FastAPI · SQLAlchemy · SQLite(FTS5+vec0) · LangChain · RQ/Redis · Whisper · LM Studio
+  </div>
+</section>
+
+<!-- ===== 视图：项目全景分析 ===== -->
+<section id="analysis">
+  <div class="sec-head"><span class="chip">01</span><h2>项目全景分析</h2></div>
+  <p class="sec-sub">先回答三件事：它是什么、由什么构成、凭什么能打。这一章是整份手册的地基，所有面试故事都从这里长出来。</p>
+
+  <h3>一句话定位</h3>
+  <p>SiteYeb（代号 P2M / CoreAI Workspace）是一个<strong>本地优先（local-first）的个人 AI 工作台</strong>：用 React 19 做前端、FastAPI 做后端、SQLite 做数据底座，把「待办 / 日历 / 番茄钟 / 笔记 / 本地视频学习 / AI 助手」收进一个可扩展插件体系，并通过 LM Studio 与云端 OpenAI 兼容接口接入 LLM。它强调「先让个人工作流真的好用」，再逐步长出 AI、检索与任务编排能力。</p>
+  <div class="callout">
+    <p><strong>面试一句话版：</strong>“我独立完成了一个本地优先的 AI 学习工作台，核心是给视频字幕库搭了一条完整的 RAG 检索问答管线，以及一套可取消、可恢复的异步任务系统——它让我把 LLM、向量检索、流式与前后端工程在一个真实产品里串通了。”</p>
+  </div>
+
+  <h3>技术栈与定位（面试会按这张表逐个追问）</h3>
+  <table>
+    <colgroup><col class="col-1"><col class="col-2"><col class="col-3"><col class="col-4"></colgroup>
+    <thead><tr><th>模块</th><th>技术</th><th>它在这项目里负责什么</th><th>面试价值点</th></tr></thead>
+    <tbody>
+      <tr><td>前端框架</td><td>React 19 · TypeScript 6 · Vite 8</td><td>SPA 主界面，40+ 页面/组件，Vite 热更新 + 生产构建</td><td>函数组件、Hooks 工程化；TS 类型安全</td></tr>
+      <tr><td>UI</td><td>Tailwind CSS · lucide-react</td><td>统一样式体系与图标语言</td><td>设计系统、响应式</td></tr>
+      <tr><td>状态管理</td><td>Zustand + persist · IndexedDB/Dexie</td><td>全局状态，本地优先持久化，登录后同步后端</td><td>状态分片、持久化迁移、本地优先同步</td></tr>
+      <tr><td>后端</td><td>FastAPI · SQLAlchemy · JWT</td><td>REST API、ORM 数据层、认证鉴权</td><td>异步框架、依赖注入、路由组织</td></tr>
+      <tr><td>数据底座</td><td>SQLite (WAL) · FTS5 · sqlite-vec</td><td>业务数据 + 全文索引 + 向量检索共存于单文件</td><td>嵌入式库、混合检索、触发同步</td></tr>
+      <tr><td>AI 接入</td><td>LangChain (LCEL) · LM Studio · OpenAI 兼容</td><td>LLM 聊天、结构化输出、RAG 生成</td><td>LCEL、provider 抽象、降级策略</td></tr>
+      <tr><td>异步任务</td><td>Redis + RQ (SimpleWorker)</td><td>Whisper 转录 / 摘要 / 字幕校对的后台队列</td><td>任务状态机、断点恢复、取消传播</td></tr>
+      <tr><td>音视频</td><td>ffmpeg · Faster-Whisper · whisper.cpp</td><td>抽音频、转写、字幕、雪碧图预览</td><td>外部进程编排、GPU/CPU 双路线</td></tr>
+      <tr><td>测试</td><td>Vitest + jsdom · Playwright · unittest</td><td>190 个前端用例 + E2E + 后端编译检查</td><td>测试意识、边界用例</td></tr>
+    </tbody>
+  </table>
+
+  <h3>系统架构</h3>
+  <p>下面这张图概括了数据流：浏览器 → FastAPI → 服务层 → 存储；AI 任务走独立 worker 进程消费队列。注意它是「一个进程里全栈」的本地优先形态，这正是它能快速迭代的原因，也是面试里值得讲的取舍。</p>
+
+  <!-- SVG 架构图 -->
+  <div class="arch-wrap" style="background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;overflow-x:auto;margin:16px 0">
+    <svg viewBox="0 0 960 520" role="img" aria-label="系统架构图" style="min-width:760px;width:100%;display:block;font-family:var(--mono)">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6b7988"/></marker>
+      </defs>
+      <!-- 层背景 -->
+      <rect x="10" y="10" width="300" height="150" rx="10" fill="rgba(53,184,160,.06)" stroke="rgba(53,184,160,.35)"/>
+      <text x="24" y="32" fill="#35b8a0" font-size="12" font-weight="700">前端 · React 19</text>
+      <rect x="330" y="10" width="300" height="150" rx="10" fill="rgba(226,161,58,.06)" stroke="rgba(226,161,58,.35)"/>
+      <text x="344" y="32" fill="#e2a13a" font-size="12" font-weight="700">API · FastAPI</text>
+      <rect x="650" y="10" width="300" height="150" rx="10" fill="rgba(91,155,213,.07)" stroke="rgba(91,155,213,.35)"/>
+      <text x="664" y="32" fill="#5b9bd5" font-size="12" font-weight="700">存储 · SQLite / Redis</text>
+
+      <!-- 前端盒 -->
+      <rect x="30" y="48" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="93" y="69" fill="#e9eef3" font-size="11" text-anchor="middle">组件 / 页面(40+)</text>
+      <rect x="30" y="92" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="93" y="113" fill="#e9eef3" font-size="11" text-anchor="middle">Zustand stores</text>
+      <rect x="168" y="48" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="231" y="69" fill="#e9eef3" font-size="11" text-anchor="middle">插件体系 registry</text>
+      <rect x="168" y="92" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="231" y="113" fill="#e9eef3" font-size="11" text-anchor="middle">IDB / Dexie 持久化</text>
+
+      <!-- API 盒 -->
+      <rect x="350" y="48" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="413" y="69" fill="#e9eef3" font-size="11" text-anchor="middle">routers ×10+</text>
+      <rect x="350" y="92" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="413" y="113" fill="#e9eef3" font-size="11" text-anchor="middle">JWT 认证</text>
+      <rect x="488" y="48" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="551" y="69" fill="#e9eef3" font-size="11" text-anchor="middle">RAG 服务层</text>
+      <rect x="488" y="92" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="551" y="113" fill="#e9eef3" font-size="11" text-anchor="middle">AI 任务编排</text>
+
+      <!-- 存储盒 -->
+      <rect x="670" y="48" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="733" y="69" fill="#e9eef3" font-size="11" text-anchor="middle">SQLite(WAL)</text>
+      <rect x="670" y="92" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="733" y="113" fill="#e9eef3" font-size="11" text-anchor="middle">FTS5 全文</text>
+      <rect x="808" y="48" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="871" y="69" fill="#e9eef3" font-size="11" text-anchor="middle">vec0 向量</text>
+      <rect x="808" y="92" width="126" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="871" y="113" fill="#e9eef3" font-size="11" text-anchor="middle">Redis + RQ</text>
+
+      <!-- 连接：前端→API -->
+      <path d="M163 100 H350" stroke="#6b7988" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M163 72 H350" stroke="#6b7988" stroke-width="1.6" marker-end="url(#ar)"/>
+      <!-- API→存储 -->
+      <path d="M488 66 H670" stroke="#6b7988" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M488 106 H670" stroke="#6b7988" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M551 126 V180 H733" stroke="#6b7988" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <!-- Worker 行 -->
+      <rect x="330" y="190" width="620" height="70" rx="10" fill="rgba(212,97,79,.06)" stroke="rgba(212,97,79,.35)"/>
+      <text x="344" y="212" fill="#d4614f" font-size="12" font-weight="700">独立 Worker 进程 · RQ SimpleWorker</text>
+      <rect x="350" y="222" width="150" height="30" rx="6" fill="#1a2634" stroke="#31404f"/><text x="425" y="241" fill="#e9eef3" font-size="10.5" text-anchor="middle">Whisper 转录</text>
+      <rect x="512" y="222" width="150" height="30" rx="6" fill="#1a2634" stroke="#31404f"/><text x="587" y="241" fill="#e9eef3" font-size="10.5" text-anchor="middle">字幕校对 / 摘要</text>
+      <rect x="674" y="222" width="150" height="30" rx="6" fill="#1a2634" stroke="#31404f"/><text x="749" y="241" fill="#e9eef3" font-size="10.5" text-anchor="middle">写 .md / .vtt 产物</text>
+      <path d="M733 122 V190" stroke="#6b7988" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <!-- 外部 LLM 行 -->
+      <rect x="10" y="290" width="940" height="86" rx="10" fill="rgba(255,255,255,.02)" stroke="#31404f" stroke-dasharray="5 4"/>
+      <text x="24" y="314" fill="#97a4b2" font-size="12" font-weight="700">外部 AI 服务（可替换，遵循 llm_usage_policy）</text>
+      <rect x="30" y="326" width="140" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="100" y="347" fill="#e9eef3" font-size="11" text-anchor="middle">LM Studio(本地)</text>
+      <rect x="182" y="326" width="140" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="252" y="347" fill="#e9eef3" font-size="11" text-anchor="middle">OpenAI 兼容</text>
+      <rect x="334" y="326" width="140" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="404" y="347" fill="#e9eef3" font-size="11" text-anchor="middle">Ollama</text>
+      <rect x="486" y="326" width="180" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="576" y="347" fill="#e9eef3" font-size="11" text-anchor="middle">bge-reranker-v2-m3</text>
+      <rect x="678" y="326" width="120" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="738" y="347" fill="#e9eef3" font-size="11" text-anchor="middle">ffmpeg</text>
+      <rect x="810" y="326" width="124" height="34" rx="6" fill="#1a2634" stroke="#31404f"/><text x="872" y="347" fill="#e9eef3" font-size="11" text-anchor="middle">Whisper</text>
+      <path d="M551 106 V290" stroke="#6b7988" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+      <path d="M74 100 V290" stroke="#6b7988" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+
+      <!-- 图例 -->
+      <text x="24" y="420" fill="#5f7184" font-size="11">—— 同步调用     -- -- 后台/异步</text>
+      <text x="24" y="440" fill="#5f7184" font-size="11">产品形态：单机 + 局域网（本机 80 / 开发 5002 / LM Studio 1234 / Ollama 11434）</text>
+    </svg>
+  </div>
+  <p class="muted" style="font-size:12.5px">示意架构图：按代码实际分层绘制，非官图。外部 AI 服务遵循 <span class="mono">llm_usage_policy</span>（local_first / external_first / local_only / external_only）自动切换。</p>
+
+  <h3>功能模块清单</h3>
+  <div class="grid2">
+    <div class="card"><h4>工作台 / 时间管理</h4>
+      <ul>
+        <li><strong>Dashboard</strong>：插件卡片 + 汇总（Todo / 番茄 / 日历 / 最近笔记）</li>
+        <li><strong>待办 Todo</strong>：优先级、截止时间、番茄计划、提醒，快捷输入解析</li>
+        <li><strong>日历 ×2</strong>：双视图，拖拽排程、时长调整、跨天</li>
+        <li><strong>番茄钟</strong>：专注/休息循环、环境音、<em>混合同步</em>（本地秒级计时 + 后端快照）</li>
+        <li><strong>时间中心</strong>：世界时钟、正/倒计时、闹钟、提醒</li>
+      </ul>
+    </div>
+    <div class="card"><h4>学习 / AI 链路</h4>
+      <ul>
+        <li><strong>IT 视频站</strong>：本地扫描、继续观看、字幕、雪碧图预览、AI 总结</li>
+        <li><strong>字幕转录王</strong>：文件夹批量转写、队列控制、模型下载可视化</li>
+        <li><strong>灵境小助手</strong>：意图识别 + 模板切换 + RAG 问答/搜索/总结</li>
+        <li><strong>笔记 / 闪卡 / 习惯 / 健康 / 收藏</strong>：扩展学习工具</li>
+        <li><strong>设置</strong>：主题（含自动调度）、AI、转录、数据管理</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>为什么这个项目能打（面试叙事核心）</h3>
+  <div class="grid2">
+    <div class="card" style="border-color:rgba(95,191,106,.4)">
+      <span class="tag g">真实亮点 · 面试主攻</span>
+      <ul style="margin-top:8px">
+        <li><strong>一条完整的 RAG 生产管线</strong>：查询改写 → 混合检索 → RRF 融合 → Rerank → 过滤压缩 → 生成，不是 demo，是挂在真实视频字幕库上的。</li>
+        <li><strong>务实降级文化</strong>：reranker 三级降级、检索 FTS→LIKE→近期兜底、LLM local/external 失败回退——每个依赖都留后路，这是工业级思维。</li>
+        <li><strong>异步任务状态机</strong>：可取消、可恢复、worker 重启自动 requeue，含「取消竞态」的防御处理。</li>
+        <li><strong>本地优先同步架构</strong>：IndexedDB 本地优先 → 登录后同步后端，debounce + pagehide flush，多端能接上状态。</li>
+        <li><strong>单文件多模检索</strong>：SQLite 同时承载业务、FTS5 全文与 vec0 向量，轻量但体系完整。</li>
+        <li><strong>190 个测试</strong> + 边界用例（意图识别 13 条、番茄持久化、主题调度）。</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:rgba(212,97,79,.4)">
+      <span class="tag r">诚实短板 · 面试主动认领</span>
+      <ul style="margin-top:8px">
+        <li><strong>密码用 SHA-256</strong>（应换 bcrypt/argon2）——README 也承认公网需加固。</li>
+        <li><strong>JWT secret 为默认值</strong>，CORS <span class="mono">allow_origins=["*"]</span> 且带 credentials（按规范浏览器会拒收）。</li>
+        <li><strong>无 Alembic</strong>，靠手写 SQL 迁移；无速率限制、多租户隔离未做。</li>
+        <li><strong>RAG 没有评测基座</strong>：检索质量靠手感，没接 RAGAS 这类量化评估。</li>
+        <li>向量检索 <span class="mono">vec0 无 JOIN</span>，按 video 过滤是「多取 4 倍 + Python 过滤」。</li>
+        <li>RAG 问答是同步 <span class="mono">llm.invoke</span>，未上流式（<span class="mono">llmStream.ts</span> 只做了解析工具）。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout g">
+    <p><strong>短板怎么用：</strong>面试里主动说出「我知道这里不够好」，再补一句「我准备这样升级」——比藏着掖着强得多。这些短板恰好指向 RAGAS 评测、Alembic、bcrypt、流式输出、agent 编排这些高频考点，等于给自己铺好了「下一步」的答案。</p>
+  </div>
+</section>
+
+<!-- ===== 视图：RAG 全链路深挖 ===== -->
+<section id="rag">
+  <div class="sec-head"><span class="chip">02</span><h2>RAG 全链路深挖</h2></div>
+  <p class="sec-sub">这是你项目的技术护城河，也是面试官最想听的部分。把它讲成一条「从原始查询到带引用的回答」的流水线，每个阶段你都能说清「为什么这么设计」和「挂了怎么办」。</p>
+
+  <h3>完整管线（6 个阶段 + 意图前置）</h3>
+  <p>入口处先做<strong>意图识别</strong>（前端正则给 hint，后端 LangChain 结构化输出做最终裁决），然后进入检索六阶段。下面这张流程图画清了每一步的输入输出与降级路径。</p>
+
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;overflow-x:auto;margin:16px 0">
+    <svg viewBox="0 0 960 470" role="img" aria-label="RAG 管线流程图" style="min-width:820px;width:100%;display:block;font-family:var(--mono)">
+      <defs>
+        <marker id="rg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6b7988"/></marker>
+        <marker id="rgd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d4614f"/></marker>
+      </defs>
+      <!-- 意图 -->
+      <rect x="330" y="12" width="300" height="44" rx="9" fill="rgba(226,161,58,.10)" stroke="#e2a13a"/>
+      <text x="480" y="32" fill="#e2a13a" font-size="12.5" font-weight="700" text-anchor="middle">0 · 意图识别</text>
+      <text x="480" y="47" fill="#97a4b2" font-size="10" text-anchor="middle">前端 regex → intent_hint → 后端结构化输出裁决</text>
+      <path d="M480 56 V86" stroke="#6b7988" stroke-width="1.8" marker-end="url(#rg)"/>
+
+      <!-- 阶段 1-6 竖排 -->
+      <g font-family="var(--mono)">
+        <rect x="30" y="96" width="260" height="46" rx="9" fill="#151f2b" stroke="#31404f"/><text x="46" y="115" fill="#e9eef3" font-size="11.5" font-weight="700">1 · 查询改写 query_enhancer.py</text><text x="46" y="131" fill="#97a4b2" font-size="10">同义词/缩写扩展 + 意图变体 + 关键词提取</text>
+        <rect x="30" y="152" width="260" height="46" rx="9" fill="#151f2b" stroke="#31404f"/><text x="46" y="171" fill="#e9eef3" font-size="11.5" font-weight="700">2 · 混合检索 hybrid_retriever.py</text><text x="46" y="187" fill="#97a4b2" font-size="10">FTS5 关键字 + sqlite-vec 向量，多变体多路</text>
+        <rect x="30" y="208" width="260" height="46" rx="9" fill="#151f2b" stroke="#31404f"/><text x="46" y="227" fill="#e9eef3" font-size="11.5" font-weight="700">3 · RRF 融合 _merge_results</text><text x="46" y="243" fill="#97a4b2" font-size="10">归一化加权融合，复合键 (video_id,start_sec)</text>
+        <rect x="30" y="264" width="260" height="46" rx="9" fill="#151f2b" stroke="#31404f"/><text x="46" y="283" fill="#e9eef3" font-size="11.5" font-weight="700">4 · Rerank reranker.py</text><text x="46" y="299" fill="#97a4b2" font-size="10">bge-reranker · 三级降级：/rerank→chat→关键词</text>
+        <rect x="30" y="320" width="260" height="46" rx="9" fill="#151f2b" stroke="#31404f"/><text x="46" y="339" fill="#e9eef3" font-size="11.5" font-weight="700">5 · Filter+Compressor postprocessor.py</text><text x="46" y="355" fill="#97a4b2" font-size="10">阈值过滤 + 相邻片段合并 + 总量控制</text>
+        <rect x="30" y="376" width="260" height="46" rx="9" fill="#151f2b" stroke="#31404f"/><text x="46" y="395" fill="#e9eef3" font-size="11.5" font-weight="700">6 · LLM 生成 rag_chain.py</text><text x="46" y="411" fill="#97a4b2" font-size="10">search/summary 双 prompt · 带引用回答</text>
+      </g>
+
+      <!-- 阶段详情列 -->
+      <g>
+        <rect x="340" y="96" width="590" height="46" rx="9" fill="#0a0f15" stroke="#31404f"/>
+        <text x="356" y="113" fill="#f0c678" font-size="10.5">SYNONYM_MAP（js→JavaScript、爬虫→crawler）· _REVERSE_MAP</text>
+        <text x="356" y="130" fill="#97a4b2" font-size="10.5">token 正则 [一-鿿]+|[a-zA-Z0-9_]+ · 变体上限 3 · 停用词表</text>
+        <rect x="340" y="152" width="590" height="46" rx="9" fill="#0a0f15" stroke="#31404f"/>
+        <text x="356" y="169" fill="#f0c678" font-size="10.5">FTS5 bm25 · 三级兜底(MATCH→LIKE→近期/收藏)</text>
+        <text x="356" y="186" fill="#97a4b2" font-size="10.5">vec0 距离→score=1-d/2 · video 过滤多取4倍再Python滤</text>
+        <rect x="340" y="208" width="590" height="46" rx="9" fill="#0a0f15" stroke="#31404f"/>
+        <text x="356" y="225" fill="#f0c678" font-size="10.5">score_norm/max × weight 累加 · fts_weight/vec_weight=0.5</text>
+        <text x="356" y="242" fill="#97a4b2" font-size="10.5">以 (video_id,start_sec) 去重 · vec 挂→纯 FTS</text>
+        <rect x="340" y="264" width="590" height="46" rx="9" fill="#0a0f15" stroke="#31404f"/>
+        <text x="356" y="281" fill="#f0c678" font-size="10.5">/rerank(Cohere格式) → chat补排序 → 0.6*原分+0.4*覆盖</text>
+        <text x="356" y="298" fill="#97a4b2" font-size="10.5">LM Studio 承载 · ConnectionError 静默回退原序</text>
+        <rect x="340" y="320" width="590" height="46" rx="9" fill="#0a0f15" stroke="#31404f"/>
+        <text x="356" y="337" fill="#f0c678" font-size="10.5">min_score=0.15 · 全滤则保最高分（不空答）</text>
+        <text x="356" y="354" fill="#97a4b2" font-size="10.5">同视频相邻≤3s合并 · max_chars=6000 · 高分优先</text>
+        <rect x="340" y="376" width="590" height="46" rx="9" fill="#0a0f15" stroke="#31404f"/>
+        <text x="356" y="393" fill="#f0c678" font-size="10.5">search:精确回答+时间点引用 · summary:结构化大纲</text>
+        <text x="356" y="410" fill="#97a4b2" font-size="10.5">references 随消息入库 · 未配置 LLM 报清晰错误</text>
+      </g>
+
+      <!-- 阶段间箭头 -->
+      <path d="M290 119 H340" stroke="#6b7988" stroke-width="1.6" marker-end="url(#rg)"/>
+      <path d="M290 175 H340" stroke="#6b7988" stroke-width="1.6" marker-end="url(#rg)"/>
+      <path d="M290 231 H340" stroke="#6b7988" stroke-width="1.6" marker-end="url(#rg)"/>
+      <path d="M290 287 H340" stroke="#6b7988" stroke-width="1.6" marker-end="url(#rg)"/>
+      <path d="M290 343 H340" stroke="#6b7988" stroke-width="1.6" marker-end="url(#rg)"/>
+      <path d="M290 399 H340" stroke="#6b7988" stroke-width="1.6" marker-end="url(#rg)"/>
+    </svg>
+  </div>
+  <p class="muted" style="font-size:12.5px">流程示意图（按源码逻辑绘制）：整体保证「任一层挂了都不白屏」——这是你最能体现工程成熟度的地方。</p>
+
+  <h3>逐阶段深挖：面试怎么讲</h3>
+
+  <div class="card">
+    <h4>意图识别：双通道裁决</h4>
+    <ul>
+      <li><strong>前端快判</strong>（<span class="mono">src/lib/intentRouter.ts</span>）：5 类意图（search/summary/video_context/learning_plan/chat），纯正则，0 延迟，同时产出 <span class="mono">intent_hint</span>。</li>
+      <li><strong>后端终判</strong>（<span class="mono">intent_recognition.py</span>）：LangChain <span class="mono">with_structured_output</span>，Pydantic 模型 <span class="mono">IntentRecognitionResult(intent, confidence, cleaned_query, keywords, reasoning)</span>，temperature 0.1。</li>
+      <li><strong>面试点</strong>：这是「规则快判 + 模型兜底」的经典混合模式——为什么不在后端只跑一次？因为正则 0 延迟、省 token、高置信场景直接采纳；模型则处理模糊语义。失败一律回退 <span class="mono">general</span>，不阻断主流程。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h4>阶段 1 · 查询改写</h4>
+    <p>把「用户怎么说」翻译成「文档里怎么写」。维护一张<strong>同义词/缩写映射表</strong>（<span class="mono">js→javascript、爬虫→crawler、LLM→大语言模型</span>）和反向索引；再按意图扩展变体（summary 模式去掉「帮我/请」等修饰词，保留核心主题）。</p>
+    <p class="muted">面试讲：<em>「关键词召回覆盖的是'词面'，同义词扩展就是为了打掉'说法不一致'导致的召回缺口。变体数量我做上限控制（3 个），避免检索爆炸。」</em></p>
+  </div>
+
+  <div class="card">
+    <h4>阶段 2 · 混合检索</h4>
+    <p><strong>两路召回</strong>：<span class="mono">FTSRetriever</span> 走 SQLite FTS5（<span class="mono">bm25</span> 排序，三级兜底：FTS MATCH → substring LIKE → 近期/收藏视频）；<span class="mono">VectorRetriever</span> 走 <span class="mono">sqlite-vec</span>（bge-m3 1024 维，距离转分数 <span class="mono">1-d/2</span>）。查询扩展后逐变体多路检索再合并。</p>
+    <p class="muted">面试讲：<em>「关键字保证精确命中与可解释，向量保证语义相关。FTS 和向量各有失效场景，混着来召回率才稳。」</em></p>
+  </div>
+
+  <div class="card">
+    <h4>阶段 3 · RRF 融合</h4>
+    <p>把两路分数统一到 0–1，再按权重累加：<span class="mono">score = norm(fts)×fts_weight + norm(vec)×vec_weight</span>（默认各 0.5）。关键细节是用<strong>复合键 (video_id, start_sec)</strong> 去重，避免同一条字幕被两路分别命中导致分数虚高。</p>
+    <pre><code>key = (it["video_id"], it["start_sec"])
+combined[key] = {**it, "_hybrid_score": it["_norm_score"] * self.fts_weight}
+# vec 命中同键时累加，否则新建</code></pre>
+    <p class="muted">面试讲：<em>「RRF 不是简单拼接，我用归一化加权融合保证两路可比；复合键去重防止同片段被双计。权重可配，这是给 rerank 留出足够候选池（3×limit）的关键。」</em></p>
+  </div>
+
+  <div class="card">
+    <h4>阶段 4 · Rerank（最有含金量的一段）</h4>
+    <p>用 <span class="mono">bge-reranker-v2-m3</span> 对融合后的候选（<span class="mono">rerank_pool_size = limit×3</span>）重排序，提纯 Top-K。Reranker 是交叉编码器，比双塔向量更准，代价是慢，所以只对少量候选跑。</p>
+    <p><strong>三级降级</strong>是这段的亮点：</p>
+    <ul>
+      <li><strong>一级</strong>：走 <span class="mono">POST /rerank</span>（Cohere 格式，LM Studio 支持），拿 <span class="mono">relevance_score</span> 映射回文档。</li>
+      <li><strong>二级</strong>：/rerank 端点不可用 → <span class="mono">_rerank_via_chat</span>，让 LLM 输出排序索引 JSON，temperature 0。</li>
+      <li><strong>三级</strong>：连接失败/超时 → <span class="mono">_fallback_rerank</span>，用关键词覆盖率加权 <span class="mono">0.6×原分 + 0.4×覆盖</span>。</li>
+    </ul>
+    <p class="muted">面试讲：<em>「重排序是检索质量的上限提升器。我特意做了三级降级——宁可降级也不让检索链路挂掉。这也暴露了真实系统的常态：模型服务不可靠，必须把'失败'当成正常路径设计。」</em></p>
+  </div>
+
+  <div class="card">
+    <h4>阶段 5 · 过滤 + 压缩</h4>
+    <p><span class="mono">RelevanceFilter</span>：低于 <span class="mono">min_score=0.15</span> 的丢掉（优先用 rerank_score，其次 score_hint）；若全被滤掉，保留最高分那条，<strong>避免空结果</strong>。<span class="mono">ContextCompressor</span>：同一视频相邻 ≤3s 的片段合并成一段，再按总分控制 <span class="mono">max_chars=6000</span>（高分优先，最后可截断）。</p>
+    <p class="muted">面试讲：<em>「进入 LLM 的上下文是 token 预算，压缩就是预算管理：合并碎片降低噪声，总量封顶控制成本与延迟。」</em></p>
+  </div>
+
+  <div class="card">
+    <h4>阶段 6 · LLM 生成（search vs summary）</h4>
+    <p>根据意图选用不同的 RAG prompt：<span class="mono">search</span> 要求「只依据参考片段、给出视频标题+时间点、不够就明说」；<span class="mono">summary</span> 要求「提炼结构化大纲、标注时间点、说明缺失部分」。带 session 时先加载最近 10 轮历史再拼消息，回答与 references 一并入库。</p>
+    <p class="muted">面试讲：<em>「同样是检索增强，'找一段话'和'总结一整课'的指令诉求完全不同，所以 prompt 分叉。回答要带可追溯引用（视频+秒数），这是 RAG 区别于裸 LLM 的核心价值——不编造、可验证。」</em></p>
+  </div>
+
+  <h3>一套你要能脱口而出的「RAG 十问自检」</h3>
+  <div class="callout">
+    <p>1) 为什么混检？2) 为什么加 rerank 而不是直接 top-k？3) 融合权重怎么定？4) 查询改写解决什么问题？5) 上下文为什么要压缩？6) 引用怎么保证不编造？7) 向量库和 FTS 的失效场景？8) 召回率 vs 准确率怎么平衡？9) 失败降级路径有哪些？10) 怎么评测检索质量（RAGAS）？</p>
+    <p class="muted">——每一条你都能用这章的内容接住；第 10 条是你的「下一步」钩子（见第 06 章精进路线）。</p>
+  </div>
+</section>
+
+<!-- ===== 视图：学习材料 ===== -->
+<section id="learn">
+  <div class="sec-head"><span class="chip">03</span><h2>学习材料 · 以项目为纲的精读地图</h2></div>
+  <p class="sec-sub">别从零啃教科书——你有一个真实项目当「活标本」。每个知识块都给出：<strong>底层概念 → 本项目里的对应文件 → 要提取的设计 → 动手练习</strong>。按冲刺计划（第 05 章）的节奏逐块过。</p>
+
+  <h3>8 大知识块总览</h3>
+  <table>
+    <colgroup><col class="col-1"><col class="col-2"><col class="col-3"><col class="col-4"></colgroup>
+    <thead><tr><th>#</th><th>知识块</th><th>本项目落点（先读这些）</th><th>面试产出</th></tr></thead>
+    <tbody>
+      <tr><td>K1</td><td>React 19 + TS 工程化</td><td><span class="mono">src/components/</span>、<span class="mono">hooks/</span>、<span class="mono">types/</span></td><td>能讲组件拆分、Hooks、TS 边界</td></tr>
+      <tr><td>K2</td><td>Zustand 状态 + IndexedDB 持久化</td><td><span class="mono">src/stores/</span>、<span class="mono">lib/idbStorage.ts</span></td><td>能讲状态分片、持久化迁移、本地优先</td></tr>
+      <tr><td>K3</td><td>FastAPI + SQLAlchemy</td><td><span class="mono">backend/app/main.py</span>、<span class="mono">routers/</span>、<span class="mono">models.py</span></td><td>能讲路由组织、依赖注入、ORM</td></tr>
+      <tr><td>K4</td><td>SQLite：WAL / FTS5 / vec0</td><td><span class="mono">database.py</span>、<span class="mono">vector_store.py</span></td><td>能讲嵌入式库、全文检索、向量共存</td></tr>
+      <tr><td>K5</td><td>LLM 接入与 Provider 抽象</td><td><span class="mono">langchain_chat.py</span>、<span class="mono">llm_client.py</span></td><td>能讲多 provider、策略回退、结构化输出</td></tr>
+      <tr><td>K6</td><td>RAG 检索管线</td><td><span class="mono">services/rag*.py</span>、<span class="mono">hybrid_retriever.py</span></td><td>能画全链路、讲降级（第 02 章）</td></tr>
+      <tr><td>K7</td><td>异步任务系统</td><td><span class="mono">worker.py</span>、<span class="mono">services/ai_jobs.py</span></td><td>能讲状态机、恢复、取消竞态</td></tr>
+      <tr><td>K8</td><td>SSE 流式 + 外部进程编排</td><td><span class="mono">src/lib/llmStream.ts</span>、<span class="mono">ai_jobs.py</span></td><td>能讲流式解析、子进程管理</td></tr>
+    </tbody>
+  </table>
+
+  <h3>K1 · React 19 + TypeScript 工程化</h3>
+  <div class="card">
+    <ul>
+      <li><strong>概念</strong>：组件即函数、Hooks 即状态副作用、单向数据流、TS 静态类型。</li>
+      <li><strong>读项目</strong>：<span class="mono">src/components/video/useVideoPlayback.ts</span>（一个视频播放器的 Hooks 拆分）、<span class="mono">src/hooks/useCrossModuleSync.ts</span>（跨模块同步）、<span class="mono">src/components/layout/Header.tsx</span>（大组件组织）。</li>
+      <li><strong>提取</strong>：一个页面拆成「数据 Hook + 展示组件 + 交互组件」的分层；Hooks 之间如何通过 Zustand 而非 prop-drilling 通信。</li>
+      <li><strong>练习</strong>：挑一个现有页面，把状态逻辑重构成一个自定义 Hook 并抽测试；或新增一个「闪卡复习」页面，复用插件注册体系。</li>
+    </ul>
+  </div>
+
+  <h3>K2 · Zustand + IndexedDB 持久化（本地优先）</h3>
+  <div class="card">
+    <ul>
+      <li><strong>概念</strong>：全局状态、persist 中间件、Storage 适配、本地优先 + 云端同步。</li>
+      <li><strong>读项目</strong>：<span class="mono">src/stores/aiStore.ts</span>（persist + migrate + partialize + sanitize）、<span class="mono">src/lib/idbStorage.ts</span>（3 秒 debounce 写入、pagehide/visibilitychange flush、登录后切后端、scoped 命名）。</li>
+      <li><strong>提取</strong>：<span class="mono">migrate</span> 处理 schema 演进、<span class="mono">partialize</span> 控制持久化字段、损坏数据防御（<span class="mono">hasCorruptText</span>）、内存兜底（无 IndexedDB 时用 Map）。</li>
+      <li><strong>练习</strong>：给一个新 store 加「本地优先 + 登录后同步」双写，并验证刷新不丢状态——这是你项目里反复打磨过的点。</li>
+    </ul>
+  </div>
+
+  <h3>K3 · FastAPI + SQLAlchemy</h3>
+  <div class="card">
+    <ul>
+      <li><strong>概念</strong>：ASGI、路由、Pydantic 校验、依赖注入、ORM 映射、事务。</li>
+      <li><strong>读项目</strong>：<span class="mono">main.py</span>（lifespan、中间件、路由挂载、SPA fallback）、<span class="mono">routers/videos.py</span>（业务最重的一个）、<span class="mono">schemas.py</span>、<span class="mono">auth.py</span>（JWT）。</li>
+      <li><strong>提取</strong>：依赖注入 <span class="mono">get_db</span> 的会话生命周期；统一错误转成友好 detail（connection/timeout/401/404 分诊）。</li>
+      <li><strong>练习</strong>：新增一个 <span class="mono">/api/assistant/eval</span> 端点（接 RAGAS），打通「检索质量可查」——直接解决你最大的短板。</li>
+    </ul>
+  </div>
+
+  <h3>K4 · SQLite：WAL / FTS5 / vec0 三合一</h3>
+  <div class="card">
+    <ul>
+      <li><strong>概念</strong>：嵌入式数据库、WAL 并发、全文索引、向量扩展、触发器同步。</li>
+      <li><strong>读项目</strong>：<span class="mono">database.py</span>（<span class="mono">PRAGMA journal_mode=WAL / busy_timeout=30000</span>、FTS5 表 + <span class="mono">ai/ad/au</span> 三个触发器自动同步、vec0 建表、手写迁移）、<span class="mono">vector_store.py</span>（<span class="mono">struct.pack</span> 二进制向量、批量 upsert、增量索引 <span class="mono">get_unindexed_segment_ids</span>）。</li>
+      <li><strong>提取</strong>：为什么 local-first 选 SQLite 而非 PostgreSQL；FTS5 用 content 外置表 + 触发器保持一致性；vec0 无 JOIN 的限制怎么绕。</li>
+      <li><strong>练习</strong>：给字幕加一个「按视频聚合统计」的索引/查询，或写一段把 SQLite 导出到真实向量库（如 Qdrant/Chroma）的适配层。</li>
+    </ul>
+  </div>
+
+  <h3>K5 · LLM 接入与 Provider 抽象</h3>
+  <div class="card">
+    <ul>
+      <li><strong>概念</strong>：OpenAI 兼容协议、多 provider、运行时策略、结构化输出、降级链。</li>
+      <li><strong>读项目</strong>：<span class="mono">langchain_chat.py</span>（<span class="mono">_resolve_provider</span> 按 <span class="mono">llm_usage_policy</span> 四策略回退；provider 探测 openai vs ollama）、<span class="mono">intent_recognition.py</span>（<span class="mono">with_structured_output</span>）、<span class="mono">embedding.py</span>（用 requests 直连绕开 httpx 兼容问题）。</li>
+      <li><strong>提取</strong>：把「选哪个模型」做成可配置策略而非写死——local 便宜私密、external 更强，四档策略覆盖成本/可用性权衡。</li>
+      <li><strong>练习</strong>：给聊天加流式（SSE），并把 <span class="mono">llmStream.ts</span> 的解析工具接到后端 <span class="mono">stream=True</span>。</li>
+    </ul>
+  </div>
+
+  <h3>K6 · RAG 检索管线</h3>
+  <div class="card">
+    <ul>
+      <li><strong>概念</strong>：Embedding、向量检索、混合检索、RRF、Rerank、上下文压缩、引用生成。</li>
+      <li><strong>读项目</strong>：第 02 章已逐段拆解——<span class="mono">rag_chain.py → hybrid_retriever.py → query_enhancer.py → reranker.py → retrieval_postprocessor.py</span> 按调用链读一遍。</li>
+      <li><strong>提取</strong>：把「召回 → 融合 → 重排 → 压缩 → 生成」画成一张图（你面试要能白板画出来）；记熟每个阶段的参数与降级。</li>
+      <li><strong>练习</strong>：写一个 RAGAS 评测脚本，对 20 条真实查询算 faithfulness / context_recall / context_precision，量化当前质量。</li>
+    </ul>
+  </div>
+
+  <h3>K7 · 异步任务系统</h3>
+  <div class="card">
+    <ul>
+      <li><strong>概念</strong>：消息队列、Worker、任务状态机、断点恢复、取消、幂等。</li>
+      <li><strong>读项目</strong>：<span class="mono">worker.py</span>（RQ SimpleWorker、Windows 关掉 Unix 专属 death penalty、启动时 requeue 中断任务）、<span class="mono">services/ai_jobs.py</span>（状态机 queued→running[extracting/transcribing/correcting/summarizing/writing]→completed/failed/cancelled；<span class="mono">update_job_state</span> 里 <span class="mono">db.refresh</span> 防取消被复活；失败先 rollback）。</li>
+      <li><strong>提取</strong>：任务 vs 视频的产物落盘（.wav/.md/.vtt）、DB 队列与 Redis 队列同步（<span class="mono">sync_db_queue_to_rq</span>）、重启恢复的两种语义（running→requeue、cancelling→finalize）。</li>
+      <li><strong>练习</strong>：画一张完整状态机图；给任务加「重试上限 + 指数退避」。</li>
+    </ul>
+  </div>
+
+  <h3>K8 · SSE 流式 + 外部进程编排</h3>
+  <div class="card">
+    <ul>
+      <li><strong>概念</strong>：SSE 解析、跨格式响应归一化、subprocess 生命周期、PIPE 防死锁。</li>
+      <li><strong>读项目</strong>：<span class="mono">src/lib/llmStream.ts</span>（<span class="mono">extractAssistantText</span> 兼容 OpenAI delta / Ollama / LM Studio 多种响应形状；<span class="mono">parseSSELines</span> 处理缓冲边界）、<span class="mono">main.py</span> 的 <span class="mono">_drain_worker_stdout</span>（吃掉 PIPE 避免死锁）。</li>
+      <li><strong>提取</strong>：流式是 LLM 应用体验的关键，解析必须容忍各家返回格式差异。</li>
+      <li><strong>练习</strong>：把 RAG 问答改成 <span class="mono">StreamingResponse</span>，前端逐字渲染——这是面试官爱听的「我给 RAG 加了流式」。</li>
+    </ul>
+  </div>
+
+  <h3>精读文件地图（一次一张图，别贪多）</h3>
+  <table>
+    <colgroup><col class="col-2"><col class="col-3"><col class="col-4"></colgroup>
+    <thead><tr><th>要弄懂的问题</th><th>读这份文件</th><th>读完要能回答</th></tr></thead>
+    <tbody>
+      <tr><td>一条查询怎么走到答案</td><td><span class="mono">rag_chain.py</span></td><td>search/summary 双模式差异？引用怎么生成？</td></tr>
+      <tr><td>两路检索怎么合</td><td><span class="mono">hybrid_retriever.py</span></td><td>RRF 权重？复合键？vec 挂了的兜底？</td></tr>
+      <tr><td>任务断了怎么办</td><td><span class="mono">ai_jobs.py</span> + <span class="mono">worker.py</span></td><td>running 重启后？cancelling 呢？取消竞态？</td></tr>
+      <tr><td>状态刷新不丢</td><td><span class="mono">idbStorage.ts</span> + <span class="mono">pomodoroStore.ts</span></td><td>debounce？flush 时机？本地/后端双写？</td></tr>
+      <tr><td>数据怎么建表迁移</td><td><span class="mono">database.py</span></td><td>WAL？FTS 触发器？vec0？手写迁移？</td></tr>
+      <tr><td>选哪个模型</td><td><span class="mono">langchain_chat.py</span></td><td>四档 policy？provider 探测？失败回退？</td></tr>
+    </tbody>
+  </table>
+
+  <h3>补知识的顺序（不按书本，按面试）</h3>
+  <ol>
+    <li><strong>先深后广</strong>：RAG + 异步任务是你项目的护城河，第 02 章 + K6/K7 优先啃透。</li>
+    <li><strong>概念对照代码</strong>：每学一个新概念（如 RRF、交叉编码器、WAL），回到项目里找到那一行，把「概念 ↔ 实现」钉死。</li>
+    <li><strong>输出型学习</strong>：每天睡前用「白板默写」——画 RAG 管线、写状态机、讲一次项目故事，讲不出就是没学会。</li>
+    <li><strong>横向补盲</strong>：LangGraph/Coze/Dify 是当前 Agent 岗位热词，用你项目的「意图识别 + 模板切换」作为理解它们的锚点（第 06 章展开）。</li>
+  </ol>
+</section>
+
+<!-- ===== 视图：面试材料 ===== -->
+<section id="interview">
+  <div class="sec-head"><span class="chip">04</span><h2>面试材料 · 项目讲述法 + 34 问</h2></div>
+  <p class="sec-sub">面试的核心不是罗列功能，而是<strong>把一个项目讲成一个有取舍、有挑战、有成长的故事</strong>。先学会「怎么讲」，再拿 34 问反复练。</p>
+
+  <h3>如何讲这个项目（三段式）</h3>
+  <div class="card">
+    <h4>① 一句话（15 秒，电梯版）</h4>
+    <p>“我独立做了一个<strong>本地优先的 AI 学习工作台</strong>：React + FastAPI + SQLite，核心是给视频字幕库搭了一条<strong>混合检索 RAG 问答管线</strong>和一套<strong>可取消可恢复的异步任务系统</strong>，把 LLM、向量检索、流式与前后端工程串成了一个真实在跑的产品。”</p>
+  </div>
+  <div class="card">
+    <h4>② 一段话（2 分钟，讲取舍）</h4>
+    <p>“这个项目解决的是'本地大量学习视频没法检索问答'的问题。我的核心取舍有三：<br>
+    <strong>（1）检索上选混合式</strong>——关键字 FTS 保精确、向量保语义，再用 RRF 融合 + Reranker 提纯，整条链路每一层都有降级，模型服务挂了也绝不白屏；<br>
+    <strong>（2）架构上选本地优先</strong>——数据先落 IndexedDB，登录后同步后端，单机 + 局域网就能用，换来的是极低的运维成本和极快的迭代；<br>
+    <strong>（3）AI 任务走独立 worker</strong>——用 Redis+RQ 跑 Whisper 转录/摘要，设计了完整状态机、断点恢复和取消竞态防护，让长任务稳定可追踪。”</p>
+  </div>
+  <div class="card">
+    <h4>③ 一个亮点（2 分钟，深挖 Rerank 降级）</h4>
+    <p>“我最想讲的是检索链路的<strong>工程韧性</strong>。以 Reranker 为例：它依赖本地模型服务，而真实系统里服务不可靠是常态。所以我做了三级降级——先走 <span class="mono">/rerank</span> 交叉编码器；不行就用 LLM 排序；再不行就退到关键词覆盖率加权。整条 RAG 管线的每个依赖都这么处理，这让我学会了把'失败'当正常路径来设计，而不是事后打补丁。”</p>
+  </div>
+
+  <h3>面试必背数据（数字能瞬间建立可信度）</h3>
+  <div class="grid2">
+    <div class="card">
+      <ul>
+        <li><strong>规模</strong>：40+ 前端组件/页面，10+ FastAPI 路由，190 个 Vitest 用例全通过。</li>
+        <li><strong>检索</strong>：6 阶段 RAG 管线；混合检索双通道；rerank 候选池 = limit×3；上下文上限 6000 字符；相关性阈值 0.15。</li>
+        <li><strong>异步</strong>：状态机含 5 个运行子阶段；worker 重启自动恢复；本地/外部双 LLM 四档策略。</li>
+        <li><strong>栈</strong>：React19/TS6/Vite8、Zustand+IndexedDB、FastAPI/SQLAlchemy/SQLite(WAL+FTS5+vec0)、LangChain、Redis+RQ、Whisper。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>版本迭代（证明持续维护）</h4>
+      <ul>
+        <li>2.94 · RAG 检索全链路增强</li>
+        <li>2.93 · 意图识别 + 自动模板</li>
+        <li>2.91 · 转录王 + AI 任务中心</li>
+        <li>2.7 · 持久化/时区/跨模块同步</li>
+        <li>2.6 · 番茄钟混合同步 + 雪碧图</li>
+      </ul>
+      <p class="muted" style="font-size:12px">面试时说：<em>“它一直在迭代，每个版本都解决真实使用中的问题。”</em></p>
+    </div>
+  </div>
+
+  <h3>34 道预测问答</h3>
+  <p class="muted">点开看参考答案。分五类：RAG 技术 / 架构设计 / 异步与并发 / 前端与持久化 / 行为与业务。先自己答一遍，再对照。</p>
+
+  <div class="block-label">A · RAG 技术</div>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>你的 RAG 和普通「检索 + 拼接 prompt」有什么本质区别？</summary>
+    <div class="ans"><p>区别在<strong>把检索本身做成了有取舍的工程</strong>：我有查询改写（同义词/缩写扩展打召回缺口）、混合检索（FTS 关键字 + 向量语义双路）、RRF 融合、Reranker 提纯、相关性过滤 + 上下文压缩，最后才交给 LLM。而且回答带<strong>可追溯引用</strong>（视频 + 秒数），要求模型只依据片段回答、不够就明说——这是 RAG 区别于「把文档糊进 prompt」的核心：可控、可验证、不编造。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>为什么同时用 FTS 和向量检索？各自失效场景是什么？</summary>
+    <div class="ans"><p>关键字（FTS）强在<strong>精确匹配、可解释、快</strong>，但失效于同义改写（用户说「爬虫」字幕写「crawler」）；向量强在<strong>语义相关</strong>，但失效于专有名词、缩写、数字（向量对这些敏感度低、也可能误召回）。两者互补，混合召回率更稳。所以我还做了同义词扩展，专门缓解 FTS 的召回缺口。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>RRF 融合你怎么实现的？为什么用复合键去重？</summary>
+    <div class="ans"><p>先把两路分数各自归一化到 0–1，再按权重累加：<span class="mono">score = norm(fts)×fts_weight + norm(vec)×vec_weight</span>（默认 0.5/0.5）。去重键是 <span class="mono">(video_id, start_sec)</span>——因为同一条字幕可能被两路同时命中，如果不合并就会分数虚高、排名失真。权重和候选池（limit×3）都可配，给 rerank 留足空间。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>Reranker 和向量检索的 Embedding 有什么区别？</summary>
+    <div class="ans"><p>Embedding（双塔）把 query 和 doc 各自编码成向量，用余弦/距离比相似度，<strong>快但粗</strong>——query 和 doc 之间没有交互。Reranker 是<strong>交叉编码器</strong>，把 query 和 doc 拼接一起过模型，能捕捉细粒度相关性，<strong>准但慢</strong>。所以正确姿势是：向量粗召回一大批候选（我取 limit×3），再用 reranker 精排到 Top-K——用算力换精度，但只在少量候选上花。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>你的 Reranker 三级降级具体是什么？为什么值得做？</summary>
+    <div class="ans"><p>一级 <span class="mono">POST /rerank</span>（Cohere 格式，LM Studio 承载）；端点不可用则二级，用 LLM 输出排序索引 JSON（temperature 0）；连接失败则三级，退到关键词覆盖率加权 <span class="mono">0.6×原分+0.4×覆盖</span>。值得做是因为<strong>真实系统里模型服务不可靠</strong>，链路要保证「哪怕降级也不挂」。这体现的是把失败当正常路径设计的工程思维。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>检索结果为什么要过滤和压缩？</summary>
+    <div class="ans"><p>过滤（RelevanceFilter，阈值 0.15）去掉低质量噪声，避免把无关内容喂给 LLM 干扰生成；压缩（ContextCompressor）先把同一视频相邻 ≤3s 的片段合并成一段，降低碎片化，再按 6000 字符总量控制——因为 LLM 上下文是 token 预算，塞太多会稀释注意力、增加成本和延迟。全滤空时保留最高分那条，避免「无结果」的坏体验。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>怎么保证 RAG 回答不编造？</summary>
+    <div class="ans"><p>三层：① prompt 约束「只依据参考片段、不要编造，不够就明说」；② 回答带<strong>结构化引用</strong>（视频标题 + 起止秒数），面试官可以回溯验证；③ 检索侧用阈值过滤掉低分噪声，从源头减少「无关上下文诱导幻觉」。诚实地说，引用可追溯是 RAG 控制幻觉最有效的产品手段。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>你的检索质量怎么评估？有没有量化指标？</summary>
+    <div class="ans"><p>这是我知道的短板：目前靠人工抽检 + 阈值调参，<strong>没有接 RAGAS 这类量化评测</strong>。我的下一步计划是：对一批真实查询标注 ground truth，跑 RAGAS 的 faithfulness / context_recall / context_precision，用数据驱动调 rerank 权重和阈值。这既补了短板，也是当前 Agent 岗位很看重的能力。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>search 和 summary 两种意图在检索上有什么不同？</summary>
+    <div class="ans"><p>search 是<strong>精确检索</strong>——找「特定片段」的位置，走精准匹配 + 精确回答 + 引用；summary 是<strong>覆盖式检索</strong>——要把整课讲清楚，查询改写会去掉修饰词保留核心主题，prompt 要求输出结构化大纲并标注时间点，还会说明「参考片段不足以覆盖哪些部分」。检索粒度一样，但改写策略和生成指令分叉。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">RAG</span>上下文窗口有限时，你的 token 策略是什么？</summary>
+    <div class="ans"><p>总量封顶（6000 字符）+ 高分优先：压缩时按 rerank_score 降序先保高分的，最后一条可截断。配合相邻片段合并，既保证质量优先，又严格控制成本与延迟。</p></div>
+  </details>
+
+  <div class="block-label">B · 架构设计</div>
+  <details class="qa"><summary><span class="q-tag tag b">架构</span>为什么选「本地优先 + 单机全栈」而非微服务？</summary>
+    <div class="ans"><p>因为场景是<strong>个人/小团队/工作室在可信局域网内使用</strong>，核心诉求是数据私密、运维极简、迭代快。单进程 React+FastAPI+SQLite 完全够用，代价是并发和隔离弱——README 也明确说了「面向公网要先加固」。这是<strong>基于场景的取舍</strong>：不为不存在的规模提前买单。面试里主动讲清取舍边界比堆架构更有说服力。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag b">架构</span>FastAPI 的 lifespan 里你做了什么？</summary>
+    <div class="ans"><p>建表（Base.metadata.create_all）、确保运行时 schema（FTS/vec/索引）、启动文件监听、后台线程跑启动扫描和缩略图/雪碧图生成、<strong>拉起独立的 RQ worker 子进程</strong>（并起线程 drain 其 stdout 防 PIPE 死锁）；退出时 terminate worker。把 AI 任务从 API 进程里拆出去，长任务不阻塞接口。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag b">架构</span>为什么把 AI 任务放独立 worker 进程？</summary>
+    <div class="ans"><p>转录/摘要这类任务是<strong>分钟级长任务</strong>，如果同步跑在 API 进程会阻塞请求、拖垮并发。拆到 Redis+RQ 独立 worker：① 任务入队即返回，前端轮询状态；② 可取消、可暂停、可恢复；③ worker 崩了任务还在 DB/Redis 里，重启自动 requeue；④ 用 <span class="mono">update_job_state</span> 刷新后再写，防止取消竞态把已取消任务复活。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag b">架构</span>认证你用的什么方案？有没有隐患？</summary>
+    <div class="ans"><p>FastAPI OAuth2 + JWT（HS256，exp 2160h）。<strong>诚实说隐患</strong>：密码目前用 SHA-256 哈希，生产应换 bcrypt/argon2；JWT secret 是开发默认值；CORS 开了 <span class="mono">allow_origins=["*"]</span> 且带 credentials（按规范浏览器会拒绝）。这些我清楚，也写在 README 的「公网加固清单」里——本地工具够用，上公网前必须先处理。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag b">架构</span>你的数据模型怎么设计的？</summary>
+    <div class="ans"><p>核心表：<span class="mono">videos</span>（含转录/摘要/产物路径/AI 状态）、<span class="mono">subtitle_segments</span>（逐条字幕，供 FTS5 与向量索引）、<span class="mono">ai_jobs</span>（任务状态机 + 全部转录参数快照）、<span class="mono">chat_sessions/chat_messages</span>（对话历史 + references）、<span class="mono">schedule_items</span>（统一待办/日历/番茄）、<span class="mono">user_data</span>（前端状态的后端镜像）。AI 状态直接冗余在 video 行上，查询快。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag b">架构</span>没有用 Alembic，你迁移怎么做？为什么？</summary>
+    <div class="ans"><p>用 <span class="mono">ensure_runtime_schema</span> 手写幂等迁移：读 <span class="mono">PRAGMA table_info</span> 判断缺哪些列，<span class="mono">ALTER TABLE ADD COLUMN</span> 补齐，建索引、FTS 触发器、vec 表，全部 <span class="mono">IF NOT EXISTS</span>。早期 MVP 图快没上 Alembic，但我知道这不可扩展——下一步升级计划就是把迁移切到 Alembic。</p></div>
+  </details>
+
+  <div class="block-label">C · 异步与并发</div>
+  <details class="qa"><summary><span class="q-tag tag t">异步</span>画一下你的 AI 任务状态机</summary>
+    <div class="ans"><p>queued → running（子阶段 extracting → transcribing → correcting-subtitles → summarizing → writing）→ completed / failed / cancelled。worker 启动时：<span class="mono">running</span> 且无存活 worker → requeue；<span class="mono">cancelling</span> 但 worker 已死 → 终结为 cancelled，避免卡死。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag t">异步</span>取消一个正在跑的转录任务，你如何保证它真的停？</summary>
+    <div class="ans"><p>三层：① RQ 层面按 job_id 取消/中断；② 真正的 ffmpeg/whisper 子进程会被 terminate，faster-whisper 迭代中也支持中断；③ 最关键的防御——<span class="mono">update_job_state</span> 在写状态前先 <span class="mono">db.refresh(job)</span>，如果 API 已经把它翻成 cancelled，就抛异常短路，<strong>避免 worker 用陈旧缓存把已取消任务复活回 running</strong>。这个竞态是真实踩坑后补的。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag t">异步</span>worker 重启后，正在跑的任务怎么处理？</summary>
+    <div class="ans"><p>启动时 <span class="mono">requeue_interrupted_ai_jobs</span>：把所有 <span class="mono">running</span> 的任务置回 queued 重新入队（因为无存活 worker 接），把 <span class="mono">cancelling</span> 的终结为 cancelled。同时 <span class="mono">sync_db_queue_to_rq</span> 把 Redis 不可用期间积压在 DB 的任务补推。这让「机器/worker 挂了」变成可恢复事件而不是丢数据。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag t">异步</span>数据库与 Redis 双队列怎么保持一致？</summary>
+    <div class="ans"><p>DB 是权威源（任务持久化），Redis/RQ 是执行队列。Redis 正常时任务同时入 DB 和 RQ；Redis 不可用时任务先进 DB，worker 启动或恢复时用 <span class="mono">sync_db_queue_to_rq</span> 把积压任务补推进队列。状态更新始终以 DB 为准，worker 每次写前 refresh，保证多组件视角一致。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag t">异步</span>Windows 上跑 RQ 你遇到什么问题？</summary>
+    <div class="ans"><p>RQ 的 <span class="mono">death_penalty</span> 依赖 Unix 信号，Windows 不支持。我用 <span class="mono">NoOpDeathPenalty</span> 覆盖它，自定义 <span class="mono">WindowsWorker</span>。副作用是 worker 用 SimpleWorker 在进程内跑 job，job 被强杀时 worker 进程会死，需重启——我用外层 while 循环 + 2s 退避让 worker 自动重启。这类平台适配是个人全栈项目常见的真实工程挑战。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag t">异步</span>转录的 GPU/CPU 双路线你怎么设计？</summary>
+    <div class="ans"><p>CPU 路线用 faster-whisper（通用，int8、线程数 = CPU 核−2）；外部引擎路线用 whisper.cpp，本机为 A 卡做了 Windows 兼容层。GPU 部分跟本机环境绑得比较深，所以 README 标注了「非相似环境需改」，CPU 路线保持通用——这是「环境绑定逻辑」和「通用逻辑」分离的实践。</p></div>
+  </details>
+
+  <div class="block-label">D · 前端与持久化</div>
+  <details class="qa"><summary><span class="q-tag tag b">前端</span>「本地优先」的同步策略具体是什么？</summary>
+    <div class="ans"><p>用 Zustand persist + 自研 <span class="mono">idbStorage</span>：状态先写 IndexedDB（Dexie），写入做了 <strong>3 秒 debounce</strong>，并在 <span class="mono">pagehide</span>/<span class="mono">visibilitychange=hidden</span> 时 flush 掉待写，避免刷新丢状态。登录后带 token 时改走后端 <span class="mono">user_data</span>，未登录走本地。部分高频状态（番茄/插件/UI）立即写不 debounce。IndexedDB 不可用时降级到内存 Map——每层都有兜底。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag t">前端</span>为什么状态持久化要加 debounce？</summary>
+    <div class="ans"><p>避免每次 set 都触发一次磁盘/网络写——番茄钟秒级计时、拖拽排序等高频操作会写爆 IndexedDB 和请求。debounce 到 3 秒合并最后一次写入，再在页面隐藏时强制 flush，兼顾性能和「不丢最后状态」。<span class="mono">partialize</span> 只持久化必要字段，还控制消息只留最近 50 条。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag b">前端</span>store 的 schema 升级你如何处理？</summary>
+    <div class="ans"><p>Zustand persist 的 <span class="mono">migrate</span> + <span class="mono">version</span>：读旧数据时做清洗——校验字段类型、剔除损坏文本（<span class="mono">hasCorruptText</span> 检测乱码）、归一化 endpoint、兜底模板。这样升级不炸历史数据，还能防御持久化被写坏的情况。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag t">前端</span>番茄钟的混合同步你怎么实现？</summary>
+    <div class="ans"><p>浏览器本地<strong>每秒计时</strong>保证流畅，后端只保存关键事件和 <strong>15 秒运行快照</strong>；配置、历史、运行态拆成三个后端 user_data（v2 三件套）。这样局域网多设备刷新能接上当前状态，又不至于每秒打后端。这是「前端体验」和「后端权威」的平衡。</p></div>
+  </details>
+
+  <div class="block-label">E · 行为与业务</div>
+  <details class="qa"><summary><span class="q-tag tag a">行为</span>这个项目是你一个人做的，你怎么保证代码质量？</summary>
+    <div class="ans"><p>三层：① <strong>测试锁边界</strong>——190 个 Vitest 用例覆盖意图识别（13 条）、番茄持久化、主题调度、日期/时区等最容易回归的逻辑；② <strong>构建门槛</strong>——改前端至少跑 <span class="mono">npm test</span> + <span class="mono">npm run build</span>，后端跑 <span class="mono">compileall</span>；③ <strong>踩坑记录</strong>——docs 里有详尽的「今日踩坑与维护记录」和技术报告，把每次修的根因沉淀下来，避免重复踩。代码是给自己用的，但质量习惯是职业的。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">行为</span>你踩过最深的坑是什么？怎么爬出来的？</summary>
+    <div class="ans"><p>取消竞态算一个：worker 端在 summarize/write 期间，如果 API 已把任务翻成 cancelled，worker 用缓存对象继续写会把它「复活」成 completed。根因是 <span class="mono">expire_on_commit=False</span> 导致缓存陈旧。修复是 <span class="mono">update_job_state</span> 写前先 <span class="mono">db.refresh(job)</span> 校验，失败短路。这件事让我学会了<strong>多进程写同一状态的竞态，必须回到权威源确认再写</strong>。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">行为</span>如果让你加一个功能，你会怎么开工？</summary>
+    <div class="ans"><p>先用现有插件体系注册一个最小可跑页面，再把数据层打通、补测试、跑构建。举例：加「RAG 检索质量评测」——新增 <span class="mono">/api/assistant/eval</span> 端点 + 一个评测页面，接 RAGAS 对真实查询算三个指标，量化调参。做完既补短板，又是一次完整的功能交付。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">行为</span>为什么这个项目适合你投的 Agent / RAG 岗位？</summary>
+    <div class="ans"><p>它覆盖了 Agent 岗位的核心链路：<strong>意图识别</strong>（规则+模型混合）、<strong>检索增强</strong>（混合检索+Rerank）、<strong>任务编排</strong>（异步状态机）、<strong>多模型接入</strong>（local/external 策略）。它不是 Demo，是真实在用的产品，我理解每一层为什么这么设计。而且我有英语优势，适合出海/跨境业务——能把英文技术文档和海外模型生态直接用起来。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">行为</span>你英语不错，这对你的技术工作有什么加成？</summary>
+    <div class="ans"><p>能直接读 LangChain/LangGraph/RAGAS 的一手文档和论文、跟进最新模型生态，也能在需要读英文产品/跨境业务的需求上无缝衔接。面试官可以自由切换考我英文技术表达。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">行为</span>你未来一年想往哪个方向精进？</summary>
+    <div class="ans"><p>把「本地优先 RAG 工具」往「真正智能的 Agent」演进：① 给检索接 RAGAS 量化评测，用数据驱动调优；② 把意图识别+模板切换升级成 LangGraph 的多步 Agent 编排；③ 把同步 RAG 问答改成流式；④ 安全加固（bcrypt、Alembic、限流）。这些方向正好对应 Agent 工程的核心能力，我会拿这个项目持续当试验田。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">行为</span>如果团队要多人协作，这个项目哪里要改？</summary>
+    <div class="ans"><p>① 认证升级——bcrypt + 强 secret + 正确的 CORS 策略；② 引入 Alembic 管理迁移；③ 加角色/权限和多租户数据隔离；④ 加限流、审计日志；⑤ 部署走 HTTPS 反向代理 + 访问控制；⑥ 视频目录做权限隔离。README 里我已经列了这份加固清单，方向是清楚的。</p></div>
+  </details>
+  <details class="qa"><summary><span class="q-tag tag a">行为</span>你最大的短板是什么？</summary>
+    <div class="ans"><p>技术上，我的项目<strong>缺少量化评测和自动化运维</strong>——RAG 质量靠手感、迁移靠手写 SQL、没有 CI。我正在补：接 RAGAS、上 Alembic、给仓库配 CI 跑测试和构建。过程上，个人项目让我习惯了单兵作战，所以我也在刻意练习「把设计和取舍讲给团队听」的沟通方式。短板我会主动说，同时给出正在推进的解法。</p></div>
+  </details>
+</section>
+
+<!-- ===== 视图：14 天冲刺计划 ===== -->
+<section id="plan">
+  <div class="sec-head"><span class="chip">05</span><h2>14 天冲刺计划（10–12 小时/天）</h2></div>
+  <p class="sec-sub">目标：把「我有个项目」变成「我能讲透、能白板画、能现场写」。按你的强度和手头基础，14 天足够把 RAG + Agent 岗位的核心考点击穿。每天可勾选打卡，进度存在本地浏览器里。</p>
+
+  <h3>每日作息模板（10–12 小时怎么分配）</h3>
+  <table>
+    <colgroup><col class="col-1"><col class="col-2"><col class="col-3"><col class="col-4"></colgroup>
+    <thead><tr><th>时段</th><th>时长</th><th>内容</th><th>原则</th></tr></thead>
+    <tbody>
+      <tr><td>上午 09:00–12:30</td><td>3.5h</td><td>深度专注：啃一个知识块 / 读对应源码 / 做一个小练习</td><td>一天只攻一个主题，深比广重要</td></tr>
+      <tr><td>午休</td><td>1h</td><td>吃饭 + 散步 + 不看屏幕</td><td>强制恢复，防止疲劳</td></tr>
+      <tr><td>下午 13:30–17:30</td><td>4h</td><td>实践：改项目 / 写练习 / 跑 RAGAS / 做面试题</td><td>输出型学习，动手才算数</td></tr>
+      <tr><td>傍晚 17:30–19:00</td><td>1.5h</td><td>运动 + 吃饭 + 复盘今天学的三个点</td><td>间隔复习，巩固记忆</td></tr>
+      <tr><td>晚上 19:30–22:30</td><td>3h</td><td>面试向：白板默写 / 模拟问答 / 项目讲述录音</td><td>用「讲得出来」检验「学会了」</td></tr>
+      <tr><td>睡前</td><td>0.5h</td><td>次日计划 + 扫一遍今天的错误笔记</td><td>轻量收尾</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">合计约 12 小时有效学习。10 小时版可砍掉傍晚复盘或缩短晚间模拟。关键是<strong>每天都要有输出</strong>（代码 / 白板 / 录音三选一）。</p>
+
+  <h3>14 天四阶段</h3>
+  <div class="timeline">
+    <div class="tl-date">D1–D2</div><div class="tl-axis"><span class="tl-dot t"></span></div>
+    <div class="tl-body"><div class="t">阶段一 · 地基 + 项目故事（第 01 章）</div>
+      <div class="s">读完全景分析，把架构图 / 技术栈 / 亮点短板背熟；写好「一句话 + 一段话 + 一个亮点」三段讲稿并录音；跑通项目（npm run dev + 后端）。</div></div>
+    <div class="tl-date">D3–D6</div><div class="tl-axis"><span class="tl-dot"></span></div>
+    <div class="tl-body"><div class="t">阶段二 · RAG 主攻（第 02 章 + K6/K7）</div>
+      <div class="s">逐阶段啃 RAG 管线，白板默画全流程；读 rag_chain / hybrid_retriever / reranker 源码；做一个练习（如接 RAGAS 评测或加流式）。这是你的护城河。</div></div>
+    <div class="tl-date">D7–D9</div><div class="tl-axis"><span class="tl-dot"></span></div>
+    <div class="tl-body"><div class="t">阶段三 · 后端 / 系统设计（K3/K4/K7）</div>
+      <div class="s">FastAPI + SQLAlchemy + SQLite 三合一精读；异步任务状态机讲透；补齐系统设计概念（队列、幂等、故障恢复、local-first 取舍）。</div></div>
+    <div class="tl-date">D10–D12</div><div class="tl-axis"><span class="tl-dot"></span></div>
+    <div class="tl-body"><div class="t">阶段四 · 前端 + 全栈串讲（K1/K2/K5/K8）</div>
+      <div class="s">React/Zustand/IndexedDB 持久化；LLM provider 抽象；SSE 流式。把「一条查询从前端到回答」从头到尾讲一遍。</div></div>
+    <div class="tl-date">D13–D14</div><div class="tl-axis"><span class="tl-dot g"></span></div>
+    <div class="tl-body"><div class="t">阶段五 · 模拟冲刺 + 打磨</div>
+      <div class="s">全量 34 问过一遍；做 2–3 次真实模拟面试（录音复盘）；简历把项目写法打磨到「一眼能打」；准备反问问题。查漏补缺。</div></div>
+  </div>
+
+  <h3>14 天打卡清单（勾选持久化保存）</h3>
+  <div class="progressbar" data-bar="sprint"><div class="fill"></div></div>
+  <p class="bar-label muted" style="font-size:12.5px;margin-bottom:12px">0 / 0 完成</p>
+
+  <div class="block-label">阶段一 · 地基</div>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d1a"><span class="c-body"><span class="c-title">读完第 01 章项目全景，能口述技术栈与架构图</span><span class="c-sub">背熟 190 用例 / 6 阶段 RAG / 10+ 路由这几个硬数字</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d1b"><span class="c-body"><span class="c-title">写好三段式讲稿并录音回听</span><span class="c-sub">一句话 / 一段话 / 一个亮点，各录一遍</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d2a"><span class="c-body"><span class="c-title">本地跑通项目</span><span class="c-sub">npm run dev + 后端 uvicorn，能真实点开一个功能</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d2b"><span class="c-body"><span class="c-title">把「短板 + 解法」背熟</span><span class="c-sub">bcrypt / Alembic / RAGAS / 流式，每个都能展开</span></span></label>
+
+  <div class="block-label">阶段二 · RAG 主攻（第 02 章）</div>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d3a"><span class="c-body"><span class="c-title">白板默画 RAG 六阶段全流程</span><span class="c-sub">含每阶段输入输出 + 降级路径</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d3b"><span class="c-body"><span class="c-title">读透 rag_chain.py + hybrid_retriever.py</span><span class="c-sub">能解释 RRF 融合、复合键去重</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d4a"><span class="c-body"><span class="c-title">读透 reranker.py，讲清三级降级</span><span class="c-sub">/rerank → LLM 排序 → 关键词加权</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d4b"><span class="c-body"><span class="c-title">读透 query_enhancer + postprocessor</span><span class="c-sub">同义词扩展、阈值过滤、上下文压缩</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d5a"><span class="c-body"><span class="c-title">练习：给 RAG 接 RAGAS 评测</span><span class="c-sub">20 条真实查询算 faithfulness / recall / precision</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d6a"><span class="c-body"><span class="c-title">练习：把 RAG 问答改成流式</span><span class="c-sub">后端 StreamingResponse + 前端逐字渲染</span></span></label>
+
+  <div class="block-label">阶段三 · 后端 / 系统设计</div>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d7a"><span class="c-body"><span class="c-title">读透 FastAPI lifespan + 路由 + JWT 认证</span><span class="c-sub">能讲 worker 子进程、错误分诊</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d7b"><span class="c-body"><span class="c-title">读透 SQLite WAL / FTS5 触发器 / vec0</span><span class="c-sub">database.py + vector_store.py</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d8a"><span class="c-body"><span class="c-title">画 AI 任务完整状态机</span><span class="c-sub">含重启恢复 + 取消竞态两条路径</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d9a"><span class="c-body"><span class="c-title">补齐系统设计概念</span><span class="c-sub">队列、幂等、故障恢复、local-first 取舍</span></span></label>
+
+  <div class="block-label">阶段四 · 前端 + 全栈串讲</div>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d10a"><span class="c-body"><span class="c-title">读透 Zustand persist + idbStorage</span><span class="c-sub">debounce / pagehide flush / 本地优先</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d11a"><span class="c-body"><span class="c-title">读透 LLM provider 抽象与降级链</span><span class="c-sub">四档 llm_usage_policy</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d12a"><span class="c-body"><span class="c-title">完成「一条查询的前后端全链路」口述</span><span class="c-sub">前端意图→API→检索→LLM→引用返回，录一遍</span></span></label>
+
+  <div class="block-label">阶段五 · 模拟冲刺</div>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d13a"><span class="c-body"><span class="c-title">34 问全部自答一遍</span><span class="c-sub">先答再看答案，标出卡壳的 5 题重点背</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d13b"><span class="c-body"><span class="c-title">做 1 次真实模拟面试并录音复盘</span><span class="c-sub">找人/用 AI 模拟，重点练 RAG + 项目故事</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d14a"><span class="c-body"><span class="c-title">简历项目段打磨到「一眼能打」</span><span class="c-sub">量化数字 + 一句话价值 + 三个技术亮点</span></span></label>
+  <label class="check" data-scope="sprint"><input type="checkbox" data-key="d14b"><span class="c-body"><span class="c-title">准备 3 个反问问题</span><span class="c-sub">团队技术栈 / RAG 落地场景 / 期望做的工作</span></span></label>
+
+  <div class="card" style="margin-top:22px">
+    <h4>冲刺期红线</h4>
+    <ul>
+      <li><strong>每天必须有输出</strong>：要么跑通一个练习，要么白板默画一遍，要么录一段讲述——「看得懂」≠「讲得出」。</li>
+      <li><strong>保睡眠与运动</strong>：10–12h 是上限不是目标，疲劳会毁掉记忆质量。睡足 7h、傍晚动一动。</li>
+      <li><strong>面试优先于完美</strong>：别花三天打磨一个工具而跳过模拟面试。能讲、能写、能白板，比把项目改到完美更值钱。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 视图：长期精进路线 ===== -->
+<section id="refine">
+  <div class="sec-head"><span class="chip">06</span><h2>长期精进路线</h2></div>
+  <p class="sec-sub">拿到 Offer 只是起点。这一章回答「后面我怎么再精进」——分技术纵深、项目加固、职业路径三条线，全部从你手头这个项目出发。</p>
+
+  <h3>能力现状 vs 目标（雷达图）</h3>
+  <p>下图是你面试冲刺后的目标画像。冲刺阶段先把「检索 / 后端 / 项目讲述」拉到高，长期再把「评测 / Agent 编排 / 工程运维」补上来。</p>
+  <div id="radarChart" style="width:100%;height:420px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin:14px 0"></div>
+  <p class="muted" style="font-size:12.5px">评分口径：按冲刺后预期水平估分（0–10），目标值 = 入职半年后。纯示意，用于指导学习优先级，非客观测评。</p>
+
+  <h3>三条精进线</h3>
+
+  <div class="card">
+    <h4>线一 · 技术纵深：从「会用」到「能做对并说清为什么」</h4>
+    <ol>
+      <li><strong>RAG 评测与调优（你已计划学 RAGAS）</strong>：给项目接 RAGAS 的 faithfulness / context_recall / context_precision，建立基准后调 rerank 权重、阈值、分块策略，用数据说话。这是当前 Agent 岗最稀缺的能力。</li>
+      <li><strong>Agent 编排升级</strong>：把「意图识别 + 模板切换」升级成 LangGraph 多步编排——检索 → 判断是否够 → 决定要不要二次检索 / 调工具。你的正则+结构化输出已经是最好的入门锚点。</li>
+      <li><strong>进阶检索</strong>：分块策略（semantic / 重叠）、query 改写用 LLM 而非规则表、多路召回 + 更好的融合；了解 Chroma / Qdrant / Milvus 等真实向量库与 sqlite-vec 的差异。</li>
+      <li><strong>流式 + 长任务</strong>：把 RAG 问答改 SSE 流式；任务系统加重试上限、指数退避、超时熔断。</li>
+      <li><strong>工程深度</strong>：Alembic 迁移、CI（GitHub Actions 跑测试+构建）、bcrypt、限流、Docker 部署。把「个人工具」推向「可交付小团队」的工程底线。</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h4>线二 · 项目加固：把短板逐条转成作品</h4>
+    <table>
+      <colgroup><col class="col-2"><col class="col-3"><col class="col-4"></colgroup>
+      <thead><tr><th>短板</th><th>升级动作</th><th>成果物（可写进简历）</th></tr></thead>
+      <tbody>
+        <tr><td>无 RAG 评测</td><td>接 RAGAS，建基准 + 调参报告</td><td>一份「检索质量量化报告」</td></tr>
+        <tr><td>同步问答</td><td>SSE 流式输出</td><td>「流式 RAG 问答」Demo</td></tr>
+        <tr><td>SHA-256 密码</td><td>换 bcrypt/argon2 + 强 secret</td><td>认证安全加固提交</td></tr>
+        <tr><td>无 Alembic</td><td>迁移切 Alembic</td><td>可版本化 schema 演进</td></tr>
+        <tr><td>规则意图识别</td><td>升级 LangGraph Agent 编排</td><td>「多步 Agent 工作流」作品</td></tr>
+        <tr><td>无 CI / 部署</td><td>GitHub Actions + Docker</td><td>一键构建 + 自动测试</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">每完成一项，就在简历的项目段加一行「已解决 X，采用 Y 方案」。你的项目会持续是活的履历。</p>
+  </div>
+
+  <div class="card">
+    <h4>线三 · 职业路径：让项目和目标岗位互相成就</h4>
+    <ul>
+      <li><strong>定位</strong>：你的组合（全栈 + RAG/Agent + 英语）很适合出海业务 / 综合型 AI 工程岗——既写前端交互，又管检索与 Agent 链路，还能对接英文模型生态。</li>
+      <li><strong>持续开源</strong>：把项目文档化、MIT 开源，PR 里写清架构决策。面试时丢出链接，可信度远超口头描述。</li>
+      <li><strong>跟随生态</strong>：LangChain → LangGraph → LangSmith 的评测/可观测；关注 RAGAS、Dify、Coze 的实践，用你的项目做对照实验。</li>
+      <li><strong>建立作品节奏</strong>：每 2–4 周在项目上落地一个「能讲 5 分钟」的新能力（流式 / 评测 / Agent / 加固），保持持续产出。</li>
+    </ul>
+  </div>
+
+  <div class="callout">
+    <p><strong>记住这件事：</strong>你不是在「为面试做一个项目」，你是<strong>在持续打磨一个真实好用的产品，面试只是顺带的复利</strong>。项目越真实、迭代越持续，面试就越有东西讲——这比任何话术都硬。</p>
+  </div>
+</section>
+
+<footer style="margin-top:70px;padding-top:24px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px;display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:space-between">
+  <span>SiteYeb / P2M 学习与面试冲刺手册 · 围绕你自建项目定制</span>
+  <span>打卡进度存于本机浏览器 localStorage</span>
+</footer>
+
+
+
+
+
+
+
+</main>
+
+<script>
+/* ===== 导航高亮 ===== */
+(function(){
+  const links = document.querySelectorAll('#sidenav a, #topnav a');
+  const topnav = document.getElementById('topnav');
+  // 移动端导航填充
+  topnav.innerHTML = Array.from(document.querySelectorAll('#sidenav a')).map(a=>a.outerHTML).join('');
+  const allLinks = document.querySelectorAll('#sidenav a, #topnav a');
+  const sections = ['hero','analysis','rag','learn','interview','plan','refine'].map(id=>document.getElementById(id));
+  const spy = new IntersectionObserver((es)=>{
+    es.forEach(e=>{
+      if(e.isIntersecting){
+        allLinks.forEach(l=>l.classList.toggle('active', l.getAttribute('href')==='#'+e.target.id));
+      }
+    });
+  },{rootMargin:'-20% 0px -70% 0px'});
+  sections.forEach(s=>s&&spy.observe(s));
+})();
+
+/* ===== 打卡进度（localStorage 持久化） ===== */
+(function(){
+  const KEY='p2m-study-checklist';
+  let state={};
+  try{ state=JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){ state={}; }
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
+  document.addEventListener('change',(e)=>{
+    const cb=e.target;
+    if(cb.type!=='checkbox'||!cb.hasAttribute('data-key'))return;
+    state[cb.dataset.key]=cb.checked;
+    cb.closest('.check').classList.toggle('done',cb.checked);
+    save(); updateAllBars();
+  });
+  function updateAllBars(){
+    document.querySelectorAll('[data-bar]').forEach(bar=>{
+      const scope=bar.dataset.bar;
+      const boxes=document.querySelectorAll('.check[data-scope="'+scope+'"] input[type="checkbox"]');
+      if(!boxes.length)return;
+      const done=[...boxes].filter(b=>b.checked).length;
+      const pct=Math.round(done/boxes.length*100);
+      bar.querySelector('.fill').style.width=pct+'%';
+      const label=bar.parentElement.querySelector('.bar-label');
+      if(label)label.textContent=done+' / '+boxes.length+' 完成';
+    });
+  }
+  function restore(){
+    document.querySelectorAll('.check input[type="checkbox"]').forEach(cb=>{
+      if(state[cb.dataset.key]){ cb.checked=true; cb.closest('.check').classList.add('done'); }
+    });
+    updateAllBars();
+  }
+  restore();
+})();
+
+/* ===== 技能雷达图（懒加载 ECharts + 静态兜底） ===== */
+(function(){
+  var el=document.getElementById('radarChart');
+  if(!el)return;
+
+  // 静态兜底：当前 vs 目标 双柱对比，ECharts 未加载/加载失败时也永远可读
+  function renderFallback(){
+    var dims=[
+      ['RAG 检索',8,9],
+      ['后端/系统设计',7,9],
+      ['前端/状态管理',6,8],
+      ['异步任务',7,9],
+      ['Agent 编排',3,7],
+      ['评测/工程运维',2,7]
+    ];
+    var rows=dims.map(function(d,i){
+      var y=10+i*46;
+      var bar=function(x,val,color){
+        var w=Math.round(val/10*560);
+        return '<text x="'+x+'" y="'+(y+16)+'" fill="#c9d2dc" font-size="12">'+d[0]+'</text>'+
+               '<rect x="150" y="'+y+'" width="560" height="12" rx="6" fill="rgba(255,255,255,.06)"/>'+
+               '<rect x="150" y="'+y+'" width="'+w+'" height="12" rx="6" fill="'+color+'"/>'+
+               '<text x="718" y="'+(y+14)+'" fill="#e9eef3" font-size="11" font-family="JetBrains Mono,monospace">'+val+'</text>';
+      };
+      var cur=bar(20, d[1], '#e2a13a')+'<rect x="20" y="'+(y+18)+'" width="120" height="0"/>';
+      // 当前行
+      return '<g><text x="20" y="'+(y+14)+'" fill="#e9eef3" font-size="12" font-weight="700">'+d[0]+'</text>'+
+             '<rect x="150" y="'+y+'" width="560" height="12" rx="6" fill="rgba(255,255,255,.06)"/>'+
+             '<rect x="150" y="'+y+'" width="'+Math.round(d[1]/10*560)+'" height="12" rx="6" fill="#e2a13a"/>'+
+             '<text x="718" y="'+(y+14)+'" fill="#e9eef3" font-size="11">'+d[1]+'</text>'+
+             '</g>'+
+             '<g><text x="20" y="'+(y+40)+'" fill="#5f7184" font-size="11">目标</text>'+
+             '<rect x="150" y="'+(y+28)+'" width="560" height="10" rx="5" fill="rgba(255,255,255,.06)"/>'+
+             '<rect x="150" y="'+(y+28)+'" width="'+Math.round(d[2]/10*560)+'" height="10" rx="5" fill="#35b8a0" stroke-dasharray="3 2"/>'+
+             '<text x="718" y="'+(y+40)+'" fill="#e9eef3" font-size="11">'+d[2]+'</text>'+
+             '</g>';
+    }).join('');
+    el.innerHTML='<svg viewBox="0 0 740 '+(10+dims.length*46+10)+'" role="img" aria-label="能力对比兜底图" style="width:100%;display:block;font-family:JetBrains Mono,monospace">'+
+      '<text x="20" y="6" fill="#5f7184" font-size="11">冲刺后(琥珀) / 目标半年(青绿，虚线)</text>'+rows+'</svg>';
+  }
+  renderFallback();
+
+  var injected=false, loaded=false;
+  function injectECharts(){
+    if(injected||loaded)return;
+    injected=true;
+    var srcs=[
+      'https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.1/echarts.min.js'
+    ];
+    function tryLoad(i){
+      if(i>=srcs.length){ return; }
+      var s=document.createElement('script');
+      s.src=srcs[i];
+      s.onload=function(){ loaded=true; boot(); };
+      s.onerror=function(){ s.remove(); tryLoad(i+1); };
+      document.head.appendChild(s);
+    }
+    tryLoad(0);
+  }
+  function boot(){
+    if(!loaded||typeof echarts==='undefined')return;
+    el.innerHTML='';
+    var chart=echarts.init(el);
+    chart.setOption({
+      tooltip:{},
+      legend:{data:['冲刺后','目标(半年)'],bottom:0,textStyle:{color:'#97a4b2'}},
+      radar:{
+        indicator:[
+          {name:'RAG 检索',max:10},
+          {name:'后端/系统设计',max:10},
+          {name:'前端/状态管理',max:10},
+          {name:'异步任务',max:10},
+          {name:'Agent 编排',max:10},
+          {name:'评测/工程运维',max:10}
+        ],
+        radius:'62%',center:['50%','46%'],
+        splitArea:{areaStyle:{color:['rgba(255,255,255,.02)','rgba(255,255,255,.04)']}},
+        axisName:{color:'#c9d2dc',fontSize:12},
+        splitLine:{lineStyle:{color:'#31404f'}},
+        axisLine:{lineStyle:{color:'#31404f'}}
+      },
+      series:[{type:'radar',data:[
+        {value:[8,7,6,7,3,2],name:'冲刺后',areaStyle:{color:'rgba(226,161,58,.25)'},lineStyle:{color:'#e2a13a'},itemStyle:{color:'#e2a13a'}},
+        {value:[9,9,8,9,7,7],name:'目标(半年)',areaStyle:{color:'rgba(53,184,160,.18)'},lineStyle:{color:'#35b8a0',type:'dashed'},itemStyle:{color:'#35b8a0'}}
+      ]}]
+    });
+    window.addEventListener('resize',function(){chart.resize();});
+  }
+  // 滚动到雷达区块附近才加载，首屏不被 CDN 阻塞
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ io.disconnect(); injectECharts(); } });
+    },{rootMargin:'40% 0px'});
+    io.observe(el);
+    // 兜底：页面加载 6s 后仍未触发（观察器不可靠）则尝试
+    setTimeout(function(){ if(!loaded) injectECharts(); },6000);
+  } else {
+    injectECharts();
+  }
+})();
+</script>
+</body>
+</html>

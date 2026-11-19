@@ -19,6 +19,7 @@ function skipReasonLabel(reason: string) {
 
 interface BatchActionPanelProps {
   selectedVideoCount: number;
+  videosLoading?: boolean;
   batchLoading: boolean;
   batchPreview: AiJobBatchOut | null;
   batchError?: string | null;
@@ -27,7 +28,7 @@ interface BatchActionPanelProps {
   onEnqueue: () => void;
 }
 
-export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPreview, batchError, onPreview, onApplySettings, onEnqueue }: BatchActionPanelProps) {
+export function BatchActionPanel({ selectedVideoCount, videosLoading, batchLoading, batchPreview, batchError, onPreview, onApplySettings, onEnqueue }: BatchActionPanelProps) {
   return (
     <div className="min-w-0 space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -41,11 +42,11 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
           <button
             type="button"
             onClick={onPreview}
-            disabled={batchLoading || selectedVideoCount === 0}
+            disabled={batchLoading || videosLoading || selectedVideoCount === 0}
             className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
           >
             <SearchCheck size={13} />
-            预览
+            {videosLoading ? '加载中' : '预览'}
           </button>
           <button
             type="button"
@@ -60,11 +61,11 @@ export function BatchActionPanel({ selectedVideoCount, batchLoading, batchPrevie
           <button
             type="button"
             onClick={onEnqueue}
-            disabled={batchLoading || selectedVideoCount === 0}
+            disabled={batchLoading || videosLoading || selectedVideoCount === 0}
             className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-[11px] text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
           >
-            {batchLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-            入队
+            {batchLoading || videosLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+            {videosLoading ? '加载中' : '入队'}
           </button>
         </div>
       </div>

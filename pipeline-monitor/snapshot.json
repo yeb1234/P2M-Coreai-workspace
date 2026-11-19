@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-11-18T01:14:50+08:00",
+  "generated_at_ms": 1794935690035,
+  "phase": "wait_transcription",
+  "transcribe": {
+    "queued": 4976,
+    "running": 2,
+    "completed": 753,
+    "failed": 13,
+    "total": 5744,
+    "progress": 0.1310933147632312,
+    "remaining_audio_hours": 1245.5009173113854,
+    "last60_audio_hours": 49.45106863638888,
+    "last60_count": 101,
+    "last30_audio_hours": 27.206066833888883,
+    "last30_count": 31,
+    "rate_audio_hours_per_hour": 49.45106863638888,
+    "eta_seconds": 90671.5148117457
+  },
+  "summary": {
+    "queued": 4904,
+    "running": 1,
+    "completed": 303,
+    "failed": 0,
+    "total": 5208,
+    "progress": 0.058179723502304145,
+    "last15": 40,
+    "last30": 88,
+    "rate_per_min": 2.933333333333333,
+    "remaining": 4905,
+    "eta_seconds": 100329.54545454546
+  },
+  "vector": {
+    "queued": 243,
+    "running": 0,
+    "done": 18341,
+    "failed": 1,
+    "total_chunks": 59955,
+    "missing_chunks": 388,
+    "chunk_videos": 9370,
+    "coverage": 0.9935284796931032,
+    "rate_tasks_per_min": 0,
+    "eta_seconds": null
+  },
+  "audio": {
+    "cache_wavs": 1216,
+    "cache_bytes": 18800528804,
+    "cache_gb": 17.509356889873743,
+    "running": true
+  },
+  "gpu": {
+    "util": 99.0,
+    "mem_used": 6639.0,
+    "mem_total": 8192.0,
+    "temp": 58.81,
+    "power": 170.91
+  },
+  "workers": [
+    {
+      "name": "p2-siteyeb-summary-worker-laptop-1",
+      "status": "Up 33 minutes"
+    },
+    {
+      "name": "p2-siteyeb-backend-1",
+      "status": "Up 46 minutes (healthy)"
+    },
+    {
+      "name": "p2-siteyeb-audio-prep-1",
+      "status": "Up About an hour"
+    },
+    {
+      "name": "p2-siteyeb-worker2-1",
+      "status": "Up 2 hours"
+    },
+    {
+      "name": "p2-siteyeb-worker-1",
+      "status": "Up 2 hours"
+    },
+    {
+      "name": "p2-siteyeb-frontend-1",
+      "status": "Up 26 hours (healthy)"
+    },
+    {
+      "name": "p2-siteyeb-redis-1",
+      "status": "Up 28 hours (healthy)"
+    },
+    {
+      "name": "p2-siteyeb-postgres-1",
+      "status": "Up 28 hours (healthy)"
+    }
+  ],
+  "vector_worker_running": false,
+  "redis": {
+    "ai_jobs": 4973,
+    "summary_jobs": 4904,
+    "background": 313
+  },
+  "laptop": {
+    "loaded": true,
+    "context_length": 15104,
+    "max_context_length": 32768
+  },
+  "videos": {
+    "total": 14531,
+    "transcribed": 9337,
+    "summarized": 4333,
+    "full_completed": 4333,
+    "partial": 5004,
+    "not_started": 5194,
+    "full_progress": 0.298190076388411
+  },
+  "overall": {
+    "progress": 0.1310933147632312,
+    "full_progress": 0.298190076388411,
+    "main_progress": 0.1310933147632312,
+    "eta_seconds": 100329.54545454546
+  }
+}

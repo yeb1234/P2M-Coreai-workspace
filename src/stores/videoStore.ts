@@ -4,6 +4,23 @@ import { fetchVideos, fetchVideo, searchSegments, startAiJob, fetchCategoryTree,
 
 const VIDEO_ID_KEY = 'p2m_current_video_id';
 const NAV_STATE_KEY = 'p2m_video_nav_state';
+const FAVORITE_CATEGORIES_KEY = 'p2m_favorite_category_ids';
+
+function loadFavoriteCategoryIds(): number[] {
+  try {
+    const raw = localStorage.getItem(FAVORITE_CATEGORIES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((n) => typeof n === 'number');
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveFavoriteCategoryIds(ids: number[]) {
+  try {
+    localStorage.setItem(FAVORITE_CATEGORIES_KEY, JSON.stringify(ids));
+  } catch { /* ignore */ }
+}
 
 function videoHashForCategory(categoryId: number | null): string {
   return categoryId ? `/video?category=${categoryId}` : '/video';
@@ -116,6 +133,9 @@ interface VideoState {
   currentCategoryId: number | null;
   breadcrumb: { id: number | null; name: string }[];
   selectedFolderIds: number[];
+  favoriteCategoryIds: number[];
+  favoriteVideos: VideoItem[];
+  favLoading: boolean;
 
   // Actions
   loadVideos: (page?: number, search?: string, categoryIds?: number[]) => Promise<void>;
@@ -150,6 +170,8 @@ interface VideoState {
   restoreNavigation: () => void;
   setSelectedFolderIds: (ids: number[]) => void;
   toggleFavorite: (videoId: number, nextFavorite: boolean) => Promise<void>;
+  toggleFavoriteCategory: (categoryId: number) => void;
+  loadFavoriteVideos: () => Promise<void>;
   updateCurrentSegmentText: (segmentIndex: number, text: string) => void;
 }
 
@@ -174,6 +196,9 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   currentCategoryId: null,
   breadcrumb: [{ id: null, name: '全部视频' }],
   selectedFolderIds: [],
+  favoriteCategoryIds: loadFavoriteCategoryIds(),
+  favoriteVideos: [],
+  favLoading: false,
 
   loadVideos: async (page = 1, search, categoryIds?: number[]) => {
     const requestSeq = ++videoListRequestSeq;
@@ -466,6 +491,28 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
         currentVideo: previous.currentVideo,
         error: e instanceof Error ? e.message : String(e),
       });
+    }
+  },
+
+  toggleFavoriteCategory: (categoryId) => {
+    const ids = get().favoriteCategoryIds;
+    const next = ids.includes(categoryId)
+      ? ids.filter((id) => id !== categoryId)
+      : [...ids, categoryId];
+    saveFavoriteCategoryIds(next);
+    set({ favoriteCategoryIds: next });
+  },
+
+  loadFavoriteVideos: async () => {
+    set({ favLoading: true, error: null });
+    try {
+      const data = await fetchVideos(1, 100, undefined, undefined, undefined, true);
+      set({
+        favoriteVideos: data.items,
+        favLoading: false,
+      });
+    } catch (e: unknown) {
+      set({ error: e instanceof Error ? e.message : String(e), favLoading: false });
     }
   },
 

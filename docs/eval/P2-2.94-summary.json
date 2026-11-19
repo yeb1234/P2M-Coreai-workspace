@@ -1,0 +1,188 @@
+{
+  "project": "C:\\SiteYeb",
+  "branch": "P2U-3.0-LangChain",
+  "head": "3490840",
+  "readme_version": "2.94",
+  "mode": "SQLite / FTS5 / sqlite-vec, isolated backend 127.0.0.1:12412",
+  "generated_at": "2026-11-17T07:40:00+08:00",
+  "report_html": "C:\\SiteYeb\\docs\\eval\\P2-2.94-AI检索评估报告.html",
+  "data": {
+    "db_bytes": 16034926592,
+    "db_gib": 14.93,
+    "integrity_check": "ok",
+    "videos": 14327,
+    "categories": 1348,
+    "subtitle_segments": 3592399,
+    "subtitle_segments_fts": 3592399,
+    "chat_sessions": 70,
+    "chat_messages": 130,
+    "app_settings": 2,
+    "subtitle_segment_embeddings_table": false,
+    "indexed_embeddings": 0,
+    "vector_coverage_pct": 0.0
+  },
+  "eval": {
+    "cases": 27,
+    "top_k": 6,
+    "gold": "video title substring",
+    "final_min_score": 0.0,
+    "lexical": {
+      "hit_at_6": 18,
+      "hit_rate_pct": 66.7,
+      "mrr": 0.3963,
+      "empty_refs": 0,
+      "p50_ms": 1753.0,
+      "p95_ms": 5772.7,
+      "mean_ms": 2529.1,
+      "max_ms": 8093.5
+    },
+    "rerank": {
+      "hit_at_6": 18,
+      "hit_rate_pct": 66.7,
+      "mrr": 0.3963,
+      "empty_refs": 0,
+      "p50_ms": 1699.8,
+      "p95_ms": 5727.4,
+      "mean_ms": 2507.4,
+      "max_ms": 7754.4
+    },
+    "misses": [
+      "p2-005 Vue 跨级组件通讯 provide inject 怎么用",
+      "p2-007 MySQL 索引怎么优化",
+      "p2-012 Vue 生命周期钩子函数",
+      "p2-016 LoRA 微调介绍",
+      "p2-018 Less 变量和嵌套",
+      "p2-020 Webpack 配置代理",
+      "p2-024 接口鉴权时 token 怎么校验",
+      "p2-025 用容器起数据库和缓存",
+      "p2-026 父组件怎么把数据传给子组件"
+    ],
+    "rounds": [
+      {
+        "round": 1,
+        "lexical_hit": "4/27",
+        "lexical_mrr": 0.075,
+        "rerank_hit": "3/27",
+        "rerank_mrr": 0.063,
+        "change": "no title channel"
+      },
+      {
+        "round": 2,
+        "lexical_hit": "15/27",
+        "lexical_mrr": 0.336,
+        "rerank_hit": "13/27",
+        "rerank_mrr": 0.275,
+        "change": "title channel"
+      },
+      {
+        "round": 3,
+        "lexical_hit": "18/27",
+        "lexical_mrr": 0.3963,
+        "rerank_hit": "18/27",
+        "rerank_mrr": 0.3963,
+        "change": "zh term split + IDF title ranking + LIKE fallback + adjacent subtitle context"
+      }
+    ],
+    "threshold_check": {
+      "min_score_0_10": {
+        "lexical_hit": "17/27",
+        "rerank_hit": "16/27"
+      },
+      "min_score_0_0": {
+        "lexical_hit": "18/27",
+        "rerank_hit": "18/27"
+      },
+      "note": "MRR stays about 0.396; reranker is neutral on the current candidate pool."
+    }
+  },
+  "settings": {
+    "before": {
+      "local_base_url": "http://192.168.3.154:1234/v1",
+      "local_model": "qwen3-4b",
+      "local_api_key": "lm-studio",
+      "external_base_url": "https://token.sensenova.cn/v1",
+      "external_model": "deepseek-v4-flash",
+      "llm_usage_policy": "external_first"
+    },
+    "after": {
+      "local_base_url": "http://127.0.0.1:1235/v1",
+      "local_model": "qwen3-4b",
+      "local_api_key": "lm-studio",
+      "external_base_url": "https://token.sensenova.cn/v1",
+      "external_model": "deepseek-v4-flash",
+      "llm_usage_policy": "local_first"
+    },
+    "transcription_llm_usage_policy": "local_first",
+    "api_auth": false,
+    "notes": [
+      "PUT /api/admin/assistant-settings persisted and GET read back.",
+      "External endpoint remains the old SenseNova value and is unused under local_first.",
+      "UI claims 'local first then external', but _resolve_provider returns a single provider and does not fall back.",
+      "Browser click acceptance on the settings page was not performed."
+    ]
+  },
+  "chat": {
+    "endpoint": "POST /api/assistant/chat",
+    "message": "FastAPI 依赖注入怎么实现",
+    "intent": "search",
+    "use_rag": true,
+    "elapsed_s": 29.5,
+    "references": 6,
+    "mode": "openai",
+    "answer_note": "References recovered, but the 4B model still supplements with Depends()/app.get content not present in the snippets.",
+    "before": {
+      "references": 0,
+      "answer": "根据提供的参考字幕片段，未找到任何相关内容"
+    }
+  },
+  "health": {
+    "status_code": 200,
+    "checks": 18,
+    "ok": false,
+    "failing": [
+      "Ollama: localhost:11434 connect timeout",
+      "AI 队列: Redis localhost:6379 connection refused"
+    ],
+    "fixed_from_500": true,
+    "does_not_check_embedding_or_reranker": true
+  },
+  "tests": {
+    "intent_router": "10/10",
+    "full_frontend": "26 files / 210 tests passed",
+    "backend_py_compile": "passed",
+    "previous_unrelated_failure": "todoReminderOptIn expected pomodoroRounds=1 but got 4; fixed in TodoForm to default 1"
+  },
+  "changes": [
+    "backend/app/services/reranker.py",
+    "backend/app/services/embedding.py",
+    "backend/app/services/query_enhancer.py",
+    "backend/app/services/hybrid_retriever.py",
+    "backend/app/services/rag_chain.py",
+    "backend/app/services/admin_health.py",
+    "src/lib/intentRouter.ts",
+    "src/__tests__/intentRouter.test.ts",
+    "src/components/todo/TodoForm.tsx",
+    "docs/eval/p2_retrieval_cases.json",
+    "docs/eval/p2_retrieval_eval.py",
+    "docs/eval/p2_retrieval_results.json"
+  ],
+  "open_issues": [
+    "2.94 has no subtitle_segment_embeddings; vector coverage 0/3592399.",
+    "_resolve_provider has no failover despite UI copy.",
+    "external_base_url still points to old SenseNova.",
+    ".env OPENAI_BASE_URL (1234) and DB local_base_url (1235) disagree; DB wins at runtime.",
+    "backend /api/assistant/detect-intent degrades to general/0.0 for '什么是闭包'.",
+    "health does not probe embedding/reranker.",
+    "generation still adds code details outside references.",
+    "settings page browser click acceptance not performed.",
+    "9/27 retrieval misses remain; 2 are near-miss gold-definition cases (p2-020, p2-026)."
+  ],
+  "next_actions": [
+    "Use 3.0 PostgreSQL/pgvector 60k chunks for vector retrieval if cross-stack migration is acceptable.",
+    "Or sample 1-2k segments per topic in 2.94 to validate an embedding channel before full backfill.",
+    "Implement or remove the advertised local->external failover.",
+    "Sync or clear the stale external endpoint.",
+    "Reconcile the .env 1234 vs DB 1235 config split.",
+    "Add embedding/reranker probes to /api/admin/health."
+  ]
+}

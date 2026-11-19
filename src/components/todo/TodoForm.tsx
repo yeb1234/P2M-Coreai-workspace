@@ -72,7 +72,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
         ),
         pomodoroConfig
       )
-      : pomodoroConfig.longBreakInterval);
+      : 1);
   const [pomodoroCount, setPomodoroCount] = useState(initialPomodoroCount);
 
   // 当排程时间变化时，自动反推番茄钟数量

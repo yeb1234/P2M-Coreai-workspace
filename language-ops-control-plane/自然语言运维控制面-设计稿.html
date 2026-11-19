@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>语控台 OpsTalk · 自然语言运维控制面</title>
+<meta name="description" content="概念设计：把自然语言变成受权限、预演、审批、验证和回滚约束的运维控制面。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230067c0'/%3E%3Cpath d='M8 20h6v4H8zm10-6h6v10h-6zM8 8h6v8H8z' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --page:#f2f4f7;
+    --panel:#ffffff;
+    --panel-2:#f7f9fb;
+    --panel-3:#eef3f8;
+    --ink:#18232f;
+    --ink-2:#334155;
+    --muted:#657487;
+    --faint:#8b98a8;
+    --line:#d7dfe8;
+    --line-strong:#b8c5d3;
+    --accent:#0067c0;
+    --accent-deep:#084b86;
+    --accent-soft:#e7f1fb;
+    --amber:#965900;
+    --amber-soft:#fff3dd;
+    --red:#b42318;
+    --red-soft:#fdeceb;
+    --blue-soft:#e8f1fb;
+    --shadow:0 18px 50px rgba(20,33,48,.08);
+    --shadow-soft:0 8px 24px rgba(20,33,48,.05);
+    --mono:"Cascadia Code","Consolas","SFMono-Regular",monospace;
+    --sans:"Segoe UI Variable","Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    --serif:"Iowan Old Style","Palatino Linotype",Georgia,"Songti SC",serif;
+    --radius:12px;
+  }
+  html[data-theme="dark"]{
+    --page:#0e141b;
+    --panel:#151d26;
+    --panel-2:#111923;
+    --panel-3:#1b2632;
+    --ink:#e9eff7;
+    --ink-2:#c7d3df;
+    --muted:#94a3b4;
+    --faint:#748394;
+    --line:#2a3745;
+    --line-strong:#435467;
+    --accent:#5aa7ff;
+    --accent-deep:#8fc3ff;
+    --accent-soft:#152d45;
+    --amber:#f0a45c;
+    --amber-soft:#332413;
+    --red:#ff8178;
+    --red-soft:#3a1d1e;
+    --blue-soft:#152d45;
+    --shadow:0 24px 70px rgba(0,0,0,.35);
+    --shadow-soft:0 10px 28px rgba(0,0,0,.22);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  button,input,textarea{font:inherit}
+  button{cursor:pointer}
+  ::selection{background:var(--accent);color:#fff}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .shell{max-width:1320px;margin:0 auto;padding:0 30px}
+  .mono{font-family:var(--mono)}
+  .muted{color:var(--muted)}
+  .accent{color:var(--accent)}
+  .rule{height:1px;background:var(--line)}
+
+  /* top bar */
+  .topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--page) 90%,transparent);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+  .topbar-inner{height:68px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+  .brand{display:flex;align-items:center;gap:11px;min-width:190px}
+  .brand-mark{width:34px;height:34px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:-.03em}
+  .brand b{display:block;font-size:16px;line-height:1.15;letter-spacing:.02em}
+  .brand small{display:block;color:var(--muted);font-family:var(--mono);font-size:9px;letter-spacing:.12em;margin-top:3px}
+  .nav{display:flex;gap:23px;align-items:center;font-size:13px;color:var(--ink-2)}
+  .nav a{position:relative;padding:6px 0}
+  .nav a::after{content:"";position:absolute;left:0;right:100%;bottom:0;height:1px;background:var(--accent);transition:right .2s ease}
+  .nav a:hover::after{right:0}
+  .theme-toggle{border:1px solid var(--line);background:var(--panel);color:var(--ink-2);border-radius:999px;padding:9px 13px;display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);transition:border-color .2s ease,color .2s ease}
+  .theme-toggle:hover{border-color:var(--accent);color:var(--accent)}
+  .theme-toggle svg{width:14px;height:14px}
+
+  /* hero */
+  .hero{padding:66px 0 44px;position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(to right,color-mix(in srgb,var(--line) 45%,transparent) 1px,transparent 1px),linear-gradient(to bottom,color-mix(in srgb,var(--line) 45%,transparent) 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(to bottom,#000 0%,transparent 88%);opacity:.45}
+  .hero-grid{position:relative;display:grid;grid-template-columns:minmax(0,1.06fr) minmax(420px,.94fr);gap:58px;align-items:start}
+  .eyebrow{display:flex;align-items:center;gap:9px;color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+  .eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+  h1{font-size:clamp(44px,5.3vw,74px);line-height:.98;letter-spacing:-.065em;margin:20px 0 24px;font-weight:700}
+  h1 .accent{display:inline}
+  .hero-sub{max-width:590px;color:var(--ink-2);font-size:17px;line-height:1.75;margin:0}
+  .hero-sub strong{color:var(--ink);font-weight:650}
+  .hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:9px;padding:12px 17px;border:1px solid transparent;font-size:13px;font-weight:600;letter-spacing:.01em;transition:transform .18s ease,background .18s ease,border-color .18s ease}
+  .btn:hover{transform:translateY(-1px)}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:var(--accent-deep)}
+  .btn-ghost{border-color:var(--line-strong);background:transparent;color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .hero-notes{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:38px;border-top:1px solid var(--line);max-width:620px}
+  .hero-note{padding:14px 14px 0 0}
+  .hero-note + .hero-note{padding-left:18px;border-left:1px solid var(--line)}
+  .hero-note b{display:block;font-family:var(--mono);font-size:17px;letter-spacing:-.04em;color:var(--ink)}
+  .hero-note span{display:block;color:var(--muted);font-size:11px;margin-top:4px;line-height:1.4}
+
+  .console{position:relative;border-radius:16px;padding:1px;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 35%,var(--line)),var(--line));box-shadow:var(--shadow)}
+  .console-inner{position:relative;border-radius:15px;overflow:hidden;background:#0b1622;color:#dce9f4;padding:19px 20px 18px;min-height:440px;background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px);background-size:28px 28px}
+  .console-inner::before{content:"";position:absolute;inset:-40% 20% auto -20%;height:300px;background:radial-gradient(ellipse at center,rgba(0,103,192,.34),transparent 68%);pointer-events:none}
+  .console-top{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;color:#8ea9c1;text-transform:uppercase}
+  .console-top .left{display:flex;align-items:center;gap:8px}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:#5aa7ff;box-shadow:0 0 0 4px rgba(90,167,255,.12)}
+  .console-query{position:relative;margin:20px 0 16px;padding:14px 15px 14px 17px;border-left:2px solid #5aa7ff;background:rgba(255,255,255,.055);font-size:16px;line-height:1.55;color:#f0f6fb;border-radius:0 8px 8px 0}
+  .console-query small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:#7ea6c8;margin-bottom:5px}
+  .console-parse{display:grid;grid-template-columns:1.2fr .8fr;gap:8px;position:relative}
+  .console-cell{border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);border-radius:7px;padding:10px 11px}
+  .console-cell small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:#7fa0bd;text-transform:uppercase;margin-bottom:4px}
+  .console-cell b{display:block;font-family:var(--mono);font-size:11px;font-weight:500;color:#dceaf6;line-height:1.45}
+  .console-gates{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px;position:relative}
+  .gate{border:1px solid rgba(255,255,255,.09);border-radius:6px;padding:8px 9px;background:rgba(255,255,255,.025)}
+  .gate span{display:block;font-size:9px;color:#7794ad;margin-bottom:3px}
+  .gate b{display:block;font-family:var(--mono);font-size:10px;color:#b9d5e9;font-weight:500}
+  .gate.ok b{color:#8fd0ff}
+  .gate.warn b{color:#ffc47b}
+  .console-verdict{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:15px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);position:relative}
+  .console-verdict small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:#7794ad;text-transform:uppercase}
+  .console-verdict b{display:block;font-size:13px;color:#ffc47b;margin-top:3px}
+  .risk-mark{font-family:var(--mono);font-size:10px;color:#8faac0;text-align:right}
+  .risk-mark b{color:#ffc47b;font-size:14px;letter-spacing:-.04em}
+  .mini-pipe{display:flex;align-items:center;gap:0;margin-top:19px;position:relative}
+  .pipe-node{font-family:var(--mono);font-size:9px;color:#7d9bb3;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:5px 7px;white-space:nowrap}
+  .pipe-node.active{color:#dff0ff;border-color:rgba(90,167,255,.6);background:rgba(90,167,255,.13)}
+  .mini-pipe i{height:1px;flex:1;background:rgba(255,255,255,.12);position:relative;margin:0 4px}
+  .mini-pipe i::after{content:"";position:absolute;top:-1.5px;left:0;width:4px;height:4px;border-radius:50%;background:#5aa7ff;animation:flow 2.6s linear infinite}
+  .mini-pipe i:nth-of-type(2)::after{animation-delay:.35s}.mini-pipe i:nth-of-type(3)::after{animation-delay:.7s}.mini-pipe i:nth-of-type(4)::after{animation-delay:1.05s}
+  @keyframes flow{0%{left:0;opacity:0}15%{opacity:1}100%{left:calc(100% - 4px);opacity:0}}
+  .console-note{position:relative;margin:17px 0 0;color:#7e99b0;font-size:10px;line-height:1.55;border-top:1px solid rgba(255,255,255,.08);padding-top:11px}
+
+  /* section scaffolding */
+  .section{padding:78px 0;border-top:1px solid var(--line);position:relative}
+  .section-head{display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:46px;align-items:start;margin-bottom:38px}
+  .kicker{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .kicker::before{content:"";width:18px;height:1px;background:var(--accent)}
+  h2{font-size:clamp(31px,4vw,50px);line-height:1.08;letter-spacing:-.05em;margin:13px 0 0;font-weight:680}
+  .section-head p{margin:0;color:var(--ink-2);font-size:16px;line-height:1.75;max-width:720px}
+  .section-head p + p{margin-top:12px}
+  .section-head .lead{color:var(--muted);font-size:14px}
+  .subhead{font-size:12px;font-family:var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin:0 0 13px}
+
+  /* problem */
+  .problem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--line-strong)}
+  .problem-item{padding:22px 26px 0 0;min-height:180px}
+  .problem-item + .problem-item{border-left:1px solid var(--line);padding-left:26px}
+  .problem-tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--accent);margin-bottom:15px}
+  .problem-item h3{font-size:20px;line-height:1.3;letter-spacing:-.025em;margin:0 0 9px;font-weight:650}
+  .problem-item p{color:var(--muted);font-size:13px;line-height:1.7;margin:0}
+  .quote-band{margin-top:34px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;border:1px solid var(--line);background:var(--panel);padding:20px 24px;border-left:3px solid var(--accent);box-shadow:var(--shadow-soft)}
+  .quote-band p{margin:0;font-size:15px;line-height:1.7;color:var(--ink-2)}
+  .quote-band span{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);white-space:nowrap}
+
+  /* boundary */
+  .boundary-layout{display:grid;grid-template-columns:minmax(240px,.72fr) minmax(0,1.28fr);gap:22px;align-items:stretch}
+  .tier-list{display:flex;flex-direction:column;gap:8px}
+  .tier-btn{display:grid;grid-template-columns:44px 1fr;grid-template-rows:auto auto;column-gap:12px;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:13px 14px;border-radius:9px;transition:border-color .18s ease,background .18s ease,transform .18s ease}
+  .tier-btn:hover{border-color:var(--line-strong);transform:translateX(2px)}
+  .tier-btn.is-active{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+  .tier-code{grid-row:1 / span 2;align-self:center;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent)}
+  .tier-btn strong{font-size:14px;letter-spacing:-.01em;line-height:1.3;font-weight:650}
+  .tier-btn small{font-size:11px;color:var(--muted);margin-top:2px}
+  .tier-detail{border:1px solid var(--line);background:var(--panel);padding:24px 26px;box-shadow:var(--shadow-soft);min-height:250px}
+  .detail-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:17px}
+  .detail-top small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+  .detail-top h3{font-size:24px;line-height:1.2;letter-spacing:-.035em;margin:0;font-weight:650}
+  .chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;font-family:var(--mono);font-size:9px;letter-spacing:.06em;white-space:nowrap;border:1px solid var(--line)}
+  .chip.blue{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 28%,var(--line))}
+  .chip.amber{background:var(--amber-soft);color:var(--amber);border-color:color-mix(in srgb,var(--amber) 30%,var(--line))}
+  .chip.red{background:var(--red-soft);color:var(--red);border-color:color-mix(in srgb,var(--red) 30%,var(--line))}
+  .detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .detail-cell{border-top:1px solid var(--line);padding-top:10px}
+  .detail-cell span{display:block;font-size:11px;color:var(--muted);margin-bottom:5px}
+  .detail-cell b{display:block;font-size:13px;line-height:1.55;font-weight:550;color:var(--ink-2)}
+  .detail-example{margin-top:17px;background:var(--panel-2);border:1px solid var(--line);padding:11px 13px;font-size:12px;color:var(--ink-2);line-height:1.6}
+  .detail-example span{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.08em;margin-right:8px}
+  .forbidden{margin-top:22px;border:1px solid color-mix(in srgb,var(--red) 32%,var(--line));background:var(--red-soft);padding:16px 18px;display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:start}
+  .forbidden h4{margin:0;color:var(--red);font-size:13px;font-family:var(--mono);letter-spacing:.02em}
+  .forbidden p{margin:0;color:var(--ink-2);font-size:12px;line-height:1.7}
+  .forbidden p b{color:var(--red);font-weight:650}
+  .boundary-note{margin-top:13px;color:var(--muted);font-size:11px;line-height:1.6}
+
+  /* architecture */
+  .arch-wrap{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow-soft);overflow-x:auto}
+  .arch-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  .arch-toolbar span{font-family:var(--mono);font-size:9px;letter-spacing:.11em;color:var(--muted);text-transform:uppercase}
+  .arch-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+  .arch-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:var(--accent)}
+  .arch-legend i.amber{background:var(--amber)} .arch-legend i.red{background:var(--red)} .arch-legend i.gray{background:var(--faint)}
+  .arch-svg{display:block;width:100%;min-width:1000px;height:auto}
+  .lane-label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;fill:var(--muted);text-transform:uppercase}
+  .arch-node{cursor:pointer;outline:none}
+  .arch-node rect{fill:var(--panel);stroke:var(--line-strong);stroke-width:1;transition:fill .18s ease,stroke .18s ease}
+  .arch-node:hover rect,.arch-node:focus rect{stroke:var(--accent);fill:var(--accent-soft)}
+  .arch-node.is-selected rect{stroke:var(--accent);stroke-width:2;fill:var(--accent-soft)}
+  .arch-node .node-title{font-family:var(--sans);font-size:14px;font-weight:650;fill:var(--ink);text-anchor:middle}
+  .arch-node .node-sub{font-family:var(--mono);font-size:8.5px;fill:var(--muted);text-anchor:middle;letter-spacing:.03em}
+  .arch-node .node-code{font-family:var(--mono);font-size:8px;fill:var(--accent);text-anchor:middle;letter-spacing:.09em}
+  .wire{stroke:var(--line-strong);stroke-width:1.2;fill:none}
+  .wire.dotted{stroke-dasharray:4 4;opacity:.8}
+  .wire.signal{stroke:var(--accent);stroke-width:1.6}
+  .arch-foot{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:26px;margin-top:14px}
+  .arch-key{display:flex;flex-wrap:wrap;gap:7px;align-content:flex-start}
+  .arch-key button{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:5px 8px;border-radius:5px;font-family:var(--mono);font-size:9px}
+  .arch-key button:hover,.arch-key button.is-active{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .arch-detail{border-left:2px solid var(--accent);background:var(--panel);border:1px solid var(--line);border-left-width:3px;padding:16px 18px}
+  .arch-detail small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--accent);text-transform:uppercase;margin-bottom:5px}
+  .arch-detail h3{margin:0 0 7px;font-size:18px;letter-spacing:-.02em}
+  .arch-detail p{margin:0;color:var(--ink-2);font-size:12px;line-height:1.65}
+  .arch-detail ul{margin:9px 0 0;padding:0;list-style:none;display:grid;gap:4px}
+  .arch-detail li{font-size:11px;color:var(--muted);display:flex;gap:7px;line-height:1.5}
+  .arch-detail li::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--accent);flex:0 0 auto;margin-top:6px}
+
+  /* lifecycle */
+  .lifecycle-rail{display:grid;grid-template-columns:repeat(9,minmax(112px,1fr));border:1px solid var(--line);background:var(--panel);overflow-x:auto;box-shadow:var(--shadow-soft)}
+  .step-btn{border:0;border-right:1px solid var(--line);background:transparent;color:var(--ink-2);text-align:left;padding:13px 12px 14px;min-width:112px;position:relative}
+  .step-btn:last-child{border-right:0}
+  .step-btn:hover{background:var(--panel-2)}
+  .step-btn.is-active{background:var(--accent-soft);color:var(--ink)}
+  .step-btn.is-active::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--accent)}
+  .step-btn .step-no{display:block;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.08em;margin-bottom:6px}
+  .step-btn.is-active .step-no{color:var(--accent)}
+  .step-btn .step-name{display:block;font-size:13px;font-weight:650;line-height:1.25}
+  .step-btn .step-mini{display:block;font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .lifecycle-detail{margin-top:14px;border:1px solid var(--line);background:var(--panel);padding:22px 24px;box-shadow:var(--shadow-soft)}
+  .lifecycle-detail-top{display:flex;justify-content:space-between;gap:18px;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:16px}
+  .lifecycle-detail-top small{display:block;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;margin-bottom:4px}
+  .lifecycle-detail-top h3{margin:0;font-size:22px;letter-spacing:-.03em;line-height:1.25}
+  .lifecycle-detail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+  .lifecycle-cell span{display:block;font-size:10px;color:var(--muted);margin-bottom:5px}
+  .lifecycle-cell b{display:block;font-size:12px;line-height:1.65;font-weight:550;color:var(--ink-2)}
+  .state-strip{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:15px;padding-top:14px;border-top:1px solid var(--line)}
+  .state-strip span{font-family:var(--mono);font-size:9px;color:var(--muted);padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--panel-2)}
+  .state-strip .on{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+  .state-strip .risk-on{color:var(--amber);border-color:var(--amber);background:var(--amber-soft)}
+  .state-strip i{color:var(--line-strong);font-style:normal;font-size:10px}
+
+  /* console */
+  .console-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+  .command-panel,.result-panel{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow-soft)}
+  .panel-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 15px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  .panel-bar span{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+  .panel-bar b{font-family:var(--mono);font-size:9px;color:var(--accent);font-weight:500}
+  .command-body{padding:17px 18px 18px}
+  .example-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+  .example-chip{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-2);border-radius:5px;padding:6px 9px;font-size:11px;line-height:1.4;text-align:left}
+  .example-chip:hover{border-color:var(--accent);color:var(--accent)}
+  .example-chip.is-active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+  .field-label{display:block;font-size:11px;color:var(--muted);margin-bottom:7px}
+  .command-input{width:100%;min-height:78px;resize:vertical;border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);border-radius:7px;padding:12px 13px;font-size:14px;line-height:1.6}
+  .command-input:focus{border-color:var(--accent);outline:none}
+  .command-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px}
+  .run-state{font-family:var(--mono);font-size:10px;color:var(--muted)}
+  .run-state.is-running{color:var(--accent)}
+  .run-state.is-denied{color:var(--red)}
+  .mini-map{margin-top:20px;border:1px solid var(--line);border-top:2px solid var(--accent);background:var(--panel-2);padding:13px}
+  .mini-map-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}
+  .mini-map-head span{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+  .mini-map-head b{font-size:10px;color:var(--muted);font-weight:400}
+  .cluster-row{display:grid;grid-template-columns:60px 1fr 58px;align-items:center;gap:9px;padding:7px 0;border-top:1px solid var(--line)}
+  .cluster-row:first-of-type{border-top:0}
+  .cluster-name{font-family:var(--mono);font-size:10px;color:var(--ink-2)}
+  .cluster-name i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;background:var(--accent);vertical-align:1px}
+  .cluster-name i.amber{background:var(--amber)}.cluster-name i.gray{background:var(--faint)}
+  .lane-stack{display:flex;gap:3px;align-items:center}
+  .lane-block{height:13px;flex:1;background:var(--panel-3);border:1px solid var(--line);position:relative;overflow:hidden}
+  .lane-block span{display:block;height:100%;width:var(--w,60%);background:color-mix(in srgb,var(--accent) 55%,transparent)}
+  .lane-block.amber span{background:color-mix(in srgb,var(--amber) 55%,transparent)}
+  .lane-block.gray span{background:var(--line-strong)}
+  .cluster-meta{font-family:var(--mono);font-size:9px;color:var(--muted);text-align:right}
+  .mini-map-note{font-size:10px;color:var(--muted);line-height:1.5;margin:8px 0 0}
+  .result-body{padding:16px 18px 18px}
+  .result-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:13px}
+  .result-head small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--muted);margin-bottom:4px;text-transform:uppercase}
+  .result-head h3{margin:0;font-size:20px;line-height:1.25;letter-spacing:-.03em}
+  .result-badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-family:var(--mono);font-size:9px;white-space:nowrap;border:1px solid var(--line)}
+  .result-badge.ok{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}
+  .result-badge.amber{background:var(--amber-soft);color:var(--amber);border-color:color-mix(in srgb,var(--amber) 30%,var(--line))}
+  .result-badge.red{background:var(--red-soft);color:var(--red);border-color:color-mix(in srgb,var(--red) 30%,var(--line))}
+  .result-summary{margin:12px 0 14px;font-size:12px;line-height:1.65;color:var(--ink-2)}
+  .result-meta{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:13px}
+  .result-meta div{border-top:1px solid var(--line);padding-top:7px}
+  .result-meta span{display:block;font-size:10px;color:var(--muted);margin-bottom:3px}
+  .result-meta b{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-2);font-weight:500;line-height:1.45;overflow-wrap:anywhere}
+  .risk-line{display:grid;grid-template-columns:52px 1fr 38px;align-items:center;gap:9px;padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .risk-line label{font-size:10px;color:var(--muted)}
+  .risk-track{height:7px;background:var(--panel-3);border-radius:99px;overflow:hidden}
+  .risk-track i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .4s ease,background .3s ease}
+  .risk-line b{font-family:var(--mono);font-size:10px;color:var(--ink-2);text-align:right}
+  .plan-list{margin:13px 0 0;padding:0;list-style:none;display:grid;gap:0}
+  .plan-item{display:grid;grid-template-columns:22px 1fr;gap:9px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:11px;line-height:1.5;color:var(--ink-2)}
+  .plan-item:last-child{border-bottom:0}
+  .plan-item .idx{font-family:var(--mono);font-size:9px;color:var(--accent);padding-top:1px}
+  .plan-item b{font-weight:600}
+  .plan-item span{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+  .policy-box{margin-top:13px;border-left:2px solid var(--accent);background:var(--panel-2);padding:9px 11px;font-size:11px;line-height:1.6;color:var(--ink-2)}
+  .policy-box strong{color:var(--accent)}
+  .empty-state{color:var(--muted);font-size:12px;line-height:1.7;padding:15px 0}
+
+  /* version */
+  .version-grid{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:22px;align-items:start}
+  .manifest-box{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow-soft)}
+  .manifest-body{padding:15px 17px}
+  .manifest-code{margin:0;background:var(--panel-2);border:1px solid var(--line);padding:14px;color:var(--ink-2);font-family:var(--mono);font-size:10px;line-height:1.8;overflow-x:auto;white-space:pre}
+  .manifest-code .key{color:var(--accent)}
+  .manifest-code .str{color:var(--ink)}
+  .manifest-code .faint{color:var(--muted)}
+  .manifest-caption{font-size:10px;color:var(--muted);margin:10px 0 0;line-height:1.6}
+  .version-tabs{display:flex;gap:6px;margin-bottom:11px}
+  .version-tab{border:1px solid var(--line);background:var(--panel-2);color:var(--muted);border-radius:5px;padding:7px 11px;font-family:var(--mono);font-size:10px}
+  .version-tab.is-active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+  .gate-list{display:grid;gap:0;border-top:1px solid var(--line)}
+  .gate-item{display:grid;grid-template-columns:16px 1fr auto;gap:9px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line);font-size:11px;line-height:1.55;color:var(--ink-2)}
+  .gate-item .check{width:12px;height:12px;border-radius:50%;border:1px solid var(--accent);position:relative;margin-top:2px}
+  .gate-item .check::after{content:"";position:absolute;inset:2px;background:var(--accent);border-radius:50%}
+  .gate-item.warn .check{border-color:var(--amber)}.gate-item.warn .check::after{background:transparent}
+  .gate-item .tag{font-family:var(--mono);font-size:8px;color:var(--muted);border:1px solid var(--line);padding:2px 4px;border-radius:3px;white-space:nowrap}
+  .gate-note{margin:12px 0 0;color:var(--muted);font-size:10px;line-height:1.6}
+  .eval-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  .eval-box{border:1px solid var(--line);background:var(--panel);padding:12px 13px}
+  .eval-box h4{margin:0 0 5px;font-size:12px;letter-spacing:-.01em}
+  .eval-box p{margin:0;color:var(--muted);font-size:10px;line-height:1.6}
+  .eval-box strong{color:var(--accent);font-weight:600}
+
+  /* rehearsal */
+  .rehearsal-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:28px;align-items:start}
+  .rehearsal-list{display:grid;gap:0;border-top:1px solid var(--line)}
+  .rehearsal-item{display:grid;grid-template-columns:96px 1fr;gap:22px;padding:17px 0;border-bottom:1px solid var(--line);position:relative}
+  .rehearsal-time{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--accent);padding-top:3px}
+  .rehearsal-copy h3{margin:0 0 5px;font-size:16px;line-height:1.3;letter-spacing:-.02em}
+  .rehearsal-copy p{margin:0;color:var(--muted);font-size:12px;line-height:1.7}
+  .rehearsal-copy .tagline{display:inline-block;margin-top:7px;font-family:var(--mono);font-size:9px;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 25%,var(--line));padding:3px 6px;border-radius:3px}
+  .review-box{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow-soft);padding:18px 18px 16px}
+  .review-box h3{margin:0 0 7px;font-size:18px;letter-spacing:-.03em}
+  .review-box p{margin:0 0 13px;color:var(--muted);font-size:11px;line-height:1.7}
+  .reviewer-grid{display:flex;flex-wrap:wrap;gap:6px}
+  .reviewer{border:1px solid var(--line);background:var(--panel-2);padding:6px 8px;border-radius:4px;font-family:var(--mono);font-size:9px;color:var(--ink-2)}
+  .rubric{display:grid;gap:7px;margin-top:15px;padding-top:13px;border-top:1px solid var(--line)}
+  .rubric-row{display:grid;grid-template-columns:92px 1fr;gap:9px;align-items:center}
+  .rubric-row span{font-size:9px;color:var(--muted)}
+  .rubric-track{height:6px;background:var(--panel-3);border-radius:99px;overflow:hidden}
+  .rubric-track i{display:block;height:100%;background:var(--accent);border-radius:99px}
+  .review-foot{margin:13px 0 0;color:var(--muted);font-size:10px;line-height:1.6;border-top:1px solid var(--line);padding-top:10px}
+
+  /* risk table */
+  .risk-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:26px;align-items:start}
+  table.risk-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px}
+  .risk-table th{text-align:left;color:var(--muted);font-weight:500;font-size:10px;padding:0 10px 9px 0;border-bottom:1px solid var(--line-strong)}
+  .risk-table td{padding:10px 10px 10px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-2);line-height:1.55}
+  .risk-table td:first-child{font-weight:600;color:var(--ink)}
+  .open-list{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+  .open-list li{display:grid;grid-template-columns:15px 1fr;gap:8px;font-size:11px;line-height:1.6;color:var(--ink-2)}
+  .open-list li::before{content:"";width:5px;height:5px;border-radius:50%;border:1px solid var(--accent);margin-top:6px}
+
+  /* footer */
+  .footer{border-top:1px solid var(--line-strong);padding:28px 0 38px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;color:var(--muted);font-size:11px;line-height:1.7}
+  .footer strong{color:var(--ink);font-weight:650}
+  .footer .mono{font-size:9px;letter-spacing:.08em;text-align:right;white-space:nowrap}
+
+  @media (max-width:1120px){
+    .section-head{grid-template-columns:1fr;gap:14px}
+  }
+  @media (max-width:980px){
+    .nav{display:none}
+    .hero-grid{grid-template-columns:1fr;gap:34px}
+    .console-inner{min-height:0}
+    .section-head{grid-template-columns:1fr;gap:14px}
+    .problem-grid{grid-template-columns:1fr;border-top:0}
+    .problem-item{min-height:0;padding:18px 0 0;border-top:1px solid var(--line)}
+    .problem-item + .problem-item{border-left:0;padding-left:0}
+    .boundary-layout,.arch-foot,.console-layout,.version-grid,.rehearsal-layout,.risk-grid{grid-template-columns:1fr}
+    .detail-grid,.lifecycle-detail-grid,.eval-split{grid-template-columns:1fr}
+    .forbidden{grid-template-columns:1fr;gap:8px}
+    .arch-svg{min-width:900px}
+    .quote-band{grid-template-columns:1fr;gap:8px}
+    .quote-band span{text-align:left}
+  }
+  @media (max-width:620px){
+    .shell{padding:0 18px}
+    .hero{padding-top:42px}
+    h1{font-size:clamp(38px,11.2vw,54px)}
+    .hero-sub{font-size:15px}
+    .hero-notes{grid-template-columns:1fr;border-top:0;gap:0;margin-top:26px}
+    .hero-note{padding:10px 0;border-top:1px solid var(--line)}
+    .hero-note + .hero-note{border-left:0;padding-left:0}
+    .section{padding:56px 0}
+    h2{font-size:clamp(28px,8vw,38px)}
+    .console-parse,.console-gates{grid-template-columns:1fr}
+    .console-gates{gap:6px}
+    .mini-pipe{overflow-x:auto;padding-bottom:3px}
+    .lifecycle-detail-top{display:block}
+    .result-meta{grid-template-columns:1fr}
+    .footer{display:block}
+    .footer .mono{text-align:left;margin-top:12px;white-space:normal}
+    .risk-table{font-size:10px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
+  }
+
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#top" aria-label="语控台首页">
+      <span class="brand-mark">OPS</span>
+      <span><b>语控台</b><small>OPS CONTROL PLANE</small></span>
+    </a>
+    <nav class="nav" aria-label="页面导航">
+      <a href="#problem">问题</a>
+      <a href="#boundary">边界</a>
+      <a href="#architecture">架构</a>
+      <a href="#lifecycle">生命周期</a>
+      <a href="#console">操作预演</a>
+      <a href="#version">版本</a>
+      <a href="#rehearsal">施工预演</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.1 5.1l1.4 1.4M17.5 17.5l1.4 1.4M18.9 5.1l-1.4 1.4M6.5 17.5l-1.4 1.4"/></svg>
+      <span id="themeLabel">深色</span>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero" aria-labelledby="heroTitle">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">Concept / 2026.11 · 设计预演</div>
+        <h1 id="heroTitle">让语言成为<br>操作入口，<br><span class="accent">而不是执行权限。</span></h1>
+        <p class="hero-sub"><strong>语控台不是“会敲命令的聊天机器人”。</strong>它把一句话拆成意图、上下文、能力计划、策略判定、预演、审批、执行和验证；模型只提案，策略与执行器保留最终决定权。</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#boundary">看执行边界 <span aria-hidden="true">↓</span></a>
+          <a class="btn btn-ghost" href="#console">预演一次操作</a>
+        </div>
+        <div class="hero-notes" aria-label="设计约束">
+          <div class="hero-note"><b>0</b><span>未审批变更<br>设计目标</span></div>
+          <div class="hero-note"><b>L0—L3</b><span>四级能力<br>默认拒绝</span></div>
+          <div class="hero-note"><b>1 chain</b><span>一条不可变<br>审计事件链</span></div>
+        </div>
+      </div>
+      <aside class="console" aria-label="控制包络设计示例">
+        <div class="console-inner">
+          <div class="console-top"><div class="left"><span class="live-dot"></span><span>CONTROL ENVELOPE</span></div><span>PREVIEW / NO EXECUTION</span></div>
+          <div class="console-query"><small>自然语言输入</small>“把 03 的 GPU worker 重启一下，只重启一个。”</div>
+          <div class="console-parse">
+            <div class="console-cell"><small>上下文锁定</small><b>env=prod · cluster=03<br>service=gpu-vector</b></div>
+            <div class="console-cell"><small>能力</small><b>restart_service<br>scope=one</b></div>
+          </div>
+          <div class="console-gates">
+            <div class="gate ok"><span>参数 schema</span><b>通过</b></div>
+            <div class="gate ok"><span>资源存在</span><b>通过</b></div>
+            <div class="gate warn"><span>风险预算</span><b>需审批</b></div>
+          </div>
+          <div class="console-verdict">
+            <div><small>策略判定</small><b>L1 · 单服务 · 需 1 人审批</b></div>
+            <div class="risk-mark">risk<br><b>0.31</b> / 0.80</div>
+          </div>
+          <div class="mini-pipe" aria-hidden="true">
+            <span class="pipe-node">意图</span><i></i><span class="pipe-node">计划</span><i></i><span class="pipe-node">策略</span><i></i><span class="pipe-node active">审批</span><i></i><span class="pipe-node">执行</span><i></i><span class="pipe-node">验证</span>
+          </div>
+          <p class="console-note">一句话不是命令。它先变成可检查的计划，再被策略、风险和审批约束；执行器只接受已签名的能力调用。</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section" id="problem">
+    <div class="section-head">
+      <div><div class="kicker">01 / 问题</div><h2>不是运维不会操作，<br>是操作入口太贵。</h2></div>
+      <div><p>查询、重启、改脚本、拉起整套系统，这些动作本身并不神秘。真正昂贵的是：找上下文、记顺序、判断影响、确认权限、事后解释。</p><p class="lead">现有“语言 → 豆包 → 系统”的能力已经证明入口可行，但它更像个人外挂。产品化要解决的不是“再多接几个工具”，而是把判断力变成可交接的控制面。</p></div>
+    </div>
+    <div class="problem-grid">
+      <div class="problem-item"><div class="problem-tag">ENTRY COST</div><h3>入口太散</h3><p>查一个队列要进终端、记 Redis key；重启服务要翻 compose、确认容器名。每一步都在消耗注意力。</p></div>
+      <div class="problem-item"><div class="problem-tag">TACIT KNOWLEDGE</div><h3>知识在个人脑子里</h3><p>“先停谁、后起谁、哪一步能重试”散落在聊天记录和脚本注释里，换个人值班就重新学一遍。</p></div>
+      <div class="problem-item"><div class="problem-tag">EVIDENCE GAP</div><h3>结果不可验证</h3><p>命令返回 0 不等于服务恢复。谁在什么时候因为哪句话改了什么，往往要事后拼证据。</p></div>
+    </div>
+    <div class="quote-band"><p>这个产品的核心承诺不是“AI 能操作”，而是“<strong>AI 操作错了，也有人能看懂、能叫停、能退回去</strong>”。</p><span>PRODUCT THESIS / 01</span></div>
+  </section>
+
+  <section class="section" id="boundary">
+    <div class="section-head">
+      <div><div class="kicker">02 / 边界</div><h2>先画不能做什么，<br>再谈能做什么。</h2></div>
+      <div><p>权限不是一句“请谨慎操作”。它必须体现在能力目录、资源范围、审批级别和回滚路径里。语言可以模糊，系统不能。</p><p class="lead">点击左侧级别，查看允许的动作、审批方式与回滚责任。默认策略是拒绝，只有登记过的能力才有执行入口。</p></div>
+    </div>
+    <div class="boundary-layout">
+      <div class="tier-list" id="tierList" role="tablist" aria-label="操作能力级别">
+        <button class="tier-btn" data-tier="0" role="tab" aria-selected="false"><span class="tier-code">L0</span><strong>只读查询</strong><small>自动放行 · 不留变更</small></button>
+        <button class="tier-btn is-active" data-tier="1" role="tab" aria-selected="true"><span class="tier-code">L1</span><strong>单点变更</strong><small>单资源 · 1 人审批</small></button>
+        <button class="tier-btn" data-tier="2" role="tab" aria-selected="false"><span class="tier-code">L2</span><strong>脚本 / 配置</strong><small>白名单 · 双人审批</small></button>
+        <button class="tier-btn" data-tier="3" role="tab" aria-selected="false"><span class="tier-code">L3</span><strong>整套启动 / 停止</strong><small>变更窗口 · 双人 + 值班</small></button>
+      </div>
+      <div class="tier-detail" id="tierDetail" role="tabpanel" aria-live="polite">
+        <div class="detail-top"><div><small>LEVEL 01 / SINGLE CHANGE</small><h3>单点变更</h3></div><span class="chip blue">1 人审批</span></div>
+        <div class="detail-grid">
+          <div class="detail-cell"><span>允许</span><b>重启一个无状态服务、重排一个失败任务、清缓存、暂停队列</b></div>
+          <div class="detail-cell"><span>前置</span><b>资源存在、单资源范围、无同资源执行锁、变更窗口内</b></div>
+          <div class="detail-cell"><span>回滚</span><b>恢复队列、重启回原状态、记录前后心跳</b></div>
+        </div>
+        <div class="detail-example"><span>EXAMPLE</span>“把 03 的 GPU worker 重启一下，只重启一个。”</div>
+      </div>
+    </div>
+    <div class="forbidden">
+      <h4>永久拒绝 / NEVER</h4>
+      <p><b>任意 shell、删数据或卷、改密钥、改防火墙 / IAM、DB schema、批量重启、外部写操作、生产凭据导出。</b>这些动作不进入审批流，不提供“管理员绕过”，也不允许模型在计划里自行拼出来。</p>
+    </div>
+    <p class="boundary-note">“不敏感脚本”不是“随便改脚本”：必须位于登记目录、无秘密、无外部写操作、通过静态扫描与语法检查、有 diff、沙箱预演、内容 hash、备份和回滚。满足不了，就降级成只读建议。</p>
+  </section>
+
+  <section class="section" id="architecture">
+    <div class="section-head">
+      <div><div class="kicker">03 / 架构</div><h2>模型提案，<br>策略裁决，<br>执行器兜底。</h2></div>
+      <div><p>把“理解语言”和“拥有权限”拆开，是这套系统最重要的架构选择。模型负责把一句话变成候选计划；策略引擎负责说能不能做；执行器负责安全地做、验证、退回来。</p><p class="lead">点击架构中的节点，查看职责和“绝不允许”的边界。灰色连接表示证据/审计流，不表示执行权限。</p></div>
+    </div>
+    <div class="arch-wrap">
+      <div class="arch-toolbar"><span>CONTROL PLANE / LOGICAL VIEW</span><div class="arch-legend"><span><i></i>执行路径</span><span><i class="amber"></i>审批/风险</span><span><i class="gray"></i>证据链</span></div></div>
+      <svg class="arch-svg" viewBox="0 0 1220 580" role="img" aria-label="语控台逻辑架构图">
+        <defs>
+          <marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7Z" fill="var(--line-strong)"/></marker>
+          <marker id="arrowBlue" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7Z" fill="var(--accent)"/></marker>
+        </defs>
+        <text x="24" y="35" class="lane-label">01 / 意图与计划</text>
+        <text x="24" y="218" class="lane-label">02 / 执行与验证</text>
+        <text x="24" y="390" class="lane-label">03 / 证据与版本</text>
+
+        <g class="arch-node" data-node="user" tabindex="0" role="button" aria-label="用户">
+          <rect x="24" y="65" width="150" height="76" rx="9"/><text x="99" y="91" class="node-code">ENTRY</text><text x="99" y="112" class="node-title">用户</text><text x="99" y="130" class="node-sub">文字 / 语音</text>
+        </g>
+        <g class="arch-node" data-node="gateway" tabindex="0" role="button" aria-label="意图网关">
+          <rect x="208" y="65" width="150" height="76" rx="9"/><text x="283" y="91" class="node-code">GATE</text><text x="283" y="112" class="node-title">意图网关</text><text x="283" y="130" class="node-sub">脱敏 / 限流 / 会话</text>
+        </g>
+        <g class="arch-node" data-node="context" tabindex="0" role="button" aria-label="上下文解析">
+          <rect x="392" y="65" width="150" height="76" rx="9"/><text x="467" y="91" class="node-code">RESOLVE</text><text x="467" y="112" class="node-title">上下文解析</text><text x="467" y="130" class="node-sub">环境 / 服务 / 时间</text>
+        </g>
+        <g class="arch-node" data-node="planner" tabindex="0" role="button" aria-label="计划器">
+          <rect x="576" y="65" width="170" height="76" rx="9"/><text x="661" y="91" class="node-code">PROPOSE</text><text x="661" y="112" class="node-title">计划器</text><text x="661" y="130" class="node-sub">LLM + capability schema</text>
+        </g>
+        <g class="arch-node" data-node="policy" tabindex="0" role="button" aria-label="策略引擎">
+          <rect x="780" y="65" width="170" height="76" rx="9"/><text x="865" y="91" class="node-code">DISPOSE</text><text x="865" y="112" class="node-title">策略引擎</text><text x="865" y="130" class="node-sub">默认拒绝 / 风险预算</text>
+        </g>
+        <g class="arch-node" data-node="simulation" tabindex="0" role="button" aria-label="预演与风险">
+          <rect x="984" y="65" width="170" height="76" rx="9"/><text x="1069" y="91" class="node-code">PREFLIGHT</text><text x="1069" y="112" class="node-title">预演与风险</text><text x="1069" y="130" class="node-sub">影响 / 回滚 / 断言</text>
+        </g>
+
+        <g class="arch-node" data-node="approval" tabindex="0" role="button" aria-label="审批门">
+          <rect x="984" y="236" width="170" height="76" rx="9"/><text x="1069" y="262" class="node-code">HUMAN GATE</text><text x="1069" y="283" class="node-title">审批门</text><text x="1069" y="301" class="node-sub">单批 / 双批 / 窗口</text>
+        </g>
+        <g class="arch-node" data-node="executor" tabindex="0" role="button" aria-label="持久化执行器">
+          <rect x="780" y="236" width="170" height="76" rx="9"/><text x="865" y="262" class="node-code">EXECUTE</text><text x="865" y="283" class="node-title">持久化执行器</text><text x="865" y="301" class="node-sub">状态机 / 幂等 / 锁</text>
+        </g>
+        <g class="arch-node" data-node="adapters" tabindex="0" role="button" aria-label="适配器层">
+          <rect x="576" y="236" width="170" height="76" rx="9"/><text x="661" y="262" class="node-code">ADAPT</text><text x="661" y="283" class="node-title">适配器层</text><text x="661" y="301" class="node-sub">Docker / K8s / 脚本</text>
+        </g>
+        <g class="arch-node" data-node="targets" tabindex="0" role="button" aria-label="目标系统">
+          <rect x="392" y="236" width="150" height="76" rx="9"/><text x="467" y="262" class="node-code">TARGET</text><text x="467" y="283" class="node-title">目标系统</text><text x="467" y="301" class="node-sub">集群 / 队列 / 模型</text>
+        </g>
+        <g class="arch-node" data-node="verifier" tabindex="0" role="button" aria-label="验证器">
+          <rect x="208" y="236" width="150" height="76" rx="9"/><text x="283" y="262" class="node-code">ASSERT</text><text x="283" y="283" class="node-title">验证器</text><text x="283" y="301" class="node-sub">健康 / 队列 / 错误率</text>
+        </g>
+
+        <g class="arch-node" data-node="audit" tabindex="0" role="button" aria-label="审计事件链">
+          <rect x="780" y="408" width="170" height="76" rx="9"/><text x="865" y="434" class="node-code">EVIDENCE</text><text x="865" y="455" class="node-title">审计事件链</text><text x="865" y="473" class="node-sub">append-only / hash chain</text>
+        </g>
+        <g class="arch-node" data-node="registry" tabindex="0" role="button" aria-label="能力目录">
+          <rect x="392" y="408" width="150" height="76" rx="9"/><text x="467" y="434" class="node-code">CATALOG</text><text x="467" y="455" class="node-title">能力目录</text><text x="467" y="473" class="node-sub">schema / 回滚 / 审批</text>
+        </g>
+        <g class="arch-node" data-node="release" tabindex="0" role="button" aria-label="版本台账">
+          <rect x="576" y="408" width="170" height="76" rx="9"/><text x="661" y="434" class="node-code">MANIFEST</text><text x="661" y="455" class="node-title">版本台账</text><text x="661" y="473" class="node-sub">模型 / 提示词 / 向量</text>
+        </g>
+
+        <path class="wire signal" d="M174 103H208" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M358 103H392" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M542 103H576" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M746 103H780" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M950 103H984" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M1069 141V236" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M984 274H950" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M780 274H746" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M576 274H542" marker-end="url(#arrowBlue)"/>
+        <path class="wire signal" d="M392 274H358" marker-end="url(#arrowBlue)"/>
+        <path class="wire dotted" d="M283 312V408" marker-end="url(#arrow)"/>
+        <path class="wire dotted" d="M780 446H467" marker-end="url(#arrow)"/>
+        <path class="wire dotted" d="M542 330V408" marker-end="url(#arrow)"/>
+        <path class="wire dotted" d="M746 330V408" marker-end="url(#arrow)"/>
+        <path class="wire dotted" d="M661 141V408" marker-end="url(#arrow)"/>
+        <path class="wire dotted" d="M865 312V408" marker-end="url(#arrow)"/>
+      </svg>
+    </div>
+    <div class="arch-foot">
+      <div class="arch-key" id="archKey" aria-label="快速选择节点"></div>
+      <div class="arch-detail" id="archDetail" aria-live="polite">
+        <small>SELECTED / POLICY</small><h3>策略引擎</h3><p>独立于模型的确定性判定层。输入是用户、环境、能力、参数、风险分和变更窗口，输出只有允许、拒绝、需审批或仅预演。</p>
+        <ul><li>模型不能修改策略，也不能把日志里的内容当指令。</li><li>规则版本化；每次判定记录命中的规则和策略快照。</li><li>默认拒绝；能力目录外动作没有执行入口。</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- APPEND_AFTER_ARCH -->
+  <section class="section" id="lifecycle">
+    <div class="section-head">
+      <div><div class="kicker">04 / 生命周期</div><h2>一句话要经过<br>九道门。</h2></div>
+      <div><p>自然语言不是直接落到执行器，而是先被“翻译”成可检查的计划。每道门都有明确的输入、失败处理和证据；任何一步不通过，后面的门不会打开。</p><p class="lead">点击任一阶段，查看系统在这一步实际做什么、拒绝什么、留下什么证据。</p></div>
+    </div>
+    <div class="lifecycle-rail" id="lifecycleRail" role="tablist" aria-label="操作生命周期">
+      <button class="step-btn" data-step="0" role="tab" aria-selected="false"><span class="step-no">01</span><span class="step-name">意图</span><span class="step-mini">听懂但不照做</span></button>
+      <button class="step-btn" data-step="1" role="tab" aria-selected="false"><span class="step-no">02</span><span class="step-name">上下文</span><span class="step-mini">消歧与资源锁定</span></button>
+      <button class="step-btn" data-step="2" role="tab" aria-selected="false"><span class="step-no">03</span><span class="step-name">计划</span><span class="step-mini">只组合登记能力</span></button>
+      <button class="step-btn" data-step="3" role="tab" aria-selected="false"><span class="step-no">04</span><span class="step-name">策略</span><span class="step-mini">默认拒绝</span></button>
+      <button class="step-btn is-active" data-step="4" role="tab" aria-selected="true"><span class="step-no">05</span><span class="step-name">预演</span><span class="step-mini">影响与回滚</span></button>
+      <button class="step-btn" data-step="5" role="tab" aria-selected="false"><span class="step-no">06</span><span class="step-name">审批</span><span class="step-mini">批计划不批句子</span></button>
+      <button class="step-btn" data-step="6" role="tab" aria-selected="false"><span class="step-no">07</span><span class="step-name">执行</span><span class="step-mini">锁 / 幂等 / 超时</span></button>
+      <button class="step-btn" data-step="7" role="tab" aria-selected="false"><span class="step-no">08</span><span class="step-name">验证</span><span class="step-mini">断言与回滚</span></button>
+      <button class="step-btn" data-step="8" role="tab" aria-selected="false"><span class="step-no">09</span><span class="step-name">归档</span><span class="step-mini">证据与复盘</span></button>
+    </div>
+    <div class="lifecycle-detail" id="lifecycleDetail" role="tabpanel" aria-live="polite">
+      <div class="lifecycle-detail-top"><div><small>PHASE 05 / PREFLIGHT</small><h3>预演：先看会发生什么</h3></div><span class="chip amber">风险分 0.31</span></div>
+      <div class="lifecycle-detail-grid">
+        <div class="lifecycle-cell"><span>系统做什么</span><b>计算受影响服务、依赖上下游、预计停机、回滚耗时；生成 diff 和验证断言。预演本身不产生副作用。</b></div>
+        <div class="lifecycle-cell"><span>拒绝条件</span><b>影响范围超预算、无回滚路径、当前有同资源动作、变更窗口外，或预演发现会中断正在跑的任务。</b></div>
+        <div class="lifecycle-cell"><span>留下什么证据</span><b>风险分、影响图、diff、预计时长、回滚步骤、验证断言、预演时间戳和生成它的版本。</b></div>
+      </div>
+      <div class="state-strip"><span>DRAFT</span><i>→</i><span class="on">PREFLIGHT</span><i>→</i><span>AWAITING_APPROVAL</span><i>→</i><span>RUNNING</span><i>→</i><span>VERIFIED</span></div>
+    </div>
+  </section>
+
+  <section class="section" id="console">
+    <div class="section-head">
+      <div><div class="kicker">05 / 操作预演</div><h2>一句话，先看到<br>它会被怎么执行。</h2></div>
+      <div><p>这是设计稿里的交互预演：输入或选择一句自然语言，系统展示它会被识别成什么能力、落到什么级别、需要谁审批、执行哪些步骤。<strong>只预演，不执行任何真实动作。</strong></p><p class="lead">演示使用关键词分类，不是产品级意图模型；真实系统会走 schema、上下文解析和模型评估。</p></div>
+    </div>
+    <div class="console-layout">
+      <div class="command-panel">
+        <div class="panel-bar"><span>COMMAND COMPOSER</span><b>PREVIEW ONLY</b></div>
+        <div class="command-body">
+          <div class="example-chips" id="exampleChips">
+            <button class="example-chip is-active" data-example="query">查队列</button>
+            <button class="example-chip" data-example="restart">单服务重启</button>
+            <button class="example-chip" data-example="script">脚本回滚</button>
+            <button class="example-chip" data-example="full">整套启动</button>
+            <button class="example-chip" data-example="forbidden">危险请求</button>
+          </div>
+          <label class="field-label" for="commandInput">自然语言输入</label>
+          <textarea class="command-input" id="commandInput" spellcheck="false">查一下 02 的 background 队列和 GPU worker 状态</textarea>
+          <div class="command-actions"><button class="btn btn-primary" id="simulateBtn" type="button">预演此操作</button><span class="run-state" id="runState">未执行 / 设计预演</span></div>
+          <div class="mini-map" aria-label="目标拓扑示意">
+            <div class="mini-map-head"><span>TOPOLOGY / 示意数据</span><b>不连接真实系统</b></div>
+            <div class="cluster-row"><div class="cluster-name"><i></i>02 / P2</div><div class="lane-stack"><div class="lane-block"><span style="--w:74%"></span></div><div class="lane-block"><span style="--w:58%"></span></div><div class="lane-block"><span style="--w:66%"></span></div></div><div class="cluster-meta">RUN</div></div>
+            <div class="cluster-row"><div class="cluster-name"><i></i>03 / GPU</div><div class="lane-stack"><div class="lane-block"><span style="--w:42%"></span></div><div class="lane-block amber"><span style="--w:31%"></span></div><div class="lane-block"><span style="--w:55%"></span></div></div><div class="cluster-meta">WARN</div></div>
+            <div class="cluster-row"><div class="cluster-name"><i class="gray"></i>08 / DR</div><div class="lane-stack"><div class="lane-block gray"><span style="--w:18%"></span></div><div class="lane-block gray"><span style="--w:12%"></span></div><div class="lane-block gray"><span style="--w:22%"></span></div></div><div class="cluster-meta">STBY</div></div>
+            <p class="mini-map-note">实际产品里，每条 lane 都要能下钻到容器、队列、GPU 和最近一次动作证据；这里只表达信息密度，不伪造实时数据。</p>
+          </div>
+        </div>
+      </div>
+      <div class="result-panel">
+        <div class="panel-bar"><span>PLAN &amp; POLICY</span><b id="resultBadgeBar">L0 / AUTO</b></div>
+        <div class="result-body">
+          <div class="result-head"><div><small>解析结果</small><h3 id="resultTitle">只读查询：队列与 worker</h3></div><span class="result-badge ok" id="resultBadge">自动放行</span></div>
+          <p class="result-summary" id="resultSummary">只读查询，不改变任何状态。读取队列长度、worker 心跳和最近错误率，返回证据链接。</p>
+          <div class="result-meta"><div><span>能力</span><b id="resultCapability">inspect_queue + inspect_worker</b></div><div><span>审批</span><b id="resultApproval">无需审批</b></div><div><span>回滚</span><b id="resultRollback">不适用</b></div><div><span>风险 / 级别</span><b id="resultLevel">0.08 / L0</b></div></div>
+          <div class="risk-line"><label>RISK</label><div class="risk-track"><i id="riskBar" style="width:8%"></i></div><b id="riskValue">0.08</b></div>
+          <ul class="plan-list" id="planList">
+            <li class="plan-item"><span class="idx">01</span><div><b>锁定环境与资源</b><span>env=prod · cluster=02 · queue=background</span></div></li>
+            <li class="plan-item"><span class="idx">02</span><div><b>读取只读指标</b><span>队列长度 / worker 心跳 / 5 分钟错误率</span></div></li>
+            <li class="plan-item"><span class="idx">03</span><div><b>返回证据</b><span>附时间戳与下钻链接，不写入、不重启</span></div></li>
+          </ul>
+          <div class="policy-box" id="policyNote"><strong>策略：</strong>只允许状态接口与只读查询；没有写操作、没有审批、没有资源锁。数据过期时标注“快照”，不冒充实时。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="version">
+    <div class="section-head">
+      <div><div class="kicker">06 / 版本治理</div><h2>软件、模型、<br>提示词、向量方案<br>一起版本化。</h2></div>
+      <div><p>只看 Git SHA 不够。模型换了、温度变了、工具 schema 改了、chunk 策略变了，都会改变“同样一句话会被怎么执行”。发布清单必须把这些一起钉住。</p><p class="lead">左侧是发布 manifest 的字段示例；右侧切换 0.9 与 1.0 门禁。AI 链路质量评估和软件功能测试是两条不同的证据链。</p></div>
+    </div>
+    <div class="version-grid">
+      <div class="manifest-box">
+        <div class="panel-bar"><span>RELEASE MANIFEST / EXAMPLE</span><b>IMMUTABLE</b></div>
+        <div class="manifest-body">
+<pre class="manifest-code"><span class="key">release_id</span>: <span class="str">opstalk-1.0.0</span>
+<span class="key">git_sha</span>: <span class="str">&lt;release-sha&gt;</span>
+<span class="key">backend_image</span>: <span class="str">sha256:&lt;digest&gt;</span>
+<span class="key">model</span>:
+  provider: <span class="str">claude | gpt | deepseek | kimi</span>
+  model: <span class="str">&lt;model-id&gt;</span>
+  revision: <span class="str">&lt;revision&gt;</span>
+  quantization: <span class="str">&lt;quant&gt;</span>
+<span class="key">inference</span>:
+  temperature: <span class="str">0.1</span>
+  top_p: <span class="str">0.9</span>
+  max_tokens: <span class="str">4096</span>
+<span class="key">prompt_version</span>: <span class="str">planner-v7</span>
+<span class="key">tool_schema</span>: <span class="str">capabilities-v3</span>
+<span class="key">output_format</span>: <span class="str">json_schema / plan-output-v2</span>
+<span class="key">policy_bundle</span>: <span class="str">policy-v5</span>
+<span class="key">embedding</span>: <span class="str">bge-m3</span>
+<span class="key">chunking</span>: <span class="str">chunks-v2</span>
+<span class="key">vector_index</span>: <span class="str">index-v4</span>
+<span class="key">eval_report</span>: <span class="str">&lt;hash&gt;</span>
+<span class="key">human_signoff</span>: <span class="str">&lt;record&gt;</span></pre>
+          <p class="manifest-caption">示例清单，不冒充真实发布记录。任何一次生产事故都能用 manifest 精确回放到当时的代码、模型、提示词和向量方案。</p>
+        </div>
+      </div>
+      <div class="manifest-box">
+        <div class="panel-bar"><span>RELEASE GATES</span><b>HUMAN IN THE LOOP</b></div>
+        <div class="manifest-body">
+          <div class="version-tabs" id="versionTabs"><button class="version-tab is-active" data-gate="09">0.9 / 候选</button><button class="version-tab" data-gate="10">1.0 / 可发布</button></div>
+          <div class="gate-list" id="gateList">
+            <div class="gate-item"><span class="check"></span><div>确定性 CI 全绿：单元、集成、状态机、权限</div><span class="tag">CI</span></div>
+            <div class="gate-item"><span class="check"></span><div>黄金指令集与对抗集达到门槛</div><span class="tag">AI EVAL</span></div>
+            <div class="gate-item"><span class="check"></span><div>无 P0/P1；已知问题有清单和负责人</div><span class="tag">TRIAGE</span></div>
+            <div class="gate-item"><span class="check"></span><div>staging 金丝雀通过；自测自评收敛</div><span class="tag">CANARY</span></div>
+            <div class="gate-item warn"><span class="check"></span><div>独立评估与回滚演练：1.0 才要求</div><span class="tag">NEXT</span></div>
+          </div>
+          <p class="gate-note" id="gateNote">0.9 是“可以交给独立评审”的候选版本，不是生产可用；1.0 才要求 Kimi 独立评估、人工复核、签名上传。</p>
+          <div class="eval-split">
+            <div class="eval-box"><h4>AI 链路质量评估</h4><p><strong>评什么：</strong>意图、计划、参数、拒答、解释。<br><strong>怎么评：</strong>黄金集、对抗集、LLM judge、人抽检。</p></div>
+            <div class="eval-box"><h4>软件功能质量测试</h4><p><strong>测什么：</strong>API、权限、幂等、并发、故障注入、回滚。<br><strong>怎么测：</strong>确定性测试、压测、混沌测试。</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="rehearsal">
+    <div class="section-head">
+      <div><div class="kicker">07 / 施工预演</div><h2>如果让我来做，<br>先让模型互评，<br>再让另一种模型<br>拆台。</h2></div>
+      <div><p>架构用 Claude/GPT 的最好模型做候选与互评，评审席位可以继续加模型；施工用 DeepSeek V4.1 Flash 做垂直切片和自测自评，收敛后打 0.9；再用 Kimi 做独立评估、测试和修改，打 1.0；人工复核后上传。</p><p class="lead">模型互评增加视角，不替代责任。最终架构由人类负责人签字，评审记录保留模型、版本、提示词和分歧。</p></div>
+    </div>
+    <div class="rehearsal-layout">
+      <div class="rehearsal-list">
+        <div class="rehearsal-item"><div class="rehearsal-time">W0 / FREEZE</div><div class="rehearsal-copy"><h3>冻结需求与禁区</h3><p>先写清楚目标环境、资源清单、能力目录 v0、禁止动作、审批人、回滚责任。没有这份东西，后面的架构讨论都会飘。</p><span class="tagline">OUTPUT / 需求基线 + 威胁模型</span></div></div>
+        <div class="rehearsal-item"><div class="rehearsal-time">W1 / ARCH</div><div class="rehearsal-copy"><h3>三个候选架构，多模型互评</h3><p>候选 A：聊天 + 自由工具调用；候选 B：能力型控制面；候选 C：事件驱动自治集群。用同一份证据、同一套评分维度盲评，记录致命缺陷和反对意见，人类架构负责人定案并写 ADR。</p><span class="tagline">CLAUDE / GPT / KIMI / DEEPSEEK · 可加席位</span></div></div>
+        <div class="rehearsal-item"><div class="rehearsal-time">W2 / UI</div><div class="rehearsal-copy"><h3>先设计审批人的 30 秒</h3><p>指挥台、审批箱、拓扑、执行时间线、版本台账。评审标准不是“好看”，而是审批人能否在 30 秒内看懂：会发生什么、影响谁、出了事怎么退。</p><span class="tagline">OUTPUT / 高保真控制室 + 可用性测试</span></div></div>
+        <div class="rehearsal-item"><div class="rehearsal-time">W3–W5 / BUILD</div><div class="rehearsal-copy"><h3>DeepSeek V4.1 Flash 施工，切片收敛</h3><p>L0 查询 → L1 单服务 → L2 脚本 → L3 整套启动。每个切片同时交付 schema、策略、预演、验证、回滚和测试；每轮自测后做自评，收敛后打 0.9，不直接宣称生产可用。</p><span class="tagline">0.9 / 候选版本，不是生产版本</span></div></div>
+        <div class="rehearsal-item"><div class="rehearsal-time">W6 / REVIEW</div><div class="rehearsal-copy"><h3>Kimi 独立评估、测试、修改</h3><p>用不同提示词、不同测试集，不看施工方的自评结论。重点打歧义指令、提示词注入、重复点击、并发冲突、半失败和回滚失败；修复后打 1.0。</p><span class="tagline">1.0 / 独立证据 + 回归测试</span></div></div>
+        <div class="rehearsal-item"><div class="rehearsal-time">SIGN-OFF</div><div class="rehearsal-copy"><h3>人工复核，上传 1.0</h3><p>复核能力目录、策略矩阵、审批链、回滚演练和审计样本；签署 release manifest；上传 1.0 发布包。没有人工签字，模型评分不构成发布许可。</p><span class="tagline">UPLOAD / 签名产物 + manifest</span></div></div>
+      </div>
+      <aside class="review-box">
+        <h3>架构互评不是投票</h3>
+        <p>每个评审独立给出致命缺陷、八维评分、反对意见和需要补充的证据。多数票不能抵消一个致命的安全缺陷；评审的价值是让分歧显性化。</p>
+        <div class="reviewer-grid"><span class="reviewer">CLAUDE</span><span class="reviewer">GPT</span><span class="reviewer">KIMI</span><span class="reviewer">DEEPSEEK</span><span class="reviewer">+ LLM</span></div>
+        <div class="rubric">
+          <div class="rubric-row"><span>安全边界</span><div class="rubric-track"><i style="width:94%"></i></div></div>
+          <div class="rubric-row"><span>可靠性</span><div class="rubric-track"><i style="width:88%"></i></div></div>
+          <div class="rubric-row"><span>可测试性</span><div class="rubric-track"><i style="width:90%"></i></div></div>
+          <div class="rubric-row"><span>运维复杂度</span><div class="rubric-track"><i style="width:72%"></i></div></div>
+          <div class="rubric-row"><span>交付速度</span><div class="rubric-track"><i style="width:80%"></i></div></div>
+        </div>
+        <p class="review-foot">评分条是评审维度示意，不是实际得分。真实互评要保存每个模型的完整输出、版本和提示词。</p>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section" id="risks">
+    <div class="section-head">
+      <div><div class="kicker">08 / 风险与开放问题</div><h2>先承认它会坏，<br>再设计它怎么坏。</h2></div>
+      <div><p>这套系统的最大风险不是“模型不会操作”，而是“模型看起来会操作，实际把边界弄丢了”。所以策略、审批、验证、回滚必须比语言能力更早成熟。</p></div>
+    </div>
+    <div class="risk-grid">
+      <table class="risk-table">
+        <thead><tr><th style="width:26%">风险</th><th style="width:37%">后果</th><th>处理</th></tr></thead>
+        <tbody>
+          <tr><td>模型幻觉/计划错</td><td>调用不存在的服务或错误参数</td><td>能力 schema + 资源存在性校验 + 歧义追问</td></tr>
+          <tr><td>日志提示词注入</td><td>模型被诱导调用危险工具</td><td>日志只当数据；策略独立；能力目录不可由模型修改</td></tr>
+          <tr><td>审批替换/重放</td><td>批的是 A，执行的是 B</td><td>审批绑定 plan_hash；执行前重算；一次性 token</td></tr>
+          <tr><td>半失败</td><td>服务停了一半、队列卡住</td><td>持久化 checkpoint；恢复先验证；补偿/回滚</td></tr>
+          <tr><td>验证假阳性</td><td>命令成功但服务仍坏</td><td>多断言 + 观测窗口；失败强制回滚或转人工</td></tr>
+        </tbody>
+      </table>
+      <div>
+        <p class="subhead">OPEN QUESTIONS</p>
+        <ul class="open-list">
+          <li>目标环境先支持 Docker Compose，还是直接上 K8s 多集群？</li>
+          <li>身份与审批走飞书/OIDC，还是独立控制台？</li>
+          <li>“不敏感脚本”白名单由谁维护，多久复核一次？</li>
+          <li>break-glass 是否允许单人执行？授权人是谁？</li>
+          <li>审计保留多久，是否需要外部 WORM/SIEM？</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div><strong>语控台 OpsTalk</strong> · 自然语言运维控制面<br>概念设计讨论稿 / 2026-11-18 · 设计稿不连接真实系统，不执行任何命令。</div>
+    <div class="mono">DESIGN THESIS / 01<br>LANGUAGE AS INTENT · POLICY AS AUTHORITY</div>
+  </footer>
+
+</main>
+</div>
+<script>
+  (() => {
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const themeLabel = document.getElementById('themeLabel');
+
+    function setTheme(theme) {
+      root.dataset.theme = theme;
+      const dark = theme === 'dark';
+      themeToggle.setAttribute('aria-pressed', String(dark));
+      themeLabel.textContent = dark ? '浅色' : '深色';
+      try { localStorage.setItem('opstalk-theme', theme); } catch (e) {}
+    }
+    let savedTheme = 'light';
+    try { savedTheme = localStorage.getItem('opstalk-theme') || 'light'; } catch (e) {}
+    setTheme(savedTheme === 'dark' ? 'dark' : 'light');
+    themeToggle.addEventListener('click', () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark'));
+
+    const tiers = [
+      {
+        code: 'LEVEL 00 / READ ONLY', name: '只读查询', chip: '自动放行', tone: 'blue',
+        allow: '状态、日志、指标、队列、GPU、容器、配置只读、备份列表',
+        pre: '只读凭据；不改任何状态；数据过期时标注“快照”',
+        rollback: '不适用；错误只影响展示，不产生副作用',
+        example: '查一下 02 的 background 队列和 GPU worker 状态'
+      },
+      {
+        code: 'LEVEL 01 / SINGLE CHANGE', name: '单点变更', chip: '1 人审批', tone: 'amber',
+        allow: '重启一个无状态服务、重排一个失败任务、清缓存、暂停队列',
+        pre: '资源存在、单资源范围、无同资源执行锁、变更窗口内',
+        rollback: '恢复队列、重启回原状态、记录前后心跳',
+        example: '把 03 的 GPU worker 重启一下，只重启一个'
+      },
+      {
+        code: 'LEVEL 02 / SCRIPT CHANGE', name: '脚本 / 配置', chip: '双人审批', tone: 'amber',
+        allow: '白名单目录内的非敏感脚本、启动参数、非密钥配置',
+        pre: '静态扫描、语法检查、diff、沙箱预演、快照、内容 hash',
+        rollback: '从快照恢复；失败自动回滚，保留旧版本',
+        example: '把 02 的启动脚本回滚到上一个版本'
+      },
+      {
+        code: 'LEVEL 03 / STACK CHANGE', name: '整套启动 / 停止', chip: '双人 + 值班', tone: 'amber',
+        allow: '按依赖顺序启动/停止整套系统、维护停机、灾备切换演练',
+        pre: '变更窗口、全局锁、依赖顺序、容量与备份检查',
+        rollback: '反向停机顺序；健康门禁失败自动中止并恢复',
+        example: '启动整套 P2 系统'
+      }
+    ];
+
+    const tierDetail = document.getElementById('tierDetail');
+    const tierButtons = [...document.querySelectorAll('.tier-btn')];
+    function renderTier(index) {
+      const t = tiers[index];
+      tierButtons.forEach((b, i) => {
+        b.classList.toggle('is-active', i === index);
+        b.setAttribute('aria-selected', String(i === index));
+      });
+      tierDetail.innerHTML = `
+        <div class="detail-top"><div><small>${t.code}</small><h3>${t.name}</h3></div><span class="chip ${t.tone}">${t.chip}</span></div>
+        <div class="detail-grid">
+          <div class="detail-cell"><span>允许</span><b>${t.allow}</b></div>
+          <div class="detail-cell"><span>前置</span><b>${t.pre}</b></div>
+          <div class="detail-cell"><span>回滚</span><b>${t.rollback}</b></div>
+        </div>
+        <div class="detail-example"><span>EXAMPLE</span>“${t.example}”</div>`;
+    }
+    tierButtons.forEach((b, i) => b.addEventListener('click', () => renderTier(i)));
+    renderTier(1);
+
+    const archNodes = {
+      user: { code: 'ENTRY', title: '用户', body: '文字或语音入口。用户只表达意图，不直接持有执行凭据。', rules: ['歧义时允许追问', '不把“你看着办”当成授权', '所有输入先脱敏'] },
+      gateway: { code: 'GATE', title: '意图网关', body: '接收输入，做脱敏、限流、会话绑定和审计起点。它不决定能不能执行。', rules: ['不持有 shell / DB 凭据', '不把日志内容当指令', '限流防重复提交'] },
+      context: { code: 'RESOLVE', title: '上下文解析', body: '把“它 / 那个 / 再重启一次”落到具体环境、集群、服务和范围；歧义必须追问。', rules: ['不默认选生产', '资源必须存在', '范围必须可计数'] },
+      planner: { code: 'PROPOSE', title: '计划器', body: '用 LLM 把意图变成候选步骤，但只能从能力目录组合；输出必须通过 schema 校验。', rules: ['不能生成目录外动作', '不能改策略', '不能把自由 shell 塞进计划'] },
+      policy: { code: 'DISPOSE', title: '策略引擎', body: '独立于模型的确定性判定层。输入用户、环境、能力、参数、风险分和窗口，输出允许/拒绝/需审批/仅预演。', rules: ['默认拒绝', '规则版本化', '模型不能修改策略'] },
+      simulation: { code: 'PREFLIGHT', title: '预演与风险', body: '计算影响范围、停机时间、diff、回滚耗时和验证断言；预演本身不产生副作用。', rules: ['无回滚路径不自动执行', '超预算直接拒绝', '同资源冲突先锁'] },
+      approval: { code: 'HUMAN GATE', title: '审批门', body: 'L2/L3 必须双人审批；审批绑定 plan_hash，计划变化即失效，审批不可复用。', rules: ['批计划不批句子', '双人不可同一账号', '过期自动作废'] },
+      executor: { code: 'EXECUTE', title: '持久化执行器', body: '按状态机执行，持有资源锁、幂等键、超时、熔断和补偿；进程重启后可恢复或安全停止。', rules: ['非幂等步骤不盲重试', '半失败必须可恢复', '全局急停可中止未开始步骤'] },
+      adapters: { code: 'ADAPT', title: '适配器层', body: '把能力翻译成 Docker/K8s/脚本/服务调用；短时凭据、最小权限、网络白名单。', rules: ['不暴露原始 shell', '不保存长期秘密', '每个环境独立契约'] },
+      targets: { code: 'TARGET', title: '目标系统', body: '集群、队列、模型服务、脚本目录和存储。目标系统不需要信任模型，只信任执行器。', rules: ['生产凭据不下发模型', '变更必须可回滚', '动作前后都有证据'] },
+      verifier: { code: 'ASSERT', title: '验证器', body: '执行后检查进程、接口、队列、错误率和资源指标；不通过则回滚或转人工。', rules: ['不能只看命令返回码', '验证窗口内持续观测', '失败不能静默'] },
+      audit: { code: 'EVIDENCE', title: '审计事件链', body: '记录原始意图、计划 hash、策略、审批、diff、执行结果和验证证据；append-only + hash chain。', rules: ['不可静默修改', '模型输出可追溯', '支持事故回放'] },
+      registry: { code: 'CATALOG', title: '能力目录', body: '每个能力的 schema、风险、审批、验证、回滚和适用范围。目录外动作没有执行入口。', rules: ['新增能力必须评审', 'schema 变更有版本', '定期契约测试'] },
+      release: { code: 'MANIFEST', title: '版本台账', body: '把代码、镜像、模型、参数、提示词、工具 schema、策略包、embedding、chunking 和向量索引绑定。', rules: ['发布不可变', '任何一项变化都要新 manifest', '事故可精确回放'] }
+    };
+    const archDetail = document.getElementById('archDetail');
+    const archKey = document.getElementById('archKey');
+    const archNodeEls = [...document.querySelectorAll('.arch-node')];
+    const archKeyItems = [
+      ['gateway', 'GATEWAY'], ['planner', 'PLANNER'], ['policy', 'POLICY'],
+      ['simulation', 'PREFLIGHT'], ['executor', 'EXECUTOR'], ['audit', 'AUDIT']
+    ];
+    archKey.innerHTML = archKeyItems.map(([id, label]) => `<button type="button" data-arch="${id}">${label}</button>`).join('') + `<button type="button" data-arch="approval">APPROVAL</button>`;
+    function selectArch(id) {
+      const node = archNodes[id];
+      if (!node) return;
+      archNodeEls.forEach(el => el.classList.toggle('is-selected', el.dataset.node === id));
+      archKey.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b.dataset.arch === id));
+      archDetail.innerHTML = `<small>SELECTED / ${node.code}</small><h3>${node.title}</h3><p>${node.body}</p><ul>${node.rules.map(r => `<li>${r}</li>`).join('')}</ul>`;
+    }
+    archNodeEls.forEach(el => {
+      el.addEventListener('click', () => selectArch(el.dataset.node));
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectArch(el.dataset.node); }
+      });
+    });
+    archKey.addEventListener('click', e => {
+      const b = e.target.closest('button[data-arch]');
+      if (b) selectArch(b.dataset.arch);
+    });
+    selectArch('policy');
+
+    const lifecycle = [
+      { code: 'PHASE 01 / INTENT', title: '意图：听懂，但不照做', chip: '输入', tone: 'blue', state: 'DRAFT', action: '识别动作、对象、范围和约束；区分“查询”“变更”“启动”“危险请求”。', reject: '把模糊表达直接当授权；把多个动作混成一句无范围的命令。', evidence: '原始文本（脱敏）、会话、用户、意图置信度。' },
+      { code: 'PHASE 02 / CONTEXT', title: '上下文：消歧与资源锁定', chip: '待补全', tone: 'blue', state: 'DRAFT', action: '把环境、集群、服务、时间范围落到具体资源；缺失时追问。', reject: '默认选生产；猜服务名；把“它们”当成一个资源。', evidence: '资源快照、歧义问题、用户补充、锁定结果。' },
+      { code: 'PHASE 03 / PLAN', title: '计划：只组合登记能力', chip: '候选计划', tone: 'blue', state: 'PLANNED', action: '从能力目录生成步骤、参数、依赖、超时和补偿；schema 校验。', reject: '目录外动作、自由 shell、无回滚步骤、参数越界。', evidence: '计划 hash、模型版本、prompt 版本、schema 校验结果。' },
+      { code: 'PHASE 04 / POLICY', title: '策略：默认拒绝', chip: '策略判定', tone: 'amber', state: 'POLICY_CHECK', action: '按用户、角色、环境、能力、范围、风险和窗口判定允许/拒绝/需审批。', reject: '越权、生产非窗口、资源超范围、风险超阈值、同资源冲突。', evidence: '命中的规则、风险快照、策略包版本、判定结果。' },
+      { code: 'PHASE 05 / PREFLIGHT', title: '预演：先看会发生什么', chip: '风险分 0.31', tone: 'amber', state: 'PREFLIGHT', action: '计算影响范围、依赖上下游、预计停机、diff、回滚耗时和验证断言。', reject: '影响超预算、无回滚路径、会中断关键任务、窗口外。', evidence: '风险分、影响图、diff、预计时长、回滚步骤、验证断言。' },
+      { code: 'PHASE 06 / APPROVAL', title: '审批：批计划，不批句子', chip: '待审批', tone: 'amber', state: 'AWAITING_APPROVAL', action: '展示 diff、影响、回滚和 plan_hash；双人审批用于 L2/L3；有效期绑定。', reject: '审批后计划变化、同一账号双批、过期审批、复用旧审批。', evidence: '审批人、时间、plan_hash、有效期、审批意见。' },
+      { code: 'PHASE 07 / EXECUTE', title: '执行：锁、幂等、超时', chip: '执行中', tone: 'blue', state: 'RUNNING', action: '按步骤执行；资源锁、幂等键、超时、熔断、checkpoint、补偿。', reject: '无锁并发、非幂等盲重试、超时后继续下一步、全局急停后启动。', evidence: 'trace_id、每步输入输出、耗时、重试、锁、checkpoint。' },
+      { code: 'PHASE 08 / VERIFY', title: '验证：命令成功不等于服务恢复', chip: '验证门禁', tone: 'amber', state: 'VERIFIED', action: '检查进程、接口、队列、错误率、资源指标；失败则回滚或转人工。', reject: '只看返回码、验证窗口太短、失败静默、回滚未验证。', evidence: '断言结果、观测窗口、回滚记录、最终状态。' },
+      { code: 'PHASE 09 / ARCHIVE', title: '归档：证据与复盘', chip: '已归档', tone: 'blue', state: 'ROLLED_BACK', action: '写审计链、生成复盘、标记 runbook 候选；不自动改策略。', reject: '覆盖审计、删除失败记录、让模型自动修改权限规则。', evidence: '不可变事件链、manifest、复盘记录、改进项。' }
+    ];
+    const lifecycleRail = document.getElementById('lifecycleRail');
+    const lifecycleButtons = [...lifecycleRail.querySelectorAll('.step-btn')];
+    const lifecycleDetail = document.getElementById('lifecycleDetail');
+    const stateOrder = ['DRAFT', 'PLANNED', 'POLICY_CHECK', 'PREFLIGHT', 'AWAITING_APPROVAL', 'RUNNING', 'VERIFIED', 'ROLLED_BACK'];
+    function renderLifecycle(index) {
+      const d = lifecycle[index];
+      lifecycleButtons.forEach((b, i) => {
+        b.classList.toggle('is-active', i === index);
+        b.setAttribute('aria-selected', String(i === index));
+      });
+      const stateIndex = stateOrder.indexOf(d.state);
+      const states = stateOrder.map((s, i) => `<span class="${i === stateIndex ? 'on' : ''}">${s}</span>`).join('<i>→</i>');
+      lifecycleDetail.innerHTML = `
+        <div class="lifecycle-detail-top"><div><small>${d.code}</small><h3>${d.title}</h3></div><span class="chip ${d.tone}">${d.chip}</span></div>
+        <div class="lifecycle-detail-grid">
+          <div class="lifecycle-cell"><span>系统做什么</span><b>${d.action}</b></div>
+          <div class="lifecycle-cell"><span>拒绝条件</span><b>${d.reject}</b></div>
+          <div class="lifecycle-cell"><span>留下什么证据</span><b>${d.evidence}</b></div>
+        </div>
+        <div class="state-strip">${states}</div>`;
+    }
+    lifecycleButtons.forEach((b, i) => b.addEventListener('click', () => renderLifecycle(i)));
+    renderLifecycle(4);
+
+    const examples = {
+      query: {
+        query: '查一下 02 的 background 队列和 GPU worker 状态',
+        title: '只读查询：队列与 worker', badge: '自动放行', badgeClass: 'ok', bar: 'L0 / AUTO',
+        level: 'L0', capability: 'inspect_queue + inspect_worker', approval: '无需审批', rollback: '不适用', risk: 0.08,
+        summary: '只读查询，不改变任何状态。读取队列长度、worker 心跳和最近错误率，返回证据链接。',
+        steps: [['锁定环境与资源', 'env=prod · cluster=02 · queue=background'], ['读取只读指标', '队列长度 / worker 心跳 / 5 分钟错误率'], ['返回证据', '附时间戳与下钻链接，不写入、不重启']],
+        policy: '只允许状态接口与只读查询；没有写操作、没有审批、没有资源锁。数据过期时标注“快照”，不冒充实时。'
+      },
+      restart: {
+        query: '把 03 的 GPU worker 重启一下，只重启一个',
+        title: '单点变更：重启一个 GPU worker', badge: '待 1 人审批', badgeClass: 'amber', bar: 'L1 / 1 APPROVAL',
+        level: 'L1', capability: 'restart_service · scope=one', approval: '1 人审批', rollback: '重启回原状态 / 队列恢复', risk: 0.31,
+        summary: '锁定一个无状态 worker，先确认没有同资源动作和关键任务在跑，再重启并验证心跳。',
+        steps: [['锁定单个服务', 'cluster=03 · service=gpu-vector · 不允许“全部”'], ['检查前置条件', '同资源无执行锁 / 队列可暂停 / 变更窗口内'], ['生成预演', '预计中断 8–15 秒 · 回滚路径为再次重启'], ['等待审批', '展示影响与 plan_hash；审批通过后执行'], ['执行并验证', '重启 → 心跳 → 队列恢复 → 错误率回到基线']],
+        policy: 'L1 只允许单资源；如果识别出“全部 / 所有 / 批量”，直接降级为需要重新拆分的计划或拒绝。'
+      },
+      script: {
+        query: '把 02 的启动脚本回滚到上一个版本',
+        title: '脚本回滚：非敏感启动脚本', badge: '待双人审批', badgeClass: 'amber', bar: 'L2 / DUAL APPROVAL',
+        level: 'L2', capability: 'restore_script_snapshot', approval: '双人审批', rollback: '快照回滚 / 旧版本保留', risk: 0.58,
+        summary: '从已登记的快照恢复脚本；先做静态扫描、语法检查、diff 和沙箱预演，再进入双人审批。',
+        steps: [['解析到白名单目录', 'scripts/ops/start-p2.sh · 非密钥、无外部写'], ['生成 diff', '展示变更行、文件 hash、上一版本'], ['沙箱预演', '语法检查 / dry-run / 依赖检查'], ['双人审批', '两位不同审批人确认 diff 与回滚'], ['执行 + 验证', '应用快照 → 启动 → 健康断言 → 保留旧版本']],
+        policy: '脚本变更不自动重试；静态扫描或沙箱预演失败直接拒绝。任何密钥、网络或数据删除内容都不属于“不敏感”。'
+      },
+      full: {
+        query: '启动整套 P2 系统',
+        title: '整套启动：按依赖顺序拉起', badge: '待双人 + 值班', badgeClass: 'amber', bar: 'L3 / STACK',
+        level: 'L3', capability: 'start_stack · dependency_order', approval: '双人 + 值班确认', rollback: '反向停机 / 恢复原状态', risk: 0.72,
+        summary: '整套启动不是“一键 up”。先检查依赖、容量、端口、备份和变更窗口，再按顺序启动并逐层验收。',
+        steps: [['检查变更窗口', '是否在维护窗口 / 是否有其他集群动作'], ['依赖与容量预检', 'DB → Redis → backend → worker → frontend'], ['生成启动顺序', '每一步带超时、健康门禁和失败停机'], ['双人 + 值班审批', '展示预计时长、影响面和回滚顺序'], ['分层启动', '每层健康后才进入下一层'], ['整体验收 + 归档', '接口、队列、错误率、GPU、审计']],
+        policy: 'L3 必须有全局锁、变更窗口和双人审批；任何一层健康失败都停止后续启动并执行反向停机。'
+      },
+      forbidden: {
+        query: '清空所有视频数据和 Redis',
+        title: '危险请求：数据删除', badge: '永久拒绝', badgeClass: 'red', bar: 'FORBIDDEN / NO ENTRY',
+        level: '—', capability: '—', approval: '不可审批', rollback: '无', risk: 1.0,
+        summary: '该请求涉及批量删除业务数据与缓存，超出任何语言操作权限。系统不会生成执行计划。',
+        steps: [['识别为禁止动作', '数据删除 / 批量清空 / 缓存清空'], ['不进入计划器', '没有对应能力；模型不能自行拼 shell'], ['返回拒绝 + 安全替代', '提供只读盘点、备份核对、人工变更流程']],
+        policy: '永久拒绝，不提供管理员绕过。系统可以展示“哪些数据会被影响”的只读盘点，但不能执行删除。'
+      }
+    };
+    const clarifyExample = {
+      query: '', title: '需要补充上下文', badge: '待澄清', badgeClass: 'amber', bar: 'CLARIFY / NO PLAN',
+      level: '—', capability: '—', approval: '—', rollback: '—', risk: null,
+      summary: '这句话缺少环境、服务或范围。系统不会默认选生产，也不会猜“它”是哪个资源。',
+      steps: [['追问环境', 'dev / staging / prod？'], ['追问对象', '哪个集群、哪个服务、哪个队列？'], ['追问范围', '一个、一组，还是整套？']],
+      policy: '歧义不构成授权。补全之前不生成计划，不进入策略判定。'
+    };
+    function classify(text) {
+      const t = text.toLowerCase();
+      if (/(清空|删除|删掉|drop|truncate|密钥|防火墙|iam|批量重启)/.test(t)) return 'forbidden';
+      if (/(启动|拉起|开机).*(整套|全部|系统)|整套.*(启动|拉起)/.test(t)) return 'full';
+      if (/(回滚|恢复|改|修改|替换).*(脚本|配置|启动脚本)|(脚本|配置).*(回滚|恢复|修改|替换)/.test(t)) return 'script';
+      if (/(重启|restart)/.test(t)) return 'restart';
+      if (/(查|状态|队列|多少|剩|日志|gpu|worker)/.test(t)) return 'query';
+      return null;
+    }
+    const commandInput = document.getElementById('commandInput');
+    const exampleChips = [...document.querySelectorAll('.example-chip')];
+    const resultTitle = document.getElementById('resultTitle');
+    const resultBadge = document.getElementById('resultBadge');
+    const resultBadgeBar = document.getElementById('resultBadgeBar');
+    const resultSummary = document.getElementById('resultSummary');
+    const resultCapability = document.getElementById('resultCapability');
+    const resultApproval = document.getElementById('resultApproval');
+    const resultRollback = document.getElementById('resultRollback');
+    const resultLevel = document.getElementById('resultLevel');
+    const riskBar = document.getElementById('riskBar');
+    const riskValue = document.getElementById('riskValue');
+    const planList = document.getElementById('planList');
+    const policyNote = document.getElementById('policyNote');
+    const runState = document.getElementById('runState');
+    const simulateBtn = document.getElementById('simulateBtn');
+    let simulateTimer = null;
+
+    function renderResult(data) {
+      if (simulateTimer) { window.clearTimeout(simulateTimer); simulateTimer = null; }
+      resultTitle.textContent = data.title;
+      resultBadge.textContent = data.badge;
+      resultBadge.className = `result-badge ${data.badgeClass}`;
+      resultBadgeBar.textContent = data.bar;
+      resultSummary.textContent = data.summary;
+      resultCapability.textContent = data.capability;
+      resultApproval.textContent = data.approval;
+      resultRollback.textContent = data.rollback;
+      resultLevel.textContent = data.risk === null ? data.level : `${data.risk.toFixed(2)} / ${data.level}`;
+      const width = data.risk === null ? 0 : Math.min(100, Math.max(0, data.risk * 100));
+      riskBar.style.width = `${width}%`;
+      riskBar.style.background = data.risk >= 0.8 ? 'var(--red)' : data.risk >= 0.55 ? 'var(--amber)' : 'var(--accent)';
+      riskValue.textContent = data.risk === null ? '—' : data.risk.toFixed(2);
+      planList.innerHTML = data.steps.map((s, i) => `<li class="plan-item"><span class="idx">${String(i + 1).padStart(2, '0')}</span><div><b>${s[0]}</b><span>${s[1]}</span></div></li>`).join('');
+      policyNote.innerHTML = `<strong>策略：</strong>${data.policy}`;
+      runState.textContent = '未执行 / 设计预演';
+      runState.className = 'run-state';
+    }
+    function activateExample(key) {
+      exampleChips.forEach(b => b.classList.toggle('is-active', b.dataset.example === key));
+    }
+    exampleChips.forEach(btn => btn.addEventListener('click', () => {
+      const key = btn.dataset.example;
+      activateExample(key);
+      commandInput.value = examples[key].query;
+      renderResult(examples[key]);
+    }));
+    commandInput.addEventListener('input', () => {
+      exampleChips.forEach(b => b.classList.remove('is-active'));
+      runState.textContent = '已编辑 / 待预演';
+      runState.className = 'run-state';
+    });
+    simulateBtn.addEventListener('click', () => {
+      const key = classify(commandInput.value.trim());
+      const data = key ? examples[key] : null;
+      if (!data) {
+        renderResult(clarifyExample);
+        activateExample(null);
+        runState.textContent = '未生成计划 / 需要补充上下文';
+        runState.className = 'run-state';
+        return;
+      }
+      activateExample(key);
+      renderResult(data);
+      if (data.badge === '永久拒绝') {
+        runState.textContent = '已拒绝 / 不进入执行';
+        runState.className = 'run-state is-denied';
+        return;
+      }
+      if (simulateTimer) { window.clearTimeout(simulateTimer); simulateTimer = null; }
+      runState.textContent = data.approval === '无需审批' ? '预演中 / 只读' : '预演中 / 等待审批';
+      runState.className = 'run-state is-running';
+      simulateTimer = window.setTimeout(() => {
+        runState.textContent = data.approval === '无需审批' ? '预演完成 / 只读查询未写入' : '预演完成 / 未执行（等待审批）';
+        runState.className = 'run-state';
+        simulateTimer = null;
+      }, 1800);
+    });
+    commandInput.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') simulateBtn.click();
+    });
+    renderResult(examples.query);
+
+    const gates = {
+      '09': {
+        note: '0.9 是“可以交给独立评审”的候选版本，不是生产可用；1.0 才要求 Kimi 独立评估、人工复核、签名上传。',
+        items: [
+          ['确定性 CI 全绿：单元、集成、状态机、权限', 'CI', false],
+          ['黄金指令集与对抗集达到门槛', 'AI EVAL', false],
+          ['无 P0/P1；已知问题有清单和负责人', 'TRIAGE', false],
+          ['staging 金丝雀通过；自测自评收敛', 'CANARY', false],
+          ['独立评估与回滚演练：1.0 才要求', 'NEXT', true]
+        ]
+      },
+      '10': {
+        note: '1.0 是“可发布”版本：需要独立评估、完整软件测试、人工复核、回滚演练和签名产物；模型评分不能替代签字。',
+        items: [
+          ['确定性 CI 全绿 + 回归测试通过', 'CI', false],
+          ['黄金集 / 对抗集 / 拒绝集全部达标', 'AI EVAL', false],
+          ['Kimi 独立评估与测试通过', 'INDEPENDENT', false],
+          ['权限、并发、故障注入、回滚演练通过', 'SAFETY', false],
+          ['人工复核能力目录、策略矩阵和审计样本', 'HUMAN', false],
+          ['签名 manifest 已上传', 'RELEASE', false]
+        ]
+      }
+    };
+    const gateList = document.getElementById('gateList');
+    const gateNote = document.getElementById('gateNote');
+    const versionTabs = [...document.querySelectorAll('.version-tab')];
+    function renderGate(key) {
+      versionTabs.forEach(b => b.classList.toggle('is-active', b.dataset.gate === key));
+      const g = gates[key];
+      gateList.innerHTML = g.items.map(([text, tag, warn]) => `<div class="gate-item ${warn ? 'warn' : ''}"><span class="check"></span><div>${text}</div><span class="tag">${tag}</span></div>`).join('');
+      gateNote.textContent = g.note;
+    }
+    versionTabs.forEach(b => b.addEventListener('click', () => renderGate(b.dataset.gate)));
+    renderGate('09');
+  })();
+
+</script>
+</body>
+</html>

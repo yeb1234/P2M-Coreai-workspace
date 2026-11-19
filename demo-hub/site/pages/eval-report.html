@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P2 2.94 AI 助手与检索链路评估</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230f766e'/%3E%3Cpath d='M7 23V9h4v10h7v4H7zm12 0V9h4v14h-4z' fill='%23f4f6f3'/%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f4f6f3;
+  --panel:#e9eeea;
+  --ink:#16201d;
+  --muted:#5d6b65;
+  --rule:#d3dcd6;
+  --accent:#0f766e;
+  --accent-soft:#d9ece8;
+  --warn:#b45309;
+  --warn-soft:#f4e7d5;
+  --bad:#a92d24;
+  --bad-soft:#f3dfdc;
+  --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --sans:"Segoe UI","Microsoft YaHei","Noto Sans SC",sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype","Songti SC",serif;
+  --measure:74ch;
+}
+[data-theme="dark"]{
+  --paper:#101614;
+  --panel:#17201c;
+  --ink:#e7efeb;
+  --muted:#9ba9a3;
+  --rule:#2a3732;
+  --accent:#5eead4;
+  --accent-soft:#12352f;
+  --warn:#f4b26a;
+  --warn-soft:#332414;
+  --bad:#ff8f86;
+  --bad-soft:#3a1b18;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  color:var(--ink);
+  background:var(--paper);
+  font:16px/1.65 var(--sans);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
+code,pre,.num{font-family:var(--mono)}
+code{font-size:.88em;background:var(--panel);padding:1px 5px;border-radius:3px}
+pre{background:var(--panel);border-left:3px solid var(--accent);padding:14px 16px;overflow:auto;font-size:12.5px;line-height:1.6;white-space:pre-wrap}
+.wrap{max-width:1240px;margin:0 auto;padding:28px clamp(16px,3vw,42px) 72px}
+.masthead{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;
+  border-bottom:1px solid var(--rule);padding-bottom:26px;
+}
+.eyebrow{font:11px/1.4 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+h1{font:600 clamp(38px,5.4vw,76px)/1.02 var(--serif);letter-spacing:-.035em;margin:14px 0 10px;max-width:13ch}
+.lede{max-width:var(--measure);color:var(--muted);font-size:16.5px;margin:0}
+.mast-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:200px}
+.theme-btn{
+  appearance:none;border:1px solid var(--rule);background:var(--panel);color:var(--ink);
+  padding:8px 11px;font:11px/1 var(--mono);letter-spacing:.08em;cursor:pointer;border-radius:3px;
+}
+.theme-btn:hover{border-color:var(--accent)}
+.statusline{font:11px/1.7 var(--mono);color:var(--muted);text-align:right}
+.statusline strong{color:var(--ink);font-weight:500}
+.kpis{
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;
+  border-bottom:1px solid var(--rule);margin-top:24px;
+}
+.kpi{padding:18px 14px 18px 0;min-width:0}
+.kpi + .kpi{border-left:1px solid var(--rule);padding-left:16px}
+.kpi .v{font:600 clamp(22px,3.2vw,42px)/1 var(--mono);letter-spacing:-.04em;white-space:nowrap}
+.kpi .u{font:11px/1.4 var(--mono);color:var(--muted);margin-left:4px}
+.kpi .l{font-size:12px;color:var(--muted);margin-top:7px}
+.layout{display:grid;grid-template-columns:170px minmax(0,1fr) 250px;gap:clamp(22px,4vw,52px);margin-top:36px}
+.rail{position:sticky;top:18px;align-self:start;border-left:1px solid var(--rule);padding-left:14px}
+.rail a{display:block;color:var(--muted);text-decoration:none;font:11px/2.1 var(--mono);letter-spacing:.04em}
+.rail a span{color:var(--ink);margin-right:8px}
+.rail a:hover,.rail a.active{color:var(--accent)}
+.rail-note{font-size:11px;color:var(--muted);margin-top:22px;line-height:1.65}
+main{min-width:0}
+aside.side{font-size:12px;color:var(--muted);align-self:start;position:sticky;top:18px}
+.side .box{border-top:1px solid var(--rule);padding:12px 0 16px}
+.side .box:first-child{border-top:0}
+.side .k{font:10px/1.5 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.side .v{margin-top:4px;color:var(--ink);font-size:12.5px}
+.side .v b{font-family:var(--mono);font-weight:500}
+section{padding:6px 0 46px;border-bottom:1px solid var(--rule);scroll-margin-top:20px}
+section:last-of-type{border-bottom:0}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+.sec-no{font:11px/1 var(--mono);color:var(--accent);letter-spacing:.08em}
+h2{font:600 clamp(23px,2.5vw,31px)/1.2 var(--serif);letter-spacing:-.015em;margin:0}
+h3{font:600 15px/1.4 var(--sans);margin:24px 0 8px;color:var(--ink)}
+p{max-width:var(--measure);margin:0 0 12px}
+.small{font-size:13px;color:var(--muted)}
+.callout{
+  border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:12px 16px;margin:16px 0;max-width:var(--measure);font-size:14px;
+}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.callout.bad{border-left-color:var(--bad);background:var(--bad-soft)}
+.callout strong{font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.grid2 > *{min-width:0}
+.bars{max-width:var(--measure);border-top:1px solid var(--rule);padding-top:14px;margin-top:6px}
+.brow{display:grid;grid-template-columns:110px minmax(0,1fr) 46px;gap:12px;align-items:center;padding:8px 0}
+.brow .name{font:11px/1.4 var(--mono);color:var(--muted)}
+.track{height:9px;background:var(--panel);position:relative}
+.fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);width:0}
+.fill.alt{background:var(--warn)}
+.fill.ghost{background:var(--muted);opacity:.45}
+.brow .val{font:12px/1 var(--mono);text-align:right}
+.legend{display:flex;gap:16px;font:10px/1.4 var(--mono);color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:8px;height:8px;background:var(--accent);margin-right:5px}
+.legend i.w{background:var(--warn)}
+.legend i.g{background:var(--muted);opacity:.45}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0 6px}
+th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--rule);padding:9px 10px 9px 0}
+th{font:10px/1.4 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+td.num{font-family:var(--mono);white-space:nowrap}
+table.fixed{table-layout:fixed}
+.ok{color:var(--accent);font-weight:600}
+.warn{color:var(--warn);font-weight:600}
+.bad{color:var(--bad);font-weight:600}
+.chip{display:inline-block;border:1px solid var(--rule);padding:2px 7px;font:10px/1.5 var(--mono);color:var(--muted);border-radius:2px;white-space:nowrap}
+.chip.ok{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.chip.warn{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.chip.bad{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+pre.cmd{max-width:100%}
+.files{font-size:12.5px}
+.files td:first-child{width:36%;word-break:break-all}
+.files td:nth-child(2){width:64%}
+.foot{margin-top:28px;color:var(--muted);font-size:12px;line-height:1.7;max-width:var(--measure)}
+.tiny{font-size:11px;color:var(--muted)}
+.rulebox{border:1px solid var(--rule);padding:14px 16px;margin:14px 0;max-width:var(--measure)}
+.rulebox .h{font:10px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.quote{font:15px/1.65 var(--serif);border-left:2px solid var(--accent);padding-left:14px;margin:14px 0;max-width:var(--measure)}
+.linklist{columns:2;column-gap:28px;font-size:12px;line-height:1.9}
+.linklist a{display:block;overflow-wrap:anywhere}
+@media (max-width:1080px){
+  .layout{grid-template-columns:150px minmax(0,1fr)}
+  aside.side{display:none}
+}
+@media (max-width:760px){
+  .layout{grid-template-columns:1fr}
+  .rail{display:none}
+  .kpis{grid-template-columns:1fr 1fr;border-bottom:0}
+  .kpi{border-bottom:1px solid var(--rule);padding:14px 10px 14px 0}
+  .kpi + .kpi{border-left:0;padding-left:0}
+  .kpi:nth-child(2n){border-left:1px solid var(--rule);padding-left:14px}
+  .grid2{grid-template-columns:1fr}
+  .masthead{grid-template-columns:1fr}
+  .mast-right{align-items:flex-start}
+  .statusline{text-align:left}
+  .linklist{columns:1}
+}
+@media print{
+  .theme-btn,.rail,aside.side{display:none}
+  body{background:#fff;color:#000;font-size:11px}
+  .wrap{max-width:none;padding:0}
+  .layout{display:block}
+  .kpis{grid-template-columns:repeat(5,1fr)}
+  section{break-inside:auto}
+  table{font-size:9px}
+  .callout{background:#fff;border-left-color:#000}
+  a{color:#000;text-decoration:none}
+  pre{background:#fff;border-left-color:#000}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="masthead">
+  <div>
+    <div class="eyebrow">P2 / 2.94 / Local learning workbench</div>
+    <h1>AI 助手与检索链路：评估、失效点与收敛</h1>
+    <p class="lede">对象是 <code>C:\SiteYeb</code> 的 SQLite 分支，不是正在运行的 3.0 容器。这里记录一次真实接口测试、27 题检索基线、设置写读回、五处后端补丁和一次前端意图路由补丁；所有数字都能在文末命令里复现。</p>
+  </div>
+  <div class="mast-right">
+    <button class="theme-btn" id="themeBtn" type="button">切换深色 / 浅色</button>
+    <div class="statusline">
+      <strong>2026-11-17</strong><br>
+      2.94 · SQLite 14.93 GiB<br>
+      隔离后端 127.0.0.1:12412<br>
+      未提交工作区
+    </div>
+  </div>
+</header>
+
+<div class="kpis" aria-label="关键数字">
+  <div class="kpi"><div><span class="v">14,327</span><span class="u">videos</span></div><div class="l">视频库</div></div>
+  <div class="kpi"><div><span class="v">3.59</span><span class="u">M</span></div><div class="l">subtitle_segments</div></div>
+  <div class="kpi"><div><span class="v">0.0</span><span class="u">%</span></div><div class="l">向量覆盖率</div></div>
+  <div class="kpi"><div><span class="v">18/27</span></div><div class="l">最终 Hit@6 · 两种模式</div></div>
+  <div class="kpi"><div><span class="v">210/210</span></div><div class="l">前端测试通过</div></div>
+</div>
+
+<div class="layout">
+  <nav class="rail" aria-label="目录">
+    <a href="#s01"><span>01</span>先写结论</a>
+    <a href="#s02"><span>02</span>口径与资产</a>
+    <a href="#s03"><span>03</span>三轮检索</a>
+    <a href="#s04"><span>04</span>失败案例</a>
+    <a href="#s05"><span>05</span>设置生效矩阵</a>
+    <a href="#s06"><span>06</span>真实对话与写读回</a>
+    <a href="#s07"><span>07</span>改动与复现</a>
+    <a href="#s08"><span>08</span>下一步</a>
+    <div class="rail-note">数字口径：27 题、top 6、gold 为视频标题子串；命中任意一个 gold 即成功。</div>
+  </nav>
+
+  <main>
+    <section id="s01">
+      <div class="sec-head"><span class="sec-no">01</span><h2>先写结论</h2></div>
+      <p><strong>2.94 的 AI 助手此前不是“模型不行”，而是检索链路有三处断点。</strong>第一，reranker 的 URL 已经以 <code>/rerank</code> 结尾，代码又拼了一次，实际请求打到 <code>/rerank/rerank</code>；200 响应里是错误 JSON，旧代码却把它当成功并返回空列表。第二，设置页里的 <code>EMBEDDING_*</code> 与 <code>RERANK_*</code> 在旧源码里根本没有被读取，改环境变量不会生效。第三，前端只调用本地正则 <code>detectIntent</code>，技术问题被判成 <code>chat</code> 时不构造 <code>RAGChain</code>，自然没有引用。</p>
+      <p>三处修完后，同样的 27 题从 <strong>4/27（14.8%）</strong> 提升到 <strong>18/27（66.7%）</strong>；<code>/api/assistant/chat</code> 从 <code>references=[]</code> 变成 <code>references=6</code>，延迟约 29.5 秒（含 4B 本地模型生成）。这不是“检索已经调满”：仍有 9 题未命中，根因是没有向量通道、字幕段是 ASR 行级碎片、以及 4B 模型在生成侧偏保守。</p>
+      <div class="callout"><strong>版本边界先钉死。</strong> 2.94 是 SQLite + FTS5 + sqlite-vec，<code>subtitle_segments</code> 3,592,399 条，但 <code>subtitle_segment_embeddings</code> 表不存在，<code>embedding-stats</code> 的 <code>indexed_embeddings=0</code>。3.0 的 PostgreSQL/pgvector 有 60,276 个 <code>content_chunks</code>、覆盖率 1.0，两者不能当作同一口径。3.0 的命中只作对照，不并入 2.94 的分数。</div>
+    </section>
+
+    <section id="s02">
+      <div class="sec-head"><span class="sec-no">02</span><h2>口径与资产</h2></div>
+      <div class="grid2">
+        <div>
+          <h3>数据事实</h3>
+          <table class="fixed">
+            <colgroup><col style="width:52%"><col style="width:48%"></colgroup>
+            <thead><tr><th>对象</th><th>实测</th></tr></thead>
+            <tbody>
+              <tr><td>数据库</td><td class="num">16,034,926,592 B ≈ 14.93 GiB</td></tr>
+              <tr><td>完整性</td><td><span class="chip ok">PRAGMA integrity_check = ok</span></td></tr>
+              <tr><td>videos / categories</td><td class="num">14,327 / 1,348</td></tr>
+              <tr><td>subtitle_segments</td><td class="num">3,592,399</td></tr>
+              <tr><td>subtitle_segments_fts</td><td class="num">3,592,399</td></tr>
+              <tr><td>chat_sessions / messages</td><td class="num">70 / 130</td></tr>
+              <tr><td>app_settings</td><td class="num">2 条 JSON 配置</td></tr>
+              <tr><td>向量覆盖</td><td><span class="chip bad">0 / 3,592,399 = 0.0%</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>27 题评估集</h3>
+          <p class="small">22 道标题/章节题 + 5 道口语化难题；gold 是一组视频标题子串，命中任意一个即成功。评估脚本调用真实 <code>RAGChain</code>，不是模拟检索器。</p>
+          <table>
+            <thead><tr><th>模式</th><th>配置</th></tr></thead>
+            <tbody>
+              <tr><td>lexical</td><td><code>enable_reranker=false</code>, <code>min_score=0</code>, top 6</td></tr>
+              <tr><td>rerank</td><td>SiliconFlow <code>BAAI/bge-reranker-v2-m3</code>, top 6</td></tr>
+              <tr><td>候选池</td><td>标题通道 + FTS5 + LIKE；无向量候选</td></tr>
+              <tr><td>记录</td><td><code>C:\SiteYeb\docs\eval\p2_retrieval_results.json</code></td></tr>
+            </tbody>
+          </table>
+          <div class="callout warn"><strong>别把 2.94 与 3.0 的 top1 混在一起讲。</strong> 3.0 的 60k chunk 向量能给出 <code>FastAPI 依赖注入</code> Top1《02-掌柜问数…依赖项-上》，2.94 仍主要靠标题和字幕行匹配。两者的命中率、延迟和失败解释都不同。</div>
+        </div>
+      </div>
+
+      <h3>FTS5 对中文的召回缺口</h3>
+      <p class="small">同一批关键词，FTS5（<code>unicode61</code>）和 LIKE 的命中量差一个数量级。FTS 把中文长串当一个 token，所以 <code>闭包</code>、<code>依赖注入</code> 这类词在字幕正文里召回极弱；这是标题通道和 LIKE 回退的必要性来源。</p>
+      <table class="fixed">
+        <colgroup><col style="width:18%"><col style="width:17%"><col style="width:17%"><col style="width:48%"></colgroup>
+        <thead><tr><th>关键词</th><th>FTS5 命中</th><th>LIKE 命中</th><th>读法</th></tr></thead>
+        <tbody>
+          <tr><td>闭包</td><td class="num">3</td><td class="num">45</td><td>中文长串被当成单 token</td></tr>
+          <tr><td>FastAPI</td><td class="num">12</td><td class="num">110</td><td>英文词也不等于精确</td></tr>
+          <tr><td>依赖注入</td><td class="num">6</td><td class="num">656</td><td>字幕正文与标题的分布不同</td></tr>
+          <tr><td>装饰器</td><td class="num">5</td><td class="num">361</td><td>单行字幕天然碎片化</td></tr>
+          <tr><td>MySQL</td><td class="num">24</td><td class="num">1,452</td><td>高频课程词会把结果带偏</td></tr>
+          <tr><td>索引</td><td class="num">11</td><td class="num">—</td><td>标题通道另做，不依赖 FTS</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s03">
+      <div class="sec-head"><span class="sec-no">03</span><h2>三轮检索：4 → 15 → 18</h2></div>
+      <p>三轮不是三个不同数据集，而是同一组 27 题、同一套 gold、同一 top 6 的三次代码状态。第一轮没有标题通道；第二轮加标题通道；第三轮修中文技术词切分、标题稀有度排序、LIKE 回退和相邻字幕上下文。</p>
+
+      <div class="bars" aria-label="三轮 Hit@6 对比">
+        <div class="brow"><div class="name">lexical · 第一轮</div><div class="track"><div class="fill ghost" style="width:14.8%"></div></div><div class="val">4/27</div></div>
+        <div class="brow"><div class="name">lexical · 第二轮</div><div class="track"><div class="fill ghost" style="width:55.6%"></div></div><div class="val">15/27</div></div>
+        <div class="brow"><div class="name">lexical · 第三轮</div><div class="track"><div class="fill" style="width:66.7%"></div></div><div class="val">18/27</div></div>
+        <div class="brow"><div class="name">rerank · 第一轮</div><div class="track"><div class="fill alt" style="width:11.1%"></div></div><div class="val">3/27</div></div>
+        <div class="brow"><div class="name">rerank · 第二轮</div><div class="track"><div class="fill alt" style="width:48.1%"></div></div><div class="val">13/27</div></div>
+        <div class="brow"><div class="name">rerank · 第三轮</div><div class="track"><div class="fill alt" style="width:66.7%"></div></div><div class="val">18/27</div></div>
+        <div class="legend"><span><i></i>最终 lexical</span><span><i class="w"></i>最终 rerank</span><span><i class="g"></i>历史轮次</span></div>
+      </div>
+
+      <table class="fixed" style="margin-top:22px">
+        <colgroup><col style="width:25%"><col style="width:11%"><col style="width:10%"><col style="width:11%"><col style="width:12%"><col style="width:31%"></colgroup>
+        <thead><tr><th>轮次</th><th>Hit@6</th><th>MRR</th><th>p50</th><th>p95</th><th>主要变化</th></tr></thead>
+        <tbody>
+          <tr><td>第一轮 · lexical</td><td class="num">4/27 · 14.8%</td><td class="num">0.075</td><td class="num">307.9 ms</td><td class="num">858.9 ms</td><td>纯 FTS + LIKE，泛化词带偏</td></tr>
+          <tr><td>第一轮 · rerank</td><td class="num">3/27 · 11.1%</td><td class="num">0.063</td><td class="num">302.6 ms</td><td class="num">800.3 ms</td><td>rerank 空结果被当成功</td></tr>
+          <tr><td>第二轮 · lexical</td><td class="num">15/27 · 55.6%</td><td class="num">0.336</td><td class="num">355.6 ms</td><td class="num">1,068.0 ms</td><td>标题通道上线</td></tr>
+          <tr><td>第二轮 · rerank</td><td class="num">13/27 · 48.1%</td><td class="num">0.275</td><td class="num">351.1 ms</td><td class="num">977.8 ms</td><td>候选池不足，rerank 反而降</td></tr>
+          <tr><td>第三轮 · lexical</td><td class="num"><strong>18/27 · 66.7%</strong></td><td class="num"><strong>0.396</strong></td><td class="num">1,753.0 ms</td><td class="num">5,772.7 ms</td><td>技术词切分 + IDF 标题排序 + LIKE 回退</td></tr>
+          <tr><td>第三轮 · rerank</td><td class="num"><strong>18/27 · 66.7%</strong></td><td class="num"><strong>0.396</strong></td><td class="num">1,699.8 ms</td><td class="num">5,727.4 ms</td><td>min_score=0.0，rerank 与 lexical 同分</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn"><strong>代价是延迟。</strong> 第一轮 p50 约 300 ms，第三轮约 1.7 s；p95 从 0.8–1.1 s 到 5.7 s。主要成本是 3.59M 段的全表 LIKE 回退，不是 rerank。这个版本更适合“先答对再答快”；若要压到 1 s 内，必须回到 3.0 的 chunk 向量或重建 FTS/trigram 索引。</div>
+
+      <h3>阈值实测：min_score 0.10 与 0.0</h3>
+      <p class="small">同一第三轮代码，<code>EVAL_MIN_SCORE=0.10</code> 时 lexical 17/27、rerank 16/27；<code>EVAL_MIN_SCORE=0.0</code> 时两者 18/27。差异不是 reranker 变强，而是 <code>RelevanceFilter</code> 少砍掉了候选；两种阈值下 MRR 都约 0.396。最终记录采用 0.0，报告里保留这个边界。</p>
+    </section>
+
+    <section id="s04">
+      <div class="sec-head"><span class="sec-no">04</span><h2>9 条未命中：不是同一个问题</h2></div>
+      <table class="fixed">
+        <colgroup><col style="width:10%"><col style="width:27%"><col style="width:27%"><col style="width:36%"></colgroup>
+        <thead><tr><th>ID</th><th>查询</th><th>实际 Top1</th><th>失败类型</th></tr></thead>
+        <tbody>
+          <tr><td class="num">p2-005</td><td>Vue 跨级组件通讯 provide inject 怎么用</td><td>3-3 第三方库的两种引入方式</td><td>标题通道被“引入方式”类结果挤掉；gold 语义近但标题不匹配</td></tr>
+          <tr><td class="num">p2-007</td><td>MySQL 索引怎么优化</td><td>07-01-字符串的基本操作</td><td>MySQL 标题不含“索引”；正文段没有稳定的共现</td></tr>
+          <tr><td class="num">p2-012</td><td>Vue 生命周期钩子函数</td><td>02-应用级别生命周期</td><td>生命周期类标题过多，缺少组件上下文排序</td></tr>
+          <tr><td class="num">p2-016</td><td>LoRA 微调介绍</td><td>大模型微调技术之数据清洗（二）</td><td>LoRA 视频无字幕 / chunk 为空，无法被检索</td></tr>
+          <tr><td class="num">p2-018</td><td>Less 变量和嵌套</td><td>01-初始化-2-构建项目</td><td>标题含 Less 的视频没有被稳定排到前面</td></tr>
+          <tr><td class="num">p2-020</td><td>Webpack 配置代理</td><td>4.2开发环境解决跨越代理</td><td>语义接近，gold 写的是《14-webpack配置代理》</td></tr>
+          <tr><td class="num">p2-024</td><td>接口鉴权时 token 怎么校验</td><td>02-我的-个人中心-鉴权</td><td>口语化“token 校验”与 JWT 标题没有稳定映射</td></tr>
+          <tr><td class="num">p2-025</td><td>用容器起数据库和缓存</td><td>07-HTTP协议-http缓存的基本认知</td><td>“容器/数据库/缓存”三词组合，没有向量或 chunk 级语义</td></tr>
+          <tr><td class="num">p2-026</td><td>父组件怎么把数据传给子组件</td><td>00-回顾</td><td>gold 是《05_组件通信_父向子》；Top1 语义接近但不在 gold 集合</td></tr>
+        </tbody>
+      </table>
+      <p class="small">两条值得单独说：<code>p2-020</code> 的 Top1《4.2开发环境解决跨越代理》与 gold《14-webpack配置代理》讲的是同一件事；<code>p2-026</code> 的 Top1《07-组件通讯-父传子说明》也接近 gold。它们暴露的是“单标题子串”这个判定的窄口径，不是检索器完全没找到相关内容。若把评估集改成“标题 + 章节 + 语义等价”，这两题应算命中，分数会是 20/27；本轮没有改，以免把指标做成自己想要的样子。</p>
+      <div class="callout bad"><strong>真正的硬缺口：没有向量。</strong> <code>p2-016 LoRA</code> 与 <code>p2-007 MySQL 索引</code> 这类题，需要“语义相近但字面不同”的召回；2.94 没有 <code>subtitle_segment_embeddings</code>，只靠 FTS/LIKE 和标题。3.59M 段全量重嵌入成本极高，这是下一节要做的产品决策。</div>
+    </section>
+
+    <section id="s05">
+      <div class="sec-head"><span class="sec-no">05</span><h2>设置页真实生效矩阵</h2></div>
+      <p>“设置页能保存”与“后端真的按它执行”是两件事。下面每一行都用 API 读写回或真实请求核对过；“判定”只描述实际行为，不描述 UI 文案的承诺。</p>
+      <table class="fixed">
+        <colgroup><col style="width:22%"><col style="width:24%"><col style="width:32%"><col style="width:22%"></colgroup>
+        <thead><tr><th>设定</th><th>UI / 期望</th><th>实际代码 / 请求</th><th>判定</th></tr></thead>
+        <tbody>
+          <tr><td><code>local_base_url</code></td><td>设置页填 <code>http://127.0.0.1:1235/v1</code></td><td>DB 保存成功；<code>/api/assistant/chat</code> 29.5 s 返回，<code>mode=openai</code></td><td><span class="chip ok">生效</span></td></tr>
+          <tr><td><code>local_model</code></td><td><code>qwen3-4b</code></td><td>LM Studio <code>:1235</code> 可调用；chat 有实际生成</td><td><span class="chip ok">生效</span></td></tr>
+          <tr><td><code>llm_usage_policy</code></td><td>UI 文案：<strong>“先本地，失败后外部”</strong></td><td><code>_resolve_provider()</code> 只返回一个 provider；本地失败不会自动切外部</td><td><span class="chip bad">语义错位</span></td></tr>
+          <tr><td><code>external_base_url</code></td><td>设置页仍显示 <code>https://token.sensenova.cn/v1</code></td><td>旧 SenseNova 地址；<code>local_first</code> 下不参与请求；旧 <code>/models</code> 曾 401</td><td><span class="chip warn">陈旧显示</span></td></tr>
+          <tr><td><code>OPENAI_BASE_URL</code> in <code>.env</code></td><td>文件写 <code>http://localhost:1234/v1</code></td><td>DB <code>local_base_url</code> 是 <code>127.0.0.1:1235</code>；运行时以 DB 为准</td><td><span class="chip warn">双配置源</span></td></tr>
+          <tr><td><code>EMBEDDING_*</code></td><td>设置页 / 环境变量可改模型</td><td>补丁后 <code>embedding.py</code> 已读取；但 2.94 没有 embedding 表，覆盖率 0</td><td><span class="chip bad">读到但不生效</span></td></tr>
+          <tr><td><code>RERANK_API_URL</code></td><td><code>.env</code> 原本没有这一项</td><td>补丁后优先读环境；SiliconFlow 200，相关样本 0.933</td><td><span class="chip ok">生效</span></td></tr>
+          <tr><td><code>RERANK_MIN_SCORE</code></td><td>0.10 默认</td><td>0.10 与 0.0 实测：17/16 vs 18/18；MRR 都约 0.396</td><td><span class="chip warn">召回换精度</span></td></tr>
+          <tr><td><code>admin/health</code></td><td>设置页健康卡片</td><td>Redis 未启动时旧代码 500；补丁后 200，队列项标红</td><td><span class="chip ok">已修</span></td></tr>
+          <tr><td>后端 <code>detect-intent</code></td><td>结构化意图识别</td><td><code>什么是闭包</code> 返回 <code>general / 0.0 / 服务异常</code></td><td><span class="chip bad">降级</span></td></tr>
+          <tr><td>待办默认番茄数</td><td>注释与测试都写“未排期默认 1 轮”</td><td>旧代码用 <code>longBreakInterval=4</code>；已改回 1</td><td><span class="chip ok">已修</span></td></tr>
+          <tr><td>启动 lifespan</td><td>正常启动会扫描 <code>D:/ITJC</code></td><td>扫描含 <code>remove_missing_videos</code>；评估后端必须 <code>--lifespan off</code></td><td><span class="chip warn">操作边界</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>设置写读回的证据</h3>
+      <table class="fixed">
+        <colgroup><col style="width:26%"><col style="width:37%"><col style="width:37%"></colgroup>
+        <thead><tr><th>时点</th><th>local</th><th>policy / external</th></tr></thead>
+        <tbody>
+          <tr><td>修复前 GET</td><td class="num">http://192.168.3.154:1234/v1 · qwen3-4b</td><td class="num">external_first · token.sensenova.cn/v1</td></tr>
+          <tr><td>PUT 局部更新</td><td class="num">http://127.0.0.1:1235/v1 · qwen3-4b · lm-studio</td><td class="num">local_first</td></tr>
+          <tr><td>PUT 后 GET</td><td class="num">http://127.0.0.1:1235/v1 · qwen3-4b</td><td class="num">local_first · 外部仍是旧 SenseNova</td></tr>
+          <tr><td>transcription_settings</td><td class="num">—</td><td class="num">local_first（随 assistant 同步）</td></tr>
+        </tbody>
+      </table>
+      <p class="small">接口 <code>GET/PUT /api/admin/assistant-settings</code> 在 2.94 没有鉴权；本次只做了 API 写读回和组件调用路径核对，<strong>没有做浏览器里“点保存按钮”的点击验收</strong>。如果要把 UI 也钉死，下一步应在设置页实际点击后抓一次 PUT 请求。</p>
+    </section>
+
+    <section id="s06">
+      <div class="sec-head"><span class="sec-no">06</span><h2>真实对话：引用回来了，生成还没满</h2></div>
+      <div class="grid2">
+        <div>
+          <h3>请求与结果</h3>
+          <pre class="cmd">POST /api/assistant/chat
+{
+  "message": "FastAPI 依赖注入怎么实现",
+  "intent": "search",
+  "use_rag": true
+}
+
+→ 200
+elapsed: 29.5 s
+references: 6
+mode: openai
+rag_enabled: true</pre>
+          <p class="small">修复前同一请求：<code>references=[]</code>，answer 直接写“未找到任何相关内容”。修复后引用通道恢复，但 4B 模型仍会在答案里补一句“参考片段未完整展示代码”。这是生成侧的能力/提示词问题，不是检索 0 条。</p>
+        </div>
+        <div>
+          <h3>返回的前四条引用</h3>
+          <table>
+            <thead><tr><th>标题</th><th>时间</th></tr></thead>
+            <tbody>
+              <tr><td>01-跨级组件通讯provide与inject函数</td><td class="num">374.3 s</td></tr>
+              <tr><td>01-跨级组件通讯provide与inject函数</td><td class="num">872.4 s</td></tr>
+              <tr><td>05-依赖注入数据说明</td><td class="num">72.4 s</td></tr>
+              <tr><td>16-组合API-依赖注入</td><td class="num">128.2 s</td></tr>
+            </tbody>
+          </table>
+          <p class="small">这四条里前两条是 Vue 的 provide/inject，后两条是 Vue 组合 API 的依赖注入，不是 FastAPI。它们说明标题通道能抓到“依赖注入”这个词，但“FastAPI”这个上下文没有被稳定约束住。真正的 FastAPI 片段在 Top6 的第 4–6 条（《05-掌柜问数-API接口-QueryService依赖注入》等），生成时没有优先使用。</p>
+        </div>
+      </div>
+      <div class="quote">“参考片段未完整展示 FastAPI 依赖注入的具体代码实现，建议结合官方文档补充……”——这是模型在引用已存在的情况下仍然选择外部知识补全的原话，属于生成侧待收敛项。</div>
+
+      <h3>健康检查：从 500 到 200</h3>
+      <p class="small">修复前 <code>/api/admin/health</code> 直接 500：<code>admin_ai_queue._is_queue_paused()</code> 连接 <code>localhost:6379</code> 失败，异常一路冒到路由。补丁把 Redis 改成“队列不可用”检查项，不再让整个健康页崩掉。当前 18 项检查、<code>ok=false</code>，失败项只有 Ollama 与 Redis；数据库、目录、ffmpeg、whisper.cpp、CUDA、LM Studio 均正常。健康检查仍<strong>没有实际探测 Embedding / Reranker</strong>，这是下一轮该补的。</p>
+      <div class="callout warn"><strong>不要用健康页判断 RAG 是否可用。</strong> 它现在只证明 LM Studio 的 <code>/models</code> 可连；<code>EMBEDDING_BASE_URL</code>、<code>RERANK_API_URL</code>、rerank key 都不在检查项里。真正的验证是 <code>/api/assistant/chat</code> 返回 6 条引用。</div>
+    </section>
+
+    <section id="s07">
+      <div class="sec-head"><span class="sec-no">07</span><h2>改动、测试与复现</h2></div>
+      <table class="files fixed">
+        <colgroup><col style="width:36%"><col style="width:64%"></colgroup>
+        <thead><tr><th>文件</th><th>这次改了什么</th></tr></thead>
+        <tbody>
+          <tr><td><code>backend/app/services/reranker.py</code></td><td>优先读 <code>RERANK_API_URL/MODEL/KEY</code>；200 响应校验 <code>results</code>；URL 已含 <code>/rerank</code> 不重复拼；fallback 改中英 n-gram；空结果不再当成功</td></tr>
+          <tr><td><code>backend/app/services/embedding.py</code></td><td>接入 <code>EMBEDDING_BASE_URL/MODEL/DIM/API_KEY</code>；batch 与单条都用动态 config</td></tr>
+          <tr><td><code>backend/app/services/query_enhancer.py</code></td><td>中文功能词切分 + 技术词表最长匹配；<code>用容器起数据库和缓存</code> → 容器/数据库/缓存；补 <code>token→jwt</code>、<code>父组件→父向子</code> 等同义词</td></tr>
+          <tr><td><code>backend/app/services/hybrid_retriever.py</code></td><td>标题通道 + 稀有度排序；FTS OR 查询；LIKE AND→OR 回退；空向量短路；引用补前后各 5 条字幕作为上下文</td></tr>
+          <tr><td><code>backend/app/services/rag_chain.py</code></td><td><code>RERANK_ENABLED</code>、<code>RERANK_MIN_SCORE</code> 接环境变量；<code>enable_reranker/min_score</code> 可空</td></tr>
+          <tr><td><code>backend/app/services/admin_health.py</code></td><td>Redis 异常不再让健康接口 500；队列项返回 <code>ok=false</code> 与真实原因</td></tr>
+          <tr><td><code>src/lib/intentRouter.ts</code></td><td>TECH_TERMS + 问题/报错提示；技术问题在 chat 判定前走 <code>search</code>；<code>为什么Python这么火</code> 仍 chat</td></tr>
+          <tr><td><code>src/__tests__/intentRouter.test.ts</code></td><td>两条例外期望改为 search；10 条测试</td></tr>
+          <tr><td><code>src/components/todo/TodoForm.tsx</code></td><td>未排期默认番茄轮数从 <code>longBreakInterval=4</code> 改回注释与测试要求的 1</td></tr>
+          <tr><td><code>docs/eval/p2_retrieval_cases.json</code><br><code>docs/eval/p2_retrieval_eval.py</code><br><code>docs/eval/p2_retrieval_results.json</code></td><td>27 题评估集、真实 RAGChain 评测脚本、三轮结果；支持 <code>EVAL_MIN_SCORE</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>测试结果</h3>
+      <p><span class="chip ok">intentRouter 10/10</span> <span class="chip ok">全量 26 files / 210 tests</span> <span class="chip ok">backend py_compile</span> <span class="chip ok">health 200</span></p>
+      <p class="small">全量测试起始有一次 209/210：<code>todoReminderOptIn</code> 期望 <code>pomodoroRounds=1</code>，实际 4。定位到 <code>TodoForm</code> 注释写“未排期默认 1 轮”，代码却取 <code>longBreakInterval=4</code>；改为 1 后 210/210。这不是本轮 AI 改动的副作用，而是同一个“设置语义不一致”家族里的旧问题。</p>
+
+      <h3>复现命令</h3>
+      <pre class="cmd"># 隔离后端（不要用默认 lifespan，避免扫描 D:/ITJC 删除记录）
+cd C:\SiteYeb\backend
+$env:DATABASE_URL="sqlite:///C:/SiteYeb/learning_os.db"
+$env:VIDEO_FOLDER="D:/ITJC"
+$env:RERANK_API_URL="https://api.siliconflow.cn/v1/rerank"
+$env:RERANK_MODEL="BAAI/bge-reranker-v2-m3"
+$env:RERANK_MIN_SCORE="0.0"
+$env:RERANK_API_KEY="&lt;from container env&gt;"   # 不写进文件
+$env:EMBEDDING_BASE_URL="http://127.0.0.1:1235/v1"
+$env:EMBEDDING_MODEL="text-embedding-bge-m3@q8_0"
+.\venv311\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 12412 --lifespan off
+
+# 27 题检索
+$env:EVAL_MIN_SCORE="0.0"
+.\venv311\Scripts\python.exe C:\SiteYeb\docs\eval\p2_retrieval_eval.py
+
+# 前端
+cd C:\SiteYeb
+.\node_modules\.bin\vitest.cmd run</pre>
+      <p class="tiny">当前隔离后端 PID 53032，监听 12412；<code>/api/stats</code> 返回 <code>videos=14327</code>。未改 <code>learning_os.db</code> 的数据内容；只通过 <code>app_settings</code> 更新了设置 JSON。</p>
+    </section>
+
+    <section id="s08">
+      <div class="sec-head"><span class="sec-no">08</span><h2>下一步：先把“能答对”与“能秒回”分开</h2></div>
+      <p>2.94 已经证明“标题通道 + LIKE + 上下文补窗”可以把一个纯词法检索从 4/27 拉到 18/27，但它也把 p95 拉到 5.7 秒，并且仍有 9 题失败。继续在 2.94 上堆正则或标题规则，收益会越来越小；真正能把分数和延迟同时拉起来的是 3.0 的 chunk 向量。</p>
+
+      <div class="grid2">
+        <div class="rulebox">
+          <div class="h">路线 A · 推荐</div>
+          <h3 style="margin-top:0">切到 3.0 的 60k chunk 向量</h3>
+          <p class="small">3.0 的 <code>content_chunks</code> 60,276 条、覆盖率 1.0，<code>halfvec(1024)</code>；同样的 FastAPI / 闭包 / 装饰器查询，3.0 Top1 已经落在正确课程。2.94 的 3.59M 段级向量全量成本太高，不建议硬做。</p>
+          <p class="small"><strong>代价：</strong>这是换栈，不是 2.94 内部调参；需要接受 3.0 的 PG/Redis 依赖，并把 2.94 的 SQLite 数据迁移或双读。</p>
+        </div>
+        <div class="rulebox">
+          <div class="h">路线 B · 折中</div>
+          <h3 style="margin-top:0">只给 2.94 抽样建向量</h3>
+          <p class="small">按 27 题 gold 视频 + 每个主题 1–2 千段建 <code>subtitle_segment_embeddings</code>，先验证向量通道的召回上限；再决定是否扩到全量。这样能保住 2.94 的 SQLite 架构，但只覆盖评估集，不是产品级方案。</p>
+          <p class="small"><strong>代价：</strong>需要新建表、回填脚本和 embedding 批处理；没有 3.59M 全量的预算就不要假装全量。</p>
+        </div>
+      </div>
+
+      <h3>必须先定的产品口径</h3>
+      <ul style="max-width:var(--measure);padding-left:18px">
+        <li><strong>“先本地，失败后外部”到底做不做自动切换？</strong> 现在 UI 承诺、后端单 provider，两者不一致。要么实现 fallback，要么把文案改成“本地优先，不自动切换”。</li>
+        <li><strong>外部旧地址是否清掉？</strong> <code>token.sensenova.cn/v1</code> 在 <code>local_first</code> 下不使用，但设置页仍显示，容易误导。要么同步到当前可用外部端点，要么清空。</li>
+        <li><strong>后端 <code>detect-intent</code> 是否还要保留？</strong> 前端目前完全不调用它；它的结构化输出在 qwen3-4b 上降级成 <code>general</code>。保留会让人以为有 LLM 意图识别，实际没有。</li>
+        <li><strong>评估集的 gold 要不要扩成语义等价？</strong> 现在 p2-020 / p2-026 的 Top1 已经接近正确答案，但单标题子串把它们判失败。扩 gold 会改变分数口径，必须先约定再改。</li>
+      </ul>
+
+      <h3>本轮没有做的事</h3>
+      <p class="small">没有重建 3.59M 条 FTS5 索引；没有给 2.94 建 embedding 表；没有把 reranker 的 <code>RERANK_TOP_N</code> / <code>RERANK_KEEP</code> 全接进 2.94；没有做浏览器里的设置页点击验收；没有把 <code>detect-intent</code> 修成可用。它们都写在上面，不藏在结论里。</p>
+      <p class="tiny">证据文件：<code>C:\SiteYeb\docs\eval\p2_retrieval_cases.json</code>、<code>p2_retrieval_eval.py</code>、<code>p2_retrieval_results.json</code>。报告生成时间 2026-11-17；所有路径与数值来自本轮真实运行。</p>
+    </section>
+  </main>
+
+  <aside class="side" aria-label="当前状态">
+    <div class="box">
+      <div class="k">当前状态</div>
+      <div class="v"><b>12412</b> 隔离后端在线<br><b>53032</b> PID<br>health <b>200</b> / ok=false</div>
+    </div>
+    <div class="box">
+      <div class="k">检索</div>
+      <div class="v">lexical <b>18/27</b><br>rerank <b>18/27</b><br>MRR <b>0.396</b></div>
+    </div>
+    <div class="box">
+      <div class="k">对话</div>
+      <div class="v">refs <b>6</b><br>elapsed <b>29.5 s</b><br>mode <b>openai</b></div>
+    </div>
+    <div class="box">
+      <div class="k">配置</div>
+      <div class="v">policy <b>local_first</b><br>local <b>127.0.0.1:1235</b><br>vector <b>0.0%</b></div>
+    </div>
+    <div class="box">
+      <div class="k">测试</div>
+      <div class="v">intent <b>10/10</b><br>full <b>210/210</b><br>py_compile <b>ok</b></div>
+    </div>
+    <div class="box">
+      <div class="k">未提交</div>
+      <div class="v">工作区有大量既存改动；本轮没有 commit / stash / 重置。</div>
+    </div>
+  </aside>
+</div>
+
+<div class="foot">
+  <p>读法：这份报告只对 <code>C:\SiteYeb</code> 的 2.94 SQLite 分支负责。3.0 容器的 pgvector 结果只作为方向对照；P4 / P5Plus 的评估不在这里复述。</p>
+</div>
+</div>
+
+<script>
+(function(){
+  var root = document.documentElement;
+  var btn = document.getElementById('themeBtn');
+  var saved = localStorage.getItem('p2-report-theme');
+  if (saved === 'dark') root.setAttribute('data-theme', 'dark');
+  btn.addEventListener('click', function(){
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    if (next === 'dark') root.setAttribute('data-theme', 'dark');
+    else root.removeAttribute('data-theme');
+    localStorage.setItem('p2-report-theme', next);
+    btn.textContent = next === 'dark' ? '切换浅色' : '切换深色 / 浅色';
+  });
+  if (root.getAttribute('data-theme') === 'dark') btn.textContent = '切换浅色';
+
+  var links = [].slice.call(document.querySelectorAll('.rail a'));
+  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if (!entry.isIntersecting) return;
+        links.forEach(function(a){ a.classList.remove('active'); });
+        var link = links[sections.indexOf(entry.target)];
+        if (link) link.classList.add('active');
+      });
+    }, {rootMargin: '-10% 0px -70% 0px', threshold: 0});
+    sections.forEach(function(s){ if (s) io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>

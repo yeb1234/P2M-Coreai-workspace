@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>端口号段规划 · 五位规则 · P1–P10</title>
+<style>
+  :root{
+    --bg:#f5f6f7; --card:#ffffff; --ink:#171a1d; --muted:#6b7280;
+    --line:#e3e6ea; --accent:#0f766e; --accent-soft:#e6f4f1;
+    --warn:#b45309; --warn-soft:#fdf1e3; --code:#f0f2f4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#101214; --card:#171a1d; --ink:#e8eaed; --muted:#9aa3ad;
+      --line:#282d33; --accent:#5eead4; --accent-soft:#12312e;
+      --warn:#fbbf24; --warn-soft:#2a2114; --code:#1e2328;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.65 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:40px 24px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:32px}
+  .kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  h1{font-size:30px;line-height:1.25;margin:0 0 10px;font-weight:650;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:14px;margin:0}
+  h2{font-size:17px;margin:44px 0 14px;font-weight:640;letter-spacing:-.005em}
+  h2 .idx{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:8px}
+  p{margin:0 0 12px}
+  code,.num{font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace}
+  code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:13px}
+  .formula{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin:18px 0}
+  .formula .eq{font-family:ui-monospace,Consolas,monospace;font-size:20px;letter-spacing:.01em}
+  .formula .eq b{color:var(--accent);font-weight:600}
+  .formula .note{color:var(--muted);font-size:13px;margin-top:8px}
+  .grid{display:grid;gap:12px}
+  .rules{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  .rule{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .rule .n{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.12em;margin-bottom:6px}
+  .rule h3{font-size:14px;margin:0 0 6px;font-weight:640}
+  .rule p{font-size:13px;color:var(--muted);margin:0}
+  table{width:100%;border-collapse:collapse;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13.5px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12px;font-weight:600;color:var(--muted);background:var(--code);letter-spacing:.02em}
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{font-family:ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  tr.p2{background:var(--accent-soft)}
+  tr.p2 td{font-weight:600}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;
+    background:var(--accent-soft);color:var(--accent);margin-left:6px;font-weight:600;vertical-align:1px}
+  .muted{color:var(--muted)}
+  .callout{border-left:3px solid var(--warn);background:var(--warn-soft);border-radius:0 8px 8px 0;
+    padding:14px 18px;font-size:13.5px;margin:16px 0}
+  .callout b{color:var(--warn)}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;overflow:auto;font-size:12.5px;line-height:1.7;margin:0}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:760px){.two{grid-template-columns:1fr}}
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.5px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:10px 0 0}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Infra · Port Allocation</div>
+  <h1>端口号段规划：五位服务前缀 + 两位项目号</h1>
+  <p class="sub">端口从「服务类型 + 项目号」直接算出来；同一项目的前端、API、数据库、缓存末两位完全一致。</p>
+</header>
+
+<div class="callout">
+  <b>2026-11-16 规则变更：</b>旧的 <code>base = 11000 + (n−1)×100</code> 以及 P2 的 11100/11110/11120/11130/11140 号段已作废。
+  现行规则为五位端口：<code>123xx</code> 前端、<code>124xx</code> 后端 API、<code>125xx</code> 数据库、<code>126xx</code> 缓存/中间件、<code>127xx</code> 监控与运维。
+</div>
+
+<h2><span class="idx">01</span>分配规则</h2>
+<table>
+  <thead>
+    <tr><th style="width:150px">服务类型</th><th class="num" style="width:90px">前缀</th><th class="num" style="width:150px">端口范围</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>前端 Web</td><td class="num">123</td><td class="num">12301–12399</td><td>nginx 静态资源 + 同源反代 <code>/api</code>；P2 另占 80</td></tr>
+    <tr><td>后端 API</td><td class="num">124</td><td class="num">12401–12499</td><td>FastAPI / uvicorn；默认只绑 <code>127.0.0.1</code></td></tr>
+    <tr><td>数据库</td><td class="num">125</td><td class="num">12501–12599</td><td>PostgreSQL / MySQL 统一用这段</td></tr>
+    <tr><td>缓存 / 中间件</td><td class="num">126</td><td class="num">12601–12699</td><td>Redis、MQ、队列面板等</td></tr>
+    <tr><td>监控 / 运维</td><td class="num">127</td><td class="num">12701–12799</td><td>Grafana / Prometheus / pgAdmin / MCP server</td></tr>
+  </tbody>
+</table>
+
+<div class="formula">
+  <div class="eq">port(P<b>n</b>, service) = 服务前缀 + <b>nn</b></div>
+  <div class="note">项目号统一两位：P1 → 01，P2 → 02，P99 → 99。同一项目所有服务末两位一致，例如 P2：<code>12302 / 12402 / 12502 / 12602 / 12702</code>。</div>
+</div>
+
+<h2><span class="idx">02</span>P2 当前实例（SiteYeb）</h2>
+<table>
+  <thead>
+    <tr><th style="width:150px">服务</th><th class="num" style="width:110px">宿主端口</th><th style="width:170px">绑定</th><th class="num" style="width:110px">容器内</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr class="p2"><td>前端 · 生产</td><td class="num">80 + 12302</td><td><code>0.0.0.0</code></td><td class="num">80</td><td><b>80 归 P2</b>，localhost 直接回流本项目；12302 作为显式入口</td></tr>
+    <tr><td>后端 · API</td><td class="num">12402</td><td><code>127.0.0.1</code></td><td class="num">8000</td><td>只回环发布；对外统一走 <code>http://localhost/api</code></td></tr>
+    <tr><td>前端 · 开发服务器</td><td class="num">12322</td><td><code>127.0.0.1</code></td><td class="num">5173</td><td>vite dev，proxy 打到 12402</td></tr>
+    <tr><td>PostgreSQL</td><td class="num">12502</td><td><code>127.0.0.1</code></td><td class="num">5432</td><td>PG 17 + pgvector</td></tr>
+    <tr><td>Redis</td><td class="num">12602</td><td><code>127.0.0.1</code></td><td class="num">6379</td><td>RQ 队列与缓存</td></tr>
+    <tr><td>监控 / 运维</td><td class="num">12702</td><td><code>127.0.0.1</code></td><td class="muted">—</td><td>预留，当前未起服务</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="idx">03</span>十个项目的完整号段</h2>
+<table>
+  <thead>
+    <tr>
+      <th>项目</th><th class="num">前端</th><th class="num">API</th><th class="num">数据库</th>
+      <th class="num">缓存</th><th class="num">监控</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><b>P1</b> <span class="muted">SlimTrack</span></td><td class="num">12301</td><td class="num">12401</td><td class="num">12501</td><td class="num">12601</td><td class="num">12701</td></tr>
+    <tr class="p2"><td><b>P2</b> <span class="muted">SiteYeb</span><span class="tag">当前</span></td><td class="num">12302</td><td class="num">12402</td><td class="num">12502</td><td class="num">12602</td><td class="num">12702</td></tr>
+    <tr><td><b>P3</b></td><td class="num">12303</td><td class="num">12403</td><td class="num">12503</td><td class="num">12603</td><td class="num">12703</td></tr>
+    <tr><td><b>P4</b> <span class="muted">Agent</span></td><td class="num">12304</td><td class="num">12404</td><td class="num">12504</td><td class="num">12604</td><td class="num">12704</td></tr>
+    <tr><td><b>P5</b></td><td class="num">12305</td><td class="num">12405</td><td class="num">12505</td><td class="num">12605</td><td class="num">12705</td></tr>
+    <tr><td><b>P6</b></td><td class="num">12306</td><td class="num">12406</td><td class="num">12506</td><td class="num">12606</td><td class="num">12706</td></tr>
+    <tr><td><b>P7</b></td><td class="num">12307</td><td class="num">12407</td><td class="num">12507</td><td class="num">12607</td><td class="num">12707</td></tr>
+    <tr><td><b>P8</b></td><td class="num">12308</td><td class="num">12408</td><td class="num">12508</td><td class="num">12608</td><td class="num">12708</td></tr>
+    <tr><td><b>P9</b></td><td class="num">12309</td><td class="num">12409</td><td class="num">12509</td><td class="num">12609</td><td class="num">12709</td></tr>
+    <tr><td><b>P10</b></td><td class="num">12310</td><td class="num">12410</td><td class="num">12510</td><td class="num">12610</td><td class="num">12710</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="idx">04</span>五条硬规则</h2>
+<div class="grid rules">
+  <div class="rule">
+    <div class="n">RULE 01</div>
+    <h3>容器内端口恒定</h3>
+    <p>nginx 80 / API 8000 / PG 5432 / Redis 6379，永远不随项目号变。编号只出现在宿主机映射的左侧，代码里不出现任何项目端口。</p>
+  </div>
+  <div class="rule">
+    <div class="n">RULE 02</div>
+    <h3>前端不写死后端地址</h3>
+    <p>生产由 nginx 同源反代 <code>/api → backend:8000</code>；开发由 vite proxy <code>/api → 127.0.0.1:12402</code>。浏览器永远只看一个 origin，CORS 退化为兜底而非主路径。</p>
+  </div>
+  <div class="rule">
+    <div class="n">RULE 03</div>
+    <h3>后端只绑回环</h3>
+    <p>API 发布到 <code>127.0.0.1:{前缀+项目号}</code>，不绑 <code>0.0.0.0</code>；需要局域网调试时走前端 80/12302 的同源反代，不为 API 单独开放网卡。</p>
+  </div>
+  <div class="rule">
+    <div class="n">RULE 04</div>
+    <h3>数据库与缓存只绑回环</h3>
+    <p><code>127.0.0.1:{前缀+项目号}</code>，不用 <code>0.0.0.0</code>。机器一旦拿到公网 IP，<code>0.0.0.0</code> 的 5432 就是对全世界开放。</p>
+  </div>
+  <div class="rule">
+    <div class="n">RULE 05</div>
+    <h3>80 归 P2，项目隔离靠名字</h3>
+    <p>localhost 的 80 只回流 P2，其他项目不得占用。compose 固定项目名 <code>p2-siteyeb</code>、容器由 compose 生成 <code>p2-siteyeb-&lt;service&gt;-1</code>、卷名带项目前缀；端口只是外层标识，不承担隔离职责。</p>
+  </div>
+</div>
+
+<h2><span class="idx">05</span>P2 当前映射（已落地）</h2>
+<div class="callout">
+  <b>状态：</b>本节是现行值，不是待迁移清单。旧号段 11100/11110/11120/11130/11140 已全部下线。
+</div>
+<table>
+  <thead><tr><th style="width:230px">位置</th><th>现行值</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>docker-compose.yml</code> frontend ports</td><td><code>"0.0.0.0:${WEB_PORT:-12302}:80"</code> + <code>"80:80"</code></td><td>80 只属于 P2；12302 是显式入口</td></tr>
+    <tr><td><code>docker-compose.yml</code> backend ports</td><td><code>"127.0.0.1:${API_PORT:-12402}:8000"</code></td><td>只绑回环，局域网走前端反代</td></tr>
+    <tr><td><code>docker-compose.yml</code> postgres ports</td><td><code>"127.0.0.1:${POSTGRES_PORT:-12502}:5432"</code></td><td>PG 17 + pgvector</td></tr>
+    <tr><td><code>docker-compose.yml</code> redis ports</td><td><code>"127.0.0.1:${REDIS_PORT:-12602}:6379"</code></td><td>RQ 队列</td></tr>
+    <tr><td><code>.env</code> DATABASE_URL</td><td><code>@localhost:12502/p2learning</code></td><td>宿主直连调试用</td></tr>
+    <tr><td><code>.env</code> REDIS_URL</td><td><code>redis://localhost:12602/0</code></td><td>宿主直连调试用</td></tr>
+    <tr><td><code>.env</code> CORS_ORIGINS</td><td><code>localhost / 127.0.0.1 的 12302、12322 六源</code></td><td>compose 内联默认与代码回退已同步</td></tr>
+    <tr><td><code>vite.config.ts</code> <code>server.port</code></td><td><code>12322</code></td><td>dev server</td></tr>
+    <tr><td><code>vite.config.ts</code> proxy target</td><td><code>http://127.0.0.1:12402</code></td><td>dev 直连 API</td></tr>
+    <tr><td><code>playwright.config.ts</code> baseURL / webServer</td><td><code>127.0.0.1:12322</code></td><td>E2E 使用 dev server</td></tr>
+    <tr><td><code>nginx.conf</code> <code>listen 80</code></td><td>80</td><td class="muted">容器内不变</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="idx">06</span>上线前自检</h2>
+<div class="two">
+  <div>
+    <p class="muted" style="font-size:13px">开容器前先确认这段是空的。有输出就说明本项目端口被别的进程先占了。</p>
+    <pre>$n = 2
+$ports = @(
+  (12300 + $n), (12400 + $n),
+  (12500 + $n), (12600 + $n),
+  (12700 + $n), 80
+)
+Get-NetTCPConnection -State Listen |
+  Where-Object { $ports -contains $_.LocalPort } |
+  Select-Object LocalPort, OwningProcess</pre>
+  </div>
+  <div>
+    <p class="muted" style="font-size:13px">查「这个端口到底是谁」，比看 netstat 猜进程快。</p>
+    <pre>$p = 12402
+Get-NetTCPConnection -State Listen |
+  Where-Object LocalPort -eq $p |
+  ForEach-Object {
+    (Get-Process -Id $_.OwningProcess).ProcessName
+  }</pre>
+  </div>
+</div>
+
+<h2><span class="idx">07</span>必须让出的端口（实测占用，不参与分配）</h2>
+<table>
+  <thead><tr><th class="num" style="width:150px">端口</th><th>占用方</th><th>性质</th></tr></thead>
+  <tbody>
+    <tr><td class="num">1234 / 1235 / 41343 / 63991</td><td>LM Studio</td><td>embedding + 本地 LLM，全局共享</td></tr>
+    <tr><td class="num">11434</td><td>Ollama</td><td>全局共享</td></tr>
+    <tr><td class="num">7892 / 7897 / 33331</td><td>verge-mihomo / clash-verge</td><td>代理，会随规则变动重新监听</td></tr>
+    <tr><td class="num">3389 / 135 / 445</td><td>Windows 系统服务</td><td>系统保留</td></tr>
+    <tr><td class="num">3001 / 3100</td><td>Grafana / Loki（eval 栈）</td><td>跨项目观测，独立于号段</td></tr>
+    <tr><td class="num">10000</td><td>YunDetectService</td><td>百度云检测，低于 12300</td></tr>
+    <tr><td class="num">13030–13032 / 22112 / 50100</td><td>ArmouryCrate / ROGLiveService</td><td><b>华硕全家桶，随机落在 13000 段</b></td></tr>
+    <tr><td class="num">49664+</td><td>Windows 动态端口区</td><td>禁止用作固定映射</td></tr>
+  </tbody>
+</table>
+<p class="legend">
+  <span><span class="dot" style="background:var(--accent)"></span>本项目号段</span>
+  <span><span class="dot" style="background:var(--warn)"></span>厂商/系统占用，禁止复用</span>
+</p>
+
+<div class="callout" style="margin-top:28px">
+  <b>为什么改成五位：</b>旧公式把项目号藏在千位里，端口本身看不出是哪个服务；五位规则让「前端 12302 / API 12402 / 数据库 12502 / 缓存 12602」一眼可读，扩容也只需换前缀段（例如 133xx 第二前端段），项目号不变。
+</div>
+
+<footer>
+  最后校对 2026-11-16 · 宿主机 TOWER-14700K · 现行规则：五位服务前缀 + 两位项目号<br>
+  公式对 P1–P99 成立：port = 服务前缀（123/124/125/126/127）+ 两位项目号；80 固定归 P2。
+</footer>
+
+</div>
+</body>
+</html>

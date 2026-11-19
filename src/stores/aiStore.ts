@@ -14,10 +14,18 @@ export interface PromptTemplate {
   content: string;
 }
 
+export interface ReferenceItem {
+  video_id: number;
+  video_title: string;
+  text: string;
+  score_hint: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  references?: ReferenceItem[];
 }
 
 interface AIState {
@@ -29,6 +37,7 @@ interface AIState {
   chatOpen: boolean;
   chatWidth: number;
   messages: ChatMessage[];
+  currentSessionId: string | null;
   setEndpoint: (endpoint: string) => void;
   setModel: (model: string) => void;
   setSystemPrompt: (prompt: string) => void;
@@ -41,6 +50,7 @@ interface AIState {
   setChatWidth: (width: number) => void;
   addMessage: (message: ChatMessage) => void;
   clearMessages: () => void;
+  setCurrentSessionId: (sessionId: string | null) => void;
 }
 
 function hasCorruptText(value: unknown): boolean {
@@ -81,6 +91,7 @@ export const useAIStore = create<AIState>()(
       chatOpen: false,
       chatWidth: 380,
       messages: [],
+      currentSessionId: null,
       setEndpoint: (endpoint) => set({ endpoint: normalizeEndpoint(endpoint) }),
       setModel: (model) => set({ model }),
       setSystemPrompt: (systemPrompt) => set({ systemPrompt }),
@@ -115,7 +126,8 @@ export const useAIStore = create<AIState>()(
       setChatOpen: (chatOpen) => set({ chatOpen }),
       setChatWidth: (chatWidth) => set({ chatWidth: clampChatWidth(chatWidth) }),
       addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
-      clearMessages: () => set({ messages: [] }),
+      clearMessages: () => set({ messages: [], currentSessionId: null }),
+      setCurrentSessionId: (sessionId) => set({ currentSessionId: sessionId }),
     }),
     {
       name: 'p2m-ai-storage',
@@ -146,6 +158,7 @@ export const useAIStore = create<AIState>()(
         chatOpen: state.chatOpen,
         chatWidth: state.chatWidth,
         messages: state.messages.slice(-50),
+        currentSessionId: state.currentSessionId,
       }),
     }
   )
