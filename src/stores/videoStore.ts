@@ -3,13 +3,15 @@ import type { VideoItem, SegmentSearchResult, TranscriptSegment, CategoryTree } 
 import { fetchVideos, fetchVideo, searchSegments, startAiJob, fetchCategoryTree, setVideoFavorite } from '../lib/videoApi';
 import { userScopedStorage } from '../lib/userScopedStorage';
 
+// 这三个 key 以前直接写 localStorage，换账号会读到上一个用户的收藏/导航，
+// 统一走按用户隔离的封装。
 const VIDEO_ID_KEY = 'p2m_current_video_id';
 const NAV_STATE_KEY = 'p2m_video_nav_state';
 const FAVORITE_CATEGORIES_KEY = 'p2m_favorite_category_ids';
 
 function loadFavoriteCategoryIds(): number[] {
   try {
-    const raw = localStorage.getItem(FAVORITE_CATEGORIES_KEY);
+    const raw = userScopedStorage.getItem(FAVORITE_CATEGORIES_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return parsed.filter((n) => typeof n === 'number');
@@ -19,7 +21,7 @@ function loadFavoriteCategoryIds(): number[] {
 
 function saveFavoriteCategoryIds(ids: number[]) {
   try {
-    localStorage.setItem(FAVORITE_CATEGORIES_KEY, JSON.stringify(ids));
+    userScopedStorage.setItem(FAVORITE_CATEGORIES_KEY, JSON.stringify(ids));
   } catch { /* ignore */ }
 }
 
