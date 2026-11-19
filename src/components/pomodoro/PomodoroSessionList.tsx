@@ -9,7 +9,7 @@ const INITIAL_LIMIT = 5;
 
 export const PomodoroSessionList: React.FC = () => {
   const sessions = usePomodoroStore((s) => s.sessions);
-  const clearTodayHistory = usePomodoroStore((s) => s.clearTodayHistory);
+  const clearHistory = usePomodoroStore((s) => s.clearHistory);
   const todos = useScheduleStore((s) => s.items);
   const [expanded, setExpanded] = useState(false);
 
@@ -23,7 +23,7 @@ export const PomodoroSessionList: React.FC = () => {
 
   if (completedSessions.length === 0) {
     return (
-      <div className="text-center py-8 text-[#9ca3af]">
+      <div className="text-center py-8 text-[var(--text-muted)]">
         <Clock size={32} className="mx-auto mb-2" />
         <p>暂无专注记录</p>
       </div>
@@ -38,11 +38,11 @@ export const PomodoroSessionList: React.FC = () => {
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-[var(--text-primary)]">专注记录</h3>
         <button
-          onClick={() => { clearTodayHistory(); playInteractionSound('delete'); }}
-          className="flex items-center gap-1 text-xs text-[#9ca3af] hover:text-[#dc3545] transition-colors"
+          onClick={() => { clearHistory(); playInteractionSound('delete'); }}
+          className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
         >
           <Trash2 size={12} />
-          清除当天
+          清空
         </button>
       </div>
 
@@ -50,22 +50,22 @@ export const PomodoroSessionList: React.FC = () => {
         {visibleSessions.map((session) => {
           const todo = session.todoId ? todos[session.todoId] : null;
           return (
-            <div key={session.id} className="flex items-center gap-3 p-3 bg-[#f3f2ef] rounded-lg">
-              <CheckCircle size={16} className="text-[#16a34a] flex-shrink-0" />
+            <div key={session.id} className="flex items-center gap-3 p-3 bg-[var(--bg-base)] rounded-lg">
+              <CheckCircle size={16} className="text-[var(--success)] flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-[#1a1a1a]">
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
                     {PHASE_LABELS[session.phase]}
                   </span>
-                  <span className="text-xs text-[#9ca3af]">
+                  <span className="text-xs text-[var(--text-muted)]">
                     {formatDuration(session.actualDuration)}
                   </span>
                 </div>
                 {todo && (
-                  <p className="text-xs text-[#6b7280] truncate">{todo.title}</p>
+                  <p className="text-xs text-[var(--text-secondary)] truncate">{todo.title}</p>
                 )}
               </div>
-              <span className="text-xs text-[#9ca3af] flex-shrink-0">
+              <span className="text-xs text-[var(--text-muted)] flex-shrink-0">
                 {formatDate(session.startTime, 'HH:mm')}
               </span>
             </div>
@@ -76,7 +76,7 @@ export const PomodoroSessionList: React.FC = () => {
       {hasMore && (
         <button
           onClick={toggleExpanded}
-          className="w-full flex items-center justify-center gap-1 py-2 text-xs text-[#9ca3af] hover:text-[#c87d2f] transition-colors"
+          className="w-full flex items-center justify-center gap-1 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
         >
           {expanded ? (
             <>收起 <ChevronUp size={14} /></>

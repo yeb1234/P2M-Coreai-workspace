@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { initNotesSync } from './stores/notesStore';
+import { bootstrapLocalToRemote } from './lib/idbStorage';
 import { HashRouter } from 'react-router-dom';
 import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
@@ -11,6 +13,7 @@ import { useThemeScheduler } from './hooks/useThemeScheduler';
 registerAllPlugins();
 
 function WelcomeScreen({ username, onDone }: { username: string; onDone: () => void }) {
+
   useEffect(() => {
     const t = setTimeout(onDone, 100);
     return () => clearTimeout(t);
@@ -41,6 +44,16 @@ function App() {
 
   // Rehydrate all stores with user-prefixed keys after login
   const storesReady = useRehydrateStores(currentUser);
+
+  // 重载完成后：把本地存量补推云端（云端已有的不动），再建笔记同步。
+  // 注意顺序 —— 必须等 rehydrate 结束，否则推上去的是默认值。
+  useEffect(() => {
+    if (!storesReady || !currentUser) return;
+    void (async () => {
+      await bootstrapLocalToRemote();
+      initNotesSync();
+    })();
+  }, [storesReady, currentUser]);
   const appDataReady = initialized && Boolean(currentUser) && storesReady;
   useApplyStoredTheme(initialized);
   useThemeScheduler(initialized && appDataReady);

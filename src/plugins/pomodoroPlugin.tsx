@@ -1,6 +1,5 @@
 import { Timer } from 'lucide-react';
 import type { Plugin } from '../types/plugin';
-import { PomodoroPage } from '../components/pomodoro';
 import { PomodoroSummary } from '../components/dashboard/summaries/PomodoroSummary';
 
 export const pomodoroPlugin: Plugin = {
@@ -13,8 +12,5 @@ export const pomodoroPlugin: Plugin = {
     color: 'text-[var(--accent)]',
     defaultSize: 'small',
     summaryComponent: PomodoroSummary,
-  },
-  panel: {
-    component: PomodoroPage,
   },
 };

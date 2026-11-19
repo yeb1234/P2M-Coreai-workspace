@@ -5,8 +5,8 @@ import requests
 from sqlalchemy import text
 
 from app.database import SessionLocal, engine, settings
-from app.models import AiJob, Video
-from app.services.admin_ai_queue import _is_queue_paused
+from app.models import Video
+from app.services.admin_ai_queue import _is_queue_paused, ai_job_status_counts
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 
 
@@ -126,30 +126,20 @@ def backend_health() -> dict:
 
     db = SessionLocal()
     try:
-        queued = db.query(AiJob).filter(AiJob.status == "queued").count()
-        running = db.query(AiJob).filter(AiJob.status == "running").count()
-        failed = db.query(AiJob).filter(AiJob.status == "failed").count()
+        job_counts = ai_job_status_counts(db)
+        queued = job_counts.get("queued", 0)
+        running = job_counts.get("running", 0)
+        failed = job_counts.get("failed", 0)
         videos = db.query(Video).count()
-        try:
-            queue_paused = _is_queue_paused()
-            queue_ok = True
-            queue_message = f"运行 {running}，排队 {queued}，失败 {failed}"
-        except Exception as exc:
-            # Redis 没起时，健康检查不应该整个 500；把队列状态标成不可用，
-            # 让设置页仍能看到其他检查项。
-            queue_paused = None
-            queue_ok = False
-            queue_message = f"运行 {running}，排队 {queued}，失败 {failed}；Redis 不可用: {exc}"
         checks.append(health_item(
             "AI 队列",
-            queue_ok,
-            queue_message,
+            True,
+            f"运行 {running}，排队 {queued}，失败 {failed}",
             {
                 "running": running,
                 "queued": queued,
                 "failed": failed,
-                "worker_concurrency": settings.ai_worker_concurrency,
-                "paused": queue_paused,
+                "paused": _is_queue_paused(),
             },
         ))
         checks.append(health_item("视频库", True, f"{videos} 个视频", {"videos": videos}))
@@ -234,7 +224,6 @@ def backend_health() -> dict:
             "subtitle_correction_runtime": "LM Studio/OpenAI-compatible API; GPU/CPU placement is decided by the LLM server",
             "compute_type": settings.whisper_compute_type,
             "subtitle_correction_enabled": settings.subtitle_correction_enabled,
-            "thumbnail_background_enabled": settings.thumbnail_background_enabled,
             "whisper_engine": settings.whisper_engine,
             "whisper_cpp_exe": settings.whisper_cpp_exe,
             "whisper_cpp_model": settings.whisper_cpp_model,

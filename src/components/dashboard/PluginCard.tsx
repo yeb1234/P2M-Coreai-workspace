@@ -53,7 +53,7 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
 
   return (
     <div
-      className={`plugin-card ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-[#c87d2f] ring-offset-2 rounded-2xl' : ''}`}
+      className={`plugin-card ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-[var(--accent)] ring-offset-2 rounded-2xl' : ''}`}
       data-size={currentSize}
       draggable
       onDragStart={(e) => {
@@ -77,7 +77,7 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
       }}
       onDragEnd={() => onDragEnd?.()}
     >
-      <div className="bg-[var(--bg-card)] rounded-2xl md:rounded-xl border border-[var(--border-light)] shadow-sm overflow-hidden flex flex-col h-full">
+      <div className="bg-[var(--bg-card)] rounded-[var(--r-2)] border border-[var(--border-light)] shadow-[var(--shadow-1)] hover:shadow-[var(--shadow-2)] overflow-hidden flex flex-col h-full transition-shadow">
         <div className="flex items-center justify-between px-4 py-2.5 md:px-3 md:py-2 border-b border-[var(--border-light)]">
           <div className="flex items-center gap-2 min-w-0">
             <span className={plugin.metadata.color}>{plugin.metadata.icon}</span>
@@ -86,14 +86,14 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
           <div className="flex items-center gap-0.5">
             <button
               onClick={handleZoom}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-md transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-lg transition-colors"
               title={currentSize === 'large' ? '缩小' : '放大'}
             >
               {currentSize === 'large' ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
             <button
               onClick={() => togglePlugin(plugin.metadata.id)}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] rounded-md transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] rounded-lg transition-colors"
               title="隐藏此组件"
             >
               <X size={13} />
@@ -101,14 +101,14 @@ export const PluginCard: React.FC<PluginCardProps> = React.memo(({
           </div>
         </div>
 
-        <div className="p-3 md:p-2 cursor-pointer flex-1 overflow-auto" onClick={handleNavigate}>
+        <div className="flex flex-1 cursor-pointer flex-col overflow-auto p-3 md:p-2" onClick={handleNavigate}>
           <SummaryComponent />
         </div>
 
         <div className="px-4 py-1.5 md:hidden border-t border-[var(--border-light)]">
           <button
             onClick={handleNavigate}
-            className="w-full text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] text-center py-0.5 rounded hover:bg-[var(--accent-bg)] transition-all"
+            className="w-full text-xs text-[var(--text-muted)] hover:text-[var(--accent)] text-center py-0.5 rounded hover:bg-[var(--accent-bg)] transition-all"
           >
             打开 {plugin.metadata.name} →
           </button>

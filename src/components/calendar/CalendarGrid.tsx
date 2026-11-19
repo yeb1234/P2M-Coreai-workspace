@@ -42,7 +42,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) 
     <div>
       <div className="grid grid-cols-7 mb-2">
         {weekDays.map((day) => (
-          <div key={day} className="text-center text-xs font-medium text-[#6b7280] py-2">
+          <div key={day} className="text-center text-xs font-medium text-[var(--text-secondary)] py-2">
             {day}
           </div>
         ))}
@@ -76,31 +76,31 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) 
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-[#1a1a1a]">{popupDate}</h3>
-              <button onClick={() => setPopupDate(null)} className="p-1.5 rounded-lg text-[#9ca3af] hover:text-[#1a1a1a]">
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{popupDate}</h3>
+              <button onClick={() => setPopupDate(null)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                 <X size={16} />
               </button>
             </div>
             {(eventsByDate[popupDate] || []).length === 0 && (pendingByDate[popupDate] || []).length === 0 && (completedByDate[popupDate] || []).length === 0 && (
-              <p className="text-xs text-[#9ca3af] text-center py-4">当天无内容</p>
+              <p className="text-xs text-[var(--text-muted)] text-center py-4">当天无内容</p>
             )}
             {(pendingByDate[popupDate] || []).length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-medium text-[#c87d2f] mb-1.5 flex items-center gap-1"><ListTodo size={11} /> 待办</p>
+                <p className="text-xs font-medium text-[var(--accent)] mb-1.5 flex items-center gap-1"><ListTodo size={11} /> 待办</p>
                 {(pendingByDate[popupDate] || []).map((todo) => (
-                  <div key={todo.id} className="flex items-center gap-2 py-1.5 border-b border-[#e5e2dd] last:border-0">
+                  <div key={todo.id} className="flex items-center gap-2 py-1.5 border-b border-[var(--border-light)] last:border-0">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: todo.priority === 'high' ? '#e8a0a0' : todo.priority === 'medium' ? '#e8d4a0' : todo.priority === 'low' ? '#a0c4e8' : '#a0d4a0' }} />
-                    <span className="text-xs text-[#1a1a1a] truncate flex-1">{todo.title}</span>
-                    {todo.pomodoroRounds > 0 && <span className="text-[10px] text-[#9ca3af]">{todo.pomodoroRounds}轮</span>}
+                    <span className="text-xs text-[var(--text-primary)] truncate flex-1">{todo.title}</span>
+                    {todo.pomodoroRounds > 0 && <span className="text-xs text-[var(--text-muted)]">{todo.pomodoroRounds}轮</span>}
                   </div>
                 ))}
               </div>
             )}
             {(eventsByDate[popupDate] || []).length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-medium text-[#6b7280] mb-1.5">日程</p>
+                <p className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">日程</p>
                 {(eventsByDate[popupDate] || []).map((event) => (
-                  <div key={event.id} className="py-1.5 border-b border-[#e5e2dd] last:border-0">
+                  <div key={event.id} className="py-1.5 border-b border-[var(--border-light)] last:border-0">
                     <div className="rounded px-2 py-1 text-xs font-medium text-white truncate" style={{ background: event.color }}>
                       {event.title}
                     </div>
@@ -110,10 +110,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({ onDayDoubleClick }) 
             )}
             {(completedByDate[popupDate] || []).length > 0 && (
               <div>
-                <p className="text-[10px] font-medium text-[#16a34a] mb-1.5 flex items-center gap-1"><CheckCircle2 size={11} /> 已完成</p>
+                <p className="text-xs font-medium text-[var(--success)] mb-1.5 flex items-center gap-1"><CheckCircle2 size={11} /> 已完成</p>
                 {(completedByDate[popupDate] || []).slice(0, 5).map((todo) => (
-                  <div key={todo.id} className="py-1 border-b border-[#e5e2dd] last:border-0">
-                    <span className="text-xs text-[#9ca3af] line-through">{todo.title}</span>
+                  <div key={todo.id} className="py-1 border-b border-[var(--border-light)] last:border-0">
+                    <span className="text-xs text-[var(--text-muted)] line-through">{todo.title}</span>
                   </div>
                 ))}
               </div>

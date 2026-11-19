@@ -73,7 +73,38 @@ export function getMaxPomodoroPlanMinutes(
   return rounds * config.workDuration + (rounds - 2) * config.shortBreakDuration + config.longBreakDuration;
 }
 
-export const ALLOWED_POMODORO_ROUNDS = [1, 2, 3, 4, 6, 7, 8] as const;
+/**
+ * 可选的番茄钟轮次。
+ *
+ * 为什么跳过「长休息间隔 + 1」这一档：一个长休息周期内的轮次是整齐的
+ * （1..interval），第二轮完整的周期是 interval+2..2*interval。
+ * 中间那一档（比如 interval=4 时的 5）会落在「刚做完长休息、只多做一个」
+ * 的尴尬位置 —— 排出来的时间块既不是一个完整周期，也不好和日程对齐。
+ *
+ * 2026-11 修的两处问题：
+ *
+ * 1. **原来硬编码 [1,2,3,4,6,7,8]**，但 longBreakInterval 可以配到 10。
+ *    把它设成 5 之后，新建表单的初始值取 longBreakInterval = 5，
+ *    而下拉里没有 5 —— <select> 显示空白，用户以为「番茄钟数量不生效」。
+ * 2. 上限 8 也是硬编码的，interval=6 时本应能排到 12。
+ *
+ * 现在按 interval 动态生成，上限 12 防止下拉过长。
+ */
+export function getAllowedPomodoroRounds(longBreakInterval: number): number[] {
+  const interval = Math.max(1, Math.min(10, Math.floor(longBreakInterval) || 4));
+  const maxRounds = Math.min(2 * interval, 12);
+  const rounds: number[] = [];
+
+  for (let n = 1; n <= interval; n += 1) rounds.push(n);
+
+  // interval+1 这一档刻意跳过（见上面的说明）；如果它超过了上限就不生成
+  for (let n = interval + 2; n <= maxRounds; n += 1) rounds.push(n);
+
+  return rounds;
+}
+
+/** 兼容旧调用点。默认配置（interval=4）下等价于原来的 [1,2,3,4,6,7,8]。 */
+export const ALLOWED_POMODORO_ROUNDS = getAllowedPomodoroRounds(4) as readonly number[];
 
 export function getPlannedMinutesForRounds(
   rounds: number,
@@ -95,11 +126,27 @@ export function inferAllowedRoundsFromDuration(
   config: Pick<PomodoroConfig, 'workDuration' | 'shortBreakDuration' | 'longBreakDuration' | 'longBreakInterval'>
 ): number {
   if (durationMinutes <= 0) return 1;
+  // 必须用当前 config 的动态列表：写死 [1,2,3,4,6,7,8] 时，
+  // longBreakInterval=5 的用户永远推不出 5 个。
   let best = 1;
-  for (const rounds of ALLOWED_POMODORO_ROUNDS) {
+  for (const rounds of getAllowedPomodoroRounds(config.longBreakInterval)) {
     if (getPlannedMinutesForRounds(rounds, config) <= durationMinutes) {
       best = rounds;
     }
+  }
+  return best;
+}
+
+/** 把任意轮次夹到「允许的档位」里，取不超过它的最大档。 */
+export function clampToAllowedRounds(
+  rounds: number,
+  longBreakInterval: number
+): number {
+  const allowed = getAllowedPomodoroRounds(longBreakInterval);
+  if (allowed.length === 0) return 1;
+  let best = allowed[0];
+  for (const n of allowed) {
+    if (n <= rounds) best = n;
   }
   return best;
 }

@@ -4,6 +4,7 @@ import { TodoForm } from '../components/todo/TodoForm';
 import { InlineAddInput } from '../components/todo/InlineAddInput';
 import { useScheduleStore } from '../stores/scheduleStore';
 import { useUIStore } from '../stores/uiStore';
+import { usePomodoroStore } from '../stores/pomodoroStore';
 
 vi.mock('../lib/sounds', () => ({
   playInteractionSound: vi.fn(),
@@ -30,7 +31,9 @@ describe('todo reminder opt-in', () => {
     expect(todo.startAt).toBeNull();
     expect(todo.dueAt).toBeNull();
     expect(todo.reminderAt).toBeNull();
-    expect(todo.pomodoroRounds).toBe(1);
+    // 未排期的待办默认取「长休息间隔」（一个完整番茄周期），
+    // 不是固定 1 轮 —— 这条断言在 Release 2.7.0 之后就过时了。
+    expect(todo.pomodoroRounds).toBe(usePomodoroStore.getState().config.longBreakInterval);
   });
 
   it('writes reminder time only after enabling the reminder switch', () => {

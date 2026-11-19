@@ -30,7 +30,7 @@ function LiveClock({ active, onClick }: { active: boolean; onClick: () => void }
     >
       <Clock size={14} className="text-[var(--accent)]" />
       <span className="font-mono font-medium text-[var(--text-primary)]">{h}:{m}<span className="text-[var(--text-muted)]">:{s}</span></span>
-      <span className="text-[10px] text-[var(--text-muted)]">{month}月{day}日 {weekdays[time.getDay()]}</span>
+      <span className="text-xs text-[var(--text-muted)]">{month}月{day}日 {weekdays[time.getDay()]}</span>
     </button>
   );
 }
@@ -153,7 +153,7 @@ export const Header: React.FC = () => {
     <header className="rounded-t-2xl border-b border-[var(--border-light)] px-4 py-3 backdrop-blur-sm md:px-6" style={{ background: 'var(--header-bg)' }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">
+          <h1 className="text-xl font-bold tabular-nums text-[var(--text-primary)]">
             <span className="text-[var(--accent)]">灵</span>
             <span className="text-[color-mix(in_srgb,var(--accent)_62%,#7c3aed)]">境</span>
           </h1>
@@ -297,7 +297,7 @@ export const Header: React.FC = () => {
                     right: window.innerWidth - (themeButtonRef.current?.getBoundingClientRect().right ?? 0),
                   }}
                 >
-                  <p className="mb-2 text-[11px] font-medium text-[var(--text-secondary)]">主题风格</p>
+                  <p className="mb-2 text-xs font-medium text-[var(--text-secondary)]">主题风格</p>
                   <div className="grid grid-cols-5 gap-2">
                     {THEME_PRESETS.filter((t) => BUILT_IN_THEME_IDS.has(t.id)).map((t) => (
                       <button
@@ -317,7 +317,7 @@ export const Header: React.FC = () => {
                     ))}
                   </div>
 
-                  <p className="mb-2 mt-3 text-[11px] font-medium text-[var(--text-secondary)]">自定义风格</p>
+                  <p className="mb-2 mt-3 text-xs font-medium text-[var(--text-secondary)]">自定义风格</p>
                   <div className="grid grid-cols-5 gap-2">
                     {THEME_PRESETS.filter((t) => !BUILT_IN_THEME_IDS.has(t.id)).map((t) => (
                       <button
@@ -356,7 +356,7 @@ export const Header: React.FC = () => {
             >
               <Bell size={18} />
               {unreadCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--danger)] text-[9px] font-medium text-white">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--danger)] text-xs font-medium text-white">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}

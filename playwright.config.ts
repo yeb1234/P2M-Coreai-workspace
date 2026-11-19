@@ -9,13 +9,13 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:5002',
+    baseURL: 'http://127.0.0.1:12322',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5002',
-    url: 'http://127.0.0.1:5002',
+    command: 'npm run dev -- --host 127.0.0.1 --port 12322',
+    url: 'http://127.0.0.1:12322',
     reuseExistingServer: true,
     timeout: 60_000,
   },

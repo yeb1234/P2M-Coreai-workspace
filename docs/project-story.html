@@ -1,0 +1,2630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P2 Learning OS · 项目复盘与技术说明</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --surface-2: #f4f2ee;
+    --text: #1c1c1a;
+    --text-2: #4a4a46;
+    --muted: #78776f;
+    --border: #e4e1da;
+    --border-strong: #d0ccc3;
+    --accent: #2d5c85;
+    --accent-2: #1e4260;
+    --accent-soft: #eaf1f7;
+    --ok: #1a6b3c;
+    --ok-soft: #e8f3ec;
+    --warn: #9a5b0b;
+    --warn-soft: #fdf2e0;
+    --danger: #a32a2a;
+    --danger-soft: #fbeaea;
+    --code-bg: #f2f0ec;
+    --radius: 10px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.78;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- 布局 ---------- */
+  .layout { display: flex; max-width: 1500px; margin: 0 auto; }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: 250px;
+    flex: 0 0 250px;
+    padding: 40px 20px 40px 32px;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .sidebar .brand {
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+
+  .sidebar .brand-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 26px;
+    line-height: 1.5;
+  }
+
+  .nav { list-style: none; margin: 0; padding: 0; }
+  .nav li { margin: 0; }
+  .nav a {
+    display: block;
+    padding: 6px 10px;
+    margin-left: -10px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    color: var(--text-2);
+    text-decoration: none;
+    line-height: 1.5;
+    transition: background 0.12s, color 0.12s;
+  }
+  .nav a:hover { background: var(--surface-2); color: var(--text); }
+  .nav a.active { background: var(--accent-soft); color: var(--accent-2); font-weight: 600; }
+  .nav a .n {
+    display: inline-block;
+    width: 20px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+  }
+  .nav a.active .n { color: var(--accent); }
+
+  main {
+    flex: 1;
+    min-width: 0;
+    padding: 0 56px 120px;
+    max-width: 900px;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero { padding: 72px 0 48px; border-bottom: 1px solid var(--border); }
+
+  .eyebrow {
+    font-size: 12.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 18px;
+  }
+
+  h1 {
+    font-size: clamp(30px, 4vw, 42px);
+    line-height: 1.24;
+    letter-spacing: -0.022em;
+    margin: 0 0 20px;
+    font-weight: 700;
+  }
+
+  .lede {
+    font-size: 18px;
+    line-height: 1.72;
+    color: var(--text-2);
+    margin: 0 0 34px;
+    max-width: 46em;
+  }
+
+  .kpi-grid {
+    display: grid;
+    /* 固定 3 列：6 个指标正好两行排满。
+       用 auto-fit 会在宽屏下排成 5+1，末端留一块灰底很难看 */
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .kpi { background: var(--surface); padding: 18px 20px; }
+  .kpi .v {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+  .kpi .l { font-size: 12.5px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+
+  /* ---------- 章节 ---------- */
+  section { padding: 64px 0 8px; scroll-margin-top: 20px; }
+
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; }
+
+  .sec-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+    flex: 0 0 auto;
+    padding-top: 6px;
+  }
+
+  h2 {
+    font-size: 27px;
+    line-height: 1.35;
+    letter-spacing: -0.018em;
+    margin: 0;
+    font-weight: 700;
+  }
+
+  .sec-desc {
+    color: var(--muted);
+    font-size: 15px;
+    margin: 0 0 30px;
+    padding-left: 34px;
+    max-width: 44em;
+  }
+
+  h3 {
+    font-size: 18.5px;
+    margin: 38px 0 12px;
+    letter-spacing: -0.012em;
+    font-weight: 650;
+    line-height: 1.45;
+  }
+
+  h4 {
+    font-size: 15.5px;
+    margin: 22px 0 8px;
+    font-weight: 650;
+    color: var(--text);
+  }
+
+  p { margin: 0 0 16px; }
+  p:last-child { margin-bottom: 0; }
+
+  strong { font-weight: 650; }
+  em { font-style: normal; background: linear-gradient(transparent 62%, #ffe9a8 62%); padding: 0 1px; }
+
+  a { color: var(--accent); }
+
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 7px; }
+  li:last-child { margin-bottom: 0; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.875em;
+    background: var(--code-bg);
+    padding: 1.5px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    word-break: break-word;
+  }
+
+  pre {
+    background: #23231f;
+    color: #e8e6e0;
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.65;
+    margin: 16px 0;
+    font-family: var(--mono);
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+
+  /* ---------- 卡片 ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin: 18px 0;
+  }
+
+  .card.tight { padding: 18px 20px; }
+
+  .card-title {
+    font-size: 15.5px;
+    font-weight: 650;
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+    font-family: var(--mono);
+    vertical-align: 1px;
+  }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .tag.bad { background: var(--danger-soft); color: var(--danger); }
+  .tag.info { background: var(--accent-soft); color: var(--accent-2); }
+  .tag.plain { background: var(--surface-2); color: var(--muted); }
+
+  /* ---------- 决策卡 ---------- */
+  .decision {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    margin: 22px 0;
+    overflow: hidden;
+  }
+  .decision-head {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+  }
+  .decision-head .q {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+  }
+  .decision-head h3 { margin: 0; font-size: 19px; }
+
+  .decision-body { padding: 4px 24px 20px; }
+
+  .kv { margin: 16px 0 0; }
+  .kv .k {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .kv .v { font-size: 15px; color: var(--text-2); line-height: 1.7; }
+  .kv .v:last-child { margin-bottom: 0; }
+
+  .verdict {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    font-size: 14.5px;
+    color: var(--accent-2);
+  }
+
+  .tradeoff {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: var(--warn-soft);
+    border-left: 3px solid var(--warn);
+    border-radius: 0 6px 6px 0;
+    font-size: 14px;
+    color: #6b3f08;
+  }
+
+  /* ---------- 表格 ---------- */
+  .table-wrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--border); border-radius: var(--radius); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--surface); }
+  th {
+    text-align: left;
+    padding: 11px 14px;
+    background: var(--surface-2);
+    font-weight: 650;
+    font-size: 12.5px;
+    color: var(--text-2);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+  .good { color: var(--ok); font-weight: 600; }
+  .bad { color: var(--danger); }
+
+  /* ---------- 时间线 ---------- */
+  .timeline { position: relative; margin: 26px 0 10px; padding-left: 26px; }
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 6px; top: 8px; bottom: 12px;
+    width: 2px;
+    background: var(--border-strong);
+  }
+  .tl-item { position: relative; margin-bottom: 26px; }
+  .tl-item:last-child { margin-bottom: 0; }
+  .tl-item::before {
+    content: "";
+    position: absolute;
+    left: -26px; top: 7px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border-strong);
+  }
+  .tl-item.hi::before { border-color: var(--accent); background: var(--accent); }
+  .tl-date {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    margin-bottom: 3px;
+  }
+  .tl-title { font-weight: 650; font-size: 15.5px; margin-bottom: 3px; }
+  .tl-desc { font-size: 14px; color: var(--text-2); line-height: 1.65; }
+
+  /* ---------- 坑 ---------- */
+  .pit {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .pit-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .pit-idx {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border-radius: 5px;
+    padding: 3px 8px;
+    flex: 0 0 auto;
+    margin-top: 2px;
+  }
+  .pit-head h3 { margin: 0; font-size: 16.5px; line-height: 1.5; }
+  .pit-body { padding: 16px 20px 18px; }
+  .pit-row { display: flex; gap: 14px; margin-bottom: 13px; }
+  .pit-row:last-child { margin-bottom: 0; }
+  .pit-label {
+    flex: 0 0 62px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    padding-top: 3px;
+  }
+  .pit-text { flex: 1; font-size: 14.5px; line-height: 1.7; color: var(--text-2); min-width: 0; }
+  .pit-lesson {
+    background: var(--ok-soft);
+    border-left: 3px solid var(--ok);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    font-size: 14px;
+    color: #12492a;
+    margin-top: 4px;
+  }
+
+  /* ---------- Q&A ---------- */
+  .qa { border-bottom: 1px solid var(--border); padding: 20px 0; }
+  .qa:first-of-type { border-top: 1px solid var(--border); }
+  .qa-q {
+    font-weight: 650;
+    font-size: 15.5px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+    line-height: 1.55;
+  }
+  .qa-q .mark { color: var(--accent); flex: 0 0 auto; font-family: var(--mono); }
+  .qa-a { padding-left: 25px; font-size: 14.8px; color: var(--text-2); }
+  .qa-a p { margin-bottom: 10px; }
+  .qa-a p:last-child { margin-bottom: 0; }
+  .qa-a ul { margin-bottom: 10px; }
+
+  .say {
+    background: var(--surface-2);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 12px 0;
+    font-size: 14.5px;
+    color: var(--text);
+    line-height: 1.72;
+  }
+  .say::before {
+    content: "可以这么讲";
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .avoid {
+    background: var(--danger-soft);
+    border-left: 3px solid var(--danger);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 12px 0;
+    font-size: 14.5px;
+    color: #6b1e1e;
+    line-height: 1.7;
+  }
+  .avoid::before {
+    content: "别说";
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--danger);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  /* ---------- 架构图 ---------- */
+  .figure {
+    margin: 24px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 22px 20px 14px;
+    overflow-x: auto;
+  }
+  .figure svg { display: block; width: 100%; height: auto; min-width: 620px; }
+  .figure figcaption {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    line-height: 1.6;
+  }
+
+  /* ---------- 其他 ---------- */
+  .note {
+    display: flex;
+    gap: 12px;
+    background: var(--accent-soft);
+    border-radius: var(--radius);
+    padding: 15px 18px;
+    margin: 20px 0;
+    font-size: 14.5px;
+    color: var(--accent-2);
+    line-height: 1.7;
+  }
+  .note .ico { flex: 0 0 auto; font-weight: 700; font-family: var(--mono); }
+
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 18px 0; }
+
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .stat-box .before { color: var(--danger); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .stat-box .arrow { color: var(--muted); margin: 0 6px; }
+  .stat-box .after { color: var(--ok); font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .stat-box .what { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+  footer {
+    margin-top: 70px;
+    padding-top: 26px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  @media (max-width: 1000px) {
+    .sidebar { display: none; }
+    main { padding: 0 24px 80px; max-width: 100%; }
+    .hero { padding: 44px 0 34px; }
+    .sec-desc { padding-left: 0; }
+    section { padding: 46px 0 8px; }
+  }
+
+  @media (max-width: 640px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media print {
+    .sidebar { display: none; }
+    body { background: #fff; font-size: 11pt; }
+    main { padding: 0; max-width: 100%; }
+    section { page-break-inside: avoid; }
+    .decision, .pit, .card { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<aside class="sidebar">
+  <div class="brand">P2 Learning OS</div>
+  <div class="brand-sub">项目复盘<br>2026.05 → 2026.11</div>
+  <ul class="nav">
+    <li><a href="#what"><span class="n">01</span>这是什么</a></li>
+    <li><a href="#arch"><span class="n">02</span>架构长什么样</a></li>
+    <li><a href="#story"><span class="n">03</span>从 0 到现在的两轮</a></li>
+    <li><a href="#decisions"><span class="n">04</span>六个关键取舍</a></li>
+    <li><a href="#pits"><span class="n">05</span>十个坑</a></li>
+    <li><a href="#results"><span class="n">06</span>成绩单</a></li>
+    <li><a href="#interview"><span class="n">07</span>面试怎么答</a></li>
+    <li><a href="#tell"><span class="n">08</span>怎么讲这个项目</a></li>
+    <li><a href="#hardening"><span class="n">09</span>从能跑到能上线</a></li>
+    <li><a href="#research"><span class="n">10</span>开工前的三页纸</a></li>
+    <li><a href="#appendix"><span class="n">11</span>附录</a></li>
+  </ul>
+</aside>
+
+<main>
+
+<div class="hero">
+  <div class="eyebrow">项目复盘 · 面试材料</div>
+  <h1>把 1.4 万个技术视频，<br>变成能被问答的学习资料库</h1>
+  <p class="lede">
+    一个本地优先的个人学习操作系统。核心要解决的事只有一件：<strong>当你问「X 是怎么实现的」，
+    它能在几百 TB 的录播课里定位到那 3 分钟，并告诉你出自哪个视频的第几秒。</strong>
+    这份文档不讲「用了什么技术」，只讲<em>为什么这么选、哪里踩过坑、面试怎么讲</em>。
+  </p>
+
+  <div class="note">
+    <span class="ico">※</span>
+    <div><strong>状态：现行复盘页（最后校对 2026-11-16）。</strong>
+    当前基线：PostgreSQL 17 + pgvector、3.0 线；文中历史阶段的规模、耗时与代码行数为当时快照，已在对应位置注明。</div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="v">14,327</div><div class="l">视频 / 359 万条字幕片段</div></div>
+    <div class="kpi"><div class="v">4 万行</div><div class="l">前后端代码（59 + 203 文件，11/15 快照）</div></div>
+    <div class="kpi"><div class="v">15GB → 1.77GB</div><div class="l">数据库体积</div></div>
+    <div class="kpi"><div class="v">26s → 25ms</div><div class="l">向量检索耗时</div></div>
+    <div class="kpi"><div class="v">0 → 18/18</div><div class="l">中文检索命中率</div></div>
+    <div class="kpi"><div class="v">57s → 0.4s</div><div class="l">单次 LLM 调用</div></div>
+  </div>
+</div>
+
+<!-- ============ 01 ============ -->
+<section id="what">
+  <div class="sec-head"><span class="sec-num">01</span><h2>这是什么</h2></div>
+  <p class="sec-desc">先说人话，再说技术。</p>
+
+  <p>
+    想象你买了 30 门网课，加起来 1.4 万个视频文件，存放在硬盘里。你记得「有个老师讲过闭包的内存模型」，
+    但想不起来是哪门课、第几分钟。翻文件夹？14327 个文件名，翻不动。
+  </p>
+  <p>
+    这个系统就干三件事：
+  </p>
+
+  <div class="grid-2">
+    <div class="card tight">
+      <div class="card-title"><span class="tag info">1</span>把视频变成可搜索的文字</div>
+      <p style="font-size:14.5px;color:var(--text-2);margin:0">
+        用 Whisper 把每节课的音频转成字幕，切成几秒一段的小块（359 万块），每块都记住「哪个视频、第几秒」。
+        从此视频不是黑盒，是可检索的文本。
+      </p>
+    </div>
+    <div class="card tight">
+      <div class="card-title"><span class="tag info">2</span>按意思找，不是按字面找</div>
+      <p style="font-size:14.5px;color:var(--text-2);margin:0">
+        你问「函数返回另一个函数」，它能找到讲「闭包」的片段——这两个说法字面完全不同。
+        靠的是向量检索：把每段字幕变成一串数字，意思相近的数字也相近。
+      </p>
+    </div>
+    <div class="card tight">
+      <div class="card-title"><span class="tag info">3</span>能对话，还能记得你</div>
+      <p style="font-size:14.5px;color:var(--text-2);margin:0">
+        不是「你问我答」，而是它会先查你的学习记录：看了多久、完成率多少、卡在哪个领域，
+        再结合检索结果回答，并给出带时间点的学习路径。
+      </p>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="ico">→</span>
+    <div>
+      <strong>一句话定位（面试时可以直接用）：</strong>
+      一个面向个人技术学习者的 RAG 系统 —— 把非结构化的视频课程转成可语义检索的知识库，
+      再叠一层带工具调用的 Agent，做「找内容 + 做规划」两件事。
+    </div>
+  </div>
+
+  <h3>它不是什么</h3>
+  <p>面试时主动划清边界，比夸大更加分：</p>
+  <ul>
+    <li><strong>不是公网 SaaS。</strong>单机部署，面向个人，没有多租户、没有计费、没有横向扩展。</li>
+    <li><strong>不是通用视频平台。</strong>不转码、不切片分发、不做推荐流。它是「学习的检索层」。</li>
+    <li><strong>不是微服务。</strong>一个 FastAPI 单体 + 一个后台 worker，刻意不上服务网格那套。</li>
+    <li><strong>不是从头手写。</strong>主体由 AI 协作产出，我负责设计、决策、验证和排错——这点后面单独讲（<a href="#tell">第 08 节</a>）。</li>
+  </ul>
+</section>
+
+<!-- ============ 02 ============ -->
+<section id="arch">
+  <div class="sec-head"><span class="sec-num">02</span><h2>架构长什么样</h2></div>
+  <p class="sec-desc">五个服务（PG / Redis / 后端 / worker / nginx 前端），三条数据流。先看整体，再拆每条流。</p>
+
+  <figure class="figure">
+    <svg viewBox="0 0 860 520" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+      <defs>
+        <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#8a8778"/>
+        </marker>
+        <marker id="arrowA" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#2d5c85"/>
+        </marker>
+      </defs>
+
+      <!-- 客户端层 -->
+      <rect x="20" y="20" width="820" height="72" rx="8" fill="#f4f2ee" stroke="#d0ccc3"/>
+      <text x="40" y="44" font-size="12" font-weight="700" fill="#78776f" letter-spacing="0.08em">CLIENT</text>
+      <rect x="40" y="52" width="200" height="30" rx="5" fill="#fff" stroke="#d0ccc3"/>
+      <text x="140" y="72" font-size="12.5" fill="#1c1c1a" text-anchor="middle">React 19 + Vite + Zustand</text>
+      <rect x="256" y="52" width="150" height="30" rx="5" fill="#fff" stroke="#d0ccc3"/>
+      <text x="331" y="72" font-size="12.5" fill="#1c1c1a" text-anchor="middle">流式对话（SSE）</text>
+      <rect x="422" y="52" width="180" height="30" rx="5" fill="#fff" stroke="#d0ccc3"/>
+      <text x="512" y="72" font-size="12.5" fill="#1c1c1a" text-anchor="middle">视频播放 / 字幕跳转</text>
+      <text x="640" y="71" font-size="11.5" fill="#78776f">IndexedDB 持久化会话</text>
+
+      <!-- nginx -->
+      <rect x="20" y="112" width="820" height="48" rx="8" fill="#eaf1f7" stroke="#2d5c85"/>
+      <text x="40" y="132" font-size="12" font-weight="700" fill="#2d5c85" letter-spacing="0.08em">GATEWAY</text>
+      <text x="40" y="150" font-size="12.5" fill="#1e4260">nginx　静态资源 + 反向代理　·　SSE 专用 location 关闭 proxy_buffering　·　超时 300s</text>
+
+      <!-- 后端 -->
+      <rect x="20" y="180" width="820" height="150" rx="8" fill="#fff" stroke="#d0ccc3"/>
+      <text x="40" y="202" font-size="12" font-weight="700" fill="#78776f" letter-spacing="0.08em">API · FastAPI 单体</text>
+
+      <rect x="40" y="214" width="185" height="98" rx="6" fill="#faf9f7" stroke="#e4e1da"/>
+      <text x="52" y="234" font-size="12" font-weight="650" fill="#1c1c1a">检索层</text>
+      <text x="52" y="254" font-size="11.5" fill="#4a4a46">词法：pg_trgm</text>
+      <text x="52" y="272" font-size="11.5" fill="#4a4a46">语义：pgvector HNSW</text>
+      <text x="52" y="290" font-size="11.5" fill="#4a4a46">融合：加权 RRF + cross-encoder 重排</text>
+
+      <rect x="240" y="214" width="185" height="98" rx="6" fill="#faf9f7" stroke="#e4e1da"/>
+      <text x="252" y="234" font-size="12" font-weight="650" fill="#1c1c1a">Agent 层</text>
+      <text x="252" y="254" font-size="11.5" fill="#4a4a46">LangGraph ReAct</text>
+      <text x="252" y="272" font-size="11.5" fill="#4a4a46">9 个工具 · 工具轨迹审计</text>
+      <text x="252" y="290" font-size="11.5" fill="#4a4a46">规划图：5 节点状态机</text>
+
+      <rect x="440" y="214" width="185" height="98" rx="6" fill="#faf9f7" stroke="#e4e1da"/>
+      <text x="452" y="234" font-size="12" font-weight="650" fill="#1c1c1a">记忆层</text>
+      <text x="452" y="254" font-size="11.5" fill="#4a4a46">行为事件流 watch_events</text>
+      <text x="452" y="272" font-size="11.5" fill="#4a4a46">画像聚合 user_profiles</text>
+      <text x="452" y="290" font-size="11.5" fill="#4a4a46">会话摘要 + 长期记忆</text>
+
+      <rect x="640" y="214" width="180" height="98" rx="6" fill="#faf9f7" stroke="#e4e1da"/>
+      <text x="652" y="234" font-size="12" font-weight="650" fill="#1c1c1a">任务层</text>
+      <text x="652" y="254" font-size="11.5" fill="#4a4a46">RQ + Redis 队列</text>
+      <text x="652" y="272" font-size="11.5" fill="#4a4a46">Whisper 转写</text>
+      <text x="652" y="290" font-size="11.5" fill="#4a4a46">DB 状态机兜底</text>
+
+      <!-- 数据层 -->
+      <rect x="20" y="356" width="540" height="70" rx="8" fill="#fff" stroke="#d0ccc3"/>
+      <text x="40" y="378" font-size="12" font-weight="700" fill="#78776f" letter-spacing="0.08em">DATA</text>
+      <rect x="40" y="386" width="245" height="28" rx="5" fill="#e8f3ec" stroke="#1a6b3c"/>
+      <text x="162" y="405" font-size="12" fill="#12492a" text-anchor="middle">PostgreSQL 17 + pgvector</text>
+      <rect x="300" y="386" width="110" height="28" rx="5" fill="#fff" stroke="#d0ccc3"/>
+      <text x="355" y="405" font-size="12" fill="#1c1c1a" text-anchor="middle">Redis 7</text>
+      <rect x="425" y="386" width="115" height="28" rx="5" fill="#fff" stroke="#d0ccc3"/>
+      <text x="482" y="405" font-size="12" fill="#1c1c1a" text-anchor="middle">视频文件（只读）</text>
+
+      <!-- 外部 -->
+      <rect x="580" y="356" width="260" height="70" rx="8" fill="#fdf2e0" stroke="#9a5b0b"/>
+      <text x="600" y="378" font-size="12" font-weight="700" fill="#9a5b0b" letter-spacing="0.08em">EXTERNAL</text>
+      <text x="600" y="399" font-size="12" fill="#6b3f08">DeepSeek v4.1（对话 / 重排 / 规划）</text>
+      <text x="600" y="416" font-size="12" fill="#6b3f08">LM Studio bge-m3（本地向量）</text>
+
+      <!-- 连线 -->
+      <line x1="430" y1="92" x2="430" y2="110" stroke="#8a8778" stroke-width="1.5" marker-end="url(#arrow)"/>
+      <line x1="430" y1="160" x2="430" y2="178" stroke="#8a8778" stroke-width="1.5" marker-end="url(#arrow)"/>
+      <line x1="430" y1="330" x2="430" y2="354" stroke="#8a8778" stroke-width="1.5" marker-end="url(#arrow)"/>
+      <line x1="720" y1="330" x2="720" y2="354" stroke="#9a5b0b" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+      <!-- 检索高亮路径 -->
+      <path d="M132,310 L132,340 L162,340 L162,384" fill="none" stroke="#2d5c85" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrowA)"/>
+      <text x="172" y="348" font-size="10.5" fill="#2d5c85">HNSW / GIN</text>
+
+      <text x="20" y="460" font-size="11.5" fill="#78776f">读路径：浏览器 → nginx → FastAPI → PG(pgvector + pg_trgm) → 外部 LLM</text>
+      <text x="20" y="480" font-size="11.5" fill="#78776f">写路径：文件监听 → 任务入队(Redis) → worker 转写 → 字幕入库 → 向量回填</text>
+      <text x="20" y="500" font-size="11.5" fill="#78776f">关键约束：单机、16GB 内存、无 GPU 常驻 —— 所有选型都受这条限制</text>
+    </svg>
+    <figcaption>
+      看图重点：<strong>数据层只有一个数据库</strong>（PostgreSQL 同时承担业务数据和向量），这是 3.0 最重要的架构收敛。
+      外部 LLM 是唯一出网点，其余全部本地。
+    </figcaption>
+  </figure>
+
+  <h3>三条数据流</h3>
+
+  <h4>① 入库流：视频 → 可检索文本</h4>
+  <pre><code>文件扫描（watchdog 监听）
+  → 建 videos 记录
+  → 任务入队（Redis / RQ）
+  → worker: ffmpeg 抽音轨 → Whisper 转写 → 切成片段
+  → subtitle_segments 落库（359 万条）
+  → 向量回填：bge-m3 批量嵌入 → pgvector（halfvec 半精度）
+  → 建 HNSW 索引</code></pre>
+  <p>
+    这里有个设计取舍：<strong>转写和向量化都放后台，不在请求里做</strong>。
+    一个 2 小时的视频转写要几分钟，任何同步接口都扛不住。所以用 RQ 队列 + 数据库状态机双轨：
+    队列负责「跑起来」，数据库状态负责「跑得怎么样」，进程崩了能从状态恢复。
+  </p>
+
+  <h4>② 读路径：一句话 → 带时间点的片段</h4>
+  <pre><code>POST /api/search/hybrid?q=事件循环是什么
+  ├─ 词法路：pg_trgm 三元组匹配（8~30ms）
+  ├─ 语义路：bge-m3 嵌入 → pgvector HNSW 近邻（6~25ms）
+  ├─ RRF 融合：按名次加权，词法 0.8 / 语义 1.2 / 元数据 1.5
+  └─ cross-encoder 重排：RRF 前 20 条 → 阈值 0.10 过滤（可关；API 失败退回 LLM listwise）</code></pre>
+  <p>
+    为什么必须有两条路？<strong>它们失败的场景正好互补</strong>：
+    词法擅长精确术语（<code>useEffect</code>、版本号），但整句相似度会被长文本稀释；
+    语义能跨表述召回，但对生僻 API 名不敏感。单用任一条，抽检都会掉到 60% 以下。
+  </p>
+
+  <h4>③ 对话流：Agent 的 ReAct 循环</h4>
+  <pre><code>用户问「库里有讲事件循环的视频吗」
+  → 组装上下文（人设 + 真实画像 + 长期记忆 + 会话摘要 + 最近 10 条）
+  → LLM 决定调工具：search_video_titles + search_videos（可并行）
+  → 工具返回压缩后的纯文本（不是原始 JSON）
+  → LLM 组织回答，带《视频名》和时间点
+  → SSE 逐 token 推给前端</code></pre>
+  <p>
+    这里有个不显眼但重要的细节：<strong>工具返回给 LLM 的是「人读得懂的短文本」，不是结构化 JSON</strong>。
+    早期试过直接塞 JSON，模型会浪费上下文去解析字段，回答质量反而下降。
+  </p>
+</section>
+
+<!-- ============ 03 ============ -->
+<section id="story">
+  <div class="sec-head"><span class="sec-num">03</span><h2>从 0 到现在的两轮</h2></div>
+  <p class="sec-desc">同一项目，两次完全不同的做法。这两轮的差别，比项目本身更值得讲。</p>
+
+  <div class="timeline">
+    <div class="tl-item hi">
+      <div class="tl-date">2026-05-08</div>
+      <div class="tl-title">第一行代码：114 个文件，14039 行，一次性落地</div>
+      <div class="tl-desc">
+        起点不是「先想架构」，而是「先把东西跑起来」。工作台、视频库、番茄钟、日历、笔记
+        从第一天就是一起上线的。这是典型的<strong>自下而上长出来的项目</strong>，不是设计出来的。
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-date">2026-05-08 → 05-16　（9 天，30 次提交）</div>
+      <div class="tl-title">功能堆叠期：v2.5 → v2.92</div>
+      <div class="tl-desc">
+        这 9 天几乎全是「加功能 + 修体验」：<br>
+        字幕转写引擎抽象（faster-whisper / whisper.cpp 双引擎）、AI 任务中心、播放器快捷键、
+        番茄钟与日历联动、主题系统导入导出、时区修正、侧边栏持久化、RQ 队列接入。<br>
+        <span style="color:var(--danger)">代码在长，但地基没动过。</span>
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-date">2026-05-16 → 11-15　（6 个月，0 次提交）</div>
+      <div class="tl-title">停摆期</div>
+      <div class="tl-desc">
+        项目冻结半年。这段时间在补的是另一类东西：FastAPI、PostgreSQL、Milvus、后端工程基础。
+        <strong>停摆本身不是浪费</strong>——第二次回来看代码时，才发现第一轮埋了多少问题。
+      </div>
+    </div>
+
+    <div class="tl-item hi">
+      <div class="tl-date">2026-11-15　（1 天，7 次提交）</div>
+      <div class="tl-title">第二轮：推倒地基，v3.0</div>
+      <div class="tl-desc">
+        52 个文件改动，<code>+6267 / −517</code>。数据库从 SQLite 换到 PostgreSQL + pgvector，
+        检索从「假的中文全文搜索」换成「混合检索 + 语义 + 重排」，
+        小助手从「单轮问答」换成「带工具调用和记忆的 Agent」，最后整套容器化。
+      </div>
+    </div>
+  </div>
+
+  <h3>两轮的差别，到底在哪</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>维度</th><th>第一轮（5 月）</th><th>第二轮（11 月）</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>出发点</td>
+          <td>先把功能跑起来，能点就行</td>
+          <td>先验证「它到底能不能用」，再决定改什么</td>
+        </tr>
+        <tr>
+          <td>遇到问题的反应</td>
+          <td>加兜底逻辑（搜不到就 LIKE、LIKE 搜不到就返回收藏）</td>
+          <td>先量一下到底哪里坏了，再决定换掉还是修补</td>
+        </tr>
+        <tr>
+          <td>对「能用」的标准</td>
+          <td>接口返回 200、页面不报错</td>
+          <td>抽 6 个已知答案的查询，top3 命中率必须到 100%</td>
+        </tr>
+        <tr>
+          <td>技术选型依据</td>
+          <td>哪个熟悉用哪个</td>
+          <td>写清楚候选方案、实测数据、放弃理由</td>
+        </tr>
+        <tr>
+          <td>代码量变化</td>
+          <td class="num">0 → 14,039 行</td>
+          <td class="num">+6,267 行（其中约 1/4 是删除重写）</td>
+        </tr>
+        <tr>
+          <td>产出</td>
+          <td>一个能演示的产品</td>
+          <td>一个<strong>敢被追问细节</strong>的系统</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="ico">!</span>
+    <div>
+      <strong>这段最值得在面试讲：</strong>第一轮我证明了自己能「把东西做出来」；
+      第二轮我证明了自己能「判断做出来的东西是不是真的对」。后者才是工程能力的分水岭。
+      很多项目死在「能跑」和「正确」之间那一段，而那段只能靠实测数据跨过去。
+    </div>
+  </div>
+
+  <h3>第二轮具体改了什么</h3>
+  <p>七次提交，按依赖顺序推进，每一层都可独立回滚：</p>
+
+  <pre><code>2ce0523  feat(db)!      SQLite → PostgreSQL + pgvector，清掉 14GB 废向量
+32b82f9  feat(rag,agent) 混合检索 + LangChain Agent + 记忆画像
+aee1ef3  perf(retrieval) 词法长句短路 + embedding 预热 + 画像分母修复
+0045578  feat(frontend)  流式对话 + 会话持久化 + 引用跳转时间点
+75e14ed  fix(agent)      引用片段按相关度过滤 + 时间格式
+58b66aa  build(docker)   全栈容器化，修掉路径映射与构建阻塞
+fcd1e58  chore           换行符规则固化</code></pre>
+
+  <p>
+    注意第一个提交的 <code>!</code> 标记 —— 它是破坏性变更（breaking change）。
+    这种改动必须先打 tag 留回滚点（<code>baseline-before-3.0</code>），
+    并且<strong>源库全程只读</strong>：迁移脚本用 <code>mode=ro</code> 打开 SQLite，
+    一行都没写过。这是「敢做大改动」的前提。
+  </p>
+</section>
+
+<!-- ============ 04 ============ -->
+<section id="decisions">
+  <div class="sec-head"><span class="sec-num">04</span><h2>六个关键取舍</h2></div>
+  <p class="sec-desc">
+    面试官真正想听的不是「你用了什么」，而是「你为什么不用另一个」。
+    每条都按「背景 → 候选 → 决定 → 依据 → 代价」展开。
+  </p>
+
+  <!-- 决策 1 -->
+  <div class="decision">
+    <div class="decision-head">
+      <div class="q">DECISION 01 · 存储</div>
+      <h3>数据库要不要换成 PostgreSQL？向量放哪儿？</h3>
+    </div>
+    <div class="decision-body">
+      <div class="kv">
+        <div class="k">背景</div>
+        <div class="v">
+          SQLite 库涨到 <strong>15GB</strong>，其中 14GB 是一张向量表。单写锁导致转写任务和前端查询互相卡；
+          备份要停服务；换机器得拷整个文件。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">候选</div>
+        <div class="v">
+          A. 不动 SQLite，另外装 Milvus 放向量<br>
+          B. 换 PostgreSQL + pgvector，业务和向量同一个库<br>
+          C. 换 MySQL + 独立向量库
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">决定</div>
+        <div class="v"><strong>B</strong>。用一个容器解决两件事。</div>
+      </div>
+      <div class="kv">
+        <div class="k">依据</div>
+        <div class="v">
+          关键判断是：<strong>业务库本身也是问题，不只是向量</strong>。
+          上 Milvus 只解决一半，SQLite 的 15GB、单写锁、备份难还在。
+          而 pgvector 的 HNSW 索引对这个量级的 1024 维向量完全够用 —— 实测单次查询 6~25ms。
+          Milvus 的优势（千万级以上、多租户、分布式）在这个量级用不上，却要额外维护 etcd + MinIO 三件套。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">结果</div>
+        <div class="v">
+          库 <span class="good">15GB → 1.77GB</span>（顺手清掉 14GB 废向量）；
+          359 万条片段迁移 <span class="good">53.8 秒</span>（COPY 协议，6.7 万行/秒）。
+        </div>
+      </div>
+      <div class="tradeoff">
+        <strong>代价说清楚：</strong>pgvector 的向量索引和业务表共享同一份内存与 WAL，
+        大规模写入时会互相影响；真到千万级向量或需要多租户隔离时，必须拆出去。
+        这不是「pgvector 比 Milvus 好」，是「这个量级选它更划算」。
+      </div>
+    </div>
+  </div>
+
+  <!-- 决策 2 -->
+  <div class="decision">
+    <div class="decision-head">
+      <div class="q">DECISION 02 · Agent 框架</div>
+      <h3>Agent 自己写，还是上 LangChain / LangGraph？</h3>
+    </div>
+    <div class="decision-body">
+      <div class="kv">
+        <div class="k">背景</div>
+        <div class="v">
+          原来的「小助手」是单轮问答：拼一段 prompt，调一次接口，返回。
+          没有工具调用、没有记忆、没有多步推理。要升级成 Agent，就得选框架。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">候选</div>
+        <div class="v">
+          A. 自研 ReAct 循环（约 300 行）<br>
+          B. LangChain + LangGraph 全家桶<br>
+          C. 只用 OpenAI 原生 function calling，不引入框架
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">决定</div>
+        <div class="v"><strong>B</strong>，但只用在两个地方：ReAct 对话 + 有状态规划图。</div>
+      </div>
+      <div class="kv">
+        <div class="k">依据</div>
+        <div class="v">
+          自研的话，工具调用的循环控制、并行调用、状态图的中断恢复都得自己实现，
+          工作量不小且容易出错。LangGraph 的 <code>StateGraph</code> 天生适合
+          「诊断 → 检索 → 排步骤 → 校验 → 回退重排」这种带条件边的流程，
+          自研要写一套等价的状态机。<br>
+          但反过来，<strong>LLM 调用层保留了一层极薄的封装</strong>（<code>services/llm.py</code> 约 100 行），
+          不把框架的抽象直接铺到业务代码里 —— 出问题时能一眼看到实际发出的请求。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">结果</div>
+        <div class="v">
+          9 个工具、SSE 流式、工具轨迹审计全部落地；
+          规划图 5 节点带条件边，实测产出 7 步路径、每步绑定真实视频。
+        </div>
+      </div>
+      <div class="tradeoff">
+        <strong>代价说清楚：</strong>框架抽象层厚，出错时堆栈会绕好几圈。
+        应对方式是「所有 Agent 执行都记 <code>agent_runs</code> 表」——
+        输入、工具轨迹、token 数、耗时全落库，出问题查表比读堆栈快。
+        另外 langchain 1.x 的 API 变动大，所以版本锁 <code>&gt;=1.0</code> 且关键调用集中封装。
+      </div>
+    </div>
+  </div>
+
+  <!-- 决策 3 -->
+  <div class="decision">
+    <div class="decision-head">
+      <div class="q">DECISION 03 · 检索</div>
+      <h3>词法、语义，还是两个都要？</h3>
+    </div>
+    <div class="decision-body">
+      <div class="kv">
+        <div class="k">背景</div>
+        <div class="v">
+          原来的检索是 SQLite FTS5 + <code>LIKE</code> 兜底。实测发现中文查询<strong>根本命中不了</strong>，
+          而界面上还显示着「相关视频」。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">候选</div>
+        <div class="v">
+          A. 只修词法（换 pg_trgm，够快够简单）<br>
+          B. 只上语义（向量检索，够聪明）<br>
+          C. 两路都做，用 RRF 融合
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">决定</div>
+        <div class="v"><strong>C</strong>，并且加一层可选的 cross-encoder 重排（API 失败时退回 LLM listwise）。</div>
+      </div>
+      <div class="kv">
+        <div class="k">依据</div>
+        <div class="v">
+          实测两条路失败的场景正好互补：<br>
+          · 纯词法：「FastAPI 依赖注入是怎么实现的」→ 前四条全是 <code>from fastapi</code> 这种碎片，
+          整句三元组相似度被长文本稀释；<br>
+          · 纯语义：问「函数返回另一个函数」（不含「闭包」二字）能正确召回闭包内容，这是词法做不到的。<br>
+          融合用 RRF（Reciprocal Rank Fusion）：不看绝对分数，只看各自排名，
+          <code>score = Σ w/(k + rank)</code>，词法权重 0.8 / 语义 1.2 / 元数据 1.5。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">结果</div>
+        <div class="v">
+          6 个已知答案的查询，top3 命中 <span class="good">18/18</span>；
+          分数区间从旧方案的 0.35 提到 0.55~0.95。
+        </div>
+      </div>
+      <div class="tradeoff">
+        <strong>代价说清楚：</strong>两路都查意味着延迟叠加、要同时维护两套索引。
+        优化办法是「按查询形态分流」：短查询（≤8 字）走完整词法，
+        长句直接跳过整句相似度只做术语匹配 —— 因为长句的整句 trgm 命中本来就不进前列，
+        纯属浪费。这一改把长句检索从 1.2 秒压到 157ms。
+      </div>
+    </div>
+  </div>
+
+  <!-- 决策 4 -->
+  <div class="decision">
+    <div class="decision-head">
+      <div class="q">DECISION 04 · 向量精度</div>
+      <h3>向量存 float32 还是半精度？</h3>
+    </div>
+    <div class="decision-body">
+      <div class="kv">
+        <div class="k">背景</div>
+        <div class="v">
+          1024 维向量，186 万条。float32 要 <strong>7.6GB</strong> 磁盘，全量加载进内存直接
+          把 16GB 的机器压死。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">决定</div>
+        <div class="v">
+          <code>halfvec(1024)</code> 半精度（float16）+ HNSW 索引，
+          参数 <code>m=16, ef_construction=64</code>。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">依据</div>
+        <div class="v">
+          半精度把存储和内存都砍半（<span class="good">7.6GB → 3.8GB</span>），
+          而句向量对精度不敏感 —— 余弦相似度的排序几乎不变。
+          HNSW 参数取 m=16 是召回率和内存的常见平衡点；
+          <code>ef_construction=64</code> 建索引质量够用，建库时间可控。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">配套限制</div>
+        <div class="v">
+          只对 <strong>≥8 字</strong>的片段建索引。359 万片段里短于 8 字的多是
+          「嗯」「那个」这类 ASR 碎片，进了索引只会污染召回。
+        </div>
+      </div>
+      <div class="tradeoff">
+        <strong>踩过的坑：</strong>一开始想用 hnswlib（独立索引文件），结果 Windows 上
+        编译失败（缺 MSVC）。这也反过来说明选 pgvector 的一个隐性好处 ——
+        <strong>它是数据库扩展，不需要编译原生库</strong>，安装就是 <code>CREATE EXTENSION</code>。
+      </div>
+    </div>
+  </div>
+
+  <!-- 决策 5 -->
+  <div class="decision">
+    <div class="decision-head">
+      <div class="q">DECISION 05 · 队列</div>
+      <h3>要不要引入 RabbitMQ？</h3>
+    </div>
+    <div class="decision-body">
+      <div class="kv">
+        <div class="k">背景</div>
+        <div class="v">
+          现有 RQ + Redis 跑后台转写。但 RQ 在 Windows 上用 <code>SimpleWorker</code>，
+          任务崩溃会带走 worker 进程 —— 这个缺陷让人想换一套。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">决定</div>
+        <div class="v"><strong>不换。</strong>保留 RQ，改执行模型。</div>
+      </div>
+      <div class="kv">
+        <div class="k">依据</div>
+        <div class="v">
+          三条理由：<br>
+          ① <strong>量级不匹配</strong>：日任务量几十个，RabbitMQ 的万级/秒吞吐完全用不上；<br>
+          ② <strong>运维成本翻倍</strong>：Windows 装 RabbitMQ 要拖一个 Erlang 运行时，而 Redis 已经在跑了
+          （RQ + 缓存共用）；<br>
+          ③ <strong>真正的问题不是队列选型</strong>：worker 崩溃的根因是「Windows 不能 fork」，
+          换任何 broker 都一样 —— 消费者崩了还是得重启。这是执行模型问题，不是消息中间件问题。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">实际做法</div>
+        <div class="v">
+          队列负责「跑起来」，数据库状态机负责「跑得怎么样」。
+          任务状态落在 <code>ai_jobs</code> 表里，worker 重启时扫 <code>running</code> 的行重新入队，
+          <code>cancelling</code> 的行直接终结 —— 不依赖 broker 的可靠性保证。
+        </div>
+      </div>
+      <div class="tradeoff">
+        <strong>如果将来要动，正确顺序是：</strong>先做任务级子进程隔离（崩溃只死子进程），
+        再看要不要换 broker。先换 broker 是治标 —— 这个判断在面试里比「我用了 RabbitMQ」值钱。
+      </div>
+    </div>
+  </div>
+
+  <!-- 决策 6 -->
+  <div class="decision">
+    <div class="decision-head">
+      <div class="q">DECISION 06 · 部署</div>
+      <h3>容器化到什么程度？</h3>
+    </div>
+    <div class="decision-body">
+      <div class="kv">
+        <div class="k">背景</div>
+        <div class="v">
+          原本靠 <code>start.bat</code> 起两个命令行窗口，依赖装在本地 venv。
+          换台机器就废，也没法交付给别人。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">决定</div>
+        <div class="v">
+          五个服务全容器化（PG + Redis + 后端 + worker + nginx 前端），
+          但 <strong>保留本地 venv 开发模式</strong>。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">依据</div>
+        <div class="v">
+          容器负责「交付和部署」，venv 负责「改代码」。
+          在 Windows 上把源码挂进容器做热重载，文件监听会慢得没法用 ——
+          所以不强行统一，两种模式并存，都能跑。
+        </div>
+      </div>
+      <div class="kv">
+        <div class="k">关键细节</div>
+        <div class="v">
+          · 后端容器内监听 <strong>8000</strong> 而不是 80（Linux 下非 root 不能绑 &lt;1024 端口），由 nginx 映射；<br>
+          · 依赖 <code>condition: service_healthy</code> 而不是只等容器启动；<br>
+          · 入口脚本先等库可连、再建表、再起服务，避免启动顺序竞争；<br>
+          · CUDA 拆成可选依赖，默认镜像 1.66GB 而非 4GB+。
+        </div>
+      </div>
+      <div class="tradeoff">
+        <strong>代价说清楚：</strong>镜像 1.66GB 偏大（ffmpeg + 科学计算栈）。
+        进一步优化可以换成 Alpine + 按需装 ffmpeg，但这个项目是单机部署，镜像大小不敏感，
+        优先保证「拉下来就能跑」。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 ============ -->
+<section id="pits">
+  <div class="sec-head"><span class="sec-num">05</span><h2>十个坑</h2></div>
+  <p class="sec-desc">
+    按「现象 → 排查 → 根因 → 修复 → 教训」写。这些是面试里「你遇到过什么难题」的标准答料，
+    重点不是坑本身，而是<strong>你是怎么定位到它的</strong>。
+  </p>
+
+  <!-- 坑 1 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">01</span>
+      <h3>中文全文搜索，一直是零命中</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        搜索「依赖注入」「红烧肉」这类词，接口正常返回 200，但结果永远靠 <code>LIKE '%词%'</code> 兜底。
+        列表能出来，所以在页面上看着「好像能用」。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        直接在 SQLite 里跑 FTS5 的 <code>MATCH</code>，三条测试数据全部零命中。换 <code>tokenize='trigram'</code>
+        重建后，三条全部命中。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        FTS5 默认 <code>unicode61</code> 分词器按空格和标点切词。中文句子没有空格，
+        整句被当成一个 token —— 所以永远匹配不上。<strong>英文能搜、中文不能搜</strong>，这是最迷惑的地方。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        迁到 PostgreSQL 后用 <code>pg_trgm</code>（三元组），本质上和 trigram 分词同理：
+        把「依赖注入」切成「依赖注」「赖注入」这样的三字滑窗，中文天然可切。
+        GIN 索引让 <code>ILIKE '%词%'</code> 也能走索引，实测 3~32ms。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          「接口返回 200」和「功能正确」是两件事。这个 bug 活了半年没被发现，
+          因为它有兜底逻辑把错误掩盖成了「结果质量差一点」。
+          <strong>凡是带兜底的代码路径，都要单独验证主路径是否真的在工作。</strong>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 2 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">02</span>
+      <h3>319 万条向量，全是废数据</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        库里有一张 14GB 的向量表，359 万条，看起来「已经做完了向量化」。
+        但检索出来的片段完全不相关：查「FastAPI 依赖注入」，返回「33B」「申考贝」「那猪那玩」。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        打印相似度距离 —— 全部集中在 <strong>1.35</strong>。余弦距离 1.35 意味着<em>负相关</em>，
+        正相关的正常值是 0.3~0.5。换 bge-m3 重新查，距离变成 0.647。立刻明白：<strong>建库和查询用的不是同一个模型</strong>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        建向量时用 bge-m3，查询时用 qwen3-embedding。不同模型的向量空间完全不同，
+        跨空间算余弦相似度等于随机数。另外 vec0 没有 ANN 索引，就算模型对上，
+        暴力扫 14GB 也要 <strong>26 秒</strong>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        整表 DROP，按统一模型重建；换 pgvector + HNSW；只对 ≥8 字片段建索引。
+        顺带把库从 15GB 缩到 1.77GB。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>向量必须记录「是谁生成的」。</strong>重建后的表里我加了 <code>model</code> 和 <code>dim</code> 两列，
+          查询时能直接筛出模型不匹配的数据。这是向量库最容易埋的隐性故障：
+          不报错、不崩，只是结果变垃圾。
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 3 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">03</span>
+      <h3>单次 LLM 调用 57 秒，只因为少传了一个参数</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        切换外部模型后，问一句「你好」要等将近一分钟。但同样的模型在网页版里反应很快。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        抓返回体，发现 <code>reasoning_content</code> 字段里有一大段思考过程 —— 模型在「深思」。
+        逐组参数实测：
+        <div class="table-wrap" style="margin-top:10px">
+          <table>
+            <thead><tr><th>参数写法</th><th>耗时</th><th>是否产生思考</th></tr></thead>
+            <tbody>
+              <tr><td>不传</td><td class="num bad">57.4s</td><td>是</td></tr>
+              <tr><td><code>reasoning_effort="low"</code></td><td class="num">0.8s</td><td>仍产生</td></tr>
+              <tr><td><code>enable_thinking=False</code></td><td class="num">0.5s</td><td>仍产生</td></tr>
+              <tr><td><code>chat_template_kwargs={"thinking": false}</code></td><td class="num good">0.4s</td><td class="good">不产生</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        这是个非标准参数，必须放在 <code>extra_body</code> 里透传。更要命的是：
+        用 LangChain 的 <code>model_kwargs</code> 传会直接抛
+        <code>TypeError: Completions.create() got an unexpected keyword argument</code> ——
+        <code>model_kwargs</code> 会被当成顶层参数塞进去，而不是放进请求体。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        <code>ChatOpenAI(..., extra_body={"chat_template_kwargs": {"thinking": False}})</code>。
+        <strong>57.4s → 0.4s，差 140 倍。</strong>
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          性能问题先抓「上游到底在干什么」，不要一上来就优化自己的代码。
+          如果当时去查连接池、加缓存、改异步，一周也解决不了，因为瓶颈根本不在我这边。
+          <strong>看返回体的每一个字段，包括你以为没用的那些。</strong>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 4 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">04</span>
+      <h3>检索 1.2 秒，其中 1.1 秒是纯浪费</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        「Promise 链式调用怎么用」这类长句要 1.2 秒，「事件循环是什么」只要 50ms。同样都是中文查询。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        分段计时，发现时间全花在词法路的 <code>similarity()</code> 上。
+        再看结果：这些长句的词法命中<strong>一条都没进最终 top3</strong>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        pg_trgm 的整句相似度是「查询串 vs 片段」的三元组重叠比例。
+        查询越长、分母越大，分数被稀释得越厉害 —— 长句查出来的都是
+        「from fastapi」「Python PHP研发部」这种碎片。
+        <strong>花 1.1 秒算出来的排名，最后被 RRF 当成噪声丢掉了。</strong>
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        按查询形态分流：<strong>超过 8 字且有技术术语</strong>时，跳过整句相似度，只做术语 <code>ILIKE</code>。
+        实测 <span class="good">1202ms → 157ms</span>，且结果质量不变（因为那些命中本来就没用）。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>优化前先确认这段计算有没有影响结果。</strong>
+          如果一条路径的产出最终会被丢弃，那它跑得再快也是浪费。
+          我在这里花的时间不多，但如果一开始就去调索引参数、加缓存，就是白干。
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 5 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">05</span>
+      <h3>规划图自己跟自己较劲，白跑两轮</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        学习路径生成要 100 秒，但手动单独调同样的 prompt 只要 25 秒。查图状态发现
+        <code>revision=3</code> —— 说明重排循环跑了两轮。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        看校验节点的判定逻辑：它把「估算总时长超出期限」「步骤超过 10 个」都算成了<strong>阻塞问题</strong>，
+        触发回退重排。但重排一次，模型的估算并不会变准。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        把「提示性问题」误判成「阻塞性问题」。LLM 对时长的估算本身就不精确，
+        让它重排只是换个数字，产物几乎没差别，但用户多等 40 秒。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        校验只对<strong>真问题</strong>触发重排：「所有步骤都没有视频支撑」「步骤超过 12 个」。
+        时长超标降级为提示，写进 summary 一起返回。同时 <code>MAX_REVISION</code> 从 2 降到 1。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>循环的退出条件要问一句「重试真的会让结果更好吗」。</strong>
+          如果答案是否定的，那这个重试只是把不确定性转成了延迟。
+          自校验（self-critique）看起来高级，但阈值设错就是纯浪费。
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 6 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">06</span>
+      <h3>Docker 构建「挂死」十几次，卡在装 ffmpeg</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        <code>docker compose build backend</code> 跑了 13 分钟没动静，日志停在同一行。
+        反复重试，每次都「挂死」在同一个位置。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        前几次失败是因为用 <code>tail</code> 吞掉了实时输出，只能看到最后一屏。
+        改成 <code>tee</code> 落文件后再看，发现日志停在
+        <code>Get:4 http://deb.debian.org/debian ... Packages [9678 kB]</code> —— 卡在 apt 下载索引。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        直连 <code>deb.debian.org</code> 拉不动。这个问题在宿主机上不明显（有系统缓存），
+        但容器每次构建都是干净环境，必须重新下载。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        Dockerfile 里 <code>sed</code> 把 apt 源换成国内镜像，做成 <code>APT_MIRROR</code> 构建参数。
+        <strong>整步从 13 分钟降到约 100 秒。</strong>
+        另外给 pip 加了 <code>--mount=type=cache</code>，让 wheel 跨构建复用 ——
+        否则每次中断都要从头下载 langchain 全家桶。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>先让日志可见，再谈定位。</strong> 我在这上面浪费的时间，
+          一大半是因为排除了错误方向 —— 看不到日志就会怀疑是依赖冲突、内存不足。
+          另外：<strong>构建缓存不是自动的</strong>，<code>RUN --mount=type=cache</code> 要显式声明。
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 7 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">07</span>
+      <h3>本地编译一直过，Docker 里报一堆类型错误</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        本地 <code>tsc -b</code> 一直是 <code>exit 0</code>，容器里 <code>npm run build</code> 却报
+        <code>Cannot find module '../../prompts/clientPrompts'</code>，
+        外加两条「参数 <code>t</code> 隐式具有 any 类型」。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        报错指向 <code>aiPromptDefaults.ts</code> —— 它是一行 <code>export { ... } from '../../prompts/clientPrompts'</code>。
+        Dockerfile 只拷了 <code>src/</code> 和 <code>public/</code>，没拷项目根的 <code>prompts/</code>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        两层原因叠加：<br>
+        ① 前端类型依赖了一个<strong>在 src 之外的目录</strong>，构建上下文没覆盖；<br>
+        ② 模块找不到 → 导出的类型退化成 <code>any</code> → 连带出「隐式 any」的二次报错
+        （所以那两条像是独立 bug，其实同一个根因）。<br>
+        而本地之所以不复现，是因为 <code>tsc -b</code> 有<strong>增量缓存</strong>
+        （<code>.tsbuildinfo</code>），没改动过的文件直接跳过检查。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        Dockerfile 加 <code>COPY prompts ./prompts</code>；本地用 <code>tsc -b --force</code> 复核，
+        确认根因判断正确（而不是靠「在 Docker 里碰运气重试」通过）。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>增量编译的「通过」不等于「正确」。</strong>
+          容器化最大的隐性收益就是这个：它提供了一个干净环境，
+          把本地缓存掩盖的问题全暴露出来。发布前跑一次全量检查，是必要成本。
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 8 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">08</span>
+      <h3>容器里所有视频 404，还顺手把数据库洗了</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        容器起来后视频全部 404，缩略图也 404。更诡异的是，测了两个视频之后，
+        数据库里这两条的 <code>thumbnail</code> 字段<strong>变成了空值</strong>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        先看路径：数据库里存的是 <code>D:\ITJC\Python\xxx.mp4</code>，
+        容器里视频挂在 <code>/videos</code>。宿主机绝对路径在容器里根本不存在。<br>
+        再看那两条被清空的数据：<code>get_thumbnail</code> 的逻辑是
+        「文件不存在 → 把数据库字段置空，让前端显示占位图」。所以每次 404 都在删数据。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        两个问题叠在一起：<br>
+        ① 缺少「宿主机路径 → 容器路径」的映射层；<br>
+        ② 兜底逻辑把「路径配错了」误判成「文件真的没了」，还写回数据库。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        ① 新增 <code>resolve_media_path()</code>：先试原路径，不存在再按
+        <code>PATH_MAP</code> 做前缀替换（最长前缀优先），本地 venv 跑法完全不受影响；<br>
+        ② 加平台判断：Linux 容器里遇到 <code>D:\</code> 开头的路径，说明是映射缺失而不是文件丢失，
+        <strong>只报 404 + 打警告，不动数据</strong>。被误清的 2 条已恢复。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>「读失败」不应该等于「删数据」。</strong>
+          任何在读取路径上顺手写库的逻辑，都要问一句：如果失败原因是环境问题而不是数据问题，
+          这次写入会不会造成不可逆的损失？容器化会把所有路径假设暴露一遍，
+          这类兜底逻辑就是第一批被冲垮的。
+        </div>
+      </div></div>
+    </div>
+  </div>
+  <!-- 坑 9 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">09</span>
+      <h3>「最近 7 天学了 44 分钟」，实际是 338 分钟</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        学习助手说「最近 7 天共学习 44 分钟，涉及 5 个视频」。但直接查数据库，
+        同样 7 天加起来是 338 分钟 —— 差了 8 倍。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        看工具实现，发现一行 <code>.limit(200)</code>：先按时间倒序取 200 条事件，
+        再在内存里 <code>sum(delta_sec)</code> 当总量。
+        200 条心跳只覆盖了不到一天，所以「近 7 天」实际统计的是「最近几小时」。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        把「取明细」和「做统计」混在同一个查询里。
+        明细需要 LIMIT（结果给人看，太多没意义），统计绝不能 LIMIT（求和必须覆盖全集）。
+        这两个需求写在一个查询里，就会互相污染。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        拆成两个查询：统计用 <code>SUM</code> 交给数据库算（<code>338 分钟</code>），
+        明细单独查 <code>GROUP BY</code> + <code>LIMIT 10</code>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>聚合金句：有 LIMIT 的地方不能求和。</strong>
+          这个 bug 特别阴 —— 数字看起来完全合理（44 分钟不多不少），
+          没有报错、没有空值，只有和数据库对账才会发现。
+          凡是 Agent 引用的统计数字，都要能追溯到一条可复现的 SQL。
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- 坑 10 -->
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">10</span>
+      <h3>报「磁盘满」，但磁盘还有 334G</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        全量向量回填一启动就失败：
+        <code>DiskFull: could not resize shared memory segment ... No space left on device</code>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">排查</div><div class="pit-text">
+        <code>docker system df</code> 显示 Docker 总共才占 11GB，宿主机 C 盘剩 334G。
+        既然不是磁盘，就看报错里的关键词「shared memory segment」，
+        转而查容器内的 <code>/dev/shm</code> —— 只有 <strong>64MB</strong>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        Docker 默认把 <code>/dev/shm</code> 限制在 64MB。
+        PostgreSQL 的 <code>dynamic_shared_memory_type=posix</code> 正好用这块空间，
+        而 <code>work_mem=64MB</code> × 2 个并行 worker 一次就要 128MB，直接撑爆。
+        报错文案里的「No space left on device」把人往磁盘方向带，实际是内存段。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        compose 里给 postgres 加 <code>shm_size: 1gb</code>，重建容器（数据在命名卷里，不丢）。
+        回填恢复正常，约 72 条/秒。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        <div class="pit-lesson">
+          <strong>别被错误文案的关键词牵着走。</strong>
+          「DiskFull」是个异常类型名，不是诊断结论。
+          先量一遍（Docker 占用 11GB / 磁盘剩 334G），再顺着报错里的具体名词
+          （shared memory segment）去找，比顺着结论去猜快得多。
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 ============ -->
+<section id="results">
+  <div class="sec-head"><span class="sec-num">06</span><h2>成绩单</h2></div>
+  <p class="sec-desc">全部是实测数字，不是估算。面试时被追问「有数据吗」，就靠这一页。</p>
+
+  <h3>检索质量</h3>
+  <p>向量规模（截至 2026-11-16）：<code>content_chunks</code> 60,259 条 / 8,785 个有字幕视频，向量覆盖 100%；评测集为 6 个已知答案查询（覆盖 Python、前端、AI、数据库、网络、设计模式）。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>查询</th><th>Top-3 命中</th><th>相关度</th></tr></thead>
+      <tbody>
+        <tr><td>Promise 链式调用怎么用</td><td>3/3 命中《34、Promise链式调用问题》</td><td class="num good">0.72 – 0.77</td></tr>
+        <tr><td>事件循环是什么</td><td>3/3 命中《EventLoop 事件循环》</td><td class="num good">0.81 – 0.95</td></tr>
+        <tr><td>RRF 融合重排怎么做</td><td>3/3 命中《node_rrf_融合重排和算法说明》</td><td class="num good">0.64 – 0.68</td></tr>
+        <tr><td>装饰器的作用</td><td>3/3 命中《tool 装饰器开发》</td><td class="num good">0.68 – 0.85</td></tr>
+        <tr><td>原型链继承</td><td>3/3 命中《10、原型链继承》</td><td class="num good">0.80 – 0.85</td></tr>
+        <tr><td>langgraph 的 state 怎么定义</td><td>3/3 命中 langgraph state 相关</td><td class="num good">0.69 – 0.73</td></tr>
+        <tr><td colspan="2"><strong>合计命中率</strong></td><td class="num good">18/18</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>性能</h3>
+  <div class="grid-2">
+    <div class="stat-box">
+      <div><span class="before">26,750ms</span><span class="arrow">→</span><span class="after">6–25ms</span></div>
+      <div class="what">向量检索（6.0 万条 chunk；耗时为调优当时实测）</div>
+    </div>
+    <div class="stat-box">
+      <div><span class="before">0 命中</span><span class="arrow">→</span><span class="after">3–32ms 全命中</span></div>
+      <div class="what">中文全文检索</div>
+    </div>
+    <div class="stat-box">
+      <div><span class="before">1,202ms</span><span class="arrow">→</span><span class="after">157ms</span></div>
+      <div class="what">长句混合检索</div>
+    </div>
+    <div class="stat-box">
+      <div><span class="before">57.4s</span><span class="arrow">→</span><span class="after">0.4s</span></div>
+      <div class="what">单次 LLM 调用</div>
+    </div>
+    <div class="stat-box">
+      <div><span class="before">2,050ms</span><span class="arrow">→</span><span class="after">20ms</span></div>
+      <div class="what">嵌入模型首次响应（预热后）</div>
+    </div>
+    <div class="stat-box">
+      <div><span class="before">13 分钟</span><span class="arrow">→</span><span class="after">100 秒</span></div>
+      <div class="what">Docker 构建（apt 换源后）</div>
+    </div>
+  </div>
+
+  <h3>规模与成本</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>项</th><th>数值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>业务数据迁移</td><td class="num">359 万条 / 53.8 秒</td><td>COPY 协议，6.7 万行/秒</td></tr>
+        <tr><td>数据库体积</td><td class="num good">15GB → 1.77GB</td><td>清掉 14GB 废向量</td></tr>
+        <tr><td>向量存储</td><td class="num">halfvec 半精度</td><td>比 float32 省一半（存储 / 内存）</td></tr>
+        <tr><td>后端代码</td><td class="num">10,902 行 / 59 文件</td><td>FastAPI 单体 + worker（11/15 快照）</td></tr>
+        <tr><td>前端代码</td><td class="num">29,451 行 / 203 文件</td><td>React 19 + TS（11/15 快照）</td></tr>
+        <tr><td>镜像体积</td><td class="num">1.66GB / 191MB</td><td>后端 / 前端</td></tr>
+        <tr><td>启动到可用</td><td class="num">约 60 秒</td><td>五服务，含 healthcheck 等待</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="ico">!</span>
+    <div>
+      <strong>别只说「快了 N 倍」，要说清「怎么量的」。</strong>
+      上面每个数字都有对应的测量方式：检索取 top-k 命中率（人工判定 6 个已知答案的查询），
+      延迟取服务端 timings 字段分段计时，迁移取 COPY 的每秒行数。
+      面试官追问「你怎么证明」，能答上来的才算数据，否则只是感觉。
+    </div>
+  </div>
+</section>
+
+<!-- ============ 07 ============ -->
+<section id="v2">
+  <div class="sec-head"><span class="sec-num">10</span><h2>11/16 新增：检索提速、学习轨迹、记忆系统</h2></div>
+  <p class="sec-desc">这一批改动有个共同点：问题都不是「写错了代码」，而是「配置没生效」或「选错了实现」。下面每条都附了实测数字。</p>
+
+  <h3>1. 转写一直跑在 CPU 上（而且模型错了）</h3>
+  <p>配置里写的是 <code>whisper.cpp + large-v3</code>，实际跑的是 <code>faster-whisper + small + int8 + CPU</code>。三层原因叠加：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>层</th><th>问题</th><th>表现</th></tr></thead>
+      <tbody>
+        <tr><td>配置注入</td><td>compose 的 <code>environment</code> 是白名单，没有 <code>WHISPER_*</code></td><td>容器读代码默认值</td></tr>
+        <tr><td>实现选择</td><td><code>whisper.cpp</code> 指向 Windows exe</td><td>Linux 容器根本跑不了</td></tr>
+        <tr><td>依赖路径</td><td>nvidia 的 .so 在 site-packages，不在系统库路径</td><td>报 libcublas.so.12 not found</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>最坑的是 <code>device=auto</code>：没装 CUDA 库时<b>静默回退 CPU</b>，不报错、不打日志，只表现为「有点慢」。</p>
+  <div class="kv">
+    <div><b>修复前</b>large-v3+Vulkan 13.4s / 50 秒音频</div>
+    <div><b>修复后</b>large-v3+CUDA 6.34s（7.9x 实时）</div>
+  </div>
+  <p>另外发现 <code>_ensure_cuda_libs()</code> 首行是 <code>if os.name != "nt": return</code> —— 只管 Windows，Linux 容器完全指望不上。改在 Dockerfile 里 <code>ldconfig</code> 注册。</p>
+
+  <h3>2. reranker 从 LLM 排序换成 cross-encoder</h3>
+  <p>原来把 20 个候选拼进 prompt 让 LLM 排序。两个硬伤：慢（5 秒）、不稳（同一条查询两次结果可能不同）。</p>
+  <p>换成硅基流动的 <code>BAAI/bge-reranker-v2-m3</code>，它直接算 query-doc 匹配分，不生成文本。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>LLM listwise</th><th>cross-encoder</th></tr></thead>
+      <tbody>
+        <tr><td>延迟</td><td class="num bad">5000ms</td><td class="num good">484ms</td></tr>
+        <tr><td>确定性</td><td>概率性</td><td>确定性</td></tr>
+        <tr><td>分数分布</td><td>只能排序</td><td class="num good">相关 0.99 / 无关 0.00002</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><b>最后一行是关键</b>：分数差 6 万倍，终于可以卡阈值。之前向量余弦分挤在 0.4–0.6，从来没法定阈值。</p>
+  <p>阈值调了两轮：<code>0.02</code> 时「红烧肉怎么做」返回 1 条（0.0852，不该有结果）；改 <code>0.10</code> 后正确返回空，同时保住了「RAG 召回和重排」（0.2739）。</p>
+  <p>最终 8/11 正确。剩下的两个错都不是参数问题：</p>
+  <ul>
+    <li>「Playwright vs BrowserUse」返回空 —— 库里确实没有对比这两个工具的内容，过滤是对的</li>
+    <li>「今天天气」0.88 假阳性 —— 片段在讲代码里的天气函数，语义沾边。阈值救不了，靠 Agent 层话题分流规避</li>
+  </ul>
+
+  <h3>3. 学习轨迹：把五个数据源串成一条线</h3>
+  <p>数据一直都有，但没人放在一起看：观看（<code>watch_events</code>）、完成（<code>watch_history</code>）、笔记、日历、番茄钟（<code>user_data</code>）。</p>
+  <p>经验值算法刻意保持可解释：<b>观看 1 分钟 = 1 点，专注 1 分钟 = 2 点，笔记 1 篇 = 5 点，完成 1 视频 = 20 点</b>。面试被问「等级怎么算」，能一句话说清比复杂公式有用。</p>
+  <p>做的过程中发现一个统计 bug：笔记数直接 <code>count(notes)</code>，但每个转写视频都会自动生成一条 <code>source='ai'</code> 的笔记，demo 账号显示「笔记 8770 篇」，经验值直接冲到满级。只算手写后回到 Lv.3（1078 经验 / 998 分钟），这才符合真实投入。</p>
+
+  <h3>4. 记忆系统：四层，按「谁写入」划权</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>层</th><th>写入方</th><th>LLM 能改吗</th></tr></thead>
+      <tbody>
+        <tr><td>档案（称呼/职业/目标）</td><td>用户手填</td><td>不能</td></tr>
+        <tr><td>助手设定（语气/主动程度）</td><td>用户手填</td><td>不能</td></tr>
+        <tr><td>记忆条目（一句一条，可 pin）</td><td>用户 + LLM 自动提取</td><td>能，但 pinned 的不能</td></tr>
+        <tr><td>派生数据（画像/等级）</td><td>系统计算</td><td>只读</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>自动提取走异步（不阻塞回答），落库前有二次校验：<b>LLM 只是提议，代码是闸门</b>。</p>
+  <p>实测：输入「我每周六要带孩子完全学不了；我习惯早上六点起来学，晚上效率低」，后台异步抽取完成后（LLM 超时 40s）自动多出两条，类型判断正确（preference / constraint），来源标 <code>inferred</code> 区别于手动的 <code>manual</code>。</p>
+
+  <h3>这一批的教训</h3>
+  <p><b>「配置写了」和「配置生效了」是两件事。</b>中间有四道关卡都可能断：配置有没有传进进程、传进去的能不能执行、依赖库能不能被找到、拿不到时是报错还是静默降级。</p>
+  <p>第四点最危险 —— 静默降级会让人以为一切正常，只是「有点慢」。这个问题在 whisper、embedding、rerank 上各踩了一次。</p>
+</section>
+
+<section id="interview">
+  <div class="sec-head"><span class="sec-num">07</span><h2>面试怎么答</h2></div>
+  <p class="sec-desc">
+    每一条都标了「考察点」——知道对方想听什么，才知道该往哪答。
+  </p>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q1</span><span>为什么用 pgvector 而不是 Milvus？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>你是「听过 Milvus」还是「真的权衡过」。</p>
+      <div class="say">
+        因为这个项目真正的瓶颈不止向量。当时 SQLite 已经 15GB，单写锁让转写任务和前端查询互相卡，
+        备份还得停服务。如果只上 Milvus，向量问题解决一半，业务库的问题原封不动。
+        pgvector 让业务数据和向量待在同一个库里，一个容器、一份备份、一次事务。
+        量级上也够：当前六万多条 chunk、1024 维，HNSW 实测 6~25ms。Milvus 的优势在千万级以上和分布式，
+        这个量级用不上，却要多维护 etcd 和 MinIO 三件套。
+      </div>
+      <p>
+        <strong>加分点：</strong>主动补一句「如果向量涨到千万级，或者要做多租户隔离，我会拆出去」——
+        表明你知道它的边界在哪。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q2</span><span>混合检索为什么用 RRF，不直接加权求和？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>你懂不懂「分数不可比」这件事。</p>
+      <div class="say">
+        因为两路的分数根本不在一个量纲上。词法那边是 pg_trgm 的三元组重叠率，范围 0~1，
+        但值域分布很偏；向量那边是余弦相似度，实际集中在 0.5~0.9。
+        直接加权求和，等于拿「摄氏度和华氏度加权平均」—— 权重调起来全靠试。
+        RRF 只用名次不用分数：<code>score = Σ w/(k + rank)</code>，k 取 60。
+        名次是天然可比的，而且对异常分数不敏感 —— 某一路给出一个离谱的高分也不会污染结果。
+      </div>
+      <p><strong>追问「权重怎么定的」：</strong>词法 0.8、语义 1.2、元数据 1.5。依据是抽检：
+      语义在跨表述召回上更可靠（问「函数返回另一个函数」能找到闭包），
+      词法容易被短碎片干扰，所以给语义更高权重。</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q3</span><span>RAG 的完整链路，从头到尾讲一遍</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>你脑子里有没有一张完整的图，而不是只知道「存向量、查向量」。</p>
+      <div class="say">
+        分两段。<strong>离线</strong>：视频 → ffmpeg 抽音轨 → Whisper 转写 → 切成 3~5 秒的片段落库 →
+        bge-m3 批量嵌入（batch 256，约 84 条/秒）→ 写入 pgvector 的 halfvec 列 → 建 HNSW 索引。<br>
+        <strong>在线</strong>：用户提问 → 同时跑词法、语义、元数据三路召回各 30 条 → RRF 融合取前 20 条 →
+        cross-encoder 重排 + 阈值 0.10 过滤（API 失败退回 LLM listwise）→ 参考片段最多 5 张 → 连同问题、画像、记忆、会话摘要一起组 prompt →
+        LLM 生成回答 → SSE 逐 token 推给前端 → 回答里带《视频名》和 mm:ss。参考卡片当前由前端开关 <code>FEATURES.chatVideoReferences</code> 控制，2026-11-16 默认关闭、不渲染。
+      </div>
+      <p>
+        <strong>容易被忽略的一环：</strong>重排是「锦上添花但不能拖死主流程」的，
+        兜底的 LLM listwise 设了 8 秒硬超时，超时直接退回 RRF 原序。检索的可用性不能依赖一个可能变慢的外部服务。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q4</span><span>Agent 和普通 RAG 有什么区别？你这个算 Agent 吗？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>概念边界是否清晰，别把「调一次模型」说成 Agent。</p>
+      <div class="say">
+        普通 RAG 是固定流水线：检索 → 塞进 prompt → 生成。链路写死，模型只负责最后一步。
+        Agent 的核心区别是<strong>模型自己决定要不要调工具、调哪个、调几次</strong>。
+        这个项目里，问「库里有讲事件循环的视频吗」，模型会自己决定并行调
+        <code>search_video_titles</code> 和 <code>search_videos</code> 两个工具，
+        拿到结果后组织回答；问「我最近学得怎么样」，它会先调 <code>get_learning_profile</code>
+        和 <code>get_recent_activity</code> 拿真实数据，而不是凭空鼓励。
+      </div>
+      <p>
+        <strong>边界：</strong>它是「单 Agent + 多工具」，不是多 Agent 协作。
+        多 Agent 我刻意没上 —— 这个场景没有需要分工的子任务，加了只会增加不确定性和调试成本。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q5</span><span>工具调用怎么防止死循环？</span></div>
+    <div class="qa-a">
+      <div class="say">
+        两层。第一层是硬性上限：<code>recursion_limit=12</code>，
+        超过直接终止，避免模型反复调同一个工具。第二层是工具设计本身要幂等、要快：
+        检索类工具都是只读的，重复调不会产生副作用；单个工具控制在毫秒级，不会因为慢而超时重试。
+        另外所有执行都记在 <code>agent_runs</code> 表里，工具名、参数、返回摘要、耗时全落库 ——
+        出问题能复盘是哪一步开始跑偏的。
+      </div>
+      <p><strong>可以补一句：</strong>更根本的办法是让工具返回结果足够明确。
+      我所有工具返回的都是「人读得懂的短文本」，如果返回一堆 JSON 字段，
+      模型容易反复解析、反复确认，反而更容易绕圈。</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q6</span><span>会话记忆怎么做的？为什么不用 LangChain 的 Memory？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>你是套模板还是想过「记忆到底是什么」。</p>
+      <div class="say">
+        分三层，职责不同：<br>
+        · <strong>原始消息</strong>：最近 10 条原文直接进上下文；<br>
+        · <strong>会话摘要</strong>：超过 24 条时，把更早的对话压成 300 字要点（保留目标、结论、待办、偏好，
+        丢掉寒暄和推理过程），存在 <code>chat_sessions.summary</code>；<br>
+        · <strong>长期记忆</strong>：跨会话仍然成立的事实（目标岗位、明确偏好、约束），
+        单独一张 <code>memory_items</code> 表，按重要度 + 新鲜度召回。
+      </div>
+      <p>
+        <strong>没用 LangChain Memory 的原因：</strong>它的抽象把「存哪儿、什么时候压、压成什么」
+        都藏起来了，而我需要控制压缩时机（按消息条数触发，失败就保留原文不做压缩），
+        也需要和数据库事务对齐。这块逻辑一共不到 200 行，自己写比调框架更清楚。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q7</span><span>你怎么知道检索结果是「对的」？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>这个是分水岭问题。答「感觉还行」就废了。</p>
+      <div class="say">
+        建了一个很小的评测集：6 个查询，每个我都知道正确答案在哪个视频。
+        比如「原型链继承」必须命中《10、原型链继承》那门课，
+        「RRF 融合重排」必须命中库里讲 RRF 的那一节。跑完看 top3 里有没有正确答案。
+        第一次跑是 18/18。
+      </div>
+      <p>
+        <strong>为什么这么小的集合也够用：</strong>因为我用它做「回归检测」而不是「证明系统多强」。
+        任何改动（换模型、调权重、改索引参数）之后重跑一遍，命中率掉了就说明改坏了。
+        6 个查询 30 秒就能跑完，成本低到可以每次改完都跑。
+      </p>
+      <div class="avoid">
+        不要说「我用 RAGAS / 各种指标做了全面评估」。这个项目没做，
+        被追问具体指标怎么算、样本从哪来，会立刻露馅。
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q8</span><span>为什么不微调模型？</span></div>
+    <div class="qa-a">
+      <div class="say">
+        因为问题不在模型能力，在数据。这个场景的失败案例几乎都是「字幕转写本身错了」
+        （ASR 把「闭包」听成「报表」这类），或者「库里根本没有相关内容」。
+        这两种情况微调都救不了 —— 前者要把字幕校对做好，后者要如实告诉用户没有。
+        微调适合的是「风格、格式、固定任务」这类问题，而检索增强适合「知识」问题。
+        我这个是知识问题。
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q9</span><span>16GB 内存的单机，怎么扛住几万条向量？</span></div>
+    <div class="qa-a">
+      <div class="say">
+        三个手段叠起来：<br>
+        ① <strong>半精度存储</strong>：<code>halfvec(1024)</code> 而不是 <code>vector(1024)</code>，存储和内存比 float32 省一半；<br>
+        ② <strong>HNSW 而不是暴力扫</strong>：不加载全量向量，靠图索引近似近邻，
+        查询只碰一小部分节点；<br>
+        ③ <strong>入库前过滤</strong>：只对 ≥8 字的片段建索引，
+        短片段多是 ASR 碎片，进索引只会污染召回。
+      </div>
+      <p>
+        <strong>顺带一提：</strong>最初试过 hnswlib，Windows 上编译失败（缺 MSVC）。
+        pgvector 是数据库扩展，安装就是一条 <code>CREATE EXTENSION</code>，
+        不需要编译原生库 —— 这在生产环境是个被低估的优势。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q10</span><span>为什么不上 RabbitMQ / Kafka？</span></div>
+    <div class="qa-a">
+      <div class="say">
+        量级不匹配，而且真正的问题不在队列。日任务量几十个，RabbitMQ 的吞吐优势完全用不上，
+        但 Windows 上装它要拖一个 Erlang 运行时，运维成本翻倍。
+        更关键的是：当时 worker 崩溃的根因是「Windows 不能 fork」，
+        任务崩溃会带走整个 worker 进程 —— 换任何 broker 都一样，消费者崩了还是得重启。
+        这是执行模型问题，不是消息中间件问题。
+      </div>
+      <p>
+        <strong>实际解法：</strong>队列只负责「让任务跑起来」，可靠性交给数据库状态机。
+        任务状态落在 <code>ai_jobs</code> 表，worker 重启时扫 <code>running</code> 的行重新入队，
+        <code>cancelling</code> 的行直接终结。不依赖 broker 的持久化保证。
+      </p>
+      <div class="say" style="margin-top:12px">
+        如果将来要动，正确顺序是先做任务级子进程隔离（崩溃只死子进程），再看要不要换 broker。
+        先换 broker 是治标。
+      </div>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q11</span><span>大改动怎么保证不把系统搞炸？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>有没有工程纪律，而不是「改完能跑就行」。</p>
+      <div class="say">
+        四条：<br>
+        ① <strong>先打 tag 留回滚点</strong>：动手前 <code>baseline-before-3.0</code>，任何时刻能回去；<br>
+        ② <strong>源数据只读</strong>：迁移脚本用 <code>mode=ro</code> 打开旧库，一行都没写过 ——
+        这是「敢删 14GB 数据」的前提；<br>
+        ③ <strong>分层提交</strong>：七次提交按依赖顺序，每层可独立回滚，
+        不是「一口气改完一次提交」；<br>
+        ④ <strong>每层验证再往下走</strong>：迁移完先核对行数（359 万对不对），
+        再跑检索，再做端到端。
+      </div>
+      <p>
+        <strong>补充：</strong>破坏性变更在提交信息里打 <code>!</code> 标记，
+        并且写清楚「改了什么、为什么、怎么回滚」，方便未来的自己。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q12</span><span>这个项目最大的技术难点是什么？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>你判断「难」的标准，暴露你的技术水平。</p>
+      <div class="say">
+        不是写代码，是<strong>判断东西有没有真的在工作</strong>。
+        中文检索失效、向量模型不匹配这两个问题，系统都不报错、不崩，接口一直返回 200。
+        它们以「结果质量差一点」的形式存在了半年。
+        我最后是靠「造一个已知答案的测试集，去问它答不答得上来」才发现的。
+      </div>
+      <p>
+        这件事给我的认知是：<strong>RAG 系统最大的风险是「静默劣化」</strong>。
+        传统服务挂了有 5xx、有告警；检索系统坏了只是答案变差，没人会发现。
+        所以后来我加的每个兜底逻辑都会想一句：它会不会把错误掩盖成「质量差」。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q13</span><span>前端流式输出怎么实现的？为什么不用 WebSocket？</span></div>
+    <div class="qa-a">
+      <div class="say">
+        用 SSE。对话是「客户端发一次、服务端持续推」的单向流，不需要双向通信，
+        SSE 比 WebSocket 简单：基于 HTTP、能复用现有的鉴权和代理配置、断线自动重连。
+      </div>
+      <p>
+        <strong>两个实操细节：</strong><br>
+        ① <code>EventSource</code> 不支持 POST，所以用 <code>fetch</code> + <code>ReadableStream</code>
+        手动解析 <code>data: {...}\n\n</code> 的帧；<br>
+        ② nginx 默认会缓冲响应，SSE 会被攒成一整块才发出去 —— 必须对那个 location
+        单独 <code>proxy_buffering off</code>，后端也发 <code>X-Accel-Buffering: no</code> 双保险。
+      </p>
+      <p>
+        <strong>前端渲染细节：</strong>token 是单字粒度（中文模型基本都这样），
+        如果每个字都 <code>setState</code>，一秒钟触发几十次重渲染。
+        所以用 <code>requestAnimationFrame</code> 合并：token 先进缓冲区，按帧提交一次。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q14</span><span>如果让你继续做，下一步做什么？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>你有没有真的想过这个项目的短板，而不是「已经做完了」。</p>
+      <div class="say">
+        按优先级三件：<br>
+        ① <strong>补埋点</strong>。现在学习行为表基本是空的，所以画像里「观看时长」「活跃时段」
+        全是零。规划功能是有的，但输入数据不够，输出的建议就偏空泛。
+        这是当前最影响体验的短板。<br>
+        ② <strong>字幕质量</strong>。ASR 错误是检索效果的天花板。
+        计划对高价值课程跑一轮 LLM 校对，把「申考贝」这类碎片修掉。<br>
+        ③ <strong>字幕校对与埋点补全</strong>。向量已全量覆盖（60,259 条 chunk，截至 2026-11-16）；
+        剩下的是把高价值课程的 ASR 错误修掉、把学习行为埋点补齐。
+      </div>
+      <p>
+        <strong>还有一个我想做但没做的：</strong>把「学习路径的完成情况」回流到推荐里 ——
+        现在路径是生成完就不管了，应该根据用户实际完成度动态调整后面的步骤。
+      </p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="qa-q"><span class="mark">Q15</span><span>这个项目有几个人做？做了多久？</span></div>
+    <div class="qa-a">
+      <p><strong>考察点：</strong>真实性和你的角色定位。<em>这题必须诚实，见下一节。</em></p>
+      <div class="say">
+        一个人。时间跨度上分两段：5 月集中做了 9 天把功能跑起来，
+        然后停了半年去补后端基础，11 月用一天做架构重构。
+        代码主体是 AI 协作产出的，我负责的是技术选型、验证方案设计、排错和最终判断 ——
+        比如「中文检索到底能不能用」这件事，是我造测试集去问出来的，不是 AI 主动发现的。
+      </div>
+      <p>
+        详细说法和话术见下一节，这里的关键是：<strong>不要含糊其辞</strong>。
+        含糊比承认更危险 —— 面试官只要追问两层实现细节就能分辨。
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 08 ============ -->
+<section id="tell">
+  <div class="sec-head"><span class="sec-num">08</span><h2>怎么讲这个项目</h2></div>
+  <p class="sec-desc">
+    这一节解决一个具体问题：代码主要是 AI 写的，面试时怎么说才不减分、甚至加分。
+  </p>
+
+  <h3>先明确一个判断</h3>
+  <div class="note">
+    <span class="ico">!</span>
+    <div>
+      <strong>「AI 辅助」不是需要遮掩的事，含糊其辞才是。</strong>
+      2026 年还假装所有代码都是手敲的，反而不真实。企业真正担心的是两件事：
+      ① 你是不是只会复制粘贴，出了问题没法定位；
+      ② 你是不是不知道自己在用什么，换个场景就抓瞎。<br>
+      所以策略不是「隐瞒」，而是<strong>把「人做的判断」和「AI 做的实现」分清楚</strong>，
+      并且证明前者是你做的。
+    </div>
+  </div>
+
+  <h3>三个长度的版本</h3>
+
+  <h4>30 秒版（自我介绍里带一句）</h4>
+  <div class="say">
+    我自己做了一个面向个人学习的 RAG 系统。起因是我硬盘里有 1.4 万个技术视频，
+    想找「某个知识点在哪门课第几分钟」完全找不到。
+    系统把视频转成 359 万字幕片段，用混合检索（词法 + 向量）来定位，
+    再叠一层带工具调用的 Agent 做问答和路径规划。
+    最近一次重构我把数据库从 SQLite 换到 PostgreSQL + pgvector，
+    顺手发现原来的中文检索其实是失效的 —— 这个排查过程是我收获最大的部分。
+  </div>
+
+  <h4>3 分钟版（项目介绍环节）</h4>
+  <div class="say">
+    这个项目分两个阶段。<br><br>
+    <strong>第一阶段是 5 月</strong>，9 天时间把功能堆起来：视频库、字幕转写、番茄钟、日历、
+    任务队列。那时候的目标是「能跑起来」，接口返回 200、页面不报错就算完成。<br><br>
+    <strong>然后停了半年</strong>，去补后端基础。11 月回来看代码，第一件事是验证「检索到底能不能用」。
+    我造了 6 个已知答案的查询去测，结果发现中文查询<strong>一条都命中不了</strong> ——
+    因为 SQLite 的 FTS5 默认分词器不切中文，一直是靠 LIKE 兜底撑着，
+    界面上看着有结果，其实全是糊弄。<br><br>
+    <strong>这才有了第二阶段</strong>：换成 PostgreSQL + pgvector，
+    顺手清掉 14GB 的无效向量（建库和查询用了不同模型，跨空间算相似度等于随机数）；
+    检索改成词法 + 语义双路，用 RRF 融合；小助手从单轮问答升级成 LangGraph 的 Agent；
+    最后全栈容器化。<br><br>
+    <strong>结果</strong>：库从 15GB 降到 1.77GB，中文检索从零命中变成 3~32ms 全命中，
+    抽检命中率 18/18，单次模型调用从 57 秒降到 0.4 秒。<br><br>
+    代码主体是 AI 协作写的，我负责技术选型、验证方案设计和排错 ——
+    比如「中文检索失效」和「向量模型不匹配」这两个问题，系统都不报错，
+    是靠我设计测试集去问出来的。
+  </div>
+
+  <h4>10 分钟版（深挖环节）</h4>
+  <p>结构建议按这个顺序讲，每部分都有对应章节可以展开：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>讲什么</th><th>展开点</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0–1 min</td><td>问题是什么</td><td>1.4 万视频找不到内容，人工翻不现实</td></tr>
+        <tr><td class="num">1–3 min</td><td>系统怎么工作</td><td>三条数据流：入库、检索、对话（<a href="#arch">第 02 节</a>）</td></tr>
+        <tr><td class="num">3–5 min</td><td>两轮迭代的差别</td><td>「能跑」和「正确」之间那段（<a href="#story">第 03 节</a>）</td></tr>
+        <tr><td class="num">5–7 min</td><td>两三个关键取舍</td><td>选 pgvector 而不是 Milvus、混合检索为什么 RRF</td></tr>
+        <tr><td class="num">7–9 min</td><td>一个深挖的坑</td><td>选「319 万条废向量」或「中文检索零命中」讲透</td></tr>
+        <tr><td class="num">9–10 min</td><td>局限和下一步</td><td>埋点缺失、字幕质量、学习路径回流推荐</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>被追问「这块是你写的吗」怎么答</h3>
+  <p>这是最容易慌的时刻。三个原则：</p>
+
+  <div class="grid-2">
+    <div class="card tight">
+      <div class="card-title"><span class="tag ok">可以</span>如实说分工</div>
+      <p style="font-size:14.5px;color:var(--text-2);margin:0">
+        「这部分代码是 AI 生成的，我改过两处：X 和 Y。我理解它的逻辑是……」
+        —— 然后讲逻辑。能讲清逻辑，是不是手敲的根本不重要。
+      </p>
+    </div>
+    <div class="card tight">
+      <div class="card-title"><span class="tag warn">小心</span>别硬编细节</div>
+      <p style="font-size:14.5px;color:var(--text-2);margin:0">
+        不确定具体行号、参数默认值，就说「我需要查一下代码」。
+        编一个数字被追问第二层就崩，比承认不记得伤害大得多。
+      </p>
+    </div>
+    <div class="card tight">
+      <div class="card-title"><span class="tag info">加分</span>主动说局限</div>
+      <p style="font-size:14.5px;color:var(--text-2);margin:0">
+        「这块我还没完全搞懂，目前是按 XX 理解，可能不准确。」
+        承认认知边界是工程师的常规操作，装懂才是减分项。
+      </p>
+    </div>
+    <div class="card tight">
+      <div class="card-title"><span class="tag info">加分</span>把话题拉回判断</div>
+      <p style="font-size:14.5px;color:var(--text-2);margin:0">
+        「实现细节我可以展开，但当时真正的决策点是……」
+        面试官要的是判断力，不是记忆里的代码行。
+      </p>
+    </div>
+  </div>
+
+  <h3>三个可以主动抛的「钩子」</h3>
+  <p>面试是对话，主动给话题比被动接问题更有利。这三个话题几乎必然引起追问，而你都有料：</p>
+
+  <div class="card">
+    <div class="card-title">钩子 1：「我最后发现，最大的风险是静默劣化」</div>
+    <p style="font-size:14.5px;color:var(--text-2)">
+      引到「中文检索零命中」和「向量模型不匹配」—— 两个问题都不报错、不崩，
+      只是答案变差，活了半年。然后讲你怎么造测试集发现的。
+      <strong>这个话题能自然带出你的验证意识</strong>，比讲「我实现了什么功能」有价值得多。
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">钩子 2：「我刻意没上 RabbitMQ 和 Milvus」</div>
+    <p style="font-size:14.5px;color:var(--text-2)">
+      主动说「不用什么」比说「用了什么」更能体现判断力。
+      尤其 RabbitMQ 那条 —— 指出「换 broker 解决不了 Windows 不能 fork 的问题」，
+      说明你分得清症状和根因。
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">钩子 3：「第二次回来看代码，发现自己第一轮埋了很多坑」</div>
+    <p style="font-size:14.5px;color:var(--text-2)">
+      这个话题展示的是<strong>自我复盘能力</strong>。很多人做了项目但说不出哪里做得不好，
+      而你能具体指出「第一轮用兜底逻辑掩盖了主路径失效」—— 这是明显的成长信号。
+    </p>
+  </div>
+
+  <h3>几个绝对不要说的</h3>
+  <div class="avoid">
+    「这个项目是我从零手写的」—— 一追问实现细节就崩，而且现在的面试官基本都默认有 AI 参与。<br><br>
+    「用了 RAGAS / 各种评估指标做了全面评估」—— 没做就别提，被问指标定义就完了。<br><br>
+    「支持千万级向量、可水平扩展」—— 单机项目，说这个等于自曝不懂装懂。<br><br>
+    「AI 帮我写的，我只是提需求」—— 过度自谦。你做了选型和排错，这是实打实的工作，不该被抹掉。
+  </div>
+</section>
+
+<!-- ============ 09 ============ -->
+<section id="hardening">
+  <div class="sec-head"><span class="sec-num">09</span><h2>从「能跑」到「能上线」</h2></div>
+  <p class="sec-desc">
+    前面八章讲的是「这个系统是什么」。这一章讲另一件事：<b>它原来只能一个人用，现在能给一群人用。</b>
+    中间的差距不是功能，是三层东西——凭证放哪、数据归谁、出问题怎么退。
+  </p>
+
+  <h3>一次请求到底穿过哪些层</h3>
+  <svg viewBox="0 0 860 470" width="100%" role="img" aria-label="请求链路与三层限流">
+    <defs>
+      <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L7,3 z" fill="#9ca3af"/>
+      </marker>
+    </defs>
+
+    <!-- 客户端 -->
+    <rect x="16" y="46" width="150" height="78" rx="10" fill="#faf9f7" stroke="#e5e2dd"/>
+    <text x="91" y="74" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">浏览器</text>
+    <text x="91" y="94" text-anchor="middle" font-size="11" fill="#6b7280">React SPA</text>
+    <text x="91" y="111" text-anchor="middle" font-size="10" fill="#9ca3af">不持有令牌</text>
+
+    <!-- Caddy -->
+    <rect x="212" y="46" width="150" height="78" rx="10" fill="#faf9f7" stroke="#e5e2dd"/>
+    <text x="287" y="70" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">Caddy</text>
+    <text x="287" y="88" text-anchor="middle" font-size="11" fill="#6b7280">TLS 终止</text>
+    <text x="287" y="105" text-anchor="middle" font-size="10" fill="#9ca3af">自动证书 · HSTS</text>
+
+    <!-- nginx -->
+    <rect x="408" y="46" width="150" height="78" rx="10" fill="#faf9f7" stroke="#e5e2dd"/>
+    <text x="483" y="70" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">nginx</text>
+    <text x="483" y="88" text-anchor="middle" font-size="11" fill="#6b7280">静态 + 反代</text>
+    <text x="483" y="105" text-anchor="middle" font-size="10" fill="#9ca3af">按 IP 限流 · 安全头</text>
+
+    <!-- backend -->
+    <rect x="604" y="46" width="150" height="78" rx="10" fill="#fdf6ec" stroke="#c87d2f" stroke-width="1.5"/>
+    <text x="679" y="70" text-anchor="middle" font-size="13" font-weight="600" fill="#1a1a1a">FastAPI</text>
+    <text x="679" y="88" text-anchor="middle" font-size="11" fill="#8a5a1f">鉴权 · 配额 · 业务</text>
+    <text x="679" y="105" text-anchor="middle" font-size="10" fill="#9ca3af">按用户限流</text>
+
+    <!-- 箭头 -->
+    <line x1="166" y1="85" x2="206" y2="85" stroke="#9ca3af" marker-end="url(#ar)"/>
+    <line x1="362" y1="85" x2="402" y2="85" stroke="#9ca3af" marker-end="url(#ar)"/>
+    <line x1="558" y1="85" x2="598" y2="85" stroke="#9ca3af" marker-end="url(#ar)"/>
+
+    <!-- 数据层 -->
+    <rect x="180" y="228" width="170" height="82" rx="10" fill="#faf9f7" stroke="#e5e2dd"/>
+    <text x="265" y="254" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">PostgreSQL 17</text>
+    <text x="265" y="273" text-anchor="middle" font-size="10" fill="#6b7280">业务数据 + 向量 + 模糊检索</text>
+    <text x="265" y="292" text-anchor="middle" font-size="10" fill="#9ca3af">2.76 GB · HNSW + pg_trgm</text>
+
+    <rect x="378" y="228" width="160" height="82" rx="10" fill="#faf9f7" stroke="#e5e2dd"/>
+    <text x="458" y="254" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">Redis 7</text>
+    <text x="458" y="273" text-anchor="middle" font-size="10" fill="#6b7280">任务队列 + 限流 + 配额</text>
+    <text x="458" y="292" text-anchor="middle" font-size="10" fill="#9ca3af">1.5 MB · noeviction</text>
+
+    <rect x="566" y="228" width="180" height="82" rx="10" fill="#faf9f7" stroke="#e5e2dd"/>
+    <text x="656" y="254" text-anchor="middle" font-size="12" font-weight="600" fill="#1a1a1a">外部 LLM / embedding</text>
+    <text x="656" y="273" text-anchor="middle" font-size="10" fill="#6b7280">DeepSeek · bge-m3</text>
+    <text x="656" y="292" text-anchor="middle" font-size="10" fill="#9ca3af">按 token 计费 → 必须有配额</text>
+
+    <line x1="679" y1="124" x2="679" y2="222" stroke="#d6d3cd" stroke-dasharray="4 3"/>
+    <line x1="620" y1="222" x2="560" y2="140" stroke="#d6d3cd" stroke-dasharray="4 3"/>
+    <line x1="520" y1="222" x2="500" y2="140" stroke="#d6d3cd" stroke-dasharray="4 3"/>
+    <line x1="380" y1="222" x2="330" y2="140" stroke="#d6d3cd" stroke-dasharray="4 3"/>
+
+    <!-- 三层防护标注 -->
+    <rect x="16" y="352" width="738" height="96" rx="12" fill="#f5f2ec" stroke="#e5e2dd"/>
+    <text x="36" y="376" font-size="12" font-weight="600" fill="#1a1a1a">三层防护，各管一段</text>
+    <text x="36" y="398" font-size="11" fill="#4b5563">
+      ① 边缘（CLB/WAF）：CC 攻击、恶意 IP —— 防的是「打进来」
+    </text>
+    <text x="36" y="416" font-size="11" fill="#4b5563">
+      ② 网关（nginx）：路径级速率、并发连接 —— 它只看得到 IP，看不到「谁」
+    </text>
+    <text x="36" y="434" font-size="11" fill="#4b5563">
+      ③ 应用（FastAPI）：按用户的速率与每日配额 —— 只有这里能识别身份
+    </text>
+  </svg>
+  <p class="sec-desc" style="margin-top:10px">
+    这张图解释了一件容易被忽略的事：<b>nginx 的限流按 IP，但用户是按账号区分的。</b>
+    放在云负载均衡后面时，nginx 看到的 IP 全是 LB 的内网地址——所有用户共用一个限流桶，
+    一个人刷满，全员 429。所以必须先还原真实 IP，再把「按用户」的管控放到应用层。
+  </p>
+
+  <h3>三个真问题，和它们为什么难发现</h3>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">01</span>
+      <h3>密码是无盐 SHA-256，但登录一直「正常」</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        登录、注册、改密码全都工作正常。功能测试不会失败——因为 SHA-256 确实能算出哈希、也确实能比对。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">为什么难发现</div><div class="pit-text">
+        密码哈希的问题<b>只在数据库泄露时才暴露</b>。平时它「能用」，而且是所有系统的默认写法。
+        真正的问题是：无盐 → 相同密码哈希相同；SHA-256 为速度设计 → GPU 每秒百亿次。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        换 PBKDF2-HMAC-SHA256（600k 迭代、随机盐、带算法前缀）。
+        关键是<b>旧格式仍能校验、登录成功后透明重写</b>——用户无感知，存量弱哈希随登录自然消失。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        「功能正常」和「安全」是两个维度。密码存储属于<b>不需要测试、只需要审查</b>的那类代码。
+      </div></div>
+    </div>
+  </div>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">02</span>
+      <h3>改了密码，下次还能用旧密码登录</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        设置页点「修改密码」，提示「密码已修改」，页面清空输入框。然后退出、用新密码登录——失败；
+        用旧密码登录——成功。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        它改的是浏览器 IndexedDB 里的哈希，后端完全不知道。
+        <code>upsertUser(currentUser, newHash)</code> 确实执行成功了——<b>改错了地方</b>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        这类「假成功」比报错难查一百倍：不抛异常、UI 反馈完整。
+        防线是<b>写完之后从另一条路径读一次</b>——改完密码就用新密码登录一次，30 秒成本。
+      </div></div>
+    </div>
+  </div>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">03</span>
+      <h3>359 万行的表，规划器以为它是空的</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">现象</div><div class="pit-text">
+        检索能用，但某些查询莫名慢。查 <code>pg_stat_user_tables</code> 发现
+        <code>subtitle_segments</code> 的 <code>n_live_tup</code> 是 <b>0</b>，<code>last_analyze</code> 是 NULL。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">根因</div><div class="pit-text">
+        autovacuum 的默认分析阈值是 <code>0.1 × 行数</code>。批量导入 359 万行之后，
+        还要再变 36 万次才会触发一次 analyze——<b>一次性导入的话，实际上永远不会发生</b>。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">修复</div><div class="pit-text">
+        给大表设 <code>autovacuum_analyze_scale_factor = 0.02</code>，并立即 ANALYZE。
+        实测 359 万行只花 <b>274 毫秒</b>——成本极低，纯粹是没人记得跑。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">教训</div><div class="pit-text">
+        默认值是为「平均负载」设计的，不是为你的负载设计的。
+        用之前先问：<b>它假设的使用模式，和我的实际情况一样吗？</b>
+      </div></div>
+    </div>
+  </div>
+
+  <h3>这轮改完的实测数字</h3>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi"><div class="kpi-v">9</div><div class="kpi-l">修复的 P0 问题</div></div>
+    <div class="kpi"><div class="kpi-v">34</div><div class="kpi-l">原本无鉴权的写端点</div></div>
+    <div class="kpi"><div class="kpi-v">0</div><div class="kpi-l">上线自检失败项</div></div>
+    <div class="kpi"><div class="kpi-v">274ms</div><div class="kpi-l">359 万行 ANALYZE 耗时</div></div>
+    <div class="kpi"><div class="kpi-v">1.49MB</div><div class="kpi-l">Redis 实际占用</div></div>
+    <div class="kpi"><div class="kpi-v">531MB</div><div class="kpi-l">一次完整备份体积</div></div>
+  </div>
+
+  <h3>面试官大概率会追问的三个问题</h3>
+
+  <p class="sec-desc"><b>Q：你的令牌存在哪？</b></p>
+  <p class="sec-desc" style="padding-left:24px">
+    原来在 localStorage，现在在 httpOnly Cookie。原因不是「localStorage 不安全」这种笼统说法，
+    而是具体一条：localStorage 里的东西任何 JS 都能读，站点一旦有 XSS，一行 fetch 就能把会话带走，
+    而且服务端无从察觉——令牌是完全合法的。搬到 httpOnly 之后 <code>document.cookie</code> 读不到，
+    XSS 的收益从「接管账号」降到「在当前页面里做点事」。代价是要做 CSRF，这是同一个决定的两面。
+  </p>
+
+  <p class="sec-desc"><b>Q：多用户怎么隔离的？</b></p>
+  <p class="sec-desc" style="padding-left:24px">
+    数据表按 <code>user_id</code> 过滤，前端存储按用户分区加 <code>u{id}:</code> 前缀，
+    切换账号整页重载。这里踩过一个坑：代码里 <code>if user_id is not None: filter(...)</code>
+    读起来完全正确，但调用方永远传 None，等于统计全库。
+    所以隔离不能只看代码，得造两个用户互相查一次才算验证过。
+    越权访问返回 404 而不是 403——403 会暴露「这个 id 存在」。
+  </p>
+
+  <p class="sec-desc"><b>Q：这个能上线吗？</b></p>
+  <p class="sec-desc" style="padding-left:24px">
+    单机到小团队规模可以直接跑，演示级部署有完整链路：Caddy 自动证书、pg_dump 备份、
+    16 项上线自检脚本。但我不认为它能做多租户 SaaS——没有组织概念，视频库是全局共享的，
+    没有审计日志和计费。要做那个得在数据模型上铺 <code>tenant_id</code>，是重构不是迭代。
+    <b>说清楚边界，比声称什么都能干可信。</b>
+  </p>
+</section>
+
+<section id="research">
+  <div class="sec-head"><span class="sec-num">10</span><h2>开工前的三页纸</h2></div>
+  <p class="sec-desc">
+    每个项目动手之前，先做一次「全面研究」，落成三页纸：<b>架构拆解、竞品对照、评测口径</b>，各一页。
+    这三页不是为了交差，是<b>决策工具</b>——它决定的是「要不要返工三轮」。
+  </p>
+
+  <p class="sec-desc">
+    写之前先想清楚，每一页各自回答一个不同的问题：
+  </p>
+
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi"><div class="kpi-v">钱花在哪</div><div class="kpi-l">架构拆解 → 决定分层与取舍</div></div>
+    <div class="kpi"><div class="kpi-v">别人踩过啥</div><div class="kpi-l">竞品对照 → 决定什么不做</div></div>
+    <div class="kpi"><div class="kpi-v">什么算成功</div><div class="kpi-l">评测口径 → 决定什么时候停</div></div>
+  </div>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">①</span>
+      <h3>架构拆解：画出一条请求的完整链路</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">写什么</div><div class="pit-text">
+        一张链路图，从用户点击到数据落地，每一层标两个东西：<b>它负责什么</b>、<b>它挂了会发生什么</b>。
+        然后列出三个「我认为的瓶颈」，每个都配一个可以验证它的方法。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">别写什么</div><div class="pit-text">
+        不要写「分了控制器/服务/仓储三层」——那是结果，不是决策。
+        要写的是<b>为什么这么分</b>：哪一层必须能独立替换，哪一层值得为它多写一个抽象。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">本项目实例</div><div class="pit-text">
+        画出「浏览器 → Caddy → nginx → FastAPI → 数据层」之后，发现一个当时没意识到的事：
+        <b>nginx 只看得到 IP，看不到「谁」</b>。所以在云上它一个人扛不住多用户限流，
+        按用户的速率和配额必须放到应用层。
+        <br>这条结论是画图时得到的，不是写代码时撞出来的。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">价值</div><div class="pit-text">
+        链路图上每个「它挂了会怎样」，都是一次免费的故障演练。
+        这个问题答不上来的层，就是你还不够了解的层。
+      </div></div>
+    </div>
+  </div>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">②</span>
+      <h3>竞品对照：不比功能，比三个维度</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">比什么</div><div class="pit-text">
+        <b>数据模型</b>：它把什么东西当成一个检索单元？一条还是成段？<br>
+        <b>策略分工</b>：召回、融合、重排各自解决什么问题，边界在哪？<br>
+        <b>失败处理</b>：断网、超时、依赖挂了，它是报错还是降级？
+      </div></div>
+      <div class="pit-row"><div class="pit-label">关键方法</div><div class="pit-text">
+        <b>找共同点</b>。三个竞品都做的选择，往往是被现实教育过的结论，不值得重新发明。<br>
+        <b>找差异点</b>，那才是你的机会所在。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">本项目实例</div><div class="pit-text">
+        看 RAGFlow、Dify、AnythingLLM，发现它们都做「分块 + 混合检索 + rerank」。
+        当时觉得是行业套路，等自己踩完碎片检索的坑才明白：
+        <b>它们不是选择这么做，是被教训过。</b>
+      </div></div>
+      <div class="pit-row"><div class="pit-label">价值</div><div class="pit-text">
+        竞品对照最大的用处是<b>砍需求</b>。看完三家都没做的功能，大概率不是它们没想到，
+        而是做了也不划算。
+      </div></div>
+    </div>
+  </div>
+
+  <div class="pit">
+    <div class="pit-head">
+      <span class="pit-idx">③</span>
+      <h3>评测口径：在写代码前定死「什么算好」</h3>
+    </div>
+    <div class="pit-body">
+      <div class="pit-row"><div class="pit-label">四件事</div><div class="pit-text">
+        1. 用什么数据测 —— 固定查询集，20 条左右，<b>必须含负例</b><br>
+        2. 什么叫好 —— 命中率下限、相关性标准、延迟上限<br>
+        3. 谁来判定 —— 人工判断 + 一个可量化的代理指标<br>
+        4. <b>失败长什么样</b> —— 这条最重要，先写清楚错误的样子
+      </div></div>
+      <div class="pit-row"><div class="pit-label">为什么最重要的</div><div class="pit-text">
+        是第四条。没有「失败长什么样」的时候，人会不自觉地把
+        <b>「接口返回 200」当成成功标准</b>。
+        这个项目里中文检索零命中跑了很久没被发现，就是因为 200 也是一种「成功」。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">本项目实例</div><div class="pit-text">
+        8 条查询，覆盖概念（闭包）、英文术语（useEffect）、跨表述（函数返回另一个函数）、
+        意图（RAG 召回 vs 重排）、以及<b>应无结果</b>（红烧肉怎么做）。<br>
+        判定标准：top 3 里有几条真的能回答问题。负例标准：必须返回空。
+      </div></div>
+      <div class="pit-row"><div class="pit-label">代价</div><div class="pit-text">
+        检索调了三轮才回正轨：第一轮调 RRF 权重，第二轮换 reranker，
+        第三轮才发现根因是<b>检索单元只有 9 个字</b>。
+        <br><br>
+        如果第一页就写了「8 条查询 + 人工判定」，第一天就会发现这个问题——
+        随便一条查询的返回都是「我现在啊」「对吧」这种句子，肉眼可见。
+      </div></div>
+    </div>
+  </div>
+
+  <h3>最小形态：三页纸加起来不超过 1500 字</h3>
+  <p class="sec-desc">
+    写多了就是浪费时间。每页三到五条，够用即可。
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>页</th><th>最少要写</th><th>可以省</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>架构拆解</b></td>
+        <td>一张链路图 + 每层的故障影响 + 三个待验证的瓶颈假设</td>
+        <td>详细时序图、完整部署拓扑</td>
+      </tr>
+      <tr>
+        <td><b>竞品对照</b></td>
+        <td>三个产品 × 同一个维度（数据模型 / 策略分工 / 失败处理）</td>
+        <td>功能清单、价格、截图</td>
+      </tr>
+      <tr>
+        <td><b>评测口径</b></td>
+        <td>20 条查询 + 判定标准 + 至少 3 条负例</td>
+        <td>完整测试报告、覆盖率数字</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="sec-desc" style="margin-top:12px">
+    一句话总结：<b>这三页纸加起来不超过 1500 字，但它决定的是「要不要返工三轮」。</b>
+    而且它有一个额外好处——面试时被问「你怎么启动一个项目」，这三页就是现成的答案，
+    比「先看需求、再选技术栈」这种空话具体得多。
+  </p>
+</section>
+
+<section id="appendix">
+  <div class="sec-head"><span class="sec-num">11</span><h2>附录</h2></div>
+  <p class="sec-desc">查代码、跑命令、对术语时用。</p>
+
+  <h3>关键文件地图</h3>
+  <p>被追问「这个逻辑在哪儿」时，能报出文件名比报出函数名更有说服力。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>文件</th><th>职责</th><th>值得一看的点</th></tr></thead>
+      <tbody>
+        <tr><td><code>app/services/hybrid_search.py</code></td><td>混合检索主流程</td><td>RRF 加权融合、重排失败降级</td></tr>
+        <tr><td><code>app/services/lexical.py</code></td><td>词法检索</td><td>查询形态分流（长句跳过整句相似度）</td></tr>
+        <tr><td><code>app/services/vector_store.py</code></td><td>pgvector 读写</td><td>COPY 批量写入、iterative_scan</td></tr>
+        <tr><td><code>app/services/embeddings.py</code></td><td>向量化客户端</td><td>批量 256、指数退避、维度校验</td></tr>
+        <tr><td><code>app/agents/chat_agent.py</code></td><td>对话 Agent</td><td>上下文装配顺序、工具轨迹提取</td></tr>
+        <tr><td><code>app/agents/tools.py</code></td><td>9 个工具</td><td>返回压缩后的纯文本而非 JSON</td></tr>
+        <tr><td><code>app/agents/plan_agent.py</code></td><td>规划状态机</td><td>条件边、重排阈值、真实视频回填</td></tr>
+        <tr><td><code>app/services/memory.py</code></td><td>记忆系统</td><td>会话压缩、三层记忆分工</td></tr>
+        <tr><td><code>app/services/profile.py</code></td><td>学习画像</td><td>事件流聚合、上界钳制</td></tr>
+        <tr><td><code>app/migrations.py</code></td><td>Schema 演进</td><td>HNSW / GIN 索引定义</td></tr>
+        <tr><td><code>app/core/observability.py</code></td><td>可观测性</td><td>request_id 贯穿、JSON 日志</td></tr>
+        <tr><td><code>backend/scripts/migrate_sqlite_to_pg.py</code></td><td>数据迁移</td><td>COPY 协议、源库只读</td></tr>
+        <tr><td><code>backend/scripts/backfill_chunk_embeddings.py</code></td><td>向量回填</td><td>断点续跑、游标分页</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>命令速查</h3>
+  <pre><code># 起数据库（本地开发）
+docker compose -f docker-compose.pg.yml --env-file .env up -d
+
+# 起全栈（部署）
+docker compose up -d --build
+
+# 后端（容器内监听 8000；宿主回环发布 12402，对外走 nginx /api；venv 本地直连端口按需自定）
+cd backend && .venv311/Scripts/python -m uvicorn app.main:app --port 8100 --reload
+
+# 前端（Vite dev 12322，/api 代理到 127.0.0.1:12302，无需配 VITE_API_BASE_URL）
+npm run dev
+
+# 健康检查
+curl localhost/health          # 库版本、pgvector 版本、向量条数
+curl localhost/ready           # 含模型探活
+
+# 检索试跑
+curl "localhost/api/search/hybrid?q=闭包是什么&top_k=3&rerank=false"
+
+# 迁移与回填（在 backend 目录下执行）
+cd backend && python scripts/migrate_sqlite_to_pg.py --dry-run
+cd backend && python scripts/backfill_chunk_embeddings.py --batch-size 128
+
+# 前端全量类型检查（别信增量缓存）
+./node_modules/.bin/tsc -b --force</code></pre>
+
+  <h3>术语对照</h3>
+  <p>面试时说不准的词，先在这对齐。说错了比不说更伤。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>术语</th><th>一句话解释</th><th>在这个项目里的位置</th></tr></thead>
+      <tbody>
+        <tr><td><strong>RAG</strong></td><td>先检索相关资料，再让模型基于资料回答</td><td>整个系统的核心范式</td></tr>
+        <tr><td><strong>嵌入 / embedding</strong></td><td>把文本变成一串数字，意思相近的数字也相近</td><td>bge-m3，1024 维</td></tr>
+        <tr><td><strong>向量检索 / ANN</strong></td><td>在向量空间里找最近的邻居，不逐条比对</td><td>pgvector HNSW</td></tr>
+        <tr><td><strong>HNSW</strong></td><td>分层可导航小世界图，近似最近邻的一种索引</td><td>pgvector HNSW，索引参数走默认值（m=16, ef_construction=64）</td></tr>
+        <tr><td><strong>halfvec</strong></td><td>半精度向量（float16），省一半空间</td><td>pgvector halfvec，HNSW 索引</td></tr>
+        <tr><td><strong>pg_trgm</strong></td><td>三元组模糊匹配，把字符串切成三字滑窗</td><td>中文词法检索，替代 FTS5</td></tr>
+        <tr><td><strong>RRF</strong></td><td>按名次而不是分数融合多路结果</td><td>词法 0.8 / 语义 1.2 / 元数据 1.5</td></tr>
+        <tr><td><strong>重排 / rerank</strong></td><td>对初筛结果再排一次序，精度更高但更慢</td><td>cross-encoder 优先；LLM listwise 兜底（8s 超时）</td></tr>
+        <tr><td><strong>ReAct</strong></td><td>模型边推理边调工具的循环范式</td><td>LangGraph create_react_agent</td></tr>
+        <tr><td><strong>工具调用</strong></td><td>模型输出结构化请求，由程序执行后把结果喂回</td><td>9 个工具</td></tr>
+        <tr><td><strong>SSE</strong></td><td>服务器单向持续推送，基于普通 HTTP</td><td>流式对话</td></tr>
+        <tr><td><strong>COPY 协议</strong></td><td>PostgreSQL 的批量导入通道，比 INSERT 快一个量级</td><td>359 万条 53.8 秒</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p style="margin-bottom:8px">
+      <strong>相关文档</strong>：<code>docs/2026-11-15-3.0-architecture.md</code>（架构决策与实测数据）、
+      <code>docs/docker.md</code>（部署与排障）、
+      <code>docs/changelog.md</code>（版本演进）。
+    </p>
+    <p style="margin:0">
+      项目仓库：<code>3.0-agent-rag</code> 分支　·　基线标签 <code>baseline-before-3.0</code>　·　
+      成果标签 <code>v3.0-beta.1</code>
+    </p>
+  </footer>
+</section>
+
+
+
+
+</main>
+</div>
+
+<script>
+(function () {
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var links = Array.prototype.slice.call(document.querySelectorAll('.nav a'));
+
+  if (!sections.length) return;
+
+  function update() {
+    var pos = window.scrollY + 140;
+    var current = sections[0].id;
+    sections.forEach(function (s) {
+      if (s.offsetTop <= pos) current = s.id;
+    });
+    links.forEach(function (a) {
+      var on = a.getAttribute('href') === '#' + current;
+      a.classList.toggle('active', on);
+    });
+  }
+
+  var ticking = false;
+  window.addEventListener('scroll', function () {
+    if (!ticking) {
+      window.requestAnimationFrame(function () { update(); ticking = false; });
+      ticking = true;
+    }
+  }, { passive: true });
+
+  update();
+})();
+</script>
+</body>
+</html>

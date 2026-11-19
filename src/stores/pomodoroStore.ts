@@ -391,6 +391,23 @@ export const usePomodoroStore = create<PomodoroState>()(
 
             const newSessionsCompleted = phase === 'work' ? sessionsCompleted + 1 : sessionsCompleted;
 
+            // 工作阶段完成 → 把这一轮记到关联的待办上。
+            //
+            // 之前这里什么都不做，但 TodoItem 的进度条读的是 todo.pomodoroCount ——
+            // 于是用户关联待办做完 4 个番茄，待办里仍然显示 0/4。
+            // 番茄钟只读待办、从不写回，这是两个模块最大的联动缺口。
+            //
+            // 注意排除虚拟待办（不选具体待办直接开始计时时用的占位 id）。
+            if (phase === 'work' && linkedTodoId && linkedTodoId !== POMODORO_VIRTUAL_TODO_ID) {
+              const linkedTodo = useScheduleStore.getState().items[linkedTodoId];
+              if (linkedTodo && !linkedTodo.deletedAt) {
+                useScheduleStore.getState().updateItem(linkedTodoId, {
+                  pomodoroCount: linkedTodo.pomodoroCount + 1,
+                  totalFocusMinutes: linkedTodo.totalFocusMinutes + Math.max(1, actualDuration),
+                });
+              }
+            }
+
             let nextPhase: PomodoroPhase;
             let nextTimeRemaining: number;
 

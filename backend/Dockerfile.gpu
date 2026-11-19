@@ -1,0 +1,19 @@
+# CUDA runtime overlay for the P2 backend image.
+#
+# The base image already contains the application and Python dependencies;
+# this layer only installs the three NVIDIA runtime wheels and registers their
+# lib directories with ldconfig. Build context must contain cuda-wheels/.
+FROM p2-siteyeb-backend:3.0
+
+USER root
+RUN --mount=type=bind,source=cuda-wheels,target=/tmp/cuda-wheels,ro \
+    pip install --no-index --no-deps --find-links=/tmp/cuda-wheels \
+        nvidia-cublas-cu12 \
+        nvidia-cudnn-cu12 \
+        nvidia-cuda-runtime-cu12 \
+ && find /usr/local/lib/python3.11/site-packages/nvidia -maxdepth 2 -name lib -type d \
+        > /etc/ld.so.conf.d/nvidia-cuda.conf \
+ && cat /etc/ld.so.conf.d/nvidia-cuda.conf \
+ && ldconfig
+
+USER appuser

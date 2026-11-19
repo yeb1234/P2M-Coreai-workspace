@@ -14,18 +14,75 @@ export interface PromptTemplate {
   content: string;
 }
 
-export interface ReferenceItem {
+export interface ChatReference {
   video_id: number;
   video_title: string;
+  /** 相对文件夹层级（后端已清洗，不含系统路径） */
+  folder_path?: string;
+  start_sec: number;
   text: string;
-  score_hint: number;
+  score?: number;
+}
+
+export interface ChatMentionedVideo {
+  text: string;
+  video_id: number;
+}
+
+export interface ChatHitlOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface ChatHitl {
+  runId: string;
+  interruptId: string;
+  kind: 'clarify' | 'supplement' | 'confirm' | string;
+  question: string;
+  options: ChatHitlOption[];
+  allowCustom: boolean;
+  context?: string;
+  intent?: string | null;
+  originalMessage?: string;
+  status: 'pending' | 'answered' | 'cancelled';
+  selected?: string;
+  selectedLabel?: string;
+  customText?: string;
+}
+
+export interface ChatAction {
+  id: string;
+  action_type: 'note' | 'calendar' | 'todo' | string;
+  status: 'applied' | 'failed' | 'undone' | string;
+  title: string;
+  summary?: string | null;
+  target_id?: string | null;
+  created_at?: string | null;
+  undone_at?: string | null;
+  can_undo?: boolean;
 }
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  references?: ReferenceItem[];
+  /** 该回答引用的视频片段，点击可跳转到对应时间点 */
+  references?: ChatReference[];
+  /** Agent 实际调用过的工具名，让用户知道答案不是凭空编的 */
+  steps?: string[];
+  /** 正文里提到的视频：《标题》→ video_id，渲染成可点链接 */
+  mentioned_videos?: ChatMentionedVideo[];
+  /** 这条回答是降级到备用 LLM 产出的（主通道挂了）。有值就显示提示。 */
+  degraded_from?: string;
+  /** 这条回答用的意图模板 id —— 存消息上，刷新后还能看出当时的策略 */
+  intent?: string;
+  /** 本轮真正落库的笔记/日历/Todo 动作，下面渲染执行回执与撤回按钮 */
+  actions?: ChatAction[];
+  /** 流式输出中，用于显示光标 */
+  streaming?: boolean;
+  /** 等待用户选择/补充/确认的 HITL 卡片 */
+  hitl?: ChatHitl;
 }
 
 interface AIState {
@@ -36,8 +93,12 @@ interface AIState {
   activeTemplateId: string;
   chatOpen: boolean;
   chatWidth: number;
+  /** 题目详情等入口预填到输入框的一次性草稿，不持久化。 */
+  pendingPrompt: string;
   messages: ChatMessage[];
-  currentSessionId: string | null;
+  /** 后端会话 id，刷新页面后仍能接着上次聊 */
+  sessionId: string;
+  setSessionId: (id: string) => void;
   setEndpoint: (endpoint: string) => void;
   setModel: (model: string) => void;
   setSystemPrompt: (prompt: string) => void;
@@ -48,9 +109,12 @@ interface AIState {
   toggleChat: () => void;
   setChatOpen: (open: boolean) => void;
   setChatWidth: (width: number) => void;
+  setPendingPrompt: (prompt: string) => void;
+  consumePendingPrompt: () => string;
   addMessage: (message: ChatMessage) => void;
+  updateMessage: (id: string, updates: Partial<ChatMessage>) => void;
+  setMessages: (messages: ChatMessage[]) => void;
   clearMessages: () => void;
-  setCurrentSessionId: (sessionId: string | null) => void;
 }
 
 function hasCorruptText(value: unknown): boolean {
@@ -77,7 +141,15 @@ function sanitizeTemplates(templates: unknown): PromptTemplate[] {
     const t = item as Partial<PromptTemplate>;
     return !!t.id && !!t.name && !!t.content && !hasCorruptText(t.name) && !hasCorruptText(t.content);
   });
-  return clean.length > 0 ? clean : DEFAULT_PROMPT_TEMPLATES;
+  if (clean.length === 0) return DEFAULT_PROMPT_TEMPLATES;
+
+  // 合并新增的默认模板。老用户 localStorage 里只有原来那 3 个
+  // （学习总结 / 代码助手 / 任务拆解），不补的话自动识别到
+  // course-recommend 时找不到模板，UI 只能显示 id 字符串。
+  // 用户自己改过的同名模板不动，也不删除用户自建的模板。
+  const existingIds = new Set(clean.map((t) => t.id));
+  const missing = DEFAULT_PROMPT_TEMPLATES.filter((t) => !existingIds.has(t.id));
+  return [...clean, ...missing];
 }
 
 export const useAIStore = create<AIState>()(
@@ -90,8 +162,9 @@ export const useAIStore = create<AIState>()(
       activeTemplateId: DEFAULT_PROMPT_TEMPLATES[0].id,
       chatOpen: false,
       chatWidth: 380,
+      pendingPrompt: '',
       messages: [],
-      currentSessionId: null,
+      sessionId: '',
       setEndpoint: (endpoint) => set({ endpoint: normalizeEndpoint(endpoint) }),
       setModel: (model) => set({ model }),
       setSystemPrompt: (systemPrompt) => set({ systemPrompt }),
@@ -125,9 +198,24 @@ export const useAIStore = create<AIState>()(
       toggleChat: () => set((state) => ({ chatOpen: !state.chatOpen })),
       setChatOpen: (chatOpen) => set({ chatOpen }),
       setChatWidth: (chatWidth) => set({ chatWidth: clampChatWidth(chatWidth) }),
+      setPendingPrompt: (pendingPrompt) => set({ pendingPrompt }),
+      consumePendingPrompt: () => {
+        const pendingPrompt = get().pendingPrompt;
+        if (pendingPrompt) set({ pendingPrompt: '' });
+        return pendingPrompt;
+      },
       addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
-      clearMessages: () => set({ messages: [], currentSessionId: null }),
-      setCurrentSessionId: (sessionId) => set({ currentSessionId: sessionId }),
+      // 流式结束后把富内容补写回消息本身。
+      // 原来这些只存在 AIChatPanel 的 useState 里 —— 刷新/换页面就全丢，
+      // 只剩纯文字历史，链接和视频推荐框都没了。
+      updateMessage: (id, updates) =>
+        set((state) => ({
+          messages: state.messages.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+        })),
+      // 切换历史会话时整批替换（不是追加）
+      setMessages: (messages) => set({ messages }),
+      clearMessages: () => set({ messages: [], sessionId: '' }),
+      setSessionId: (sessionId) => set({ sessionId }),
     }),
     {
       name: 'p2m-ai-storage',
@@ -158,7 +246,7 @@ export const useAIStore = create<AIState>()(
         chatOpen: state.chatOpen,
         chatWidth: state.chatWidth,
         messages: state.messages.slice(-50),
-        currentSessionId: state.currentSessionId,
+        sessionId: state.sessionId,
       }),
     }
   )

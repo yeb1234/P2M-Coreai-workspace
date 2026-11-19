@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Download, RefreshCw, Upload, XCircle } from 'lucide-react';
-import { useCalendarStore, useNotesStore, useNotificationStore, usePomodoroStore, useTodoStore } from '../../stores';
+import { useCalendarStore, useNotesStore, useNotificationStore, usePomodoroStore, useScheduleStore } from '../../stores';
 import { fetchBackendHealth, type BackendHealthOut } from '../../lib/videoApi';
 import { idbStorage } from '../../lib/idbStorage';
 import { STORAGE_KEYS } from './types';
@@ -37,14 +37,14 @@ export function PrivacySettings() {
         <SettingsButton variant="outline" onClick={handleClearNotifications} className="px-3 py-1.5 text-xs">
           清除通知
         </SettingsButton>
-        {cleared && <span className="ml-2 text-xs text-[#16a34a]">已清除{cleared}</span>}
+        {cleared && <span className="ml-2 text-xs text-[var(--success)]">已清除{cleared}</span>}
       </div>
-      <div className="border-t border-[#e5e2dd] pt-4">
+      <div className="border-t border-[var(--border-light)] pt-4">
         <div className="mb-3 flex items-start gap-2">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[#dc3545]" />
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--danger)]" />
           <div>
             <SettingsSectionTitle danger>清除所有数据</SettingsSectionTitle>
-            <SettingsHint>将删除所有待办、笔记、日历、番茄记录等数据。此操作不可撤销。</SettingsHint>
+            <SettingsHint>将删除所有待办、便签、日历、番茄记录等数据。此操作不可撤销。</SettingsHint>
           </div>
         </div>
         <SettingsButton variant="danger" onClick={() => setShowWipeConfirm(true)} className="px-3 py-1.5 text-xs">
@@ -56,7 +56,7 @@ export function PrivacySettings() {
         onClose={() => setShowWipeConfirm(false)}
         onConfirm={handleWipeAll}
         title="清除所有数据"
-        message="确定要删除所有数据吗？这将清除所有待办、笔记、日历事件、番茄记录等，且无法恢复。"
+        message="确定要删除所有数据吗？这将清除所有待办、便签、日历事件、番茄记录等，且无法恢复。"
         confirmText="确认清除"
       />
     </div>
@@ -101,23 +101,23 @@ export function BackendHealthSettings() {
           检测后端状态
         </SettingsButton>
         {health && (
-          <span className={`text-xs ${health.ok ? 'text-[#16a34a]' : 'text-[#dc3545]'}`}>
+          <span className={`text-xs ${health.ok ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
             {health.ok ? '核心服务正常' : '存在需要处理的项目'}
           </span>
         )}
-        {error && <span className="text-xs text-[#dc3545]">{error}</span>}
+        {error && <span className="text-xs text-[var(--danger)]">{error}</span>}
       </div>
 
       <div className="auto-grid-panels">
         {(health?.checks ?? []).map((check) => (
           <div key={check.name} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-3">
             <div className="flex items-start gap-2">
-              {check.ok ? <CheckCircle2 size={16} className="mt-0.5 text-[#16a34a]" /> : <XCircle size={16} className="mt-0.5 text-[#dc3545]" />}
+              {check.ok ? <CheckCircle2 size={16} className="mt-0.5 text-[var(--success)]" /> : <XCircle size={16} className="mt-0.5 text-[var(--danger)]" />}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{check.name}</p>
                 <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{check.message}</p>
                 {Object.keys(check.details || {}).length > 0 && (
-                  <pre className="mt-2 max-h-24 overflow-auto rounded-lg bg-[var(--bg-card)] px-2 py-1.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+                  <pre className="mt-2 max-h-24 overflow-auto rounded-lg bg-[var(--bg-card)] px-2 py-1.5 text-xs leading-4 text-[var(--text-secondary)]">
                     {JSON.stringify(check.details, null, 2)}
                   </pre>
                 )}
@@ -135,14 +135,18 @@ export function DataSettings() {
   const [exported, setExported] = useState(false);
   const [imported, setImported] = useState(false);
 
-  const todos = useTodoStore((s) => s.todos);
+  // 同上：用真实的待办来源（后端表）统计，否则「清空待办」清的是本地残留数据。
+  const scheduleItems = useScheduleStore((s) => s.items);
+  const todos = Object.fromEntries(
+    Object.entries(scheduleItems).filter(([, i]) => i.type === 'todo' && !i.deletedAt),
+  );
   const notes = useNotesStore((s) => s.notes);
   const events = useCalendarStore((s) => s.events);
   const sessions = usePomodoroStore((s) => s.sessions);
 
   const stats: Record<string, number> = {
     待办: Object.values(todos).length,
-    笔记: notes.length,
+    便签: notes.length,
     日历事件: Object.keys(events).length,
     番茄记录: Object.keys(sessions).length,
   };
@@ -204,7 +208,7 @@ export function DataSettings() {
           ))}
         </div>
       </div>
-      <div className="border-t border-[#e5e2dd] pt-4">
+      <div className="border-t border-[var(--border-light)] pt-4">
         <SettingsSectionTitle>导出 / 导入</SettingsSectionTitle>
         <div className="flex flex-wrap gap-3">
           <SettingsButton onClick={handleExport}>
@@ -215,8 +219,8 @@ export function DataSettings() {
           </SettingsButton>
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
         </div>
-        {exported && <p className="mt-2 text-xs text-[#16a34a]">已导出</p>}
-        {imported && <p className="mt-2 text-xs text-[#16a34a]">导入成功，正在刷新...</p>}
+        {exported && <p className="mt-2 text-xs text-[var(--success)]">已导出</p>}
+        {imported && <p className="mt-2 text-xs text-[var(--success)]">导入成功，正在刷新...</p>}
       </div>
     </div>
   );

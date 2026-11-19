@@ -1,0 +1,416 @@
+{
+  "generated_at": "2026-11-16T00:25:05",
+  "note": "数据库记录未改动，这些视频仍在 videos 表里，处理它们等于给真实数据补字幕",
+  "count": 50,
+  "total_mb": 1356.7,
+  "themes": {
+    "1_agent": 12,
+    "2_rag": 12,
+    "3_backend": 10,
+    "4_python": 8,
+    "5_llm": 5,
+    "6_frontend": 3
+  },
+  "videos": [
+    {
+      "video_id": 42119,
+      "theme": "1_agent",
+      "title": "11-11 Agent跳转、浏览网页、重启工具的设计与实现 [itjc8.com](1)",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第11章 Playwright与BrowserUse：让AI学会像人类一样使用浏览器/11-11 Agent跳转、浏览网页、重启工具的设计与实现 [itjc8.com](1).mp4",
+      "duration": 301,
+      "size_mb": 26.6
+    },
+    {
+      "video_id": 42120,
+      "theme": "1_agent",
+      "title": "11-11 Agent跳转、浏览网页、重启工具的设计与实现 [itjc8.com]",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第11章 Playwright与BrowserUse：让AI学会像人类一样使用浏览器/11-11 Agent跳转、浏览网页、重启工具的设计与实现 [itjc8.com].mp4",
+      "duration": 301,
+      "size_mb": 26.6
+    },
+    {
+      "video_id": 44062,
+      "theme": "1_agent",
+      "title": "16-15 设计Agent事件工具内容实现存储不同的工具内容 [itjc8.com]",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第16章 上下文工程：完善各个Agent功能与上下文优化/16-15 设计Agent事件工具内容实现存储不同的工具内容 [itjc8.com].mp4",
+      "duration": 310,
+      "size_mb": 15.0
+    },
+    {
+      "video_id": 44061,
+      "theme": "1_agent",
+      "title": "16-15 设计Agent事件工具内容实现存储不同的工具内容 [itjc8.com](1)",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第16章 上下文工程：完善各个Agent功能与上下文优化/16-15 设计Agent事件工具内容实现存储不同的工具内容 [itjc8.com](1).mp4",
+      "duration": 310,
+      "size_mb": 15.0
+    },
+    {
+      "video_id": 43449,
+      "theme": "1_agent",
+      "title": "14-掌柜问数-问数智能体-执行SQL",
+      "src": "/videos/尚硅谷-2026年1月开课大模型智能体线上速成班V2.0【itjc8.com】/03-项目_掌柜问数/4.视频/day_06（下午＋晚上）/14-掌柜问数-问数智能体-执行SQL.mp4",
+      "duration": 317,
+      "size_mb": 61.1
+    },
+    {
+      "video_id": 41563,
+      "theme": "1_agent",
+      "title": "9、AI_多智能体对接OpeAI的三层架构设计",
+      "src": "/videos/尚硅谷-AI大模型【202601完结】【itjc8.com】/24_尚硅谷大模型项目之ITS多智能体/2.视频/day04/1.视频/9、AI_多智能体对接OpeAI的三层架构设计.mp4",
+      "duration": 322,
+      "size_mb": 27.8
+    },
+    {
+      "video_id": 12428,
+      "theme": "1_agent",
+      "title": "9、AI_多智能体对接OpeAI的三层架构设计",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\24_尚硅谷大模型项目之ITS多智能体\\2.视频\\day04\\1.视频\\9、AI_多智能体对接OpeAI的三层架构设计.mp4",
+      "duration": 322,
+      "size_mb": 27.8
+    },
+    {
+      "video_id": 42854,
+      "theme": "1_agent",
+      "title": "12、AI_多智能体ITS百炼平台的联网搜索MCP分析Mcp工具的结果结构",
+      "src": "/videos/尚硅谷-AI大模型【202601完结】【itjc8.com】/24_尚硅谷大模型项目之ITS多智能体/2.视频/day06/1_vcr/12、AI_多智能体ITS百炼平台的联网搜索MCP分析Mcp工具的结果结构.mp4",
+      "duration": 325,
+      "size_mb": 36.3
+    },
+    {
+      "video_id": 15390,
+      "theme": "1_agent",
+      "title": "12、AI_多智能体ITS百炼平台的联网搜索MCP分析Mcp工具的结果结构",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\24_尚硅谷大模型项目之ITS多智能体\\2.视频\\day06\\1_vcr\\12、AI_多智能体ITS百炼平台的联网搜索MCP分析Mcp工具的结果结构.mp4",
+      "duration": 325,
+      "size_mb": 36.3
+    },
+    {
+      "video_id": 42552,
+      "theme": "1_agent",
+      "title": "12-13 多Agent系统File文件工具箱的设计与快速预览 [itjc8.com](1)",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第12章 沙箱模块开发：隔离环境运行本地工具确保Agent执行安全/12-13 多Agent系统File文件工具箱的设计与快速预览 [itjc8.com](1).mp4",
+      "duration": 327,
+      "size_mb": 23.7
+    },
+    {
+      "video_id": 42553,
+      "theme": "1_agent",
+      "title": "12-13 多Agent系统File文件工具箱的设计与快速预览 [itjc8.com]",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第12章 沙箱模块开发：隔离环境运行本地工具确保Agent执行安全/12-13 多Agent系统File文件工具箱的设计与快速预览 [itjc8.com].mp4",
+      "duration": 327,
+      "size_mb": 23.7
+    },
+    {
+      "video_id": 44215,
+      "theme": "1_agent",
+      "title": "16.Agent实战——AutoGen智能体开发",
+      "src": "/videos/产品经理/0基础转行AI产品经理/00.大模型学习/16.Agent实战——AutoGen智能体开发.mp4",
+      "duration": 343,
+      "size_mb": 171.3
+    },
+    {
+      "video_id": 34980,
+      "theme": "2_rag",
+      "title": "194：JavaScript_DocumentFragment节点",
+      "src": "D:\\ITJC\\Python\\【百战程序员】Python全栈工程师[itjc8.com]\\7、网页编程基础\\章节20：DOM模型\\194：JavaScript_DocumentFragment节点.mp4",
+      "duration": 349,
+      "size_mb": 21.3
+    },
+    {
+      "video_id": 49450,
+      "theme": "2_rag",
+      "title": "194：JavaScript_DocumentFragment节点",
+      "src": "/videos/Python/【百战程序员】Python全栈工程师[itjc8.com]/7、网页编程基础/章节20：DOM模型/194：JavaScript_DocumentFragment节点.mp4",
+      "duration": 349,
+      "size_mb": 21.3
+    },
+    {
+      "video_id": 42799,
+      "theme": "2_rag",
+      "title": "12_GraphRAG_扩展思考",
+      "src": "/videos/尚硅谷-AI大模型【202601完结】【itjc8.com】/26_尚硅谷大模型项目之智能客服系统/04_视频/day04/12_GraphRAG_扩展思考.mp4",
+      "duration": 357,
+      "size_mb": 16.2
+    },
+    {
+      "video_id": 15243,
+      "theme": "2_rag",
+      "title": "12_GraphRAG_扩展思考",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\26_尚硅谷大模型项目之智能客服系统\\04_视频\\day04\\12_GraphRAG_扩展思考.mp4",
+      "duration": 357,
+      "size_mb": 16.2
+    },
+    {
+      "video_id": 42439,
+      "theme": "2_rag",
+      "title": "11、AI_多智能体ITS知识库查询封装检索方法的第二路基于标题检索的精排测试",
+      "src": "/videos/尚硅谷-AI大模型【202601完结】【itjc8.com】/24_尚硅谷大模型项目之ITS多智能体/2.视频/day03/1_vcr/11、AI_多智能体ITS知识库查询封装检索方法的第二路基于标题检索的精排测试.mp4",
+      "duration": 358,
+      "size_mb": 43.6
+    },
+    {
+      "video_id": 14457,
+      "theme": "2_rag",
+      "title": "11、AI_多智能体ITS知识库查询封装检索方法的第二路基于标题检索的精排测试",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\24_尚硅谷大模型项目之ITS多智能体\\2.视频\\day03\\1_vcr\\11、AI_多智能体ITS知识库查询封装检索方法的第二路基于标题检索的精排测试.mp4",
+      "duration": 358,
+      "size_mb": 43.6
+    },
+    {
+      "video_id": 46754,
+      "theme": "2_rag",
+      "title": "32_文本向量化hello",
+      "src": "/videos/尚硅谷-2026年1月开课大模型智能体线上速成班V2.0【itjc8.com】/02-LangChain_LangGraph_MCP/day05/32_文本向量化hello.mp4",
+      "duration": 359,
+      "size_mb": 56.6
+    },
+    {
+      "video_id": 39439,
+      "theme": "2_rag",
+      "title": "5_相似检索模块_最终实现_创建数据集",
+      "src": "/videos/尚硅谷-AI大模型【202601完结】【itjc8.com】/09_尚硅谷大模型项目之智图寻宝/3.视频及代码/Day5/5_相似检索模块_最终实现_创建数据集.wmv",
+      "duration": 361,
+      "size_mb": 10.5
+    },
+    {
+      "video_id": 7624,
+      "theme": "2_rag",
+      "title": "5_相似检索模块_最终实现_创建数据集",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\09_尚硅谷大模型项目之智图寻宝\\3.视频及代码\\Day5\\5_相似检索模块_最终实现_创建数据集.wmv",
+      "duration": 361,
+      "size_mb": 10.5
+    },
+    {
+      "video_id": 35447,
+      "theme": "2_rag",
+      "title": "214_04数值分析—第十九章NumPy数据分析练习和案例实战-【练习题3】原生Python列表如何实现向量化操作？",
+      "src": "D:\\ITJC\\Python\\Python从零到就业全栈500课(编程+爬虫+数据+自动化+前后端+算法)【itjc8.com】\\214_04数值分析—第十九章NumPy数据分析练习和案例实战-【练习题3】原生Python列表如何实现向量化操作？.mp4",
+      "duration": 361,
+      "size_mb": 11.0
+    },
+    {
+      "video_id": 49549,
+      "theme": "2_rag",
+      "title": "214_04数值分析—第十九章NumPy数据分析练习和案例实战-【练习题3】原生Python列表如何实现向量化操作？",
+      "src": "/videos/Python/Python从零到就业全栈500课(编程+爬虫+数据+自动化+前后端+算法)【itjc8.com】/214_04数值分析—第十九章NumPy数据分析练习和案例实战-【练习题3】原生Python列表如何实现向量化操作？.mp4",
+      "duration": 361,
+      "size_mb": 11.0
+    },
+    {
+      "video_id": 10037,
+      "theme": "2_rag",
+      "title": "07_Search策略_检索器基类设计&动态加载自定义子类",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\26_尚硅谷大模型项目之智能客服系统\\04_视频\\day04\\07_Search策略_检索器基类设计&动态加载自定义子类.mp4",
+      "duration": 392,
+      "size_mb": 27.6
+    },
+    {
+      "video_id": 46388,
+      "theme": "3_backend",
+      "title": "28-接口的继承【itjc8.com】",
+      "src": "/videos/前端/黑马前端V7.6/01、视频/07、阶段七 React项目实战【拓展课程】/06、第六章 Typescript/6-3 ts 对象/28-接口的继承【itjc8.com】.mp4",
+      "duration": 301,
+      "size_mb": 18.9
+    },
+    {
+      "video_id": 46062,
+      "theme": "3_backend",
+      "title": "25.API接口案例 - 初始化项目【itjc8.com】",
+      "src": "/videos/前端/黑马前端V7.6/01、视频/05、阶段五 Vue.js项目实战开发/01、第一章 webpack+vue基础/1-6 vue前置知识案例-API接口案例/25.API接口案例 - 初始化项目【itjc8.com】.mp4",
+      "duration": 309,
+      "size_mb": 17.2
+    },
+    {
+      "video_id": 42957,
+      "theme": "3_backend",
+      "title": "13-10 使用Socat代理CDP通信数据实现外部接口联通 [itjc8.com]",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第13章 沙箱API与部署：部署沙箱为独立API服务并集成到项目/13-10 使用Socat代理CDP通信数据实现外部接口联通 [itjc8.com].mp4",
+      "duration": 311,
+      "size_mb": 21.9
+    },
+    {
+      "video_id": 42956,
+      "theme": "3_backend",
+      "title": "13-10 使用Socat代理CDP通信数据实现外部接口联通 [itjc8.com](1)",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第13章 沙箱API与部署：部署沙箱为独立API服务并集成到项目/13-10 使用Socat代理CDP通信数据实现外部接口联通 [itjc8.com](1).mp4",
+      "duration": 311,
+      "size_mb": 21.9
+    },
+    {
+      "video_id": 47454,
+      "theme": "3_backend",
+      "title": "47.jsonp - 实现jsonp的接口【itjc8.com】",
+      "src": "/videos/前端/黑马前端V7.6/01、视频/04、阶段四 前后端交互/06、第六章 MySQL数据库/6-1 cors+jsonp/47.jsonp - 实现jsonp的接口【itjc8.com】.mp4",
+      "duration": 331,
+      "size_mb": 13.5
+    },
+    {
+      "video_id": 35747,
+      "theme": "3_backend",
+      "title": "485_15Django后端开发从零到实战-完整操作步骤：web界面显示提示信息",
+      "src": "D:\\ITJC\\Python\\Python从零到就业全栈500课(编程+爬虫+数据+自动化+前后端+算法)【itjc8.com】\\485_15Django后端开发从零到实战-完整操作步骤：web界面显示提示信息.mp4",
+      "duration": 331,
+      "size_mb": 18.1
+    },
+    {
+      "video_id": 50046,
+      "theme": "3_backend",
+      "title": "485_15Django后端开发从零到实战-完整操作步骤：web界面显示提示信息",
+      "src": "/videos/Python/Python从零到就业全栈500课(编程+爬虫+数据+自动化+前后端+算法)【itjc8.com】/485_15Django后端开发从零到实战-完整操作步骤：web界面显示提示信息.mp4",
+      "duration": 331,
+      "size_mb": 18.1
+    },
+    {
+      "video_id": 39307,
+      "theme": "3_backend",
+      "title": "5.封装单独的登录接口【itjc8.com】",
+      "src": "/videos/前端/黑马前端V7.6/01、视频/05、阶段五 Vue.js项目实战开发/03、第三章 HR-saas中台管理项目/3-3 登录模块/5.封装单独的登录接口【itjc8.com】.mp4",
+      "duration": 335,
+      "size_mb": 17.8
+    },
+    {
+      "video_id": 46979,
+      "theme": "3_backend",
+      "title": "36.cors - 接口的跨域问题【itjc8.com】",
+      "src": "/videos/前端/黑马前端V7.6/01、视频/04、阶段四 前后端交互/06、第六章 MySQL数据库/6-1 cors+jsonp/36.cors - 接口的跨域问题【itjc8.com】.mp4",
+      "duration": 343,
+      "size_mb": 13.6
+    },
+    {
+      "video_id": 38207,
+      "theme": "3_backend",
+      "title": "03知识点-webAPI学好前提",
+      "src": "/videos/前端/黑马前端8.0/04、Web_api/01/视频/03知识点-webAPI学好前提.wmv",
+      "duration": 344,
+      "size_mb": 12.6
+    },
+    {
+      "video_id": 45035,
+      "theme": "4_python",
+      "title": "19.封装自己的Ajax函数-处理data参数【itjc8.com】",
+      "src": "/videos/前端/黑马前端V7.6/01、视频/04、阶段四 前后端交互/01、第一章 Ajax+HTTP/1-9 封装自己的Ajax函数/19.封装自己的Ajax函数-处理data参数【itjc8.com】.mp4",
+      "duration": 301,
+      "size_mb": 9.2
+    },
+    {
+      "video_id": 34148,
+      "theme": "4_python",
+      "title": "70：函数_内置的聚合函数和内置表生成函数",
+      "src": "D:\\ITJC\\Python\\【百战程序员】Python全栈工程师[itjc8.com]\\28、Hadoop 离线体系：Hive（扩展）\\70：函数_内置的聚合函数和内置表生成函数.mp4",
+      "duration": 301,
+      "size_mb": 14.2
+    },
+    {
+      "video_id": 48048,
+      "theme": "4_python",
+      "title": "70：函数_内置的聚合函数和内置表生成函数",
+      "src": "/videos/Python/【百战程序员】Python全栈工程师[itjc8.com]/28、Hadoop 离线体系：Hive（扩展）/70：函数_内置的聚合函数和内置表生成函数.mp4",
+      "duration": 301,
+      "size_mb": 14.2
+    },
+    {
+      "video_id": 36200,
+      "theme": "4_python",
+      "title": "01-02-Python注释  [itjc8.com]",
+      "src": "/videos/2025年智泊AGI大模型第12期【itjc8.com】/0.预习课程/预习三：python语法/01-02-Python注释  [itjc8.com].mp4",
+      "duration": 302,
+      "size_mb": 8.3
+    },
+    {
+      "video_id": 42356,
+      "theme": "4_python",
+      "title": "11_AI大模型之Python基础_向list中添加元素 [itjc8.com]",
+      "src": "/videos/尚硅谷-AI大模型【202601完结】【itjc8.com】/01_尚硅谷大模型技术之Python基础/3.视频及代码/day03/11_AI大模型之Python基础_向list中添加元素 [itjc8.com].mp4",
+      "duration": 303,
+      "size_mb": 31.6
+    },
+    {
+      "video_id": 14251,
+      "theme": "4_python",
+      "title": "11_AI大模型之Python基础_向list中添加元素 [itjc8.com]",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\01_尚硅谷大模型技术之Python基础\\3.视频及代码\\day03\\11_AI大模型之Python基础_向list中添加元素 [itjc8.com].mp4",
+      "duration": 303,
+      "size_mb": 31.6
+    },
+    {
+      "video_id": 35627,
+      "theme": "4_python",
+      "title": "377_11办公自动化-第三十二章Python办公自动化基本操作实战-创建github仓库并把本地代码上传上去",
+      "src": "D:\\ITJC\\Python\\Python从零到就业全栈500课(编程+爬虫+数据+自动化+前后端+算法)【itjc8.com】\\377_11办公自动化-第三十二章Python办公自动化基本操作实战-创建github仓库并把本地代码上传上去.mp4",
+      "duration": 303,
+      "size_mb": 14.1
+    },
+    {
+      "video_id": 49938,
+      "theme": "4_python",
+      "title": "377_11办公自动化-第三十二章Python办公自动化基本操作实战-创建github仓库并把本地代码上传上去",
+      "src": "/videos/Python/Python从零到就业全栈500课(编程+爬虫+数据+自动化+前后端+算法)【itjc8.com】/377_11办公自动化-第三十二章Python办公自动化基本操作实战-创建github仓库并把本地代码上传上去.mp4",
+      "duration": 303,
+      "size_mb": 14.1
+    },
+    {
+      "video_id": 38726,
+      "theme": "5_llm",
+      "title": "04_AI大模型之MySQL_左外连接",
+      "src": "/videos/尚硅谷-AI大模型【202601完结】【itjc8.com】/04_尚硅谷大模型技术之MySQL/3.视频及代码/day03/04_AI大模型之MySQL_左外连接.mp4",
+      "duration": 301,
+      "size_mb": 41.5
+    },
+    {
+      "video_id": 6076,
+      "theme": "5_llm",
+      "title": "04_AI大模型之MySQL_左外连接",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\04_尚硅谷大模型技术之MySQL\\3.视频及代码\\day03\\04_AI大模型之MySQL_左外连接.mp4",
+      "duration": 301,
+      "size_mb": 41.5
+    },
+    {
+      "video_id": 44558,
+      "theme": "5_llm",
+      "title": "17_AI大模型之MySQL_DDL和DML总结 [itjc8.com]",
+      "src": "/videos/尚硅谷-AI大模型【202601完结】【itjc8.com】/04_尚硅谷大模型技术之MySQL/3.视频及代码/day01/17_AI大模型之MySQL_DDL和DML总结 [itjc8.com].mp4",
+      "duration": 305,
+      "size_mb": 25.3
+    },
+    {
+      "video_id": 18784,
+      "theme": "5_llm",
+      "title": "17_AI大模型之MySQL_DDL和DML总结 [itjc8.com]",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\04_尚硅谷大模型技术之MySQL\\3.视频及代码\\day01\\17_AI大模型之MySQL_DDL和DML总结 [itjc8.com].mp4",
+      "duration": 305,
+      "size_mb": 25.3
+    },
+    {
+      "video_id": 13267,
+      "theme": "5_llm",
+      "title": "10_AI大模型之Python基础_比较运算符",
+      "src": "D:\\ITJC\\尚硅谷-AI大模型【202601完结】【itjc8.com】\\01_尚硅谷大模型技术之Python基础\\3.视频及代码\\day02\\10_AI大模型之Python基础_比较运算符.mp4",
+      "duration": 306,
+      "size_mb": 35.4
+    },
+    {
+      "video_id": 44377,
+      "theme": "6_frontend",
+      "title": "17-2 MoocManus前端页面组件设计逻辑拆解 [itjc8.com](1)",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第17章 Next.js开发基础：多Agent协作前端UI基础逻辑开发/17-2 MoocManus前端页面组件设计逻辑拆解 [itjc8.com](1).mp4",
+      "duration": 302,
+      "size_mb": 30.7
+    },
+    {
+      "video_id": 44378,
+      "theme": "6_frontend",
+      "title": "17-2 MoocManus前端页面组件设计逻辑拆解 [itjc8.com]",
+      "src": "/videos/mksz/mksz955-MCP+A2A 从0到1构建类Manus多Agent全栈应用【itjc8.com】/第17章 Next.js开发基础：多Agent协作前端UI基础逻辑开发/17-2 MoocManus前端页面组件设计逻辑拆解 [itjc8.com].mp4",
+      "duration": 302,
+      "size_mb": 30.7
+    },
+    {
+      "video_id": 34931,
+      "theme": "6_frontend",
+      "title": "150：JavaScript_数组方法_concat()",
+      "src": "D:\\ITJC\\Python\\【百战程序员】Python全栈工程师[itjc8.com]\\7、网页编程基础\\章节17：字符串与数组\\150：JavaScript_数组方法_concat().mp4",
+      "duration": 302,
+      "size_mb": 34.8
+    }
+  ]
+}

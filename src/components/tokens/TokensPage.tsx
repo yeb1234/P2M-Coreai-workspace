@@ -47,13 +47,13 @@ export const TokensPage: React.FC = () => {
         subtitle="AI API 调用统计与成本监控"
         icon={<Coins size={22} />}
         action={
-          <div className="flex gap-1 bg-[#f3f2ef] rounded-lg p-0.5">
+          <div className="flex gap-1 bg-[var(--bg-base)] rounded-lg p-0.5">
             {(['today', 'week', 'month'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  period === p ? 'bg-[#faf9f7] text-[#1a1a1a] shadow-sm' : 'text-[#6b7280] hover:text-[#1a1a1a]'
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  period === p ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {p === 'today' ? '今日' : p === 'week' ? '本周' : '本月'}
@@ -65,61 +65,61 @@ export const TokensPage: React.FC = () => {
 
       {/* Summary cards */}
       <div className="auto-grid-cards">
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#c87d2f] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--accent)] mb-2">
             <Coins size={16} />
             <span className="text-xs font-medium">总花费</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">${totalCost.toFixed(2)}</p>
-          <p className="text-[10px] text-[#16a34a] mt-1 flex items-center gap-1">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">${totalCost.toFixed(2)}</p>
+          <p className="text-xs text-[var(--success)] mt-1 flex items-center gap-1">
             <ArrowDownRight size={10} /> -12% vs 上周
           </p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#2563eb] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--info)] mb-2">
             <Zap size={16} />
             <span className="text-xs font-medium">请求次数</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">{totalRequests.toLocaleString()}</p>
-          <p className="text-[10px] text-[#16a34a] mt-1 flex items-center gap-1">
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{totalRequests.toLocaleString()}</p>
+          <p className="text-xs text-[var(--success)] mt-1 flex items-center gap-1">
             <ArrowUpRight size={10} /> +8% vs 上周
           </p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#16a34a] mb-2">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--success)] mb-2">
             <TrendingUp size={16} />
             <span className="text-xs font-medium">输入 Tokens</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">{formatTokens(totalInput)}</p>
-          <p className="text-[10px] text-[#9ca3af] mt-1">prompt 用量</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{formatTokens(totalInput)}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">prompt 用量</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#8b5cf6] mb-2">
             <BarChart3 size={16} />
             <span className="text-xs font-medium">输出 Tokens</span>
           </div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">{formatTokens(totalOutput)}</p>
-          <p className="text-[10px] text-[#9ca3af] mt-1">completion 用量</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{formatTokens(totalOutput)}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">completion 用量</p>
         </div>
       </div>
 
       {/* Weekly spend chart */}
-      <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-5">
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Clock size={14} className="text-[#6b7280]" />
-          <h3 className="text-sm font-medium text-[#1a1a1a]">本周花费趋势</h3>
+          <Clock size={14} className="text-[var(--text-secondary)]" />
+          <h3 className="text-sm font-medium text-[var(--text-primary)]">本周花费趋势</h3>
         </div>
-        <div className="min-w-[300px] flex items-end gap-3 h-28">
+        <div className="min-w-0 flex items-end gap-3 h-28">
           {WEEKLY_SPEND.map((d) => (
             <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-[9px] text-[#9ca3af]">${d.amount}</span>
+              <span className="text-xs text-[var(--text-muted)]">${d.amount}</span>
               <div className="w-full flex items-end justify-center" style={{ height: '80px' }}>
                 <div
-                  className="w-full bg-gradient-to-t from-[#c87d2f] to-[#e0973f] rounded-t-md transition-all"
+                  className="w-full bg-gradient-to-t from-[var(--accent)] to-[var(--accent)] rounded-t-md transition-all"
                   style={{ height: `${(d.amount / maxSpend) * 100}%` }}
                 />
               </div>
-              <span className="text-xs text-[#6b7280]">{d.day}</span>
+              <span className="text-xs text-[var(--text-secondary)]">{d.day}</span>
             </div>
           ))}
         </div>
@@ -127,18 +127,18 @@ export const TokensPage: React.FC = () => {
 
       {/* Alerts */}
       {MOCK_ALERTS.length > 0 && (
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <h3 className="text-sm font-medium text-[#1a1a1a] mb-3 flex items-center gap-2">
-            <AlertTriangle size={14} className="text-[#f59e0b]" />
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3 flex items-center gap-2">
+            <AlertTriangle size={14} className="text-[var(--warn)]" />
             用量预警
           </h3>
           <div className="space-y-2">
             {MOCK_ALERTS.map((alert, i) => (
               <div key={i} className={`flex items-center gap-3 p-3 rounded-lg text-xs ${
-                alert.level === 'warning' ? 'bg-[#fef7ed] text-[#c87d2f]' : 'bg-[#eff6ff] text-[#2563eb]'
+                alert.level === 'warning' ? 'bg-[var(--bg-accent)] text-[var(--accent)]' : 'bg-[var(--info-bg)] text-[var(--info)]'
               }`}>
                 <span className="flex-1">{alert.msg}</span>
-                <span className="text-[10px] opacity-60">{alert.time}</span>
+                <span className="text-xs opacity-60">{alert.time}</span>
               </div>
             ))}
           </div>
@@ -146,41 +146,41 @@ export const TokensPage: React.FC = () => {
       )}
 
       {/* Model breakdown table */}
-      <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-[#e5e2dd]">
-          <h3 className="text-sm font-medium text-[#1a1a1a]">模型用量明细</h3>
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-[var(--border-light)]">
+          <h3 className="text-sm font-medium text-[var(--text-primary)]">模型用量明细</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[#f3f2ef]">
-                <th className="text-left px-4 py-2 font-medium text-[#6b7280]">模型</th>
-                <th className="text-left px-4 py-2 font-medium text-[#6b7280]">供应商</th>
-                <th className="text-right px-4 py-2 font-medium text-[#6b7280]">输入 Tokens</th>
-                <th className="text-right px-4 py-2 font-medium text-[#6b7280]">输出 Tokens</th>
-                <th className="text-right px-4 py-2 font-medium text-[#6b7280]">请求数</th>
-                <th className="text-right px-4 py-2 font-medium text-[#6b7280]">花费</th>
+              <tr className="bg-[var(--bg-base)]">
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">模型</th>
+                <th scope="col" className="text-left px-4 py-2 font-medium text-[var(--text-secondary)]">供应商</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">输入 Tokens</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">输出 Tokens</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">请求数</th>
+                <th scope="col" className="text-right px-4 py-2 font-medium text-[var(--text-secondary)]">花费</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e5e2dd]">
+            <tbody className="divide-y divide-[var(--border-light)]">
               {MOCK_MODELS.map((model) => (
-                <tr key={model.name} className="hover:bg-[#fef7ed]">
-                  <td className="px-4 py-2.5 font-medium text-[#1a1a1a]">{model.name}</td>
-                  <td className="px-4 py-2.5 text-[#6b7280]">{model.provider}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-[#16a34a]">{formatTokens(model.inputTokens)}</td>
+                <tr key={model.name} className="hover:bg-[var(--bg-accent)]">
+                  <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">{model.name}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{model.provider}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-[var(--success)]">{formatTokens(model.inputTokens)}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-[#8b5cf6]">{formatTokens(model.outputTokens)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-[#1a1a1a]">{model.requests.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right font-mono font-bold text-[#c87d2f]">${model.cost.toFixed(2)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">{model.requests.toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right font-mono font-bold text-[var(--accent)]">${model.cost.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="bg-[#f3f2ef] font-medium">
-                <td className="px-4 py-2.5 text-[#1a1a1a]" colSpan={2}>合计</td>
-                <td className="px-4 py-2.5 text-right font-mono text-[#16a34a]">{formatTokens(totalInput)}</td>
+              <tr className="bg-[var(--bg-base)] font-medium">
+                <td className="px-4 py-2.5 text-[var(--text-primary)]" colSpan={2}>合计</td>
+                <td className="px-4 py-2.5 text-right font-mono text-[var(--success)]">{formatTokens(totalInput)}</td>
                 <td className="px-4 py-2.5 text-right font-mono text-[#8b5cf6]">{formatTokens(totalOutput)}</td>
-                <td className="px-4 py-2.5 text-right font-mono text-[#1a1a1a]">{totalRequests.toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-right font-mono font-bold text-[#c87d2f]">${totalCost.toFixed(2)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-[var(--text-primary)]">{totalRequests.toLocaleString()}</td>
+                <td className="px-4 py-2.5 text-right font-mono font-bold text-[var(--accent)]">${totalCost.toFixed(2)}</td>
               </tr>
             </tfoot>
           </table>
@@ -189,3 +189,4 @@ export const TokensPage: React.FC = () => {
     </div>
   );
 };
+

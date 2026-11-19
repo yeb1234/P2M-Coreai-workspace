@@ -3,11 +3,12 @@ import Clock from 'react-clock';
 import 'react-clock/dist/Clock.css';
 import { AlarmClock, Eye, EyeOff, Hourglass, Maximize2, Minimize2, Pause, Play, Plus, RotateCcw, Settings2, TimerReset, X } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { useNotificationStore, useTimeCenterStore, useTodoStore } from '../../stores';
+import { useNotificationStore, useScheduleStore, useTimeCenterStore } from '../../stores';
 import { playNotificationSound } from '../../lib/sounds';
 import { toLocalDateString } from '../../lib/date';
 import { generateId } from '../../lib/id';
 import { useClockNow } from '../../hooks/useClockNow';
+import { userScopedStorage } from '../../lib/userScopedStorage';
 
 /* ------------------------------------------------------------------ */
 /*  Widget system                                                      */
@@ -105,7 +106,7 @@ const WidgetCard: React.FC<WidgetCardProps> = React.memo(({
 
   return (
     <div
-      className={`tc-widget ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-[#c87d2f] ring-offset-2 rounded-2xl' : ''}`}
+      className={`tc-widget ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'ring-2 ring-[var(--accent)] ring-offset-2 rounded-2xl' : ''}`}
       data-size={size}
       draggable
       onDragStart={(e) => {
@@ -128,14 +129,14 @@ const WidgetCard: React.FC<WidgetCardProps> = React.memo(({
           <div className="flex items-center gap-0.5">
             <button
               onClick={() => onToggleSize(id)}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-md transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] rounded-lg transition-colors"
               title={size === 'full' || size === 'large' ? '缩小' : '放大'}
             >
               {size === 'full' || size === 'large' ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
             <button
               onClick={() => onToggleEnabled(id)}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] rounded-md transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] rounded-lg transition-colors"
               title="隐藏此组件"
             >
               <X size={13} />
@@ -195,12 +196,12 @@ function WorldClocksWidget({ now }: { now: Date }) {
           <div key={clock.id} className="group relative flex flex-col items-center justify-center rounded-lg bg-[var(--bg-elevated)] px-3 py-2 border border-[var(--border-light)] flex-1 min-w-0 h-[56px]">
             {clock.id === 'local' ? (
               <>
-                <p className="truncate text-[10px] text-[var(--text-muted)] h-4 leading-4">{clock.label}</p>
+                <p className="truncate text-xs text-[var(--text-muted)] h-4 leading-4">{clock.label}</p>
                 <p className="font-mono text-sm leading-none text-[var(--accent)]">{formatTimeInZone(now, clock.timeZone)}</p>
               </>
             ) : (
               <>
-                <input value={clock.label} onChange={(e) => updateWorldClock(clock.id, { label: e.target.value })} className="text-center min-w-0 h-4 leading-4 p-0 m-0 rounded border border-transparent bg-transparent text-[10px] text-[var(--text-muted)] outline-none transition focus:border-[var(--border)] focus:bg-[var(--bg-card)] w-full" />
+                <input value={clock.label} onChange={(e) => updateWorldClock(clock.id, { label: e.target.value })} className="text-center min-w-0 h-4 leading-4 p-0 m-0 rounded border border-transparent bg-transparent text-xs text-[var(--text-muted)] outline-none transition focus:border-[var(--border)] focus:bg-[var(--bg-card)] w-full" />
                 <p className="font-mono text-sm leading-none text-[var(--text-primary)]">{formatTimeInZone(now, clock.timeZone)}</p>
                 <button onClick={() => removeWorldClock(clock.id)} className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded text-[var(--text-muted)] opacity-0 transition hover:bg-[var(--bg-card)] hover:text-[var(--danger)] group-hover:opacity-100">
                   <X size={10} />
@@ -272,8 +273,8 @@ function ActiveCountdownWidget({
               <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                 <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
               </div>
-              <button onClick={() => onPause(id)} className="shrink-0 px-2 py-0.5 rounded-md bg-blue-500 text-white text-[10px]">暂停</button>
-              <button onClick={() => onComplete(id)} className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--bg-card)] text-[var(--text-muted)] text-[10px] hover:text-[var(--danger)]">取消</button>
+              <button onClick={() => onPause(id)} className="shrink-0 px-2 py-0.5 rounded-lg bg-blue-500 text-white text-xs">暂停</button>
+              <button onClick={() => onComplete(id)} className="shrink-0 px-2 py-0.5 rounded-lg bg-[var(--bg-card)] text-[var(--text-muted)] text-xs hover:text-[var(--danger)]">取消</button>
             </div>
           </div>
         );
@@ -340,14 +341,17 @@ function TaskCreator() {
   const [taskAt, setTaskAt] = useState(() => toDateTimeInput(new Date(Date.now() + 30 * 60 * 1000)));
 
   const { addCountdownPreset } = useTimeCenterStore();
-  const addTodo = useTodoStore((s) => s.addTodo);
+  // 待办统一走 scheduleStore（后端 schedule_items 表）。
+  // 待办统一写这里：
+  // 在时间中心建的待办不会出现在待办页 —— 两边数据不通。
+  const addTodo = useScheduleStore((s) => s.addTodo);
 
   const create = () => {
     const title = taskTitle.trim() || (taskType === 'countdown' ? '倒计时' : '待办提醒');
     if (taskType === 'countdown') addCountdownPreset({ label: title, seconds: Math.max(1, taskMinutes) * 60 });
     if (taskType === 'todo') {
       const d = new Date(taskAt);
-      addTodo({ title, description: '来自时间中心的提醒', priority: 'medium', dueDate: toLocalDateString(d), reminderAt: d.toISOString() });
+      addTodo({ title, description: '来自时间中心的提醒', priority: 'medium', dueAt: toLocalDateString(d), reminderAt: d.toISOString() });
     }
     setTaskTitle('新的时间任务');
     setTaskMinutes(5);
@@ -383,7 +387,7 @@ export const TimeCenterPage2: React.FC = () => {
   const validWidgetIds = new Set<WidgetId>(['hero-clock', 'world-clocks', 'stopwatch', 'active-countdown', 'quick-presets']);
   const [layout, setLayout] = useState<WidgetLayout[]>(() => {
     try {
-      const raw = localStorage.getItem('p2m-timecenter-layout');
+      const raw = userScopedStorage.getItem('p2m-timecenter-layout');
       if (raw) {
         const parsed = JSON.parse(raw) as WidgetLayout[];
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -460,7 +464,7 @@ export const TimeCenterPage2: React.FC = () => {
         if (item.id === idB) return { ...item, position: a.position };
         return item;
       });
-      localStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
+      userScopedStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -471,7 +475,7 @@ export const TimeCenterPage2: React.FC = () => {
       if (!item) return prev;
       const nextSize: WidgetSize = item.size === 'small' ? 'large' : 'small';
       const next = prev.map((i) => (i.id === id ? { ...i, size: nextSize } : i));
-      localStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
+      userScopedStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -479,7 +483,7 @@ export const TimeCenterPage2: React.FC = () => {
   const toggleWidgetEnabled = useCallback((id: string) => {
     setLayout((prev) => {
       const next = prev.map((i) => (i.id === id ? { ...i, enabled: !i.enabled } : i));
-      localStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
+      userScopedStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -487,7 +491,7 @@ export const TimeCenterPage2: React.FC = () => {
   const setAllWidgetSize = useCallback((size: WidgetSize) => {
     setLayout((prev) => {
       const next = prev.map((i) => (i.enabled ? { ...i, size } : i));
-      localStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
+      userScopedStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
       return next;
     });
   }, []);

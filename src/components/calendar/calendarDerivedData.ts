@@ -47,10 +47,3 @@ export function groupScheduleItemsByDate(items: ScheduleItem[]) {
 export function getScheduleItemsForDate(items: Record<string, ScheduleItem>, date: string): ScheduleItem[] {
   return Object.values(items).filter((item) => !item.deletedAt && hasScheduleTime(item) && datePart(item.startAt) === date);
 }
-
-export function getCalendarEventsForDate(items: Record<string, ScheduleItem>, date: string): ScheduleCalendarEvent[] {
-  return getScheduleItemsForDate(items, date).flatMap((item) => {
-    if (item.type !== 'event' || !hasScheduleTime(item)) return [];
-    return [scheduleItemToCalendarEvent(item)];
-  });
-}

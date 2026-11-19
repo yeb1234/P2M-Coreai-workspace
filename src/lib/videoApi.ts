@@ -1,15 +1,53 @@
 import { API_BASE, resolveApiPath } from './apiBase';
-
-export function resolveApiUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (/^https?:\/\//i.test(url)) return url;
-  return `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`;
-}
+import { clearSession, getSessionUserId } from './authApi';
 
 type ApiFetchInit = RequestInit & { timeoutMs?: number };
 
-async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
-  const { timeoutMs = 60000, signal, ...fetchInit } = init ?? {};
+// 会话凭证在 httpOnly Cookie 里，JS 读不到；这里只负责带上 Cookie
+const CREDENTIAL_MODE: RequestCredentials = API_BASE ? 'include' : 'same-origin';
+
+/** 后端的密钥掩码占位：GET 返回它，PUT 原样回传表示「这一项没改」。 */
+export const MASKED_SECRET = '__MASKED__';
+
+/** 结构化接口错误：把 status / code / request_id 一起带出来，方便页面分类展示。 */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  requestId?: string;
+
+  constructor(message: string, options: { status: number; code?: string; requestId?: string }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = options.status;
+    this.code = options.code;
+    this.requestId = options.requestId;
+  }
+}
+
+/**
+ * 把后端的结构化错误解析成人话，而不是把 JSON 原样丢给用户。
+ * 保留 request_id：排查时要它，但不占主位（页面放小字里）。
+ */
+function extractErrorMessage(status: number, raw: string): { message: string; code?: string; requestId?: string } {
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const detail = parsed?.error?.message ?? parsed?.detail;
+      const code = typeof parsed?.error?.code === 'string' ? parsed.error.code : undefined;
+      const requestId = typeof parsed?.error?.request_id === 'string' ? parsed.error.request_id : undefined;
+      if (typeof detail === 'string' && detail) return { message: detail, code, requestId };
+    } catch {
+      /* 非 JSON，走下面的截断 */
+    }
+  }
+  if (status === 403) return { message: '没有权限执行这个操作' };
+  if (status === 404) return { message: '接口不存在，可能是版本不匹配' };
+  if (status >= 500) return { message: '服务端出错了，请稍后重试' };
+  return { message: raw ? raw.slice(0, 200) : `请求失败（HTTP ${status}）` };
+}
+
+export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
+  const { timeoutMs = 60000, signal, headers: initHeaders, ...fetchInit } = init ?? {};
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   if (signal) {
@@ -17,22 +55,41 @@ async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T> {
     else signal.addEventListener('abort', () => controller.abort(), { once: true });
   }
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(initHeaders as Record<string, string> | undefined),
+  };
+
   let res: Response;
   try {
     res = await fetch(resolveApiPath(path), {
-      headers: { 'Content-Type': 'application/json', ...fetchInit.headers },
       ...fetchInit,
+      credentials: CREDENTIAL_MODE,
+      headers,
       signal: controller.signal,
     });
   } catch (err) {
-    if (controller.signal.aborted) throw new Error(`API timeout: ${path}`, { cause: err });
+    if (controller.signal.aborted) throw new Error(`请求超时（${Math.round(timeoutMs / 1000)}s）：${path}`, { cause: err });
     throw err;
   } finally {
     window.clearTimeout(timeout);
   }
+
+  if (res.status === 401) {
+    // 会话过期或已被撤销（改密码 / 管理员踢下线），统一回到登录态。
+    // 先带上旧用户 id：authStore 需要在会话标记被删前把旧裸 key 归到旧账号。
+    const expiredUserId = getSessionUserId();
+    window.dispatchEvent(new CustomEvent('p2m:auth-expired', {
+      detail: { userId: expiredUserId },
+    }));
+    clearSession();
+    throw new ApiError('登录已失效，请重新登录', { status: 401 });
+  }
+
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
+    const parsed = extractErrorMessage(res.status, text);
+    throw new ApiError(parsed.message, { status: res.status, code: parsed.code, requestId: parsed.requestId });
   }
   return res.json();
 }
@@ -59,6 +116,8 @@ export interface VideoItem {
   transcription: string | null;
   transcript_segments: TranscriptSegment[];
   summary: string | null;
+  has_subtitles?: boolean;
+  has_summary?: boolean;
   markdown_path: string | null;
   subtitle_path: string | null;
   subtitle_url: string | null;
@@ -100,6 +159,20 @@ export interface SegmentSearchResult {
   text: string;
   subtitle_url: string | null;
   score_hint: number;
+  /** 相对文件夹层级（不含系统路径） */
+  folder_path?: string | null;
+  /** 课程 / 章 / 课时 / 第 N 节 —— 后端 retrieval_meta 解析 */
+  meta?: {
+    course?: string;
+    lesson?: string;
+    lesson_no?: number | string | null;
+    display?: string;
+    meta_text?: string;
+    position?: number;
+    total?: number;
+    prev?: string | null;
+    next?: string | null;
+  } | null;
 }
 
 export interface AssistantReference {
@@ -341,10 +414,6 @@ export async function fetchContinueVideo(): Promise<VideoItem | null> {
   }
 }
 
-export async function rescanVideos(): Promise<{ added: number; removed: number; total: number }> {
-  return apiFetch<{ added: number; removed: number; total: number }>('/api/admin/rescan', { method: 'POST' });
-}
-
 export async function generateThumbnails(videoIds: number[]): Promise<{ generated: number; total: number }> {
   return apiFetch<{ generated: number; total: number }>('/api/admin/generate-thumbnails', {
     method: 'POST',
@@ -373,62 +442,183 @@ export async function fetchPlaylist(videoId: number, scope: 'leaf' | 'descendant
   return apiFetch<Playlist>(`/api/videos/${videoId}/playlist?${params}`);
 }
 
-export async function fetchSegments(videoId: number): Promise<SubtitleSegmentOut[]> {
-  return apiFetch<SubtitleSegmentOut[]>(`/api/videos/${videoId}/segments`);
-}
-
 export async function searchSegments(q: string, limit = 20): Promise<SegmentSearchResult[]> {
   const params = new URLSearchParams({ q, limit: String(limit) });
   return apiFetch<SegmentSearchResult[]>(`/api/videos/search/segments?${params}`);
 }
 
-export interface AssistantIntentOut {
-  intent: string;
-  confidence: number;
-  cleaned_query: string;
-  keywords: string[];
-  reasoning: string;
+export interface AssistantHitlOption {
+  id: string;
+  label: string;
+  description?: string;
 }
 
-export async function detectAssistantIntent(
-  message: string,
-  pageContext = ''
-): Promise<AssistantIntentOut> {
-  return apiFetch<AssistantIntentOut>('/api/assistant/detect-intent', {
-    method: 'POST',
-    body: JSON.stringify({ message, page_context: pageContext }),
-  });
+export interface AssistantResumePayload {
+  runId: string;
+  interruptId?: string;
+  selected?: string;
+  text?: string;
+  originalMessage?: string;
 }
 
-export async function sendAssistantChat(
+export type ChatStreamEvent =
+  | { type: 'token'; text: string }
+  | { type: 'tool_start'; tool: string }
+  | { type: 'tool_end'; tool: string; ok: boolean | null }
+  | {
+      /** HITL 暂停点：任务停下来等用户选 A/B/C 或补充信息 */
+      type: 'interrupt';
+      run_id: string;
+      session_id?: string;
+      interrupt_id: string;
+      kind: 'clarify' | 'supplement' | 'confirm' | string;
+      question: string;
+      options: AssistantHitlOption[];
+      allow_custom: boolean;
+      context?: string;
+      intent?: string | null;
+      original_message?: string;
+    }
+  | {
+      type: 'done';
+      run_id: string;
+      session_id?: string;
+      latency_ms: number;
+      steps: unknown[];
+      references?: Array<{
+        video_id: number;
+        video_title: string;
+        folder_path?: string;
+        start_sec: number;
+        end_sec?: number;
+        text: string;
+        score?: number;
+      }>;
+      /** 回答正文里提到的视频（书名号片段 → video_id），用于渲染可点跳转 */
+      mentioned_videos?: Array<{
+        text: string;
+        video_id: number;
+      }>;
+      /** 本轮真正落库的个人动作（笔记/日历/Todo），用于执行回执与撤回 */
+      actions?: Array<{
+        id: string;
+        action_type: 'note' | 'calendar' | 'todo' | string;
+        status: 'applied' | 'failed' | 'undone' | string;
+        title: string;
+        summary?: string | null;
+        target_id?: string | null;
+        created_at?: string | null;
+        undone_at?: string | null;
+        can_undo?: boolean;
+      }>;
+      /** 实际用的 LLM 通道（local / external） */
+      provider?: string;
+      /** 主通道失败、切到备用时，这里是失败的那家。空/缺省表示没降级。 */
+      degraded_from?: string;
+    }
+  | { type: 'error'; message: string; provider?: string; degraded_from?: string };
+
+/**
+ * 流式对话（SSE over POST）。
+ * EventSource 不支持 POST，因此用 fetch + ReadableStream 手动解析。
+ * 每块格式：`data: {json}\n\n`
+ */
+export async function streamAssistantChat(
   message: string,
-  limit = 15,
-  pageContext = '',
-  systemPrompt = '',
-  cleanedQuery?: string,
-  sessionId?: string | null,
-  intent?: string,
-  intentHint?: string
-): Promise<AssistantChatOut> {
-  const body: Record<string, unknown> = {
-    message, limit, page_context: pageContext, system_prompt: systemPrompt
-  };
-  if (cleanedQuery) body.cleaned_query = cleanedQuery;
-  if (sessionId) body.session_id = sessionId;
-  if (intent) body.intent = intent;
-  if (intentHint) body.intent_hint = intentHint;
-  return apiFetch<AssistantChatOut>('/api/assistant/chat', {
+  options: {
+    sessionId?: string;
+    pageContext?: string;
+    /** 当前笔记完整正文，供聊天工具保存；不放进提示词 */
+    pageNote?: { title: string; markdown: string };
+    systemPrompt?: string;
+    videoId?: number;
+    /** 前端 detectIntent() 识别到的意图 id，随请求存库，历史会话还原时用 */
+    intent?: string | null;
+    /** HITL 中断后继续；携带 runId + 用户选择，不重新写一条用户消息 */
+    resume?: AssistantResumePayload;
+    onEvent: (event: ChatStreamEvent) => void;
+    signal?: AbortSignal;
+  }
+): Promise<void> {
+  const response = await fetch(resolveApiPath('/api/assistant/chat/stream'), {
     method: 'POST',
-    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message,
+      page_context: options.pageContext ?? '',
+      page_note: options.pageNote ?? undefined,
+      system_prompt: options.systemPrompt ?? '',
+      session_id: options.sessionId || undefined,
+      video_id: options.videoId ?? undefined,
+      intent: options.intent ?? undefined,
+      resume: options.resume
+        ? {
+            run_id: options.resume.runId,
+            interrupt_id: options.resume.interruptId ?? '',
+            selected: options.resume.selected ?? '',
+            text: options.resume.text ?? '',
+            original_message: options.resume.originalMessage ?? '',
+          }
+        : undefined,
+    }),
+    signal: options.signal,
   });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`对话请求失败 HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+  }
+  if (!response.body) throw new Error('当前浏览器不支持流式响应');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // 服务端以空行分隔事件块
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary !== -1) {
+      const raw = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf('\n\n');
+
+      for (const line of raw.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        try {
+          options.onEvent(JSON.parse(payload) as ChatStreamEvent);
+        } catch {
+          // 忽略无法解析的心跳或截断块
+        }
+      }
+    }
+  }
 }
 
 export async function fetchAssistantModels(baseUrl: string, apiKey = ''): Promise<string[]> {
   const data = await apiFetch<{ models: string[] }>('/api/assistant/models', {
     method: 'POST',
     body: JSON.stringify({ base_url: baseUrl, api_key: apiKey }),
+    // 后端扫模型是一次 15s 超时 + 最多 25s 预算的同步请求
+    timeoutMs: 45000,
   });
   return data.models;
+}
+
+/** 当前实际生效的 LLM 配置（不含密钥），用于保存后自检。 */
+export interface AssistantLlmHealth {
+  policy: LlmUsagePolicy;
+  external: { base_url: string; model: string; configured: boolean };
+  local: { base_url: string; model: string; configured: boolean };
+}
+
+export async function fetchAssistantLlmHealth(): Promise<AssistantLlmHealth> {
+  return apiFetch<AssistantLlmHealth>('/api/assistant/llm-health');
 }
 
 export async function testAssistantConnection(options: {
@@ -449,6 +639,8 @@ export async function testAssistantConnection(options: {
       system_prompt: options.systemPrompt ?? '',
       temperature: options.temperature ?? 0.2,
     }),
+    // 后端单个请求就是 120s 超时，前端至少得比它长，否则本地大模型永远「超时」
+    timeoutMs: 150000,
   });
 }
 
@@ -515,10 +707,6 @@ export async function startAiJob(
       subtitle_correction_prompt: opts?.subtitle_correction_prompt,
     }),
   });
-}
-
-export async function fetchAiJob(jobId: string): Promise<AiJobOut> {
-  return apiFetch<AiJobOut>(`/api/ai-jobs/${jobId}`);
 }
 
 export async function fetchAiJobs(limit = 20, status?: string): Promise<AiJobListOut> {
@@ -605,10 +793,6 @@ export async function batchAiJobs(
     if (remainingMaxEnqueue <= 0) break;
   }
 
-  if (merged) {
-    merged.max_enqueue = opts.max_enqueue ?? 20;
-  }
-
   return merged!;
 }
 
@@ -642,10 +826,6 @@ export async function clearActiveAiJobs(): Promise<{ cleared: number }> {
   return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-active', { method: 'POST' });
 }
 
-export async function clearQueuedAiJobs(): Promise<{ cleared: number }> {
-  return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-queued', { method: 'POST' });
-}
-
 export async function clearFinishedAiJobs(): Promise<{ cleared: number }> {
   return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-history', { method: 'POST' });
 }
@@ -656,13 +836,6 @@ export async function clearCompletedAiJobs(): Promise<{ cleared: number }> {
 
 export async function clearAllAiJobs(): Promise<{ cleared: number }> {
   return apiFetch<{ cleared: number }>('/api/admin/ai-jobs/clear-all', { method: 'POST' });
-}
-
-export async function recoverStuckAiJobs(minutes = 60, correctionMinutes = 15, force = false): Promise<{ recovered: number; cutoff_minutes: number; correction_cutoff_minutes?: number }> {
-  return apiFetch<{ recovered: number; cutoff_minutes: number; correction_cutoff_minutes?: number }>(
-    `/api/admin/ai-jobs/recover-stuck?minutes=${minutes}&correction_minutes=${correctionMinutes}&force=${force ? 'true' : 'false'}`,
-    { method: 'POST' }
-  );
 }
 
 export async function fetchAiQueueState(): Promise<AiQueueState> {
@@ -728,4 +901,41 @@ export async function saveAssistantRuntimeSettings(settings: AssistantRuntimeSet
     method: 'PUT',
     body: JSON.stringify(settings),
   });
+}
+
+/** 撤回一条助手动作（笔记删除 / 日历事件删除 / Todo 软删）。 */
+export async function undoAgentAction(actionId: string): Promise<{
+  ok: boolean;
+  already?: boolean;
+  action?: {
+    id: string;
+    action_type: string;
+    status: string;
+    title: string;
+    can_undo?: boolean;
+    undone_at?: string | null;
+  };
+}> {
+  return apiFetch(`/api/agent-actions/${encodeURIComponent(actionId)}/undo`, {
+    method: 'POST',
+    timeoutMs: 15000,
+  });
+}
+
+/** 查询当前用户的动作执行记录；用于聊天面板的“执行记录”抽屉。 */
+export async function fetchAgentActions(limit = 30): Promise<{
+  items: Array<{
+    id: string;
+    action_type: 'note' | 'calendar' | 'todo' | string;
+    status: string;
+    title: string;
+    summary?: string | null;
+    target_id?: string | null;
+    created_at?: string | null;
+    undone_at?: string | null;
+    can_undo?: boolean;
+  }>;
+  count: number;
+}> {
+  return apiFetch(`/api/agent-actions?limit=${Math.max(1, Math.min(100, limit))}`);
 }

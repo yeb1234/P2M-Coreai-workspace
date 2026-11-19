@@ -1,14 +1,44 @@
-import { useNotesStore, useUIStore, useVideoStore } from '../stores';
+import { useMdNotesStore, useNotesStore, useUIStore, useVideoStore } from '../stores';
+import { useInterviewContextStore } from '../stores/interviewContextStore';
 import type { VideoItem } from './videoApi';
 
 const MAX_CONTEXT_CHARS = 9000;
 const MAX_TRANSCRIPT_CHARS = 6000;
 const MAX_NOTE_CHARS = 5000;
+const MAX_MD_NOTE_CHARS = 60000;
+
+const INTERVIEW_TAB_LABELS: Record<string, string> = {
+  all: '题库',
+  project: '项目题库',
+  mock: '模拟面试',
+  books: '原书',
+  knowledge: '知识库',
+};
+
+const INTERVIEW_TYPE_LABELS: Record<string, string> = {
+  concept: '概念题',
+  code: '代码题',
+  handwrite: '手写题',
+  debug: '改错题',
+  scenario: '场景题',
+  compare: '对比题',
+  troubleshoot: '排障题',
+  system: '系统设计题',
+  project: '项目深挖题',
+  behavioral: '行为面试题',
+};
+
+export interface AssistantPageNote {
+  title: string;
+  markdown: string;
+}
 
 export interface AssistantPageContext {
-  kind: 'video' | 'notes' | 'none';
+  kind: 'video' | 'notes' | 'interview' | 'none';
   label: string;
   promptContext: string;
+  /** 当前笔记的完整正文，供聊天工具保存；不在提示词里展开。 */
+  notePayload?: AssistantPageNote;
 }
 
 function truncateText(value: string | null | undefined, max: number): string {
@@ -67,15 +97,15 @@ function buildNotesContext(): AssistantPageContext {
 
   if (activeNote) {
     const body = [
-      `当前页面：笔记`,
-      `当前笔记标题：${activeNote.title}`,
+      `当前页面：便签`,
+      `当前便签标题：${activeNote.title}`,
       activeNote.tag ? `标签：${activeNote.tag}` : '',
       `更新时间：${new Date(activeNote.updatedAt).toLocaleString('zh-CN')}`,
-      `\n[笔记正文]\n${truncateText(activeNote.content, MAX_NOTE_CHARS) || '空笔记'}`,
+      `\n[便签正文]\n${truncateText(activeNote.content, MAX_NOTE_CHARS) || '空便签'}`,
     ].filter(Boolean).join('\n');
     return {
       kind: 'notes',
-      label: `已探测当前笔记：${activeNote.title}`,
+      label: `已探测当前便签：${activeNote.title}`,
       promptContext: truncateText(body, MAX_CONTEXT_CHARS),
     };
   }
@@ -84,21 +114,109 @@ function buildNotesContext(): AssistantPageContext {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
   if (recentNotes.length === 0) {
-    return { kind: 'notes', label: '笔记页暂无笔记', promptContext: '当前页面：笔记\n暂无笔记内容。' };
+    return { kind: 'notes', label: '便签页暂无便签', promptContext: '当前页面：便签\n暂无便签内容。' };
   }
 
   const body = [
-    '当前页面：笔记',
-    '[最近更新的笔记摘要]',
+    '当前页面：便签',
+    '[最近更新的便签摘要]',
     ...recentNotes.map((note, index) => {
-      const content = truncateText(note.content, 700) || '空笔记';
+      const content = truncateText(note.content, 700) || '空便签';
       return `${index + 1}. ${note.title}${note.tag ? ` #${note.tag}` : ''}\n${content}`;
     }),
   ].join('\n\n');
 
   return {
     kind: 'notes',
-    label: `已探测笔记页：${recentNotes.length} 条最近笔记`,
+    label: `已探测便签页：${recentNotes.length} 条最近便签`,
+    promptContext: truncateText(body, MAX_CONTEXT_CHARS),
+  };
+}
+
+function buildMdNotesContext(): AssistantPageContext {
+  const state = useMdNotesStore.getState();
+  const active = state.notes.find(
+    (note) => note.id === state.activeNoteId && !note.trashedAt
+  );
+  if (!active) {
+    return {
+      kind: 'notes',
+      label: '笔记页：当前没有打开的笔记',
+      promptContext: '当前页面：笔记\n当前没有打开的笔记。',
+    };
+  }
+
+  const body = [
+    '当前页面：笔记',
+    `当前笔记标题：${active.title}`,
+    active.tags.length ? `标签：${active.tags.join(', ')}` : '',
+    '保存这篇笔记时，完整正文会随请求一并交给聊天工具；这里只展示开头。',
+    `\n[笔记正文开头]\n${truncateText(active.markdown, MAX_NOTE_CHARS) || '空笔记'}`,
+  ].filter(Boolean).join('\n');
+
+  return {
+    kind: 'notes',
+    label: `已探测当前笔记：${active.title}`,
+    promptContext: truncateText(body, MAX_CONTEXT_CHARS),
+    notePayload: {
+      title: active.title.slice(0, 240),
+      markdown: active.markdown.slice(0, MAX_MD_NOTE_CHARS),
+    },
+  };
+}
+
+function buildInterviewContext(): AssistantPageContext {
+  const { tab, activeQuestion } = useInterviewContextStore.getState();
+  const tabLabel = INTERVIEW_TAB_LABELS[tab] || tab;
+
+  if (!activeQuestion) {
+    return {
+      kind: 'interview',
+      label: `已探测面试题库页：${tabLabel}`,
+      promptContext: [
+        '当前页面：面试题库',
+        `当前标签：${tabLabel}`,
+        '当前没有打开具体题目。',
+        '可用能力：检索整套题库、检索面试知识库、按用户要求推荐站内视频。',
+        '用户如果问「这题」，先请他在题库里点开一道题，或让他在问题里带题号/标题。',
+      ].join('\n'),
+    };
+  }
+
+  const typeLabel = INTERVIEW_TYPE_LABELS[activeQuestion.type] || activeQuestion.type;
+  const body = [
+    '当前页面：面试题库',
+    `当前标签：${tabLabel}`,
+    `当前题目：${activeQuestion.id} · ${activeQuestion.title}`,
+    `题型：${typeLabel}｜难度：${activeQuestion.difficulty}`,
+    `分组：${activeQuestion.groupLabel}${activeQuestion.resumeGroupLabel ? `｜简历组：${activeQuestion.resumeGroupLabel}` : ''}`,
+    activeQuestion.chapter ? `章节：${activeQuestion.chapter}` : '',
+    activeQuestion.bookId && activeQuestion.bookPage
+      ? `原书定位：书${activeQuestion.bookId} p.${activeQuestion.bookPage}`
+      : '',
+    `\n[题干]\n${truncateText(activeQuestion.question, 1200)}`,
+    activeQuestion.rubric.length
+      ? `\n[评分点]\n${activeQuestion.rubric.map((item) => `- ${item}`).join('\n')}`
+      : '',
+    activeQuestion.followUps.length
+      ? `\n[常见追问]\n${activeQuestion.followUps.map((item) => `- ${item}`).join('\n')}`
+      : '',
+    `\n[参考答案开头]\n${truncateText(activeQuestion.answer, 1800)}`,
+    activeQuestion.tags.length ? `\n标签：${activeQuestion.tags.join(' / ')}` : '',
+    '\n当前标签对应功能：',
+    tab === 'mock'
+      ? '- 模拟面试：按评分点给分、指出缺口、模拟面试官追问。'
+      : tab === 'knowledge'
+        ? '- 知识库：优先检索专题文章，再回到题目。'
+        : tab === 'books'
+          ? '- 原书：按书页和章节定位，不虚构原文。'
+          : '- 题库/项目题：讲题、追问、找同类题、按评分点检查答案。',
+    '- 用户明确要视频/课程时：检索站内视频，给《标题》和时间点；没有就如实说。',
+  ].filter(Boolean).join('\n');
+
+  return {
+    kind: 'interview',
+    label: `已探测当前题目：${activeQuestion.id} · ${activeQuestion.title}`,
     promptContext: truncateText(body, MAX_CONTEXT_CHARS),
   };
 }
@@ -106,21 +224,9 @@ function buildNotesContext(): AssistantPageContext {
 export function getAssistantPageContext(): AssistantPageContext {
   const activeView = useUIStore.getState().activeView;
   if (activeView === 'video') return buildVideoContext(useVideoStore.getState().currentVideo);
+  if (activeView === 'mdnotes') return buildMdNotesContext();
   if (activeView === 'notes') return buildNotesContext();
+  if (activeView === 'interview') return buildInterviewContext();
   return { kind: 'none', label: '当前页面无专属上下文', promptContext: '' };
 }
 
-export function buildContextualAssistantMessage(message: string, context: AssistantPageContext): string {
-  if (!context.promptContext.trim()) return message;
-  return [
-    '请结合下面的当前页面上下文回答用户问题；如果上下文和问题无关，可以忽略上下文。不要在回答中说“我探测到页面”，直接回答。',
-    '',
-    '<当前页面上下文>',
-    context.promptContext,
-    '</当前页面上下文>',
-    '',
-    '<用户问题>',
-    message,
-    '</用户问题>',
-  ].join('\n');
-}

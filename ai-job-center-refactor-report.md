@@ -1,8 +1,22 @@
 # 项目重构踩坑报告
 
+> 状态：历史参考（最后校对 2026-11-16）
+
 ## 背景
 
 AI 任务中心模块负责视频的批量转录（Whisper）、字幕校对（LLM）和智能总结（LLM）。重构前逻辑全部堆在 `VideoPage.tsx`（834 行），存在多个隐蔽 bug 和架构问题。后续全项目扫描又发现并修复了 7 个额外问题。
+
+### 与现状差异（2026-11-16 校对）
+
+本篇是重构期（早期 SQLite 版本）的过程记录，正文描述当时的代码位置、表结构和踩坑过程，保持原样；下列条目已与 2026-11-16 现状不同，引用时不要当成现行实现。
+
+- **主库**：报告成稿时为 SQLite；2026-11-15 起已迁到 PostgreSQL 17 + pgvector，Redis 仅作 RQ 队列存储。踩坑 3（SQLite 并发写入）随迁移成为历史。
+- **队列代码位置**：现队列工厂在 `app/services/rq_client.py`（`ai_jobs_queue` / `background_queue`），后台任务在 `app/services/background_tasks.py`；报告文件清单引用的 `services/ai_jobs.py`、`routers/ai_jobs.py`、`routers/videos.py` 仍存在。
+- **任务状态机**：报告五态 `queued / running / completed / failed / cancelled`；现多一个 `cancelling` 取消中态。
+- **AiJob 字段**：报告未列表结构；现模型无 `job_type`，转写由 `whisper_engine / whisper_model / language / do_summary` 等字段驱动（见 `app/models.py`）。
+- **文件清单核对**：报告两处文件清单用的就是仓库根 `src/...`、`backend/app/...` 路径；除 `todoStore.ts` 外，清单引用的文件抽样核实仍存在。
+- **`todoStore`**：踩坑 14 与第二轮清单引用的 `src/stores/todoStore.ts` 已于 2026-11 并入 `scheduleStore` 后移除。
+- **仍成立**：RQ 两队列 `ai_jobs` / `background` 的分工；worker 为 RQ `SimpleWorker` 消费这两个队列；单任务进度在 DB 行上推进、列表接口触发自愈的大方向未变。
 
 ---
 

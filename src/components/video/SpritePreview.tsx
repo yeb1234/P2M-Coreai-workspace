@@ -7,7 +7,7 @@ export function SpritePreview({ videoId, time }: { videoId: number; time: number
 
   if (status === 'loading') {
     return (
-      <div className="grid h-[102px] w-[180px] place-items-center rounded-lg border border-white/20 bg-black/80 text-[10px] text-white/70 shadow-2xl">
+      <div className="grid h-[102px] w-[180px] place-items-center rounded-lg border border-white/20 bg-black/80 text-xs text-white/70 shadow-2xl">
         生成预览中...
       </div>
     );
@@ -15,7 +15,7 @@ export function SpritePreview({ videoId, time }: { videoId: number; time: number
 
   if (status === 'error' || !meta) {
     return (
-      <div className="grid h-[102px] w-[180px] place-items-center rounded-lg border border-white/20 bg-black/80 px-2 text-center text-[10px] text-white/60 shadow-2xl">
+      <div className="grid h-[102px] w-[180px] place-items-center rounded-lg border border-white/20 bg-black/80 px-2 text-center text-xs text-white/60 shadow-2xl">
         暂无雪碧图
       </div>
     );

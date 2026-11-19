@@ -41,23 +41,29 @@ export const ImportantDates: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl overflow-x-auto">
-      <span className="text-[10px] text-[#b8b4ac] whitespace-nowrap font-medium">重要日子</span>
-      <div className="h-3 w-px bg-[#e5e2dd]" />
+    <div className="relative">
+      {/* 右边缘渐隐只在窄屏加：桌面宽度够，五个节日放得下；
+          移动端放不下，渐隐是「还能往右滑」的唯一提示 ——
+          否则最后一项被硬切一半，看着像渲染 bug。 */}
+      <span className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 rounded-r-[var(--r-2)] bg-gradient-to-l from-[var(--bg-elevated)] to-transparent md:hidden" />
+      <div className="flex items-center gap-3 overflow-x-auto rounded-[var(--r-2)] border border-[var(--border-light)] bg-[var(--bg-elevated)] px-4 py-2.5">
+        <span className="text-xs font-medium whitespace-nowrap text-[var(--text-muted)]">重要日子</span>
+      <div className="h-3 w-px bg-[var(--border-light)]" />
       {upcoming.map((item) => (
         <div
           key={item.label}
           className="flex items-center gap-1.5 whitespace-nowrap"
         >
           <span style={{ color: item.color }}>{item.icon}</span>
-          <span className="text-xs text-[#6b7280]">{item.label}</span>
-          <span className={`text-[10px] font-medium ${
-            item.daysLeft === 0 ? 'text-[#c87d2f]' : item.daysLeft <= 7 ? 'text-[#dc3545]' : 'text-[#b8b4ac]'
+          <span className="text-xs text-[var(--text-secondary)]">{item.label}</span>
+          <span className={`text-xs font-medium ${
+            item.daysLeft === 0 ? 'text-[var(--accent)]' : item.daysLeft <= 7 ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]'
           }`}>
             {item.daysLeft === 0 ? '今天' : `${item.daysLeft}天`}
           </span>
         </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 };

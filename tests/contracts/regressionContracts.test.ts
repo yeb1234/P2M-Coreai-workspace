@@ -115,18 +115,23 @@ describe('regression contracts', () => {
   });
 
   it('keeps time center on the shared clock without an extra stopwatch interval', () => {
-    const timeCenter = readRepoFile('src/components/timecenter/TimeCenterPage.tsx');
+    // 2026-11 清理时删掉了 TimeCenterPage.tsx（零引用，路由用的是 Page2）。
+    // 契约本身没变，改成检查真正在跑的那一版。
+    // 秒表状态字段名从 stopwatchBaseElapsed 变成了 swStartAt / swBase，
+    // 但它仍然提升在页面级（注释写着「page-level so it survives widget hide/show」），
+    // 这正是这条契约要守的东西。
+    const timeCenter = readRepoFile('src/components/timecenter/TimeCenterPage2.tsx');
 
     expect(timeCenter).toContain('useClockNow');
     expect(timeCenter).not.toContain('setInterval');
-    expect(timeCenter).toContain('stopwatchBaseElapsed');
+    expect(timeCenter).toContain('swStartAt');
     expect(timeCenter).toContain('pauseStopwatch');
   });
 
   it('keeps AI job polling adaptive to page visibility', () => {
     const aiJobCenter = readRepoFile('src/hooks/useAiJobCenter.ts');
 
-    expect(aiJobCenter).toContain('document.visibilityState === \'visible\' ? 3000 : 10000');
+    expect(aiJobCenter).toContain("document.visibilityState === 'visible' ? 5000 : 20000");
     expect(aiJobCenter).toContain('document.addEventListener(\'visibilitychange\'');
     expect(aiJobCenter).toContain('window.setTimeout(tick');
     expect(aiJobCenter).not.toContain('window.setInterval');
@@ -333,7 +338,9 @@ describe('regression contracts', () => {
     const backendMain = readRepoFile('backend/app/main.py');
     const backendSprite = readRepoFile('backend/app/services/sprite.py');
 
-    expect(backendMain).toContain('expose_headers=["X-Sprite-Meta"]');
+    // 用正则而不是全字面量：expose_headers 后来追加了 X-Request-ID，
+    // 写死的 ["X-Sprite-Meta"] 已经不是子串了。
+    expect(backendMain).toMatch(/expose_headers=\[[^\]]*"X-Sprite-Meta"[^\]]*\]/);
     expect(backendSprite).toContain('settings.sprite_frame_width');
     expect(backendSprite).toContain('FRAME_WIDTH = max(160');
     expect(backendSprite).toContain('"jpeg_quality": JPEG_QUALITY');

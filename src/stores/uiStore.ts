@@ -4,17 +4,17 @@ import { idbStorage } from '../lib/idbStorage';
 import { type ThemeVars, type ThemeScheduleRule, THEME_PRESETS, applyTheme, DEFAULT_THEME_SCHEDULE_RULES } from '../lib/themes';
 import { VIEW_PATH } from '../config/pageRegistry';
 
-export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'pomodoro' | 'timecenter' | 'video' | 'transcriber' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
+export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'mdnotes' | 'pomodoro' | 'timecenter' | 'learning' | 'journey' | 'video' | 'transcriber' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
 
 export type FontSize = 'sm' | 'md' | 'lg';
 export type ThemeId = string;
 export type NoteEnterBehavior = 'enter_save' | 'enter_newline';
 
 const DEFAULT_NAV_ORDER: ActiveView[] = [
-  'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'pomodoro', 'timecenter',
-  'health', 'video', 'transcriber', 'compare', 'shop', 'esports',
+  'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'mdnotes', 'pomodoro', 'timecenter',
+  'health', 'bookmarks', 'learning', 'journey', 'video', 'transcriber', 'compare', 'shop', 'esports',
   'stats', 'reader', 'snippets', 'habits',
-  'flashcards', 'bookmarks', 'tokens',
+  'flashcards', 'tokens',
   'leetcode', 'interview', 'codenav', 'aiagent', 'openclaw', 'hermes',
 ];
 
@@ -178,6 +178,42 @@ export const useUIStore = create<UIState>()(
     {
       name: 'p2m-ui-storage',
       storage: createJSONStorage(() => idbStorage),
+      // navOrder 是持久化的，新版本加的页面不会自动出现在老用户侧边栏里。
+      // 之前试过在 Sidebar 组件里 import PAGES 补齐，触发了 pageRegistry ↔ Sidebar
+      // 的循环依赖（TDZ: Cannot access 'h' before initialization），已回退。
+      // 正确的位置是这里：在状态恢复时做一次迁移，把新页面按默认顺序插入，
+      // 而不是追加到末尾。
+      version: 3,
+      migrate: (persisted: unknown, version: number) => {
+        const state = (persisted ?? {}) as Record<string, unknown>;
+        if (version < 3 && Array.isArray(state.navOrder)) {
+          const stored = state.navOrder as ActiveView[];
+          const storedSet = new Set(stored);
+          const merged: ActiveView[] = [];
+          DEFAULT_NAV_ORDER.forEach((id, idx) => {
+            if (storedSet.has(id)) {
+              merged.push(id);
+              return;
+            }
+            // 新页面：插到默认顺序里「它前面最近的一个已存在项」之后
+            let insertAt = merged.length;
+            for (let j = idx - 1; j >= 0; j -= 1) {
+              const pos = merged.indexOf(DEFAULT_NAV_ORDER[j]);
+              if (pos >= 0) {
+                insertAt = pos + 1;
+                break;
+              }
+            }
+            merged.splice(insertAt, 0, id);
+          });
+          // 用户自己调整过、但默认顺序里没有的项，保持原样追加
+          stored.forEach((id) => {
+            if (!merged.includes(id)) merged.push(id);
+          });
+          state.navOrder = merged;
+        }
+        return state as never;
+      },
       partialize: (state) => ({
         sidebarOpen: state.sidebarOpen,
         sidebarWidth: state.sidebarWidth,

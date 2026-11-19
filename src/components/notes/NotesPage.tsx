@@ -4,6 +4,8 @@ import { CollapsibleToolPanel, EmptyState, PageTitle } from '../shared';
 import { useNotesStore, useUIStore } from '../../stores';
 import type { Note, NoteColor, NoteInsertPosition } from '../../stores/notesStore';
 import { getNoteTags, NOTE_COLOR_OPTIONS } from '../../stores/notesStore';
+import { splitNotesByPinned } from '../../lib/projections/notes';
+import { apiFetch } from '../../lib/videoApi';
 import { playInteractionSound } from '../../lib/sounds';
 
 const COLOR_DOT = Object.fromEntries(NOTE_COLOR_OPTIONS.map((item) => [item.value, item.dot])) as Record<NoteColor, string>;
@@ -45,6 +47,8 @@ export const NotesPage: React.FC = () => {
   const [collapsedTrash, setCollapsedTrash] = useState(false);
   const [collapsedFilters, setCollapsedFilters] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [aiNoteLoading, setAiNoteLoading] = useState(false);
+  const [aiNoteError, setAiNoteError] = useState('');
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [insertPosition, setInsertPosition] = useState<NoteInsertPosition>('after');
@@ -86,8 +90,9 @@ export const NotesPage: React.FC = () => {
     });
   }, [activeColor, activeTag, notes, search]);
 
-  const pinned = useMemo(() => filtered.filter((note) => note.pinned), [filtered]);
-  const unpinned = useMemo(() => filtered.filter((note) => !note.pinned), [filtered]);
+  // 置顶/非置顶的分组口径和工作台卡片共用（lib/projections/notes），
+  // 免得便签页和工作台卡片各排一套顺序
+  const { pinned, unpinned } = useMemo(() => splitNotesByPinned(filtered), [filtered]);
 
   const startEdit = useCallback((note: Note) => {
     setActiveNoteId(note.id);
@@ -96,7 +101,7 @@ export const NotesPage: React.FC = () => {
 
   const startNew = useCallback(() => {
     const id = addNote({
-      title: '新笔记',
+      title: '新便签',
       content: '',
       color: activeColor === 'all' ? 'sticky-yellow' : activeColor,
       tag: activeTag === 'all' ? '' : activeTag,
@@ -106,21 +111,40 @@ export const NotesPage: React.FC = () => {
     playInteractionSound('success');
   }, [activeColor, activeTag, addNote, startEdit]);
 
-  const createTodayAiNote = useCallback(() => {
-    const id = upsertTodayAiNote();
-    const note = useNotesStore.getState().notes.find((item) => item.id === id);
-    if (note) {
-      setActiveTag('all');
-      setActiveColor('all');
-      startEdit(note);
-      playInteractionSound('success');
+  const createTodayAiNote = useCallback(async () => {
+    if (aiNoteLoading) return;
+    setAiNoteLoading(true);
+    setAiNoteError('');
+    try {
+      const todayKey = new Date().toDateString();
+      const localNotes = notes
+        .filter((note) => note.tag !== 'AI日报' && new Date(note.updatedAt).toDateString() === todayKey)
+        .slice(0, 10)
+        .map((note) => note.title);
+      const result = await apiFetch<{ title: string; content: string }>('/api/notes/ai-daily', {
+        method: 'POST',
+        body: JSON.stringify({ local_notes: localNotes }),
+        timeoutMs: 75000,
+      });
+      const id = upsertTodayAiNote({ title: result.title, content: result.content });
+      const note = useNotesStore.getState().notes.find((item) => item.id === id);
+      if (note) {
+        setActiveTag('all');
+        setActiveColor('all');
+        startEdit(note);
+        playInteractionSound('success');
+      }
+    } catch (error) {
+      setAiNoteError(error instanceof Error ? error.message : '生成失败，稍后再试');
+    } finally {
+      setAiNoteLoading(false);
     }
-  }, [startEdit, upsertTodayAiNote]);
+  }, [aiNoteLoading, notes, startEdit, upsertTodayAiNote]);
 
   const saveEdit = useCallback(() => {
     if (!edit.id) return;
     updateNote(edit.id, {
-      title: edit.title.trim() || '未命名笔记',
+      title: edit.title.trim() || '未命名便签',
       content: edit.content,
       color: edit.color,
       tag: edit.tag,
@@ -217,7 +241,7 @@ export const NotesPage: React.FC = () => {
             value={edit.title}
             onChange={(event) => setEdit((prev) => ({ ...prev, title: event.target.value }))}
             onKeyDown={handleEditTitleKeyDown}
-            className="w-full text-sm font-semibold text-[#1a1a1a] bg-transparent outline-none border-b border-[#d1cdc6] pb-1 mb-2"
+            className="w-full text-sm font-semibold text-[var(--text-primary)] bg-transparent outline-none border-b border-[var(--border-medium)] pb-1 mb-2"
             placeholder="标题"
             autoFocus
           />
@@ -229,7 +253,7 @@ export const NotesPage: React.FC = () => {
             className="w-full text-xs text-[#374151] bg-transparent outline-none resize-none min-h-[120px] leading-relaxed"
             placeholder={noteEnterBehavior === 'enter_save' ? '写点什么... Enter 保存，Alt+Enter 换行' : '写点什么... Enter 换行，Alt+Enter 保存'}
           />
-          <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-[#d1cdc6]/30">
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-[var(--border-medium)]/30">
             <div className="flex items-center gap-1.5">
               {NOTE_COLOR_OPTIONS.map((color) => (
                 <button
@@ -244,7 +268,7 @@ export const NotesPage: React.FC = () => {
                 type="text"
                 value={edit.tag}
                 onChange={(event) => setEdit((prev) => ({ ...prev, tag: event.target.value }))}
-                className="ml-2 text-[11px] px-2 py-1 bg-white/70 rounded-full outline-none w-24"
+                className="ml-2 text-xs px-2 py-1 bg-white/70 rounded-full outline-none w-24"
                 placeholder="标签"
               />
             </div>
@@ -252,7 +276,7 @@ export const NotesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => { setActiveNoteId(note.id); setEdit((prev) => ({ ...prev, id: null })); }}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#6b7280] transition-colors hover:bg-white/65 hover:text-[#dc3545]"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-white/65 hover:text-[var(--danger)]"
                 title="取消"
                 aria-label="取消编辑"
               >
@@ -261,9 +285,9 @@ export const NotesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={saveEdit}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#16a34a] text-white shadow-sm transition-colors hover:bg-[#15803d]"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--success)] text-white shadow-sm transition-colors hover:bg-[#15803d]"
                 title="保存"
-                aria-label="保存笔记"
+                aria-label="保存便签"
               >
                 <Save size={14} strokeWidth={2.2} />
               </button>
@@ -290,7 +314,7 @@ export const NotesPage: React.FC = () => {
         onClick={() => startEdit(note)}
       >
         <div
-          className="absolute left-2 top-3 cursor-grab rounded-md px-0.5 py-1 text-[#6b7280]/45 opacity-0 transition-all hover:bg-white/45 hover:text-[#374151] active:cursor-grabbing group-hover:opacity-100"
+          className="absolute left-2 top-3 cursor-grab rounded-lg px-0.5 py-1 text-[var(--text-secondary)]/45 opacity-0 transition-all hover:bg-white/45 hover:text-[#374151] active:cursor-grabbing group-hover:opacity-100"
           draggable
           onClick={(event) => event.stopPropagation()}
           onDragStart={(event) => {
@@ -312,34 +336,34 @@ export const NotesPage: React.FC = () => {
         </div>
         <button
           onClick={(event) => { event.stopPropagation(); togglePin(note.id); }}
-          className={`absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity ${note.pinned ? 'opacity-100 text-[#c87d2f]' : 'text-[#6b7280] hover:text-[#c87d2f]'}`}
+          className={`absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity ${note.pinned ? 'opacity-100 text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--accent)]'}`}
           title={note.pinned ? '取消置顶' : '置顶'}
         >
           <Pin size={12} />
         </button>
         <button
           onClick={(event) => { event.stopPropagation(); handleDelete(note.id); }}
-          className="absolute top-3 right-8 opacity-0 group-hover:opacity-100 transition-opacity text-[#6b7280] hover:text-[#dc3545]"
+          className="absolute top-3 right-8 opacity-0 group-hover:opacity-100 transition-opacity text-[var(--text-secondary)] hover:text-[var(--danger)]"
           title="移入垃圾箱"
         >
           <Trash2 size={12} />
         </button>
-        <h3 className="text-sm font-semibold text-[#1a1a1a] mb-2 pl-4 pr-12">{note.title}</h3>
-        <p className={`text-xs text-[#374151] leading-relaxed whitespace-pre-wrap ${isHovered ? '' : 'line-clamp-4'}`}>{note.content || '空笔记'}</p>
-        <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#d1cdc6]/20">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2 pl-4 pr-12">{note.title}</h3>
+        <p className={`text-xs text-[#374151] leading-relaxed whitespace-pre-wrap ${isHovered ? '' : 'line-clamp-4'}`}>{note.content || '空便签'}</p>
+        <div className="flex items-center justify-between mt-3 pt-2 border-t border-[var(--border-medium)]/20">
           <div className="flex min-w-0 flex-wrap gap-1">
             {getNoteTags(note).slice(0, 3).map((tag) => (
               <button
                 key={tag}
                 onClick={(event) => { event.stopPropagation(); setActiveTag(tag); }}
-                className="text-[10px] px-2 py-0.5 bg-white/65 text-[#4b5563] rounded-full hover:bg-white/90 transition-colors"
+                className="text-xs px-2 py-0.5 bg-white/65 text-[#4b5563] rounded-full hover:bg-white/90 transition-colors"
                 title={`筛选 #${tag}`}
               >
                 #{tag}
               </button>
             ))}
           </div>
-          <span className="text-[10px] text-[#6b7280] flex items-center gap-1">
+          <span className="text-xs text-[var(--text-secondary)] flex items-center gap-1">
             <Clock size={10} />
             {timeAgo(note.updatedAt)}
           </span>
@@ -351,7 +375,7 @@ export const NotesPage: React.FC = () => {
             }`}
             style={{ boxShadow: '0 0 14px rgba(245,158,11,0.55)' }}
           >
-            <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#f59e0b] shadow-sm" />
+            <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[var(--warn)] shadow-sm" />
           </div>
         )}
       </div>
@@ -361,27 +385,31 @@ export const NotesPage: React.FC = () => {
   return (
     <div className="w-full pt-2 space-y-5">
       {/* Mobile compact header */}
-      <div className="md:hidden mb-1 pb-1 border-b border-[#e5e2dd]">
+      <div className="md:hidden mb-1 pb-1 border-b border-[var(--border-light)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <StickyNote size={16} className="text-[#f59e0b]" />
-            <h2 className="text-sm font-bold text-[#1a1a1a]">笔记</h2>
-            <span className="text-[10px] text-[#9ca3af]">({notes.length})</span>
+            <StickyNote size={16} className="text-[var(--warn)]" />
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">便签</h2>
+            <span className="text-xs text-[var(--text-muted)]">({notes.length})</span>
           </div>
           <div className="flex items-center gap-0.5">
-            <button onClick={() => setShowToolbar(!showToolbar)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] transition-colors ${showToolbar ? 'text-[#f59e0b] bg-[#fffbeb]' : 'text-[#9ca3af]'}`} title="筛选">
+            <button onClick={() => setShowToolbar(!showToolbar)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showToolbar ? 'text-[var(--warn)] bg-[#fffbeb]' : 'text-[var(--text-muted)]'}`} title="筛选">
               <SlidersHorizontal size={13} />
               <span>{activeColorLabel !== '全部' ? activeColorLabel : activeTagLabel !== '全部' ? `#${activeTagLabel}` : '全部'}</span>
             </button>
-            <button onClick={() => setShowTrash(!showTrash)} className={`p-1.5 rounded-lg relative ${showTrash ? 'text-[#dc3545] bg-[#fef2f2]' : 'text-[#9ca3af]'}`} title="垃圾箱">
+            <button onClick={() => setShowTrash(!showTrash)} className={`p-1.5 rounded-lg relative ${showTrash ? 'text-[var(--danger)] bg-[var(--danger-bg)]' : 'text-[var(--text-muted)]'}`} title="垃圾箱">
               <Trash2 size={14} />
-              {trashedNotes.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#dc3545] text-white text-[7px] rounded-full flex items-center justify-center">{trashedNotes.length}</span>}
+              {trashedNotes.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[var(--danger)] text-white text-xs rounded-full flex items-center justify-center">{trashedNotes.length}</span>}
             </button>
-            <button onClick={startNew} className="p-1.5 rounded-lg text-[#f59e0b] bg-[#fffbeb]" title="新建笔记">
+            <button onClick={createTodayAiNote} disabled={aiNoteLoading} className="p-1.5 rounded-lg text-[#7c3aed] bg-[#f5f3ff] disabled:opacity-60" title="AI 今日便签">
+              <StickyNote size={14} className={aiNoteLoading ? 'animate-pulse' : undefined} />
+            </button>
+            <button onClick={startNew} className="p-1.5 rounded-lg text-[var(--warn)] bg-[#fffbeb]" title="新建便签">
               <Plus size={14} />
             </button>
           </div>
         </div>
+        {aiNoteError && <p className="mt-1 text-xs text-[var(--danger)]">{aiNoteError}</p>}
       </div>
 
       {/* Mobile filters - shown directly */}
@@ -390,7 +418,7 @@ export const NotesPage: React.FC = () => {
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => setActiveColor('all')}
-              className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${activeColor === 'all' ? 'bg-[#f59e0b] text-white' : 'bg-[#f3f2ef] text-[#6b7280]'}`}
+              className={`px-2 py-0.5 text-xs rounded-full transition-colors ${activeColor === 'all' ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
             >
               全部
             </button>
@@ -398,7 +426,7 @@ export const NotesPage: React.FC = () => {
               <button
                 key={color.value}
                 onClick={() => setActiveColor(color.value)}
-                className={`px-2 py-0.5 text-[10px] rounded-full transition-colors flex items-center gap-1 ${activeColor === color.value ? 'text-white' : 'bg-[#f3f2ef] text-[#6b7280]'}`}
+                className={`px-2 py-0.5 text-xs rounded-full transition-colors flex items-center gap-1 ${activeColor === color.value ? 'text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
                 style={{ backgroundColor: activeColor === color.value ? color.dot : undefined }}
               >
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color.dot }} />
@@ -410,7 +438,7 @@ export const NotesPage: React.FC = () => {
             <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => setActiveTag('all')}
-                className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${activeTag === 'all' ? 'bg-[#f59e0b] text-white' : 'bg-[#f3f2ef] text-[#6b7280]'}`}
+                className={`px-2 py-0.5 text-xs rounded-full transition-colors ${activeTag === 'all' ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
               >
                 全部标签
               </button>
@@ -418,7 +446,7 @@ export const NotesPage: React.FC = () => {
                 <button
                   key={tag.name}
                   onClick={() => setActiveTag(tag.name)}
-                  className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${activeTag === tag.name ? 'bg-[#f59e0b] text-white' : 'bg-[#f3f2ef] text-[#6b7280]'}`}
+                  className={`px-2 py-0.5 text-xs rounded-full transition-colors ${activeTag === tag.name ? 'bg-[var(--warn)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)]'}`}
                 >
                   #{tag.name}
                 </button>
@@ -426,7 +454,7 @@ export const NotesPage: React.FC = () => {
             </div>
           )}
           {(activeColor !== 'all' || activeTag !== 'all') && (
-            <button onClick={resetFilters} className="text-[10px] text-[#9ca3af] hover:text-[#f59e0b] transition-colors">
+            <button onClick={resetFilters} className="text-xs text-[var(--text-muted)] hover:text-[var(--warn)] transition-colors">
               清除筛选
             </button>
           )}
@@ -436,35 +464,38 @@ export const NotesPage: React.FC = () => {
       {/* Desktop header */}
       <div className="hidden md:block">
         <PageTitle
-          title="笔记"
-          subtitle={`${notes.length} 条笔记，${trashedNotes.length} 条在垃圾箱；拖动卡片手柄调整顺序`}
+          title="便签"
+          subtitle={`${notes.length} 条便签，${trashedNotes.length} 条在垃圾箱；拖动卡片手柄调整顺序`}
           icon={<StickyNote size={22} />}
           action={
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowTrash((value) => !value)}
-                className={`p-2 rounded-lg transition-colors relative ${showTrash ? 'text-[#dc3545] bg-[#fef2f2]' : 'text-[#9ca3af] hover:text-[#dc3545] hover:bg-[#fef2f2]'}`}
+                className={`p-2 rounded-lg transition-colors relative ${showTrash ? 'text-[var(--danger)] bg-[var(--danger-bg)]' : 'text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-bg)]'}`}
                 title="垃圾箱"
               >
                 <Trash2 size={16} />
                 {trashedNotes.length > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-[#dc3545] text-white text-[9px] rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-[var(--danger)] text-white text-xs rounded-full flex items-center justify-center">
                     {trashedNotes.length}
                   </span>
                 )}
               </button>
+              {aiNoteError && (
+                <span className="max-w-[220px] text-xs text-[var(--danger)]">{aiNoteError}</span>
+              )}
               <button
                 onClick={createTodayAiNote}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#7c3aed] bg-[#f5f3ff] border border-[#ddd6fe] rounded-lg hover:bg-[#ede9fe] transition-colors"
-                title="施工中：先生成或更新一条置顶的今日 AI 笔记"
+                disabled={aiNoteLoading}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#7c3aed] bg-[#f5f3ff] border border-[#ddd6fe] rounded-lg hover:bg-[#ede9fe] transition-colors disabled:opacity-60"
+                title="汇总今天的学习记录，生成一条置顶的 AI 便签"
               >
-                <StickyNote size={16} />
-                AI 今日笔记
-                <span className="text-[10px] font-normal text-[#8b5cf6]">施工中</span>
+                <StickyNote size={16} className={aiNoteLoading ? 'animate-pulse' : undefined} />
+                {aiNoteLoading ? '生成中…' : 'AI 今日便签'}
               </button>
-              <button onClick={startNew} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#f59e0b] rounded-lg hover:bg-[#d97706] transition-colors">
+              <button onClick={startNew} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[var(--warn)] rounded-lg hover:bg-[#d97706] transition-colors">
                 <Plus size={16} />
-                新建笔记
+                新建便签
               </button>
             </div>
           }
@@ -481,25 +512,25 @@ export const NotesPage: React.FC = () => {
         summary={<>颜色: {activeColorLabel} / 标签: {activeTagLabel}</>}
       >
         <div className="relative max-w-xl">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="搜索标题、正文或标签..."
-            className="w-full pl-8 pr-3 py-1.5 border border-[#e5e2dd] rounded-lg focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent outline-none transition-all text-xs bg-[#faf9f7]"
+            className="w-full pl-8 pr-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[#f59e0b] focus:border-transparent outline-none transition-all text-xs bg-[var(--bg-elevated)]"
           />
         </div>
 
         <div className="flex items-start gap-2">
-          <div className="flex h-6 w-12 shrink-0 items-center gap-1.5 text-xs text-[#6b7280]">
-            <Filter size={13} className="text-[#9ca3af]" />
+          <div className="flex h-6 w-12 shrink-0 items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <Filter size={13} className="text-[var(--text-muted)]" />
             <span>颜色</span>
           </div>
           <div className="flex flex-1 flex-wrap gap-1.5">
             <button
               onClick={() => setActiveColor('all')}
-              className={`h-6 px-2.5 text-xs rounded-full transition-colors ${activeColor === 'all' ? 'bg-[#c87d2f] text-white' : 'bg-[#f3f2ef] text-[#6b7280] hover:bg-[#e5e2dd]'}`}
+              className={`h-6 px-2.5 text-xs rounded-full transition-colors ${activeColor === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)] hover:bg-[var(--border-light)]'}`}
             >
               全部
             </button>
@@ -508,28 +539,28 @@ export const NotesPage: React.FC = () => {
                 key={color.value}
                 onClick={() => setActiveColor(color.value)}
                 className={`h-6 px-2.5 text-xs rounded-full transition-colors flex items-center gap-1.5 ${
-                  activeColor === color.value ? 'text-white' : 'bg-[#f3f2ef] text-[#6b7280] hover:bg-[#e5e2dd]'
+                  activeColor === color.value ? 'text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)] hover:bg-[var(--border-light)]'
                 }`}
                 style={{ backgroundColor: activeColor === color.value ? color.dot : undefined }}
                 title={`${color.label} ${color.count} 条`}
               >
                 <span className="w-2 h-2 rounded-full bg-white/80" style={{ backgroundColor: activeColor === color.value ? 'rgba(255,255,255,0.85)' : color.dot }} />
                 <span>{color.label}</span>
-                <span className={activeColor === color.value ? 'text-white/75' : 'text-[#9ca3af]'}>{color.count}</span>
+                <span className={activeColor === color.value ? 'text-white/75' : 'text-[var(--text-muted)]'}>{color.count}</span>
               </button>
             ))}
           </div>
         </div>
 
         <div className="flex items-start gap-2">
-          <div className="flex h-6 w-12 shrink-0 items-center gap-1.5 text-xs text-[#6b7280]">
-            <Tag size={13} className="text-[#9ca3af]" />
+          <div className="flex h-6 w-12 shrink-0 items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <Tag size={13} className="text-[var(--text-muted)]" />
             <span>标签</span>
           </div>
           <div className="flex flex-1 flex-wrap gap-1.5">
             <button
               onClick={() => setActiveTag('all')}
-              className={`h-6 px-2.5 text-xs rounded-full transition-colors ${activeTag === 'all' ? 'bg-[#c87d2f] text-white' : 'bg-[#f3f2ef] text-[#6b7280] hover:bg-[#e5e2dd]'}`}
+              className={`h-6 px-2.5 text-xs rounded-full transition-colors ${activeTag === 'all' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)] hover:bg-[var(--border-light)]'}`}
             >
               全部
             </button>
@@ -538,18 +569,18 @@ export const NotesPage: React.FC = () => {
                 key={tag.name}
                 onClick={() => setActiveTag(tag.name)}
                 className={`h-6 px-2.5 text-xs rounded-full transition-colors ${
-                  activeTag === tag.name ? 'bg-[#c87d2f] text-white' : 'bg-[#f3f2ef] text-[#6b7280] hover:bg-[#e5e2dd]'
+                  activeTag === tag.name ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-base)] text-[var(--text-secondary)] hover:bg-[var(--border-light)]'
                 }`}
                 title={`${tag.name} ${tag.count} 条`}
               >
-                #{tag.name} <span className={activeTag === tag.name ? 'text-white/75' : 'text-[#9ca3af]'}>{tag.count}</span>
+                #{tag.name} <span className={activeTag === tag.name ? 'text-white/75' : 'text-[var(--text-muted)]'}>{tag.count}</span>
               </button>
             ))}
           </div>
         </div>
 
         {(search || activeColor !== 'all' || activeTag !== 'all') && (
-          <button onClick={resetFilters} className="h-6 px-2 text-xs text-[#9ca3af] hover:text-[#c87d2f] transition-colors">
+          <button onClick={resetFilters} className="h-6 px-2 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
             清除筛选
           </button>
         )}
@@ -557,44 +588,46 @@ export const NotesPage: React.FC = () => {
       </div>
 
       {showTrash && (
-        <div className="border border-[#e5e2dd] rounded-lg bg-[#f8f6f2] overflow-hidden">
+        <div className="border border-[var(--border-light)] rounded-lg bg-[#f8f6f2] overflow-hidden">
           <button
+            type="button"
             onClick={() => setCollapsedTrash((value) => !value)}
-            className="w-full flex items-center justify-between px-3 py-2 border-b border-[#e5e2dd]"
+            aria-expanded={!collapsedTrash}
+            className="flex w-full items-center justify-between border-b border-[var(--border-light)] px-3 py-2"
           >
             <div className="flex items-center gap-2">
-              <Trash2 size={14} className="text-[#dc3545]" />
-              <span className="text-sm font-medium text-[#1a1a1a]">垃圾箱</span>
-              <span className="text-xs text-[#9ca3af]">({trashedNotes.length})</span>
+              <Trash2 size={14} className="text-[var(--danger)]" />
+              <span className="text-sm font-medium text-[var(--text-primary)]">垃圾箱</span>
+              <span className="text-xs text-[var(--text-muted)]">({trashedNotes.length})</span>
             </div>
             <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
               {trashedNotes.length > 0 && !collapsedTrash && (
-                    <button onClick={() => { clearTrash(); playInteractionSound('delete'); }} className="text-xs text-[#9ca3af] hover:text-[#dc3545] transition-colors px-2 py-1">
+                    <button onClick={() => { clearTrash(); playInteractionSound('delete'); }} className="text-xs text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors px-2 py-1">
                   清空垃圾箱
                 </button>
               )}
-              <button onClick={() => setShowTrash(false)} className="p-1 text-[#9ca3af] hover:text-[#1a1a1a] transition-colors">
+              <button onClick={() => setShowTrash(false)} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                 <X size={14} />
               </button>
             </div>
           </button>
           {!collapsedTrash && (
             trashedNotes.length === 0 ? (
-              <div className="text-center py-6 text-[#9ca3af] text-sm">垃圾箱为空</div>
+              <div className="text-center py-6 text-[var(--text-muted)] text-sm">垃圾箱为空</div>
             ) : (
-              <div className="max-h-64 overflow-y-auto divide-y divide-[#e5e2dd]">
+              <div className="max-h-64 overflow-y-auto divide-y divide-[var(--border-light)]">
                 {trashedNotes.map(({ note, deletedAt }) => (
-                  <div key={note.id} className="flex items-center gap-3 px-3 py-2 hover:bg-[#fef7ed] transition-colors">
-                    <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: COLOR_DOT[note.color] }} />
+                  <div key={note.id} className="flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-accent)] transition-colors">
+                    <div className="w-3 h-3 rounded-lg flex-shrink-0" style={{ backgroundColor: COLOR_DOT[note.color] }} />
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm text-[#1a1a1a] truncate block">{note.title}</span>
-                      <span className="text-[10px] text-[#b8b4ac]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
+                      <span className="text-sm text-[var(--text-primary)] truncate block">{note.title}</span>
+                      <span className="text-xs text-[var(--text-muted)]">删除于 {new Date(deletedAt).toLocaleString('zh-CN')}</span>
                     </div>
-                    <button onClick={() => { restoreNote(note.id); playInteractionSound('restore'); }} className="flex items-center gap-1 px-2 py-1 text-xs text-[#c87d2f] hover:bg-[#fef7ed] rounded transition-colors">
+                    <button onClick={() => { restoreNote(note.id); playInteractionSound('restore'); }} className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--accent)] hover:bg-[var(--bg-accent)] rounded transition-colors">
                       <RotateCcw size={12} />
                       恢复
                     </button>
-                    <button onClick={() => { permanentDeleteNote(note.id); playInteractionSound('delete'); }} className="p-1 text-[#9ca3af] hover:text-[#dc3545] transition-colors" title="永久删除">
+                    <button onClick={() => { permanentDeleteNote(note.id); playInteractionSound('delete'); }} className="p-1 text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors" title="永久删除">
                       <X size={14} />
                     </button>
                   </div>
@@ -607,7 +640,7 @@ export const NotesPage: React.FC = () => {
 
       {pinned.length > 0 && (
         <section>
-          <h3 className="text-xs font-medium text-[#9ca3af] mb-2 flex items-center gap-1"><Pin size={10} />置顶</h3>
+          <h3 className="text-xs font-medium text-[var(--text-muted)] mb-2 flex items-center gap-1"><Pin size={10} />置顶</h3>
           <div className="auto-grid-wide">
             {pinned.map(renderCard)}
           </div>
@@ -615,16 +648,16 @@ export const NotesPage: React.FC = () => {
       )}
 
       <section>
-        {pinned.length > 0 && <h3 className="text-xs font-medium text-[#9ca3af] mb-2">全部笔记</h3>}
+        {pinned.length > 0 && <h3 className="text-xs font-medium text-[var(--text-muted)] mb-2">全部便签</h3>}
         {unpinned.length > 0 ? (
           <div className="auto-grid-wide">
             {unpinned.map(renderCard)}
           </div>
         ) : filtered.length === 0 && (
           <EmptyState
-            icon={<StickyNote size={24} className="text-[#9ca3af]" />}
-            title={search ? '没有找到匹配的笔记' : '还没有笔记'}
-            description="可以新建一条笔记，或调整标签、颜色筛选条件。"
+            icon={<StickyNote size={24} className="text-[var(--text-muted)]" />}
+            title={search ? '没有找到匹配的便签' : '还没有便签'}
+            description="可以新建一条便签，或调整标签、颜色筛选条件。"
           />
         )}
       </section>

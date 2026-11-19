@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save } from 'lucide-react';
-import { ConfirmDialog, PageTitle } from '../shared';
-import { usePomodoroStore, useUIStore, useAuthStore, useNotificationStore } from '../../stores';
-import { getUser, hashPassword, upsertUser } from '../../lib/idbStorage';
+import { CheckCircle2, Settings, Timer, User, Bell, Palette, Shield, Database, Bot, Save, Users, Brain } from 'lucide-react';
+import { PageTitle } from '../shared';
+import { usePomodoroStore, useUIStore, useNotificationStore, useAuthStore } from '../../stores';
+import { changePassword } from '../../lib/authApi';
 import type { PomodoroConfig } from '../../types';
 import { AISettings } from './AISettingsSection';
+import { MemorySettingsSection } from './MemorySettingsSection';
 import { TranscriptionSettings } from './TranscriptionSettingsSection';
+import { UserManagementSection } from './UserManagementSection';
 import { AppearanceSettings } from './AppearanceSettings';
 import { SettingsNav } from './SettingsNav';
 import { SettingsButton, SettingsFieldLabel, SettingsHint, SettingsPanelTitle, SettingsSectionTitle, SettingsTextInput, ToggleSwitch } from './SettingsPrimitives';
@@ -18,13 +20,17 @@ const SECTIONS = [
   { id: 'notifications', label: '通知', icon: <Bell size={16} /> },
   { id: 'appearance', label: '外观', icon: <Palette size={16} /> },
   { id: 'ai', label: '灵境小助手', icon: <Bot size={16} /> },
+  { id: 'memory', label: '记忆与档案', icon: <Brain size={16} /> },
   { id: 'transcription', label: '转写设置', icon: <Database size={16} /> },
   { id: 'backend', label: '后端状态', icon: <CheckCircle2 size={16} /> },
   { id: 'privacy', label: '隐私', icon: <Shield size={16} /> },
   { id: 'data', label: '数据', icon: <Database size={16} /> },
 ] as const;
 
-type SectionId = typeof SECTIONS[number]['id'];
+// 用户管理只对管理员显示，不放进公共 SECTIONS 里
+const ADMIN_SECTION = { id: 'users', label: '用户管理', icon: <Users size={16} /> } as const;
+
+type SectionId = (typeof SECTIONS)[number]['id'] | 'users';
 
 /* ─── Pomodoro ─── */
 type PomodoroSettingsForm = Pick<
@@ -56,7 +62,6 @@ function PomodoroSettings() {
   const clearHistory = usePomodoroStore((s) => s.clearHistory);
   const sessions = usePomodoroStore((s) => s.sessions);
   const [saved, setSaved] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [form, setForm] = useState<PomodoroSettingsForm>(() => createPomodoroSettingsForm(config));
 
   const handleSave = () => {
@@ -80,8 +85,12 @@ function PomodoroSettings() {
       <div className="auto-grid-panels">
         {numberFields.map(({ key, label, min, max }) => (
           <div key={key}>
-            <SettingsFieldLabel>{label}</SettingsFieldLabel>
+            {/* 用字段 key 生成稳定 id，label 和 input 才能真正配对。
+                之前这两个组件只是「视觉上挨着」，读屏软件念到数字输入框时
+                不会说是哪个字段。 */}
+            <SettingsFieldLabel htmlFor={`pomodoro-${key}`}>{label}</SettingsFieldLabel>
             <SettingsTextInput
+              id={`pomodoro-${key}`}
               type="number"
               min={min}
               max={max}
@@ -92,8 +101,12 @@ function PomodoroSettings() {
         ))}
       </div>
       <div>
-        <SettingsFieldLabel>背景音模式</SettingsFieldLabel>
-        <div className="auto-grid-compact">
+        {/* 这里是一组选项按钮，不是单个控件 —— 用 htmlFor 会指向不存在的元素。
+            改成 group + aria-labelledby，读屏软件会念「背景音模式 分组」。 */}
+        <span id="pomodoro-ambient-label" className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+          背景音模式
+        </span>
+        <div role="group" aria-labelledby="pomodoro-ambient-label" className="auto-grid-compact">
           {[
             { value: 'manual' as const, label: '手动', desc: '背景音由番茄钟面板手动开关。' },
             { value: 'focus' as const, label: '专注', desc: '只在专注阶段计时时自动播放。' },
@@ -104,12 +117,12 @@ function PomodoroSettings() {
               onClick={() => setForm((f) => ({ ...f, ambientPlaybackMode: item.value }))}
               className={`rounded-lg border px-3 py-2 text-left transition-colors ${
                 (form.ambientPlaybackMode ?? 'manual') === item.value
-                  ? 'border-[#c87d2f] bg-[#fff7ed] text-[#9a5a1e]'
-                  : 'border-[#e5e2dd] bg-[#faf9f7] text-[#5f5a52] hover:border-[#c87d2f]/50'
+                  ? 'border-[var(--accent)] bg-[var(--warn-bg)] text-[var(--accent-hover)]'
+                  : 'border-[var(--border-light)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-[var(--accent)]/50'
               }`}
             >
               <p className="text-sm font-medium">{item.label}</p>
-              <p className="mt-1 text-[10px] leading-4">{item.desc}</p>
+              <p className="mt-1 text-xs leading-4">{item.desc}</p>
             </button>
           ))}
         </div>
@@ -119,7 +132,7 @@ function PomodoroSettings() {
         <select
           value={form.ambientSound ?? 'none'}
           onChange={(e) => setForm((f) => ({ ...f, ambientSound: e.target.value as PomodoroConfig['ambientSound'] }))}
-          className="w-full rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[#c87d2f]"
+          className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)]"
         >
           <option value="none">不播放</option>
           {Object.entries(AMBIENT_SOUNDS).map(([value, item]) => (
@@ -132,24 +145,15 @@ function PomodoroSettings() {
         <SettingsButton onClick={handleSave}>
           <Save size={14} /> 保存设置
         </SettingsButton>
-        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
+        {saved && <span className="text-xs text-[var(--success)]">已保存</span>}
       </div>
-      <div className="border-t border-[#e5e2dd] pt-4">
+      <div className="border-t border-[var(--border-light)] pt-4">
         <SettingsSectionTitle>历史数据</SettingsSectionTitle>
         <SettingsHint className="mb-3 mt-2">共 {sessionCount} 个已完成的番茄记录</SettingsHint>
-        <SettingsButton variant="danger" onClick={() => setShowClearConfirm(true)} className="px-3 py-1.5 text-xs">
+        <SettingsButton variant="danger" onClick={() => { if (window.confirm('确定清除所有番茄历史记录？此操作不可撤销。')) { clearHistory(); playInteractionSound('delete'); } }} className="px-3 py-1.5 text-xs">
           清除历史记录
         </SettingsButton>
       </div>
-      <ConfirmDialog
-        isOpen={showClearConfirm}
-        onClose={() => setShowClearConfirm(false)}
-        onConfirm={() => { clearHistory(); playInteractionSound('delete'); }}
-        title="清除所有番茄历史记录"
-        message={`你共有 ${sessionCount} 条番茄历史记录，确定要全部清除吗？此操作不可撤销。`}
-        confirmText="确认清除"
-        variant="danger"
-      />
     </div>
   );
 }
@@ -160,7 +164,6 @@ function ProfileSettings() {
   const setDisplayName = useUIStore((s) => s.setDisplayName);
   const noteEnterBehavior = useUIStore((s) => s.noteEnterBehavior);
   const setNoteEnterBehavior = useUIStore((s) => s.setNoteEnterBehavior);
-  const currentUser = useAuthStore((s) => s.currentUser);
   const [name, setName] = useState(displayName);
   const [saved, setSaved] = useState(false);
   const [pwOld, setPwOld] = useState('');
@@ -180,17 +183,25 @@ function ProfileSettings() {
     setPwMsg('');
     setPwError(false);
     if (!pwOld || !pwNew) { setPwMsg('请填写所有字段'); setPwError(true); return; }
-    if (pwNew.length < 4) { setPwMsg('新密码至少4个字符'); setPwError(true); return; }
+    if (pwNew.length < 8) { setPwMsg('新密码至少 8 位，且要同时包含字母和数字'); setPwError(true); return; }
     if (pwNew !== pwConfirm) { setPwMsg('两次密码不一致'); setPwError(true); return; }
-    const oldHash = await hashPassword(pwOld);
-    const user = await getUser(currentUser!);
-    if (!user || user.passwordHash !== oldHash) { setPwMsg('原密码错误'); setPwError(true); return; }
-    const newHash = await hashPassword(pwNew);
-    await upsertUser(currentUser!, newHash);
-    playInteractionSound('success');
-    setPwMsg('密码已修改');
-    setPwError(false);
-    setPwOld(''); setPwNew(''); setPwConfirm('');
+    if (pwOld === pwNew) { setPwMsg('新密码不能与原密码相同'); setPwError(true); return; }
+
+    // 早期实现只改了浏览器 IndexedDB 里的哈希，后端根本不知道，
+    // 结果「改完密码下次还能用旧密码登录」。这里必须走后端。
+    try {
+      const message = await changePassword(pwOld, pwNew);
+      playInteractionSound('success');
+      setPwMsg(`${message}，即将返回登录页`);
+      setPwError(false);
+      setPwOld(''); setPwNew(''); setPwConfirm('');
+      // 服务端已经把 token_version +1 并清了 Cookie，当前会话必然失效
+      window.setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      playInteractionSound('error');
+      setPwMsg(err instanceof Error ? err.message : '修改失败，请稍后再试');
+      setPwError(true);
+    }
   };
 
   return (
@@ -203,32 +214,32 @@ function ProfileSettings() {
           onChange={(e) => setName(e.target.value)}
           placeholder="输入你的昵称"
         />
-        <p className="mt-1 text-[10px] text-[var(--text-muted)]">将显示在侧边栏和工作台中</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">将显示在侧边栏和工作台中</p>
       </div>
       <div>
         <SettingsFieldLabel>语言</SettingsFieldLabel>
-        <div className="px-3 py-2 bg-[#f3f2ef] border border-[#e5e2dd] rounded-lg text-sm text-[#6b7280]">简体中文（内置）</div>
+        <div className="px-3 py-2 bg-[var(--bg-base)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-secondary)]">简体中文（内置）</div>
       </div>
       <div>
         <SettingsFieldLabel>一周起始日</SettingsFieldLabel>
-        <div className="px-3 py-2 bg-[#f3f2ef] border border-[#e5e2dd] rounded-lg text-sm text-[#6b7280]">星期一（内置）</div>
+        <div className="px-3 py-2 bg-[var(--bg-base)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-secondary)]">星期一（内置）</div>
       </div>
       <div className="flex items-center gap-3">
         <SettingsButton onClick={handleSave}>
           <Save size={14} /> 保存设置
         </SettingsButton>
-        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
+        {saved && <span className="text-xs text-[var(--success)]">已保存</span>}
       </div>
 
-      <div className="pt-4 border-t border-[#e5e2dd]">
+      <div className="pt-4 border-t border-[var(--border-light)]">
         <SettingsSectionTitle>编辑偏好</SettingsSectionTitle>
-        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-[#e5e2dd] bg-[#faf9f7] px-3 py-3">
+        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-3">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">编辑回车行为</p>
             <SettingsHint>
               {noteEnterBehavior === 'enter_save'
-                ? 'Enter 保存笔记/待办，Alt+Enter 在正文里换行。'
-                : 'Enter 在正文里换行，Alt+Enter 保存笔记/待办。'}
+                ? 'Enter 保存便签/待办，Alt+Enter 在正文里换行。'
+                : 'Enter 在正文里换行，Alt+Enter 保存便签/待办。'}
             </SettingsHint>
           </div>
           <ToggleSwitch
@@ -242,7 +253,7 @@ function ProfileSettings() {
       </div>
 
       {/* Change password */}
-      <div className="pt-4 border-t border-[#e5e2dd]">
+      <div className="pt-4 border-t border-[var(--border-light)]">
         <SettingsSectionTitle>修改密码</SettingsSectionTitle>
         <div className="space-y-2">
           <SettingsTextInput type="password" value={pwOld} onChange={(e) => setPwOld(e.target.value)} placeholder="原密码" />
@@ -252,7 +263,7 @@ function ProfileSettings() {
         <SettingsButton variant="secondary" onClick={handleChangePassword} className="mt-3">
           修改密码
         </SettingsButton>
-        {pwMsg && <p className={`mt-2 text-xs ${pwError ? 'text-[#dc3545]' : 'text-[#16a34a]'}`}>{pwMsg}</p>}
+        {pwMsg && <p className={`mt-2 text-xs ${pwError ? 'text-[var(--danger)]' : 'text-[var(--success)]'}`}>{pwMsg}</p>}
       </div>
     </div>
   );
@@ -287,7 +298,7 @@ function NotificationSettings() {
     <div className="space-y-4">
       <p className="text-sm text-[var(--text-secondary)]">管理各类通知的开关和提示音设置。</p>
       {toggles.map(({ key, label, desc }) => (
-        <div key={key} className="flex items-center justify-between py-3 border-b border-[#e5e2dd] last:border-0">
+        <div key={key} className="flex items-center justify-between py-3 border-b border-[var(--border-light)] last:border-0">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
             <SettingsHint>{desc}</SettingsHint>
@@ -299,7 +310,7 @@ function NotificationSettings() {
         <SettingsButton onClick={handleSave}>
           <Save size={14} /> 保存设置
         </SettingsButton>
-        {saved && <span className="text-xs text-[#16a34a]">已保存</span>}
+        {saved && <span className="text-xs text-[var(--success)]">已保存</span>}
       </div>
     </div>
   );
@@ -308,6 +319,8 @@ function NotificationSettings() {
 /* ─── Main ─── */
 export const SettingsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionId>('pomodoro');
+  const role = useAuthStore((s) => s.role);
+  const visibleSections = role === 'admin' ? [...SECTIONS, ADMIN_SECTION] : [...SECTIONS];
 
   const renderSection = () => {
     switch (activeSection) {
@@ -321,6 +334,8 @@ export const SettingsPage: React.FC = () => {
         return <div><SettingsPanelTitle>外观设置</SettingsPanelTitle><AppearanceSettings /></div>;
       case 'ai':
         return <div><SettingsPanelTitle>灵境小助手</SettingsPanelTitle><AISettings /></div>;
+      case 'memory':
+        return <div><SettingsPanelTitle>记忆与档案</SettingsPanelTitle><MemorySettingsSection /></div>;
       case 'transcription':
         return <div><SettingsPanelTitle>转写设置</SettingsPanelTitle><TranscriptionSettings /></div>;
       case 'backend':
@@ -329,6 +344,8 @@ export const SettingsPage: React.FC = () => {
         return <div><SettingsPanelTitle>隐私设置</SettingsPanelTitle><PrivacySettings /></div>;
       case 'data':
         return <div><SettingsPanelTitle>数据管理</SettingsPanelTitle><DataSettings /></div>;
+      case 'users':
+        return <div><SettingsPanelTitle>用户管理</SettingsPanelTitle><UserManagementSection /></div>;
     }
   };
 
@@ -340,7 +357,7 @@ export const SettingsPage: React.FC = () => {
         icon={<Settings size={22} />}
       />
       <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-        <SettingsNav sections={SECTIONS} activeSection={activeSection} onSelect={(id) => setActiveSection(id)} />
+        <SettingsNav sections={visibleSections} activeSection={activeSection} onSelect={(id) => setActiveSection(id as SectionId)} />
         <div className="flex-1 rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4 md:p-5">
           {renderSection()}
         </div>

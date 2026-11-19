@@ -1,100 +1,8 @@
 # 更新日志
 
-## 5.0 - 2026-11-19
+> 状态：历史参考（截至 2026-05-16），与当前实现差异：本文件是 2.5–2.92 时期的详细变更记录；现行用户可见功能变化以根目录 [`CHANGELOG.md`](../CHANGELOG.md) 为准。数据库已从 SQLite 迁到 PostgreSQL + pgvector，端口拓扑与容器命名策略已改。
 
-这一版把 AI 助手从「正则判断意图 + 关键词检索」重构成一条完整的检索增强链，并把仓库治理到「clone 下来就是全新应用」的状态。
-
-### 检索链重构
-
-- **新增 `intent_recognition.py`**：把用户问题归一为 `search` / `summary` / `chat` / `video_context` 四类意图，作为后续检索路径的分派依据，替代此前散落在前后端的两套正则。
-- **新增 `query_enhancer.py`**：同义词扩展（JS→JavaScript、爬虫→crawler/scraping/爬取）、缩写补全（vue3→vue.js 3、py→python）、查询变体拆解。中文技术词用词表做最长匹配，修复「依赖注入怎么实现」被整句当作单个 token 的问题。
-- **新增 `vector_store.py` / `embedding.py`**：封装 sqlite-vec 的向量写入、批量嵌入与相似度检索。embedding 模型、维度、批量大小、超时全部改从 `EMBEDDING_*` 环境变量读取，修掉旧代码把模型名写死的硬编码。
-- **新增 `hybrid_retriever.py`**：FTS5 关键词检索与 sqlite-vec 向量检索并行执行，用 RRF（倒数排名融合）合并两路排名。旧的纯词法检索在「问法与字幕用词不同」时召不回，混合后由语义通道补齐。同时兼容尚未建 embedding 表的旧库——没有向量时自动退回单路 FTS。
-- **新增 `reranker.py`**：调 bge-reranker-v2-m3 对 query-doc 对打分重排，三级降级：模型端点正常 → LLM 输出排序索引 → 关键词覆盖率打分。修复旧代码把 `/rerank` 拼成 `/rerank/rerank` 导致 200 响应里其实是错误 JSON、却被当成功处理的问题。
-- **新增 `retrieval_postprocessor.py`**：相关性阈值过滤、相邻字幕片段合并、总 token 量控制，避免把没切好的长段落整块塞进上下文。
-- **新增 `rag_chain.py` / `langchain_chat.py`**：把意图识别 → 查询改写 → 混合检索 → 重排 → 后处理 → LLM 生成串成链路，对外仍暴露原有的 `/api/assistant`，前端调用方式不变。
-- `requirements.txt` 补充 langchain 相关依赖。
-
-### 仓库治理
-
-- 新增 `.env.example`：53 项配置分组建注释，密钥留空，`DATABASE_URL` 默认指向本地 SQLite。新环境 clone 后无需配置数据库即可启动，后端 `create_all` + `ensure_runtime_schema` 会自动建表。
-- `.gitignore` 补充 `.env.*`（保留 `.env.example`）、`*.rdb` / `dump.rdb`、`tmp/`、`.edge-shot/`、`*.db-journal`，以及 `desktop-release/*.exe|*.blockmap|*.zip|*.dmg|*.AppImage`。
-- 移除误跟踪文件：`dump.rdb`（Redis 快照，2.8 MB）、`.claude/settings.local.json`；桌面端安装包（78 MB）不再进版本库，改由 GitHub Release 分发。
-- 数据库与向量索引不进入版本库。本项目的 embedding 由 sqlite-vec 存在 `learning_os.db` 同一文件内，`*.db` 忽略后业务数据、字幕、向量全部留在本地，仓库内只有代码与文档。
-
-## 2.94 - 2026-06-28
-
-这一版聚焦 RAG 检索全链路增强，从查询改写、意图统一、模型重排序到检索后处理，大幅提升视频字幕检索的精准度和覆盖率。
-
-### RAG 检索全链路增强
-
-- **检索模式区分**：将原 `search` 意图拆分为两种检索策略：
-  - `search`（精确检索）：针对"搜Python爬虫"、"找闭包讲解"等搜索请求，limit=6，重精确度，返回精确时间点的字幕片段。
-  - `summary`（总结检索）：针对"总结一下"、"这节课讲了什么"等概括请求，limit=15，重召回率，覆盖全视频内容后由 LLM 生成结构化大纲。
-- **查询改写（QueryEnhancer）**：
-  - 同义词扩展：`JS` → `JavaScript`，`爬虫` → `crawler/spider/scraping`，`闭包` → `closure` 等中英文互译。
-  - 缩写补全：`vue3` → `vue.js 3`，`py` → `python` 等。
-  - 多变体检索：每个查询变体分别走 FTS5 + 向量检索，合并去重后提升召回率。
-  - 关键词提取：过滤停用词，保留有意义的检索关键词。
-- **意图识别统一（前后端协同）**：
-  - 前端 regex 意图识别增加 `intent_hint` 字段，传给后端 LLM 做参考。
-  - 后端 LLM 意图识别接受 `intent_hint`，在 prompt 中告知 LLM 前端建议，提高准确率。
-  - 前端 `IntentType` 新增 `summary` 类型，视频页总结类关键词（总结/概括/提炼/复盘等）不再走 `video_context`，而是走独立的 `summary` 检索模式。
-- **Reranker 模型重排序**：
-  - 新增 `reranker.py`，通过 LM Studio API 调用 `bge-reranker-v2-m3` 模型，对 query-doc 对打分重排序。
-  - 降级方案：若 `/rerank` 端点不可用，自动降级到 chat-based reranking（让 LLM 输出排序索引）。
-  - 兜底方案：模型完全不可用时，基于关键词覆盖率 + 原始分数的轻量重排序。
-- **检索后处理**：
-  - `RelevanceFilter`：相关性阈值过滤（默认 min_score=0.15），过滤低质量结果，避免噪声干扰 LLM。全部被过滤时保留最高分的一条。
-  - `ContextCompressor`：
-    - 相邻片段合并：同一视频、时间间隔 ≤3s 的字幕片段自动合并，减少碎片化。
-    - 总量控制：优先保留高分结果，总字符数超过 max_chars（默认 6000）时截断。
-  - `format_references()` 增加 max_chars 参数，超出时显示省略提示。
-
-### 完整 RAG 流水线（改进后）
-
-```
-用户输入
-  → 前端 regex 意图识别 (intent_hint)
-  → 查询改写 (同义词/缩写扩展 → 多变体)
-  → 意图路由 (后端 LLM，参考 intent_hint)
-  → 混合检索 (FTS5 + sqlite-vec × N 变体，RRF 融合)
-  → Reranker (bge-reranker-v2-m3 模型重排序)
-  → Filter (相关性阈值过滤)
-  → Compressor (相邻片段合并 + max_chars 控制)
-  → LLM 生成回答
-```
-
-### 新增文件
-
-- `backend/app/services/query_enhancer.py` — 查询改写服务
-- `backend/app/services/reranker.py` — Reranker 模型服务
-- `backend/app/services/retrieval_postprocessor.py` — 检索后处理（Filter + Compressor）
-
-### 测试
-
-- 前端：TypeScript 编译零错误，`intentRouter.test.ts` 10/10 全通过（新增 summary 意图和 intent_hint 测试）。
-- 后端：全部 9 个 Python 文件语法检查通过，QueryEnhancer / RelevanceFilter / ContextCompressor 功能验证通过。
-- Reranker 需要 LM Studio 加载 bge-reranker-v2-m3 模型后测试，已内置三级降级兜底。
-
-## 2.93 - 2026-05-16
-
-这一版聚焦灵境小助手的场景化体验，引入正则意图识别和自动模板切换。
-
-### 灵境小助手：意图识别 + 自动模板切换
-
-- **正则意图识别**：发消息前自动检测用户意图（搜索 / 总结 / 提问），纯正则匹配，无需 LangGraph。
-  - 搜索：搜/找/查/检索/帮我找/有没有...视频/关于...的内容/查找/search/find
-  - 总结：总结/概括/提炼/归纳/摘要/复盘/要点/大纲/summarize/summary
-  - 提问：问/为什么/怎么/如何/什么是/讲讲/解释/介绍/what is/how to/why
-- **自动模板切换**：命中意图后自动切换到对应提示词模板。UI 在"当前模板"名称旁闪烁提示 "→ 已切搜索/总结/问答"，3 秒后消失。
-- **页面上下文推断**：
-  - 首页（无上下文）：短输入（<20字且无标点）默认走搜索，排除纯问候语。
-  - 视频页/笔记页：短输入默认走总结。
-- **模板扩展**：默认模板从 3 个扩展到 6 个：
-  - 新增："内容搜索"（视频库检索，不强行推荐无关内容）、"总结提炼"（重点/易错点/可执行清单）、"知识问答"（直接回答，忽略不相关视频）、"通用对话"（兜底）。
-  - 保留："代码助手""任务拆解"。
-- **测试覆盖**：13 条单元测试覆盖全部意图检测和上下文推断场景。
+> 说明：本文件与根目录 `CHANGELOG.md` 在 2.5–2.92 区间内容重复且本文件更旧。根 `CHANGELOG.md` 是现行维护入口，新变更请记入那里；本文件早期详细叙述保留备查。是否合并 / 归档见本次校对的碎片清单「待用户确认」。
 
 ## 2.92 - 2026-05-16
 
@@ -317,8 +225,12 @@
 ### 视频与 AI
 
 - 视频收藏能力开始接入 SQLite，为后续 AI 推荐保留基础数据。
+
+  > 后续变化（2026-11-16 现状）：主库已迁到 PostgreSQL + pgvector，SQLite 仅作为迁移来源保留（`backend/app/database.py:3-7`）。
 - AI 任务中心和批处理逻辑继续收敛，区分继续未完成、全部重跑和真实总结状态。
 - 外部 LLM 默认模型调整为 `deepseek-v4-flash`，并继续保留原 URL/API 配置方式。
+
+  > 注：模型名为 2026-05 时期快照，当前默认模型以设置页运行时配置为准。
 - AI 设置页提示词模板支持完整管理：列出、切换、编辑名称和内容、新建、删除、重置默认。
 
 ### 主题与布局
@@ -332,6 +244,8 @@
 - README 改成更适合开源社区阅读的中文说明。
 - 明确当前项目定位：个人使用优先，适合局域网、小团体改造和二次开发。
 - 补充端口说明：80 端口用于局域网访问，5002 端口用于 Vite 热更新开发。
+
+  > 后续变化（2026-11-16 现状）：`5002` 已作废。现行映射：Web `80` + `12302`（同一 nginx）；后端 API `127.0.0.1:12402`（只绑回环，对外走 `http://localhost/api`）；dev `12322`；PostgreSQL `127.0.0.1:12502`；Redis `127.0.0.1:12602`；监控段未分配。旧 111xx 系列号与「backend 不映射宿主端口」说法均已作废。
 - 补充视频转录说明：A 卡 Windows GPU 兼容层可能需要大改，CPU 路线更通用。
 - 更新今天的踩坑记录，补充番茄钟配置回流规则、背景音播放边界和全局提醒弹窗。
 

@@ -171,7 +171,9 @@ describe('ambientPlayer', () => {
     expect(ambientPlayer.getCurrentSound()).toBe('rain');
   });
 
-  it('preloads the preferred ambient sound before the rest of the queue', async () => {
+  // 行为变更（性能优化）：原来会全量排队预加载，首屏因此多下载 1.1MB 音频。
+  // 现在只预加载当前选中的那一个，其余等用户真切换时再加载。
+  it('preloads only the selected ambient sound, not the whole list', async () => {
     vi.resetModules();
 
     const loaded: string[] = [];
@@ -208,7 +210,9 @@ describe('ambientPlayer', () => {
     await flushMicrotasks();
 
     expect(loaded[0]).toBe('/sounds/wind.ogg');
-    expect(loaded).toContain('/sounds/rain.ogg');
+    // 关键断言：未选中的声音不该被预加载
+    expect(loaded).not.toContain('/sounds/rain.ogg');
+    expect(loaded.length).toBe(1);
   });
 
   it('does not create duplicate preload requests for the same sound', async () => {

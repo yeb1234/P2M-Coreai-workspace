@@ -31,7 +31,7 @@ export class VideoErrorBoundary extends React.Component<React.PropsWithChildren,
     if (!this.state.hasError) return this.props.children;
 
     return (
-      <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] p-5 text-[#7f1d1d]">
+      <div className="rounded-xl border border-[#fecaca] bg-[var(--danger-bg)] p-5 text-[#7f1d1d]">
         <div className="flex items-start gap-3">
           <AlertCircle size={20} className="mt-0.5 shrink-0" />
           <div className="min-w-0 flex-1">

@@ -1,7 +1,6 @@
-import { PRIORITY_COLORS, type ISODateTimeString, type ScheduleCalendarEvent, type ScheduleItem, type Todo } from '../types';
+import { PRIORITY_COLORS, type ISODateTimeString, type ScheduleCalendarEvent, type ScheduleItem } from '../types';
 import { toLocalDateString } from './date';
 
-const FALLBACK_HOUR = 9;
 type ScheduledScheduleItem = ScheduleItem & { startAt: ISODateTimeString; dueAt: ISODateTimeString };
 
 export function floorToMinute(date: Date): Date {
@@ -62,39 +61,6 @@ export function getNextWholeHour(now = new Date()): { date: string; startTime: s
     startTime: `${String(startHour).padStart(2, '0')}:00`,
     endTime: `${String(endHour).padStart(2, '0')}:00`,
     endDate,
-  };
-}
-
-export function defaultStartAtForDate(date?: string | null): string {
-  const target = date ? new Date(`${date}T${String(FALLBACK_HOUR).padStart(2, '0')}:00:00`) : new Date();
-  if (!date) {
-    target.setHours(FALLBACK_HOUR, 0, 0, 0);
-  }
-  return toMinuteISOString(target);
-}
-
-export function scheduleItemToTodo(item: ScheduleItem): Todo {
-  const start = item.startAt ? dateTimeParts(item.startAt) : null;
-  const due = item.dueAt ? dateTimeParts(item.dueAt) : null;
-  return {
-    id: item.id,
-    title: item.title,
-    description: item.description,
-    priority: item.priority,
-    tags: [],
-    dueDate: due?.date ?? null,
-    startDate: start?.date ?? null,
-    startTime: start?.time ?? null,
-    endTime: due?.time ?? null,
-    reminderAt: item.reminderAt,
-    status: item.status,
-    pomodoroCount: item.pomodoroCount,
-    pomodoroRounds: item.pomodoroRounds,
-    totalFocusMinutes: item.totalFocusMinutes,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt,
-    completedAt: item.completedAt,
-    calendarEventId: null,
   };
 }
 

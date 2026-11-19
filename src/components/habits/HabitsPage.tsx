@@ -20,7 +20,7 @@ export const HabitsPage: React.FC = () => {
         subtitle="每日打卡，养成好习惯"
         icon={<Target size={22} />}
         action={
-          <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#16a34a] rounded-lg hover:bg-[#15803d] transition-colors">
+          <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[var(--success)] rounded-lg hover:bg-[#15803d] transition-colors">
             <Plus size={16} />
             新建习惯
           </button>
@@ -29,18 +29,18 @@ export const HabitsPage: React.FC = () => {
 
       <div className="space-y-3">
         {MOCK_HABITS.map((habit) => (
-          <div key={habit.name} className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
+          <div key={habit.name} className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${habit.today ? 'bg-[#16a34a]' : 'bg-[#e5e2dd]'}`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${habit.today ? 'bg-[var(--success)]' : 'bg-[var(--border-light)]'}`}
                 >
-                  {habit.today ? <Check size={16} className="text-white" /> : <span className="text-xs text-[#9ca3af]">○</span>}
+                  {habit.today ? <Check size={16} className="text-white" /> : <span className="text-xs text-[var(--text-muted)]">○</span>}
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-[#1a1a1a]">{habit.name}</h3>
-                  <span className="text-xs text-[#9ca3af] flex items-center gap-1">
-                    <Flame size={10} className="text-[#f59e0b]" />
+                  <h3 className="text-sm font-medium text-[var(--text-primary)]">{habit.name}</h3>
+                  <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+                    <Flame size={10} className="text-[var(--warn)]" />
                     连续 {habit.streak} 天
                   </span>
                 </div>
@@ -49,8 +49,8 @@ export const HabitsPage: React.FC = () => {
                 {WEEK.map((d, i) => (
                   <div
                     key={d}
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] ${
-                      i < habit.streak % 7 ? 'text-white' : 'bg-[#f3f2ef] text-[#b8b4ac]'
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                      i < habit.streak % 7 ? 'text-white' : 'bg-[var(--bg-base)] text-[var(--text-muted)]'
                     }`}
                     style={i < habit.streak % 7 ? { backgroundColor: habit.color } : undefined}
                   >

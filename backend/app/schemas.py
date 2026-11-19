@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TranscriptSegment(BaseModel):
@@ -60,6 +60,8 @@ class VideoOut(BaseModel):
     transcription: Optional[str] = None
     transcript_segments: list[TranscriptSegment] = Field(default_factory=list)
     summary: Optional[str] = None
+    has_subtitles: bool = False
+    has_summary: bool = False
     markdown_path: Optional[str] = None
     subtitle_path: Optional[str] = None
     subtitle_url: Optional[str] = None
@@ -125,6 +127,7 @@ class AiJobOut(BaseModel):
     whisper_model: str
     language: str
     do_summary: bool
+    summary_only: bool = False
     word_limit: int
     ollama_model: Optional[str] = None
     device_type: Optional[Literal["auto", "cuda", "cpu"]] = None
@@ -155,6 +158,7 @@ class AiJobListItem(BaseModel):
     whisper_model: str
     language: str
     do_summary: bool
+    summary_only: bool = False
     word_limit: int
     cpu_threads: Optional[int] = None
     compute_type: Optional[str] = None
@@ -182,6 +186,10 @@ class AiJobBatchCreate(AiJobCreate):
     mode: str = "missing_subtitles"
     max_enqueue: int = Field(default=20, ge=1, le=999999)
     dry_run: bool = True
+    # 插队到队首。前端「点开某个视频手动生成」时传 true ——
+    # 用户正盯着这个视频等结果，不该排在 10 个批量任务后面等两小时。
+    # 批量处理（选中一批）保持 false，按提交顺序排队。
+    at_front: bool = False
 
 
 class AiJobBatchSkippedItem(BaseModel):
@@ -266,6 +274,10 @@ class AssistantRuntimeSettingsIn(BaseModel):
 class NoteOut(BaseModel):
     id: int
     video_id: Optional[int] = None
+    # 私有笔记的归属；共享笔记为 None
+    user_id: Optional[int] = None
+    # shared（AI 转写产物，系统共有）/ private（用户自己写的）
+    scope: str = "shared"
     title: str
     content: str
     source: str
@@ -305,38 +317,51 @@ class SegmentSearchResult(BaseModel):
     text: str
     subtitle_url: str | None = None
     score_hint: float = 0
+    # 元数据线索：课程 / 章 / 课时 / 第 N/M 节。
+    # 由 retrieval_meta 从磁盘路径解析，不含系统路径。
+    folder_path: str | None = None
+    meta: dict | None = None
 
 
-class AssistantIntentCreate(BaseModel):
-    message: str = Field(min_length=1)
-    page_context: str = ""
-    intent_hint: str = ""  # 前端 regex 意图判断，传给后端 LLM 做参考
+class AssistantPageNote(BaseModel):
+    """当前笔记的保存上下文。只在用户要求保存时由聊天工具读取。"""
+
+    title: str = Field(default="", max_length=240)
+    markdown: str = Field(default="", max_length=60_000)
 
 
-class AssistantIntentOut(BaseModel):
-    intent: str = Field(default="general",
-        description="search, summary, question, general")
-    confidence: float = Field(default=0.0, ge=0, le=1)
-    cleaned_query: str = Field(default="",
-        description="去除意图词后的纯净查询")
-    keywords: list[str] = Field(default_factory=list)
-    reasoning: str = Field(default="")
+class AssistantResume(BaseModel):
+    """HITL 中断后继续执行。
+
+    run_id 是 LangGraph checkpoint 的 thread_id；前端从 interrupt 事件拿回。
+    selected 是 A/B/C 选项 id，text 是「其它」里的自定义补充。
+    original_message 只用于恢复引用检索和指代消解，不会重新写进历史。
+    """
+
+    run_id: str = Field(min_length=1)
+    interrupt_id: str = ""
+    selected: str = ""
+    text: str = ""
+    original_message: str = ""
 
 
 class AssistantChatCreate(BaseModel):
     message: str = Field(min_length=1)
     page_context: str = ""
+    page_note: AssistantPageNote | None = None
     system_prompt: str = ""
     session_id: str | None = None
     video_id: int | None = None
     depth: str = "basic"
     use_rag: bool = False
     use_web_search: bool = False
+    # 前端 detectIntent() 识别出的意图模板 id。
+    # 由前端算是因为模板定义在前端（prompts/clientPrompts.ts），
+    # 后端只负责随消息一起持久化，历史会话加载时才能还原「当时用的策略」。
+    intent: str | None = None
     use_deep_research: bool = False
     limit: int = Field(default=6, ge=1, le=20)
-    cleaned_query: str = ""
-    intent: str = ""  # search / summary / video_context / learning_plan / chat — 由前端意图识别传入
-    intent_hint: str = ""  # 前端 regex 意图判断，传给后端 LLM 做参考
+    resume: AssistantResume | None = None
 
 
 class AssistantReference(BaseModel):
@@ -385,19 +410,45 @@ class AssistantConnectionTestOut(BaseModel):
 
 
 class UserRegister(BaseModel):
-    username: str = Field(min_length=2, max_length=50)
-    password: str = Field(min_length=4, max_length=128)
+    username: str = Field(min_length=2, max_length=50, pattern=r"^[A-Za-z0-9_.-]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        """只挡最差的一批：纯数字、纯字母、纯符号。
+
+        不做「必须含大写+特殊字符」那套，实测只会逼出 Password1! 这种更差的东西。
+        """
+        if value.isdigit() or value.isalpha():
+            raise ValueError("密码需要同时包含字母和数字")
+        if value.lower() in {"password", "12345678", "qwertyui", "admin123"}:
+            raise ValueError("这个密码太常见了，换一个")
+        return value
 
 
 class UserLogin(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=50)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        if value.isdigit() or value.isalpha():
+            raise ValueError("密码需要同时包含字母和数字")
+        return value
 
 
 class UserOut(BaseModel):
     id: int
     username: str
     display_name: str | None = None
+    role: str = "member"
     model_config = {"from_attributes": True}
 
 
@@ -409,6 +460,39 @@ class TokenOut(BaseModel):
 
 class UserDataItem(BaseModel):
     value: str
+
+
+# ---------------- 管理员：用户管理 ----------------
+
+
+class AdminUserOut(BaseModel):
+    id: int
+    username: str
+    display_name: Optional[str] = None
+    role: str = "member"
+    is_active: bool = True
+    last_login_at: Optional[str] = None
+    created_at: Optional[str] = None
+    # 便于管理员判断「这个号到底有没有在用」
+    watch_events: int = 0
+    learning_paths: int = 0
+
+
+class AdminUserUpdate(BaseModel):
+    role: Optional[Literal["admin", "member"]] = None
+    is_active: Optional[bool] = None
+    display_name: Optional[str] = Field(default=None, max_length=50)
+
+
+class AdminPasswordReset(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        if value.isdigit() or value.isalpha():
+            raise ValueError("密码需要同时包含字母和数字")
+        return value
 
 
 class UserDataBulkImport(BaseModel):
@@ -504,3 +588,43 @@ class CalendarEventOut(CalendarEventBase):
 
 class CalendarEventListOut(BaseModel):
     items: list[CalendarEventOut]
+
+
+# ==================== 混合检索 ====================
+
+
+class HybridSearchHit(BaseModel):
+    segment_id: int
+    video_id: int
+    video_title: str
+    category_id: int | None = None
+    start_sec: float
+    end_sec: float
+    text: str
+    score: float
+    lexical_score: float | None = None
+    vector_score: float | None = None
+    rerank_score: float | None = None
+    sources: list[str] = []
+    # 上下文扩展后：text 是合并出的段落，原始命中片段留在 raw_text。
+    # 少了这两个字段，前端无法判断这条结果覆盖了多长时间的内容，
+    # 也没法在高亮时区分「命中的是这一句」还是「展开的整段」。
+    raw_text: str | None = None
+    segment_count: int = 1
+    # 路径线索（视频级）。命中来自「元数据通道」时才有 meta_score；
+    # meta 里带 display（资料库/课程/章）、lesson_no、position/total、prev/next。
+    # 之前不加这两个字段，hybrid_search 算出来的东西会被 Pydantic 静默丢掉，
+    # 前端拿不到「这条属于哪门课、第几节」。
+    meta: Optional[dict] = None
+    meta_score: Optional[float] = None
+
+
+class HybridSearchOut(BaseModel):
+    query: str
+    hits: list[HybridSearchHit]
+    # timings 里除了毫秒数还有查询向量缓存状态（"hit"/"miss"），
+    # 不能只声明 float，否则匿名/首次搜索会被 Pydantic 校验成 500。
+    timings: dict[str, float | str] = {}
+    degraded: list[str] = []
+    rerank_used: bool = False
+    rerank_mode: str | None = None

@@ -3,21 +3,37 @@ import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../stores';
 import { playInteractionSound } from '../../lib/sounds';
 
-const REMEMBER_KEY = 'p2m-remember';
+// 只记住用户名。早期版本把明文密码也塞进 localStorage 实现「记住密码」——
+// 那是把口令写在硬盘上，任何 XSS 或共享电脑都能直接读走。
+// 密码交给浏览器自带的凭据管理器（下面的 autoComplete 属性），
+// 它加密存储且与系统钥匙串绑定，比自建方案安全得多。
+const REMEMBER_KEY = 'p2m-remember-username';
 
-function loadRemembered(): { username: string; password: string } | null {
+function loadRememberedUsername(): string {
   try {
-    const raw = localStorage.getItem(REMEMBER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+    // 旧版本把 { username, password } 明文存在 p2m-remember 里；
+    // 发现即清除，绝不让它继续留在共享浏览器中。
+    localStorage.removeItem('p2m-remember');
+    localStorage.removeItem('p2m-password');
+    localStorage.removeItem('p2m-auth-token');
+
+    const legacyLastUsername = localStorage.getItem('p2m-last-username');
+    if (legacyLastUsername && !localStorage.getItem(REMEMBER_KEY)) {
+      localStorage.setItem(REMEMBER_KEY, legacyLastUsername);
+      localStorage.removeItem('p2m-last-username');
+    }
+    return localStorage.getItem(REMEMBER_KEY) || '';
+  } catch {
+    return '';
+  }
 }
 
 export const AuthPage: React.FC = () => {
-  const remembered = loadRemembered();
+  const rememberedName = loadRememberedUsername();
   const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState(remembered?.username ?? '');
-  const [password, setPassword] = useState(remembered?.password ?? '');
-  const [remember, setRemember] = useState(!!remembered);
+  const [username, setUsername] = useState(rememberedName);
+  const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(!!rememberedName);
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -34,8 +50,9 @@ export const AuthPage: React.FC = () => {
     const fn = isRegister ? register : login;
     const ok = await fn(username, password);
     playInteractionSound(ok ? 'success' : 'error');
+    // 只存用户名，绝不存密码
     if (ok && remember) {
-      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ username, password }));
+      localStorage.setItem(REMEMBER_KEY, username);
     } else if (ok && !remember) {
       localStorage.removeItem(REMEMBER_KEY);
     }
@@ -58,20 +75,23 @@ export const AuthPage: React.FC = () => {
         </div>
 
         {/* Card */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-[#e5e2dd] p-6">
-          <h2 className="text-lg font-semibold text-[#1a1a1a] mb-4 flex items-center gap-2">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-[var(--border-light)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
             {isRegister ? <UserPlus size={18} /> : <LogIn size={18} />}
             {isRegister ? '注册账号' : '登录'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-[#6b7280] mb-1">用户名</label>
+              <label htmlFor="auth-username" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">用户名</label>
               <input
+                id="auth-username"
                 type="text"
                 value={username}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? 'auth-error' : undefined}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10 transition-colors"
+                className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
                 placeholder="输入用户名"
                 autoFocus
                 autoComplete="username"
@@ -79,25 +99,31 @@ export const AuthPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#6b7280] mb-1">密码</label>
+              <label htmlFor="auth-password" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">密码</label>
               <input
+                id="auth-password"
                 type="password"
                 value={password}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? 'auth-error' : undefined}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10 transition-colors"
-                placeholder="输入密码"
+                className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
+                placeholder={isRegister ? '至少 8 位，含字母和数字' : '输入密码'}
                 autoComplete={isRegister ? 'new-password' : 'current-password'}
               />
             </div>
 
             {isRegister && (
               <div>
-                <label className="block text-xs font-medium text-[#6b7280] mb-1">确认密码</label>
+                <label htmlFor="auth-confirm" className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">确认密码</label>
                 <input
+                  id="auth-confirm"
                   type="password"
                   value={confirm}
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? 'auth-error' : undefined}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-lg text-sm outline-none focus:border-[#c87d2f] focus:ring-2 focus:ring-[#c87d2f]/10 transition-colors"
+                  className="w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-lg text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 transition-colors"
                   placeholder="再次输入密码"
                   autoComplete="new-password"
                 />
@@ -110,20 +136,29 @@ export const AuthPage: React.FC = () => {
                   type="checkbox"
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-[#d1cdc6] text-[#c87d2f] focus:ring-[#c87d2f]/20"
+                  className="w-3.5 h-3.5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]/20"
                 />
-                <span className="text-xs text-[#6b7280]">记住密码</span>
+                <span className="text-xs text-[var(--text-secondary)]">记住账号</span>
               </label>
             )}
 
+            {/* role="alert" 让读屏软件在错误出现时立刻播报，
+                而不是等用户 Tab 到下一个元素才听到。
+                id 供上面三个输入框的 aria-describedby 引用。 */}
             {error && (
-              <p className="text-xs text-[#dc3545] bg-[#dc3545]/5 px-3 py-2 rounded-lg">{error}</p>
+              <p
+                id="auth-error"
+                role="alert"
+                className="rounded-lg bg-[var(--danger-bg)] px-3 py-2 text-xs text-[var(--danger)]"
+              >
+                {error}
+              </p>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] disabled:opacity-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : isRegister ? <UserPlus size={16} /> : <LogIn size={16} />}
               {isRegister ? '注册' : '登录'}
@@ -133,7 +168,7 @@ export const AuthPage: React.FC = () => {
           <div className="mt-4 text-center">
             <button
               onClick={toggleMode}
-              className="text-xs text-[#8b7355] hover:text-[#c87d2f] transition-colors"
+              className="text-xs text-[#8b7355] hover:text-[var(--accent)] transition-colors"
             >
               {isRegister ? '已有账号？去登录' : '没有账号？去注册'}
             </button>

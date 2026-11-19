@@ -15,7 +15,10 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
-  const [createTodo, setCreateTodo] = useState(false);
+  // 默认勾上，和周历保持一致。
+  // 原来这里是 false 而周历是 true —— 用户在日历里新建了东西、
+  // 以为会进待办页，结果「有时行有时不行」，其实取决于在哪个页面建的。
+  const [createTodo, setCreateTodo] = useState(true);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -51,14 +54,14 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-[#6b7280] mb-1">
-          标题 <span className="text-[#dc3545]">*</span>
+        <label htmlFor="event-form-title" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+          标题 <span className="text-[var(--danger)]">*</span>
         </label>
         <input
-          type="text"
+          id="event-form-title" type="text"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          className="w-full px-3 py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#fef7ed]"
+          className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-accent)]"
           placeholder="事件标题"
           autoFocus
           required
@@ -66,11 +69,11 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[#6b7280] mb-1">描述</label>
-        <textarea
+        <label htmlFor="f-3bdd08" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">描述</label>
+        <textarea id="f-3bdd08"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          className="w-full px-3 py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all resize-none bg-[#fef7ed]"
+          className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all resize-none bg-[var(--bg-accent)]"
           placeholder="事件描述（可选）"
           rows={2}
         />
@@ -78,12 +81,12 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-[#6b7280] mb-1">开始时间</label>
-          <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} step="60" className="w-full px-3 py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#fef7ed]" />
+          <label htmlFor="event-form-start" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">开始时间</label>
+          <input id="event-form-start" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} step="60" className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-accent)]" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#6b7280] mb-1">截止时间</label>
-          <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} step="60" className="w-full px-3 py-2 border border-[#d1cdc6] rounded-lg focus:ring-2 focus:ring-[#c87d2f] focus:border-transparent outline-none transition-all bg-[#fef7ed]" />
+          <label htmlFor="event-form-due" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">截止时间</label>
+          <input id="event-form-due" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} step="60" className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all bg-[var(--bg-accent)]" />
         </div>
       </div>
 
@@ -93,18 +96,21 @@ export const CalendarEventForm: React.FC<CalendarEventFormProps> = ({ date, onCl
           id="createTodo"
           checked={createTodo}
           onChange={(event) => setCreateTodo(event.target.checked)}
-          className="w-4 h-4 text-[#c87d2f] rounded focus:ring-[#c87d2f]"
+          className="w-4 h-4 text-[var(--accent)] rounded focus:ring-[var(--accent)]"
         />
-        <label htmlFor="createTodo" className="text-sm text-[#6b7280]">
+        <label htmlFor="createTodo" className="text-sm text-[var(--text-secondary)]">
           保存为待办事项
         </label>
+        <span className="text-[11px] text-[var(--text-muted)]">
+          {createTodo ? '会出现在待办事项' : '只是日程，不进待办'}
+        </span>
       </div>
 
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-[#6b7280] bg-[#f3f2ef] rounded-lg hover:bg-[#e5e2dd] transition-colors">
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-base)] rounded-lg hover:bg-[var(--border-light)] transition-colors">
           取消
         </button>
-        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-[#c87d2f] rounded-lg hover:bg-[#b06d20] transition-colors">
+        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] transition-colors">
           创建
         </button>
       </div>

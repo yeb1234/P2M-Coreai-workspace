@@ -1,8 +1,15 @@
+import os
 import shutil
 import subprocess
 from pathlib import Path
 
 from app.database import settings
+
+# On Windows a console-less parent (pythonw, scheduled task, GUI launcher)
+# gives every console child a brand-new console window. ffmpeg is spawned once
+# per queued video, so without this flag the audio-prep queue turns into a
+# continuous stream of black windows. CREATE_NO_WINDOW keeps the child hidden.
+_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
 
 def _resolve_threads(cpu_threads: int | None = None) -> int | None:
@@ -23,6 +30,10 @@ def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | No
 
     cmd = [
         "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-y",
         "-i",
         str(video_path),
@@ -41,11 +52,13 @@ def extract_wav_16k_mono(video_path: Path, wav_path: Path, cpu_threads: int | No
 
     process = subprocess.Popen(
         cmd,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
         errors="replace",
+        creationflags=_CREATE_NO_WINDOW,
     )
     try:
         stdout, stderr = process.communicate()

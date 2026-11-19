@@ -1,0 +1,476 @@
+# 在屎山上持续开发的工作法
+
+> 状态：部分现行（最后校对 2026-11-16）。第 2、5、6、9、10 节的工作方法仍然成立；第 1、8 节里引用的历史故障实例已逐条复核，已修复的标注「已修」，未修的保留为技术债。
+
+> `lessons.md` 讲的是「哪些 bug 不报错、怎么识别」。
+> 这份讲的是另一件事：**怎么让「改动」这个动作本身不失控。**
+>
+> 写给未来的自己。每次动手前花 30 秒看第 2 节，收工前看第 5 节。
+
+---
+
+## 0. 先说结论：难修的不是代码，是「同一个事实有多个副本」
+
+这一轮 83 个提交，真正写代码的时间大概占三成。剩下七成花在同一件事上：
+
+**确认「我改的，是不是页面真正在读的那份数据」。**
+
+副本有三种形态，这一轮每种都撞到了：
+
+| 形态 | 这次的实例 | 报错吗 |
+|---|---|---|
+| 同一份数据两个存储 | 待办同时在 `schedule_items` 表和 IndexedDB `p2m-todo-storage`（**该双轨后来已收敛到 `scheduleStore`/服务端表，`useTodoStore` 已删除；旧键只留在本地清理清单里**） | 不报 |
+| 同一份规则两处写 | `models.py` 里 11 张表有 `user_id` 外键，`delete_user` 手抄了 8 张（**漏表问题已修，见 1.2**） | 不报（删到有数据的用户才 500） |
+| 同一份配置两处读 | `PATH_MAP` 存在、`resolve_media_path()` 存在，但 `generate_thumbnail` 没调它 | 不报（日志里只有 FileNotFound） |
+
+**每多一个副本，就多一个会静默不同步的地方，而且没有任何地方会报错。**
+
+代码丑只是难读。副本才是难改。
+
+---
+
+## 1. 三种高发病
+
+### 1.1 双轨：同一份数据，两个地方都能写
+
+**这次的实例**
+
+```
+待办页          useScheduleStore → /api/schedule-items → schedule_items 表
+周历/统计/隐私   useTodoStore     → IndexedDB p2m-todo-storage
+时间中心         useTodoStore     → IndexedDB p2m-todo-storage
+```
+
+> 现状（2026-11-16）：`useTodoStore` 已删除，待办/周历/统计统一走 `scheduleStore` → `schedule_items` 表；
+> `p2m-todo-storage` 只是浏览器里可能残留的旧键，列在 `src/components/settings/types.ts` 的 `STORAGE_KEYS`
+> 清理清单中，不再有代码写入。
+
+**用户看到了什么**
+
+- 在待办页加的东西，周历里看不到
+- 统计页说「1 条待办」，待办页显示 5 条
+- 隐私设置点「清空待办」，真待办一条没少
+
+**为什么难查**：两边都不报错，都是「正常渲染」，只是数据不同源。
+
+**怎么发现**
+
+```bash
+# 同一个业务概念，被几个 store 承载？
+grep -rhoE "use[A-Z][a-zA-Z]+Store" src/components/ --include=*.tsx | sort | uniq -c | sort -rn
+
+# 同一份数据，有没有同时写本地和后端？
+grep -rn "localStorage\|indexedDB" src/stores/ src/lib/
+```
+
+**怎么修**：优先保留「已经在服务端」的那一份。理由不是技术洁癖——服务端那份天然跨设备、天然能做多用户隔离。本地那份留着当离线缓存可以，但不能当事实源。
+
+---
+
+### 1.2 只读不写回：读得到，但从不写回去
+
+这是这一轮最隐蔽的一类，两个实例都是真 bug：
+
+**番茄钟 → 待办**
+
+```typescript
+// TodoItem 的进度条读的是这个
+width: `${(todo.pomodoroCount / totalPomodoros) * 100}%`
+
+// 而 pomodoroStore 里搜 updateItem / scheduleStore.getState() 的写操作
+// → 一处都没有
+```
+
+**用户关联待办做完了整个番茄周期，待办里还是 0/4。**
+
+> **已修**：`pomodoroStore` 完成关联番茄后会把待办的 `pomodoroCount` 加 1
+> （`src/stores/pomodoroStore.ts:395-404`）。这个「字段有了没人写」的坑本身仍是检查清单项。
+
+**删用户 → 11 张表**
+
+```python
+# delete_user 的注释写着「按依赖顺序手工清」
+# 实际清了 8 张，漏了 notes / calendar_events / memory_items
+```
+
+**只要用户有这三张表里任一数据，删除就撞外键、接口 500。**
+
+> **已修**：`delete_user` 现在按依赖顺序清 14 个模型，含 `CalendarEvent` / `MemoryItem` / `Note`
+> （`backend/app/routers/admin.py:488-515`）。清单仍是手抄，规则 3 说的「下次加表还会错」依然成立。
+
+**为什么难查**：读取路径完全正常，代码读起来也没毛病。**「谁负责写」这件事没有任何地方声明**。
+
+**怎么防**
+
+改任何「读」的地方，顺手问一句：**这个字段是谁写的？**
+
+```bash
+# 字段有了，有没有人写？
+grep -rn "pomodoroCount" src/ | grep -E "update|set\(|=" | grep -v "__tests__"
+```
+
+如果搜出来全是「读」，那就是 bug。
+
+---
+
+### 1.3 长事务：把 DDL 堵死，站点起不来
+
+**这次的实例**
+
+```python
+thumbnail_worker._run_one:
+    db.query(Video)          # ← 拿到 videos 的 ACCESS SHARE
+    generate_thumbnail(...)  # ← 跑 ffmpeg，0.3-2 秒（长视频更久）
+    db.commit()              # ← 这会儿才放手
+```
+
+4 个线程 = 4 个 `idle in transaction` 一直压着 `videos` 表。
+
+**现象**：重建 backend 后整站 502。容器 `Up` 但 `unhealthy`，
+日志停在「初始化 schema」，迁移里的 `ALTER TABLE videos` 等了 **12 分 30 秒**。
+
+**为什么难查**：从应用日志看不出任何异常——没有报错，就是不动。
+必须去 `pg_stat_activity` 看 `state='idle in transaction'` 才找得到。
+
+> **已修**：7 处涉及 ffmpeg/网络/文件 IO 的路径都改成了「短事务读 → 无事务做活 → 短事务写」三段式，
+> 迁移 DDL 加了 `SET LOCAL lock_timeout = '20s'`；`/health` 保留 `transactions` 段做监控
+> （`backend/app/main.py` 的 `/health`）。长事务本身仍是排查时的第一嫌疑。
+
+**排查命令**
+
+```sql
+SELECT pid, state, now()-query_start, left(query,60)
+FROM pg_stat_activity
+WHERE datname='p2u...' AND state <> 'idle';
+```
+
+**怎么防**
+
+1. **DB 事务绝不跨越耗时操作**（网络请求、子进程、文件 IO）。
+   固定三段式：短事务读 → 无事务做活 → 短事务写。
+2. 迁移里的 DDL 加 `SET LOCAL lock_timeout = '20s'` ——
+   宁可 20 秒报错，也不要无声卡 12 分钟。
+
+这条和 1.2「只读不写回」是一对：那条是忘了写，这条是**写之前攥太久**。
+
+### 1.4 默认值假设了错误的使用场景
+
+框架的默认值是为 demo 设计的，不是为你的生产设计的。
+
+| 默认值 | 我们这儿实际发生了什么 | 现状（2026-11-16） |
+|---|---|---|
+| RQ `job_timeout = 180s` | 转写一小时的课程视频，3 分钟就被强杀 —— 三处 `enqueue` 全都没传这个参数 | **已修**：`rq_client.py:37` `compute_job_timeout` 按时长算超时，不再吃 RQ 默认 180s |
+| Vite `emptyOutDir`（被手改成 `false`） | 每次构建只增不删，累积 839 个文件、71MB 镜像，而首页只引用 17 个 js | **已修**：`vite.config.ts:26` `emptyOutDir: true` |
+| `<audio preload="auto">` | 首屏把 15 个环境音全下载了，1147KB，占首屏传输量的 **98%** | **已修**：环境音由开关控制，关闭时不预加载（`globalAmbientSoundController.test.ts`） |
+| `threading.Thread(...).start()` 每请求一个 | 两个请求同时到达会重复处理同一批视频，同一 id 被两个线程同时写文件 + commit | 历史实例；当前启动扫描在 `lifespan` 里起守护线程，重复处理风险未单独复核 |
+
+**共同点**：都不是「写错了」，是**没写**。默认值在数据量小、任务短、只有一个人的时候完全没问题。
+
+**怎么防**：任何「起线程 / 入队列 / 定时器 / 预加载 / 删目录」的地方，都必须显式回答两个数：**超时多少？并发几个？** 答不上来就是在靠默认值赌。
+
+---
+
+## 2. 动手前的三问（30 秒，能省两小时）
+
+```
+Q1  这份数据的事实源是什么？（表名 / store 名 / localStorage key）
+Q2  谁写它？写的地方有几个？
+Q3  我要改的这段代码，是「读者」还是「写者」？
+```
+
+**这一轮绕最久的一次，就是因为跳过了 Q1**：我往 `p2m-todo-storage` 写测试数据，待办页不显示，于是去查 `getItem` 的回读逻辑、`rehydrate` 时序、`persist` 版本号、`401` 连锁清理……一路查到浏览器 console。
+
+最后发现：**待办页根本不读那个 key。**
+
+而 `demo` 账号的 `schedule_items` 本来就是 0 条，页面显示空是**正确行为**。
+
+命令版：
+
+```bash
+# Q1：页面在读哪个 store
+grep -n "useScheduleStore\|useState" src/components/todo/TodoList.tsx | head
+
+# Q2：谁在写这个 key
+grep -rn "p2m-todo-storage" src/ backend/ | grep -v node_modules
+
+# Q3：这段是读还是写
+sed -n '120,150p' src/stores/scheduleStore.ts
+```
+
+---
+
+## 3. 五条硬规则
+
+### 规则 1：一个事实，只允许一个写入点
+
+有两个写入点，就一定会有一天不一致。而且不一致的时候**没有任何日志**。
+
+合并时的选择顺序：**服务端表 > user_data 快照 > 本地 IndexedDB**。
+
+本地存储不是不能用，但它只能当缓存。判断标准：**清掉浏览器数据，功能应该还在。**
+
+### 规则 2：能派生就不要复制
+
+**对的**：日历视图从 `scheduleStore` 实时派生（`calendarDerivedData`），不往 `calendar_events` 写待办副本。
+
+**错的**：`todoCalendarSyncPlan` —— 老方案是「把待办写成日历事件，带 `todo:due` 标记」。这玩意儿最后只有测试在引用，业务代码一次都没调过，成了死代码。该文件现已删除，截至 2026-11-16 `src/` 下 0 处引用。
+
+**判据**：如果 A 能由 B 算出来，就不要存 A。存了就得管同步，管同步就有同步失败。
+
+### 规则 3：清单从元数据生成，不要手抄
+
+`delete_user` 的注释是「按依赖顺序手工清」——**注释说得完全正确，代码抄漏了 3 张表**。
+
+手抄清单的问题不是这次抄错，是**下次加表还会错**。
+
+两个可选做法：
+
+```python
+# A. 让数据库管（最省心）
+user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+
+# B. 启动时自检（不改表结构时用）
+# 扫 models 里所有含 user_id 外键的表，比 delete_user 的清理清单，差集告警
+```
+
+至少要做到：**加带 `user_id` 的新表时，同一个提交里必须改 `delete_user`**。
+
+### 规则 4：所有常驻进程必须在编排里
+
+`worker.py` 逻辑写得很完整（建表 → 恢复中断任务 → 补推 → 清僵尸 → 阻塞消费）。
+
+> **已修**：`docker-compose.yml` 现在有独立 `worker` 服务，复用 backend 镜像、只换启动命令，
+> `restart: unless-stopped`，并关掉了继承来的 HTTP healthcheck（worker 不提供 HTTP）。
+> 内嵌 worker 受 `AI_WORKER_EMBEDDED` 控制，compose 部署时为 `false`，避免两个 worker 抢队列。
+
+**判据**：`docker compose ps` 里看不到的常驻进程，全是定时炸弹。
+
+顺便两个坑：
+
+```yaml
+# 1. 镜像自带的 HEALTHCHECK 探 8000 端口（uvicorn）
+#    worker 不提供 HTTP，继承下来会永远 unhealthy
+healthcheck:
+  disable: true
+
+# 2. 转写是 worker 干的活，只给 backend 挂 GPU 没用
+#    docker-compose.gpu.yml 里也要给 worker 加
+```
+
+### 规则 5：恢复能力按「能否被扫描发现」分级
+
+不是所有任务都需要同一套持久化机制。先问一句：**重启之后，能不能靠查库知道还剩什么？**
+
+| 任务 | 靠什么恢复 | 要任务表吗 |
+|---|---|---|
+| 缩略图批量补齐 | `SELECT ... WHERE thumbnail IS NULL` | **不要** |
+| AI 转写 | `ai_jobs` + RQ | 已有 |
+| 向量化 / 索引重建 | 扫不出来（不知道用户想建哪些、参数是什么） | **要** |
+
+**为什么缩略图不该建任务表**：为 2 万多个视频建 2 万多条记录，而一条 SQL 能得到同样信息。**能用查询表达的，不该用状态表存。**
+
+**要表的那类，三条原则**：
+
+1. **DB 是状态源，Redis 只是管道**。队列可能丢，但 `status='queued'` 的记录还在。worker 启动扫一遍重投，一条不漏。**不要相信队列，要相信表。**
+2. **handler 必须幂等**。恢复会把 `running` 改回 `queued` 重跑，同一任务可能执行两次。
+3. **带重试上限**（当前 3 次），否则必失败的任务会占死队列。
+
+参考 `docs/background-tasks.md`。
+
+---
+
+## 4. 验证：这一轮我被自己的测法骗了六次
+
+这部分比规则更重要。**改错了至少能看出来，测错了会把你带到完全相反的方向。**
+
+| # | 我做的 | 得到的假结论 | 真相 | 正确做法 |
+|---|---|---|---|---|
+| 1 | 往 `p2m-todo-storage` 写数据，看待办页不显示 | 「跨设备同步坏了」 | 待办页不读那个 key | 先 grep 页面读哪个 store |
+| 2 | `?limit=200` 测分页，返回字节数不变 | 「分页参数失效」 | 端点用的是 `page_size` | 先看端点签名 |
+| 3 | 在待办页数 `[aria-expanded]`，得到 0 | 「aria 改动没生效」 | 那些折叠区默认不渲染 | 换到转写页（分类树一直可见）→ 101 个 |
+| 4 | `goto` 之后才挂 `route()` 拦截 | 「骨架屏没做」 | `loadItems` 在 App 挂载时就跑完了 | 拦截必须在数据请求发起**之前**挂 |
+| 5 | `waitForTimeout(5500)` 当登录耗时 | 「登录要 5.5 秒，后端慢」 | 那 5.5 秒是我自己写的等待 | `waitForFunction` 等真实信号 → 340ms |
+| 6 | 手写 JSON 塞进 store 测跨设备 | 「rehydrate 没生效」 | 我写的数据形状和 `partialize` 对不上 | 用真实 UI 操作创建数据 |
+
+**一条判据**：
+
+> 如果「修复」之后结果**完全没有任何变化**，八成是测法问题。
+> 真实代码很少一点变化都没有——它通常会以某种方式坏得不一样。
+
+**一条原则**：假数据比没数据危险。没数据你会去查，假数据你会照着它做决定。
+
+---
+
+## 5. 每次改完的验证分层
+
+| 层 | 命令 | 能抓到什么 | 抓不到什么 |
+|---|---|---|---|
+| L1 类型 | `npx tsc --noEmit` | 签名不匹配、字段名错 | 运行时的逻辑错 |
+| L2 单测 | `npx vitest run` | store 行为、纯函数逻辑 | 渲染、网络、时序 |
+| L3 构建 | `npm run build` | import 错、循环依赖 | 一切运行时问题 |
+| L4 端到端 | Playwright + 断言页面文本 | 真实点击、真实接口 | 异常路径 |
+| L5 异常路径 | 重启进程 / 断依赖 / 限速 | 恢复、超时、降级 | —— |
+
+**原则**：
+
+- 改了哪层，验哪层。
+- **动了数据源的，必须走到 L4 + L5。** 因为数据源的问题在 L1-L3 里永远是绿的。
+- 只改视觉的，L3 + 一张截图就够，别浪费时间。
+
+**L4 的断言要写行为，不要写结构**：
+
+```js
+// 好：断言用户能看见的东西
+const body = await page.locator('body').innerText();
+console.log(body.includes('跨设备验证待办'));
+
+// 差：断言 DOM 结构 —— 换个 class 名就红了，但功能其实没坏
+expect(await page.locator('.todo-item').count()).toBe(1);
+```
+
+---
+
+## 6. 症状 → 去哪查（速查表）
+
+改不动的项目里，70% 的时间耗在「不知道往哪看」。这张表是这一轮的产出。
+
+| 症状 | 第一嫌疑 | 具体查什么 |
+|---|---|---|
+| 页面显示空，但接口有数据 | **数据源不对** | 页面读哪个 store？store 从哪加载？ |
+| 改了 A 页面，B 页面不跟着变 | **双轨** | grep 两个页面的 store 引用，看是不是不同的 store |
+| 数字对不上（统计/进度条/计数） | **口径或写回** | 有没有 `LIMIT` 后聚合；那个字段谁在写 |
+| 重启之后功能失效 / 一直转圈 | **进程不在编排里** | `docker compose ps`；`docker inspect <c> --format '{{.HostConfig.RestartPolicy.Name}}'` |
+| 长任务跑到一半失败 | **默认超时** | `enqueue(...)` 的 `job_timeout`；`result_ttl` |
+| 提示成功，但下次看还是旧值 | **写到了假目标** | 前端写本地还是后端？后端有没有这个端点？ |
+| 容器里文件找不到 | **路径映射没接** | `resolve_media_path()` 有没有被调用 |
+| 首屏慢 | **静态资源** | `performance.getEntriesByType('resource')` 按 `initiatorType` 分组求和 |
+| 镜像体积异常 | **构建产物累积** | `emptyOutDir`；`ls dist/assets/*.js \| wc -l` |
+| 删数据 500 | **外键漏清** | 对比 `models.py` 里带 `user_id` 的表 vs 清理清单 |
+| 容器 Up 但 unhealthy，日志停在迁移 | **长事务堵住 DDL** | `pg_stat_activity` 里找 `idle in transaction` |
+| 有 worker 但任务一直排队 | **双 worker 抢队列** | `redis-cli SMEMBERS rq:workers:ai_jobs`，应为 1 个 |
+| 同一功能两个页面行为不一致 | **双实现** | 找两个组件各自的实现，选一个删掉 |
+
+### 表比人快的时候：直接跑诊断脚本
+
+```bash
+bash scripts/diagnose.sh
+```
+
+只读，一次打出四样东西：容器状态 + 探针最后输出 + PG 锁等待 + worker 注册。
+
+**为什么需要脚本而不是看 `/health`**：站点 502 的时候 `/health` 自己也是 502。
+应用层探针在最需要它的时候是死的，所以必须有一条不依赖应用进程的路径。
+
+**`/health` 现在带事务指标**：
+
+```json
+"transactions": {
+  "level": "warn",
+  "idle_in_transaction": 1,
+  "longest_idle_tx_sec": 76.0,
+  "blocked_queries": 0,
+  "warnings": ["1 个会话 idle in transaction，最长 76s（会阻塞 ALTER TABLE / CREATE INDEX，进而卡死迁移）"]
+}
+```
+
+而且它**故意在 warn 时仍返回 200**：探针挂掉会触发编排重启，
+但重启解决不了锁等待（持锁的是别的连接），只会让问题看起来像「进程不稳定」。
+这里要的是「看得见」，不是「自动重启」。
+
+docker 会把探针输出存下来，所以即使不 curl 也能看（容器名由 compose 生成，形如 `p2-siteyeb-backend-1`，以 `docker ps` 为准）：
+
+```bash
+docker inspect -f '{{json .State.Health.Log}}' p2-siteyeb-backend-1 | tail -c 500
+```
+
+> 已核对：`start.bat` / `start.sh` / `scripts/diagnose.sh` / `backup.sh` / `restore.sh` / `preflight.sh`
+> 已统一按 compose 实际生成的 `p2-siteyeb-<service>-1` 取容器，并保留 `*_CONTAINER` 环境变量覆盖；
+> 文档命令一律按 compose 生成名写。
+
+---
+
+## 7. 加新功能的标准动作
+
+```
+□ 1. 先定事实源：这份数据存在哪？（表 / user_data / 本地缓存）
+       —— 只能有一个写入点
+□ 2. 如果它是「算得出来的」，别存，改成派生
+□ 3. 加字段的同时改写入路径，并且写一条「能被执行结果证伪」的测试
+□ 4. 涉及用户私有数据 → 加 user_id 过滤，并造两个用户互查一次
+□ 5. 涉及常驻进程 → 加进 docker-compose，带 restart: unless-stopped
+□ 6. 涉及异步/长任务 → 显式写超时、并发、重试上限
+□ 7. 涉及删数据 → 清单从外键元数据生成，或加 ON DELETE CASCADE
+□ 8. 加端点 → 默认加鉴权，除非能明确说出「为什么这个可以匿名」
+□ 9. 表名 / 列名不要写字符串字面量 → 从 app/tables.py 取
+      两张向量表的 id 空间重叠，拼错不报错，只会静默返回另一批数据
+```
+
+> `app/tables.py` 是这两张表的唯一来源：查询用的列对象、建表和索引的 DDL 都在那儿，`migrations.py` 只负责调用。加列时只改它。
+
+第 8 条不是洁癖：这一轮发现 `GET /api/ai-jobs` **完全不登录就能列出所有转写任务**（含视频标题、失败原因、模型配置），`GET /api/ai-jobs/{id}` 匿名可查。都是单用户时代留下的。
+
+> **已修**：任务列表与批量入口现在是 `require_admin`（`backend/app/routers/ai_jobs.py:60,160`），
+> 单任务读取走 `get_current_user`（`ai_jobs.py:272`）。「加端点默认加鉴权」这条规则仍然适用。
+
+**单用户时代不设防的端点，多用户之后全是后门。**
+
+---
+
+## 8. 当前项目的技术债（诚实版）
+
+不是待办清单，是「下次碰到别惊讶」。
+
+| 项 | 影响 | 建议 |
+|---|---|---|
+| `p2m-todo-storage` 旧数据还留在用户浏览器里 | 无害，但排查时会误导（这次的坑） | 加一次性清理，或明确写进文档 |
+| 时间中心只显示 `reminderAt` 非空的待办 | 设计如此（它是「时间中心」），但没文档 | 补一句注释，别再当 bug 查 |
+| `sprite` 代码矛盾：`file_scanner` 有 `generate_missing_sprites()`，`models.py` 没有 `sprite` 字段（雪碧图按文件系统判断有无，不落库） | 功能半途废弃或改名 | 查清后要么补字段要么删函数 |
+| ~~旧检索表 `segment_embeddings` 覆盖率 38%~~ **已删除** | 表 3.5GB / 71 万行，检索早已不走它 | 已删表 + 删掉碎片检索路径 + 删 `retrieval_source` 开关。删前后 4 个查询结果完全一致 |
+| `dist/sounds` 47MB（`cafe.ogg` 单个 20M，`wind.ogg` 529kbps） | 镜像体积，不影响首屏 | 重编码 64kbps 单声道，有音质取舍 |
+| worker 并发 = 1；AI 转写任务失败不自动重试 | 队列堆 20 个视频要等很久；网络抖动导致的失败永久失败 | 通用 `background_tasks` 已有 3 次重试上限（`MAX_ATTEMPTS=3`）；转写任务仍不重试，要区分「可重试」和「不可重试」，别盲目加 |
+| `sync_db_queue_to_rq` 没测过 Redis 挂掉的场景 | 未知 | 断 Redis 试一次 |
+| 测试账号清理靠手写 SQL，且要按依赖顺序 | 每次清理都可能撞外键 | 做成脚本，或复用 `delete_user` |
+| 其余 13 个主题的对比度已修，但没逐个截图验证 | 数值达标，观感未验 | 抽样看 2-3 个 |
+
+---
+
+## 9. 优先级：先改什么
+
+```
+数据源  >  进程/任务  >  交互/可访问性  >  视觉
+```
+
+**理由不是重要性，是「改错了的代价」**：
+
+- 视觉改错 → 难看，用户能用，回退成本接近零
+- 可访问性改错 → 少数人受影响，能局部回退
+- 进程/任务改错 → 任务不跑，能重启恢复
+- **数据源改错 → 用户数据「消失」，不可回退**
+
+所以数据源要单独做、单独验、单独提交。**不要和视觉改动混在一个提交里**——混了就没法 bisect。
+
+---
+
+## 10. 最后一条：不要攒大重构
+
+这一轮 83 个提交，最危险的不是改颜色（纯视觉，可回退），是合并数据源（动行为）。
+
+但正因为是 83 个小提交而不是 1 个大提交，出问题时能 `git bisect` 定位到具体哪一个。
+
+**「等有空了重构」= 永远不会做，而且债会复利。**
+
+替代做法：**碰到一处双轨就并一处。** 每次只碰一个数据源，验证完再下一个。
+
+这轮的顺序其实是反的——先做了颜色（视觉），后做的数据源（行为）。正确的应该是反过来：**先把数据理干净，再调长相。**
+
+因为数据不干净的时候，你连「这个页面显示的对不对」都判断不了。
+
+---
+
+## 附：这份文档怎么用
+
+- **动手前**：看第 2 节（三问）和第 9 节（优先级）
+- **卡住时**：看第 6 节（症状速查表）
+- **测出意外结果时**：看第 4 节（六次被骗），先怀疑测法
+- **收工前**：看第 5 节（验证分层），确认走到第几层
+- **加新功能**：照着第 7 节八条走一遍

@@ -1,0 +1,39 @@
+# GPU 转写覆盖配置
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# 前提：
+#   1. 宿主机有 NVIDIA 驱动
+#   2. Docker Desktop（WSL2 后端）已启用 GPU 支持
+#   3. 验证：docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+#
+# 不启用 GPU 时转写走 CPU（int8），功能正常但慢数倍。
+
+services:
+  backend:
+    build:
+      args:
+        INSTALL_CUDA: "true"
+    environment:
+      DEVICE_TYPE: cuda
+      WHISPER_COMPUTE_TYPE: float16
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # worker 也要 GPU —— 转写本身是它跑的，只给 backend 挂 GPU 没用。
+  worker:
+    environment:
+      DEVICE_TYPE: cuda
+      WHISPER_COMPUTE_TYPE: float16
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

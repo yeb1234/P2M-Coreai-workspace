@@ -31,8 +31,11 @@ import {
 import { transcriptionFormToDto, transcriptionDtoToForm } from '../settings/types';
 import { useTranscriptionStore } from '../../stores';
 import { VideoAiJobCenter } from '../video/VideoAiJobCenter';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 export function TranscriberPage() {
+  const isMobile = useIsMobile();
+  const [mobileSection, setMobileSection] = useState<'tree' | 'settings' | 'jobs'>('tree');
   const [tree, setTree] = useState<CategoryTreeWithVideos[]>([]);
   const [treeLoading, setTreeLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -381,17 +384,55 @@ export function TranscriberPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageTitle title="字幕转录王" />
-      <div className="flex min-h-0 flex-1 gap-3 p-3">
+      <PageTitle title="字幕转录王" subtitle="目录、转写设置与任务队列" />
+      {isMobile && (
+        <div className="transcriber-mobile-tabs" role="tablist" aria-label="字幕转录王移动端分区">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileSection === 'tree'}
+            onClick={() => setMobileSection('tree')}
+            className={`transcriber-mobile-tab ${mobileSection === 'tree' ? 'is-active' : ''}`}
+          >
+            目录
+            {selectedIds.size > 0 && <span className="transcriber-mobile-badge">{selectedIds.size}</span>}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileSection === 'settings'}
+            onClick={() => setMobileSection('settings')}
+            className={`transcriber-mobile-tab ${mobileSection === 'settings' ? 'is-active' : ''}`}
+          >
+            设置
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileSection === 'jobs'}
+            onClick={() => setMobileSection('jobs')}
+            className={`transcriber-mobile-tab ${mobileSection === 'jobs' ? 'is-active' : ''}`}
+          >
+            任务
+            {(jobs?.running ?? 0) > 0 && <span className="transcriber-mobile-badge is-running">{jobs?.running}</span>}
+          </button>
+        </div>
+      )}
+      <div className={`flex min-h-0 flex-1 gap-3 p-3 ${isMobile ? 'transcriber-mobile-body flex-col' : ''}`}>
         {/* Left: Category Tree */}
-        <div className="theme-surface flex min-w-0 w-64 shrink-0 flex-col overflow-hidden rounded-xl border">
+        <div
+          className={`theme-surface flex min-w-0 shrink-0 flex-col overflow-hidden rounded-xl border ${
+            isMobile ? 'min-h-0 w-full flex-1' : 'w-64'
+          }`}
+          style={isMobile && mobileSection !== 'tree' ? { display: 'none' } : undefined}
+        >
           <div className="flex items-center justify-between border-b border-[var(--border-light)] px-3 py-2">
             <h2 className="text-sm font-semibold text-[var(--text-primary)]">目录</h2>
             <button
               type="button"
               onClick={loadTree}
               disabled={treeLoading}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-45"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)] disabled:opacity-45"
               title="刷新目录"
             >
               <RefreshCw size={14} className={treeLoading ? 'animate-spin' : ''} />
@@ -407,7 +448,12 @@ export function TranscriberPage() {
         </div>
 
         {/* Center: Settings + Batch Action */}
-        <div className="theme-surface flex min-w-0 flex-1 flex-col gap-3 overflow-hidden rounded-xl border p-4">
+        <div
+          className={`theme-surface flex min-w-0 flex-col gap-3 rounded-xl border p-4 ${
+            isMobile ? 'min-h-0 w-full flex-1 overflow-y-auto' : 'flex-1 overflow-hidden'
+          }`}
+          style={isMobile && mobileSection !== 'settings' ? { display: 'none' } : undefined}
+        >
           <TranscriptionSettingsPanel settings={settings} onChange={handleSettingsChange} />
 
           {/* Selected Videos */}
@@ -420,7 +466,7 @@ export function TranscriberPage() {
                 <button
                   type="button"
                   onClick={() => { setSelectedIds(new Set()); }}
-                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-accent)] hover:text-[var(--danger)]"
+                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-accent)] hover:text-[var(--danger)]"
                 >
                   <X size={12} />
                   清空
@@ -429,21 +475,21 @@ export function TranscriberPage() {
             </div>
             <div className="min-h-0 flex-1 overflow-auto space-y-1 pr-1">
               {videosLoading ? (
-                <div className="py-2 text-center text-[11px] text-[var(--text-muted)]">加载视频列表...</div>
+                <div className="py-2 text-center text-xs text-[var(--text-muted)]">加载视频列表...</div>
               ) : selectedVideos.length === 0 ? (
-                <div className="py-2 text-center text-[11px] text-[var(--text-muted)]">
+                <div className="py-2 text-center text-xs text-[var(--text-muted)]">
                   {selectedIds.size === 0 ? '在左侧目录中勾选文件夹以选择视频' : '所选文件夹下暂无视频'}
                 </div>
               ) : (
                 selectedVideos.map((video) => (
                   <div
                     key={video.id}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] hover:bg-[var(--bg-elevated)]"
+                    className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-[var(--bg-elevated)]"
                     title={video.title}
                   >
                     <PlayCircle size={13} className="shrink-0 text-[var(--accent)]" />
                     <span className="min-w-0 flex-1 truncate text-[var(--text-primary)]">{video.title}</span>
-                    <span className={`shrink-0 rounded px-1 py-0.5 text-[10px] ${
+                    <span className={`shrink-0 rounded px-1 py-0.5 text-xs ${
                       video.ai_status === 'completed' ? 'bg-green-500/10 text-green-600' :
                       video.ai_status === 'running' ? 'bg-blue-500/10 text-blue-600' :
                       video.ai_status === 'queued' ? 'bg-amber-500/10 text-amber-600' :
@@ -476,7 +522,12 @@ export function TranscriberPage() {
         </div>
 
         {/* Right: AI Job List */}
-        <div className="flex min-w-0 w-[26rem] shrink-0 flex-col overflow-hidden">
+        <div
+          className={`flex min-w-0 flex-col overflow-hidden ${
+            isMobile ? 'min-h-0 w-full flex-1 overflow-y-auto' : 'w-[26rem] shrink-0'
+          }`}
+          style={isMobile && mobileSection !== 'jobs' ? { display: 'none' } : undefined}
+        >
           <VideoAiJobCenter
             jobs={jobs}
             loading={jobsLoading}

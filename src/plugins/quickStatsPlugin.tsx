@@ -13,7 +13,4 @@ export const quickStatsPlugin: Plugin = {
     defaultSize: 'small',
     summaryComponent: QuickStatsSummary,
   },
-  panel: {
-    component: QuickStatsSummary,
-  },
 };

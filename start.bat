@@ -1,113 +1,171 @@
 @echo off
-setlocal
-set "ROOT=%~dp0"
-if /i "%~1"=="exit" goto exit_launcher
+REM ===========================================================================
+REM  P2 Learning OS - launcher
+REM
+REM  Everything runs in Docker now (this is the part that changed).
+REM  The old start.bat ran  uvicorn + npm run dev  directly on Windows.
+REM  That no longer works: the app needs pgvector (PostgreSQL extension),
+REM  Redis, and ffmpeg, all of which the compose stack provides.
+REM
+REM  Keep this file ASCII-only. cmd.exe reads .bat with the OEM codepage
+REM  (GBK/936 on Chinese Windows); UTF-8 Chinese here shows up as garbage.
+REM ===========================================================================
+
+setlocal EnableDelayedExpansion
+cd /d "%~dp0"
+
+set "COMPOSE=docker compose"
+
+REM ---- sanity checks -------------------------------------------------------
+docker info >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Docker is not running.
+    echo         Start Docker Desktop and run this again.
+    echo.
+    pause
+    exit /b 1
+)
+
+if not exist "docker-compose.yml" (
+    echo [ERROR] docker-compose.yml not found next to this script.
+    pause
+    exit /b 1
+)
+
+if not exist ".env" (
+    echo [WARN] .env not found. Copy .env.example to .env and fill it in.
+    echo.
+    pause
+)
 
 :menu
 cls
-echo ========================================
-echo   SiteYeb / P2M CoreAI Workspace
-echo ========================================
+echo ============================================================
+echo   P2 Learning OS   ^|   Docker launcher
+echo ============================================================
 echo.
-echo   1. Start / restart all services
-echo   2. Restart backend only
-echo   3. Restart frontend only
-echo   4. Stop all services
-echo   5. Exit launcher
+echo   [1] Full stack      db + redis + backend + worker + web
+echo                       ^(needed for AI transcription/indexing^)
 echo.
-choice /c 12345 /n /m "Select: "
-if errorlevel 5 goto exit_launcher
-if errorlevel 4 goto stop_all
-if errorlevel 3 goto restart_frontend
-if errorlevel 2 goto restart_backend
-if errorlevel 1 goto restart_all
-
-:restart_all
-call :stop_backend
-call :stop_frontend
-call :start_redis
-call :start_backend
-timeout /t 2 /nobreak >nul
-call :start_frontend
-goto after_action
-
-:restart_backend
-call :stop_backend
-call :start_redis
-call :start_backend
-goto after_action
-
-:restart_frontend
-call :stop_frontend
-call :clean_vite_cache
-call :start_frontend
-goto after_action
-
-:stop_all
-call :stop_backend
-call :stop_frontend
-call :stop_redis
-goto after_action
-
-:start_redis
-docker --version >nul 2>&1
-if errorlevel 1 (
-    echo WARNING: Docker not found. Please start Redis manually on localhost:6379.
-    exit /b
-)
-echo Starting Redis (port 6379)...
-docker compose up -d redis
-exit /b
-
-:start_backend
-echo Starting backend (port 80)...
-start "SiteYeb Backend" /D "%ROOT%backend" cmd /k ".venv311\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload"
-exit /b
-
-:start_worker
-echo Starting AI RQ worker...
-start "SiteYeb AI Worker" /D "%ROOT%backend" cmd /k ".venv311\Scripts\python -m app.worker"
-exit /b
-
-:clean_vite_cache
-echo Cleaning Vite cache...
-if exist "%ROOT%node_modules\.vite" (
-    rmdir /s /q "%ROOT%node_modules\.vite"
-    echo   Vite cache cleared.
-)
-if exist "%ROOT%dist" (
-    rmdir /s /q "%ROOT%dist"
-    echo   dist folder cleared.
-)
-exit /b
-
-:start_frontend
-echo Starting frontend dev server (port 5002)...
-start "SiteYeb Frontend" /D "%ROOT%" cmd /k "npm run dev"
-exit /b
-
-:stop_backend
-echo Stopping backend...
-python "%~dp0stop.py" backend
-exit /b
-
-:stop_frontend
-echo Stopping frontend...
-python "%~dp0stop.py" frontend
-exit /b
-
-:stop_redis
-docker --version >nul 2>&1
-if errorlevel 1 exit /b
-echo Stopping Redis...
-docker compose down redis >nul 2>&1
-exit /b
-
-:after_action
+echo   [2] Web only        db + redis + backend + web
+echo                       ^(no worker: no AI jobs, everything else works^)
 echo.
-echo Done. Service logs are shown in their own windows.
-timeout /t 2 /nobreak >nul
+echo   [3] Restart backend only
+echo   [4] Restart frontend only
+echo   [5] Status
+echo   [6] Follow backend log
+echo   [7] Stop everything
+echo   [0] Exit
+echo.
+set "PICK="
+set /p "PICK=Select: "
+
+if "%PICK%"=="1" goto full
+if "%PICK%"=="2" goto webonly
+if "%PICK%"=="3" goto restart_backend
+if "%PICK%"=="4" goto restart_frontend
+if "%PICK%"=="5" goto status
+if "%PICK%"=="6" goto logs
+if "%PICK%"=="7" goto stop_all
+if "%PICK%"=="0" goto bye
 goto menu
 
-:exit_launcher
+REM ---- actions -------------------------------------------------------------
+:full
+echo.
+echo Starting full stack ^(with AI worker^)...
+%COMPOSE% up -d
+call :wait_healthy
+goto done
+
+:webonly
+echo.
+echo Starting web-only stack ^(no AI worker^)...
+REM redis is still started: backend declares depends_on: redis healthy.
+REM It costs a few MB and keeps the compose file unchanged.
+REM Worker is deliberately excluded - nothing will consume AI jobs.
+%COMPOSE% up -d postgres redis backend frontend
+call :wait_healthy
+goto done
+
+:restart_backend
+echo.
+echo Rebuilding and restarting backend + worker...
+%COMPOSE% up -d --build backend worker
+call :wait_healthy
+goto done
+
+:restart_frontend
+echo.
+echo Rebuilding and restarting frontend...
+%COMPOSE% up -d --build frontend
+call :wait_healthy
+goto done
+
+:status
+echo.
+%COMPOSE% ps
+echo.
+echo --- probe ---------------------------------------------------
+curl -s -o nul -m 5 -w "  /health   HTTP %%{http_code}\n" http://localhost/health 2>nul
+curl -s -o nul -m 5 -w "  /ready    HTTP %%{http_code}\n" http://localhost/ready 2>nul
+echo.
+echo   /ready 503 usually means the embedding server is down
+echo   (LM Studio on the host, see EMBEDDING_BASE_URL in .env).
+echo   The site still works; semantic search degrades to lexical.
+echo.
+pause
+goto menu
+
+:logs
+echo.
+echo Following backend log. Ctrl+C to stop following.
+echo.
+docker logs -f --tail 60 p2-siteyeb-backend-1
+goto menu
+
+:stop_all
+echo.
+%COMPOSE% down
+echo.
+echo Stopped. Data volumes are kept ^(siteyeb-pgdata / siteyeb-redis^).
+pause
+goto menu
+
+REM ---- helpers -------------------------------------------------------------
+:wait_healthy
+echo.
+echo   waiting for backend to become healthy...
+set "READY=0"
+for /l %%i in (1,1,30) do (
+    if "!READY!"=="0" (
+        for /f "delims=" %%s in ('docker inspect -f "{{.State.Health.Status}}" p2-siteyeb-backend-1 2^>nul') do (
+            if "%%s"=="healthy" set "READY=1"
+        )
+        if "!READY!"=="0" (
+            <nul set /p "=."
+            timeout /t 4 /nobreak >nul
+        )
+    )
+)
+echo.
+if "!READY!"=="1" (
+    echo   backend healthy.
+) else (
+    echo   [WARN] backend not healthy after ~2 minutes.
+    echo          Run option [6] to see the log.
+)
 exit /b
+
+:done
+echo.
+echo   Opening http://localhost
+start "" http://localhost
+echo.
+pause
+goto menu
+
+:bye
+endlocal
+exit /b 0

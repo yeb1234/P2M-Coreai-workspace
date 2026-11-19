@@ -1,0 +1,98 @@
+# 腾讯云部署覆盖层
+#
+# 用法：
+#   docker compose -f docker-compose.yml -f docker-compose.tencent.yml up -d
+#   # 需要 HTTPS 时再叠一层：
+#   docker compose -f docker-compose.yml -f docker-compose.tencent.yml -f docker-compose.https.yml up -d
+#
+# 这一层只做「云上才需要考虑」的事：资源上限、日志轮转、镜像仓库前缀。
+# 业务配置全部留在 .env，避免同一个值两处维护。
+
+services:
+  postgres:
+    # 腾讯云自建 PG 必须是内存型实例起步：向量索引构建很吃内存
+    mem_limit: ${PG_MEM_LIMIT:-2g}
+    cpus: ${PG_CPUS:-2}
+    logging:
+      driver: json-file
+      options:
+        # 不设上限的话 Docker 会一直写，云硬盘写满后 PG 直接崩
+        max-size: "20m"
+        max-file: "5"
+
+  redis:
+    mem_limit: ${REDIS_MEM_LIMIT:-512m}
+    cpus: ${REDIS_CPUS:-1}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    mem_limit: ${BACKEND_MEM_LIMIT:-3g}
+    cpus: ${BACKEND_CPUS:-2}
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    environment:
+      # 云上没有 LM Studio，embedding 必须指向独立服务。
+      # 详见 docs/deploy-tencent.md「embedding 迁移」一节 —— 换实现会导致
+      # 存量向量不可比，需要重建，这不是改个地址就完事的。
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL_DOCKER:-http://embedding:80/v1}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL_DOCKER:-http://embedding:80/v1}
+      # 配额：防止单个账号把外部 LLM 额度跑光
+      QUOTA_CHAT_DAILY: ${QUOTA_CHAT_DAILY:-200}
+      QUOTA_PLAN_DAILY: ${QUOTA_PLAN_DAILY:-20}
+      QUOTA_SEARCH_DAILY: ${QUOTA_SEARCH_DAILY:-100}
+      QUOTA_AI_DAILY: ${QUOTA_AI_DAILY:-10}
+      QUOTA_ADMIN_MULTIPLIER: ${QUOTA_ADMIN_MULTIPLIER:-5}
+    # 云上容器内不需要访问宿主机服务，去掉这条可以减少一个攻击面
+    extra_hosts: !reset []
+
+  frontend:
+    mem_limit: ${FRONTEND_MEM_LIMIT:-256m}
+    cpus: ${FRONTEND_CPUS:-1}
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ---- 可选：自建 embedding 服务 ----
+  # 用 llama.cpp 跑与本地完全相同的 GGUF 模型，保证向量可比。
+  # 不用它时把 profile 去掉即可（默认不启动）。
+  embedding:
+    image: ${EMBEDDING_IMAGE:-ghcr.io/ggerganov/llama.cpp:server}
+    restart: unless-stopped
+    profiles: ["embedding"]
+    command:
+      - "--model"
+      - "/models/bge-m3-q8_0.gguf"
+      - "--embeddings"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "80"
+      # bge-m3 的池化方式是 CLS，不是均值池化，必须显式指定
+      - "--pooling"
+      - "cls"
+      - "--ctx-size"
+      - "8192"
+      - "-t"
+      - "${EMBEDDING_THREADS:-4}"
+    volumes:
+      - ${EMBEDDING_MODEL_DIR:-./models}:/models:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:80/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

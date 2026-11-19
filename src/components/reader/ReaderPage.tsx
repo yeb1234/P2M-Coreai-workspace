@@ -22,14 +22,14 @@ export const ReaderPage: React.FC = () => {
 
       <div className="flex gap-3">
         <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
             placeholder="搜索文章..."
-            className="w-full pl-10 pr-4 py-2.5 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl text-sm outline-none"
+            className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl text-sm outline-none"
           />
         </div>
-        <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-[#6b7280] bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:bg-[#f3f2ef]">
+        <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--text-secondary)] bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl hover:bg-[var(--bg-base)]">
           <Filter size={14} />
           筛选
         </button>
@@ -37,24 +37,24 @@ export const ReaderPage: React.FC = () => {
 
       <div className="space-y-2">
         {MOCK_ARTICLES.map((article) => (
-          <div key={article.title} className="flex items-center gap-4 p-4 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md transition-shadow cursor-pointer group">
+          <div key={article.title} className="flex items-center gap-4 p-4 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl hover:shadow-md transition-shadow cursor-pointer group">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#2563eb] transition-colors truncate">
+                <h3 className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--info)] transition-colors truncate">
                   {article.title}
                 </h3>
-                {article.starred && <Star size={12} className="text-[#f59e0b] fill-[#f59e0b] flex-shrink-0" />}
+                {article.starred && <Star size={12} className="text-[var(--warn)] fill-[#f59e0b] flex-shrink-0" />}
               </div>
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-xs text-[#9ca3af]">{article.source}</span>
-                <span className="text-xs text-[#b8b4ac] flex items-center gap-1">
+                <span className="text-xs text-[var(--text-muted)]">{article.source}</span>
+                <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
                   <Clock size={10} />
                   {article.readTime}
                 </span>
-                <span className="text-[10px] px-2 py-0.5 bg-[#eff6ff] text-[#2563eb] rounded-full">{article.tag}</span>
+                <span className="text-xs px-2 py-0.5 bg-[var(--info-bg)] text-[var(--info)] rounded-full">{article.tag}</span>
               </div>
             </div>
-            <ExternalLink size={14} className="text-[#d1cdc6] group-hover:text-[#6b7280] flex-shrink-0" />
+            <ExternalLink size={14} className="text-[var(--border-medium)] group-hover:text-[var(--text-secondary)] flex-shrink-0" />
           </div>
         ))}
       </div>

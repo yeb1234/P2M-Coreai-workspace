@@ -5,8 +5,13 @@ import { usePluginStore } from '../../stores';
 import { PluginCard } from './PluginCard';
 import { PageTitle } from '../shared';
 import { ImportantDates } from './ImportantDates';
+import { useDashboardProjectionRefresh } from '../../hooks/useDashboardProjectionRefresh';
 
 export const DashboardPage: React.FC = () => {
+  // 卡片摘要读的是实时 store，这里负责把后端的待办/日历再拉一遍，
+  // 工作台挂着不动的时候数据也不会停在登录那一刻
+  useDashboardProjectionRefresh();
+
   const layout = usePluginStore((s) => s.layout);
   const swapPlugins = usePluginStore((s) => s.swapPlugins);
   const setAllPluginSize = usePluginStore((s) => s.setAllPluginSize);

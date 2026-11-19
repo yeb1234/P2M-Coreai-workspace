@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user, require_admin
 from app.database import get_db
 from app.models import AiJob, Note, SubtitleSegment, Video
 from app.schemas import AiJobBatchCreate, AiJobBatchOut, AiJobBatchSkippedItem, AiJobListItem, AiJobListOut, AiJobOut
@@ -9,7 +10,12 @@ from app.services.ai_jobs import _apply_job_options, _build_job_options
 from app.utils.files import unique_suffix
 import logging
 
-from app.services.admin_ai_queue import _is_queue_paused, enqueue_ai_jobs
+from app.services.admin_ai_queue import (
+    _is_queue_paused,
+    ai_job_status_counts,
+    enqueue_ai_jobs,
+    reconcile_stuck_ai_jobs,
+)
 from app.services.ai_job_rules import is_batch_eligible
 from app.utils.serialization import load_segments, to_output_url
 
@@ -50,7 +56,15 @@ def list_ai_jobs(
     status: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=999999),
     db: Session = Depends(get_db),
+    # 任务列表是运维视图：会暴露所有视频标题、失败原因、模型配置。
+    # 普通用户不需要看，原来这里**完全没有鉴权**，不登录就能翻。
+    _admin=Depends(require_admin),
 ):
+    # 前端每 3 秒轮询这个接口。顺手校对 DB 与 RQ 的状态：
+    # worker 被强杀后 RQ 把任务标 failed，DB 却还停在 queued，
+    # 用户会看到永远不动的「处理中 / 1 排队」。这里发现后重新投递。
+    reconcile_stuck_ai_jobs(db)
+
     base_query = db.query(AiJob).outerjoin(Video)
     total_all = base_query.count()
 
@@ -83,13 +97,14 @@ def list_ai_jobs(
             .all()
         )
 
+    status_counts = ai_job_status_counts(db)
     return AiJobListOut(
         items=[_job_list_item(job) for job in jobs],
         total=total_all,
-        running=db.query(AiJob).filter(AiJob.status == "running").count(),
-        queued=db.query(AiJob).filter(AiJob.status == "queued").count(),
-        failed=db.query(AiJob).filter(AiJob.status == "failed").count(),
-        completed=db.query(AiJob).filter(AiJob.status == "completed").count(),
+        running=status_counts.get("running", 0),
+        queued=status_counts.get("queued", 0),
+        failed=status_counts.get("failed", 0),
+        completed=status_counts.get("completed", 0),
     )
 
 
@@ -139,7 +154,13 @@ def _prepare_force_rerun(db: Session, video: Video) -> None:
 
 
 @router.post("/batch", response_model=AiJobBatchOut)
-def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
+def batch_ai_jobs(
+    payload: AiJobBatchCreate,
+    db: Session = Depends(get_db),
+    # 转写是重资源操作：一次批量能把 CPU 吃满几小时。
+    # 不鉴权等于让任何能访问站点的人给你的机器排满 whisper 任务。
+    _admin=Depends(require_admin),
+):
     unique_ids = list(dict.fromkeys(payload.video_ids))
     videos = db.query(Video).filter(Video.id.in_(unique_ids)).all()
     video_by_id = {video.id: video for video in videos}
@@ -206,6 +227,7 @@ def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
                 status="queued",
                 stage="queued",
                 message="Queued for processing",
+                summary_only=(payload.mode == "missing_summary"),
             )
             _apply_job_options(job, options)
             db.add(job)
@@ -216,7 +238,11 @@ def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
         db.commit()
         if not _is_queue_paused():
             try:
-                enqueue_ai_jobs(job_ids)
+                # 单视频手动触发插队到最前；批量按提交顺序排。
+                # 这是「多用户同时提交」下唯一能保交互体验的手段 ——
+                # AiJob 表没有 user_id，做不了用户级配额，
+                # 但可以让「有人在等的那个」优先。
+                enqueue_ai_jobs(job_ids, at_front=payload.at_front)
             except Exception:
                 logging.getLogger(__name__).exception("Failed to enqueue jobs to RQ")
         else:
@@ -241,7 +267,13 @@ def batch_ai_jobs(payload: AiJobBatchCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{job_id}", response_model=AiJobOut)
-def get_ai_job(job_id: str, db: Session = Depends(get_db)):
+def get_ai_job(
+    job_id: str,
+    db: Session = Depends(get_db),
+    # 前端转写进度轮询走这里，所以不要求 admin；但必须登录，
+    # 原来匿名就能查，等于把任务 id 当公开资源。
+    _user=Depends(get_current_user),
+):
     job = db.query(AiJob).filter(AiJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")

@@ -9,6 +9,7 @@ import {
   type AmbientVolumeMap,
 } from '../lib/ambientSoundRules';
 import type { AmbientPlaybackMode, AmbientVolumeBySound, PomodoroPhase, PomodoroStatus } from '../types/pomodoro';
+import { userScopedStorage } from '../lib/userScopedStorage';
 
 interface UseAmbientSoundControllerOptions {
   mode: AmbientPlaybackMode;
@@ -73,7 +74,7 @@ function areAmbientVolumesEqual(left: AmbientVolumeMap, right: AmbientVolumeMap)
 function readAmbientPlaybackState(): AmbientPlaybackState {
   if (typeof localStorage === 'undefined') return { sound: 'none', isPlaying: false };
   try {
-    const parsed = JSON.parse(localStorage.getItem(AMBIENT_PLAYBACK_STATE_KEY) || '{}') as Partial<AmbientPlaybackState>;
+    const parsed = JSON.parse(userScopedStorage.getItem(AMBIENT_PLAYBACK_STATE_KEY) || '{}') as Partial<AmbientPlaybackState>;
     return {
       sound: isKnownAmbientSound(parsed.sound) ? parsed.sound : 'none',
       isPlaying: parsed.isPlaying === true,
@@ -85,7 +86,7 @@ function readAmbientPlaybackState(): AmbientPlaybackState {
 
 function writeAmbientPlaybackState(sound: AmbientSound, isPlaying: boolean): void {
   if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(AMBIENT_PLAYBACK_STATE_KEY, JSON.stringify({ sound, isPlaying }));
+  userScopedStorage.setItem(AMBIENT_PLAYBACK_STATE_KEY, JSON.stringify({ sound, isPlaying }));
 }
 
 function notifyAmbientControllerListeners(): void {

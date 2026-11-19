@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import React, { useId, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react';
 
 interface CollapsibleToolPanelProps {
@@ -10,6 +10,18 @@ interface CollapsibleToolPanelProps {
   children: ReactNode;
 }
 
+/**
+ * 可折叠的工具面板。
+ *
+ * 无障碍要点（之前三条都缺）：
+ *   1. aria-expanded —— 告诉读屏软件当前是展开还是收起。
+ *      没有它，屏幕阅读器只会念「筛选设置 按钮」，用户不知道点下去会发生什么。
+ *   2. aria-controls —— 指向被控制的内容区域，建立关系。
+ *   3. 内容区用 hidden 属性而不是条件渲染 —— 条件渲染会把 DOM 整个拿掉，
+ *      aria-controls 指向的 id 就不存在了，关系断掉。
+ *      这里折中：仍然条件渲染（省 DOM），但有内容时才渲染 id，
+ *      两者不会同时缺。
+ */
 export const CollapsibleToolPanel: React.FC<CollapsibleToolPanelProps> = ({
   collapsed,
   onToggle,
@@ -17,17 +29,36 @@ export const CollapsibleToolPanel: React.FC<CollapsibleToolPanelProps> = ({
   icon,
   summary,
   children,
-}) => (
-  <div>
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 py-1 text-xs font-medium text-[#6b7280] hover:text-[#1a1a1a] transition-colors"
-    >
-      {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-      {icon ?? <SlidersHorizontal size={13} />}
-      <span>{title}</span>
-      {collapsed && summary && <span className="text-[#9ca3af] font-normal truncate">{summary}</span>}
-    </button>
-    {!collapsed && <div className="space-y-2 mt-1">{children}</div>}
-  </div>
-);
+}) => {
+  const contentId = useId();
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        aria-controls={!collapsed ? contentId : undefined}
+        className="flex w-full items-center gap-2 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+      >
+        {collapsed ? (
+          <ChevronRight size={14} aria-hidden="true" />
+        ) : (
+          <ChevronDown size={14} aria-hidden="true" />
+        )}
+        <span aria-hidden="true">{icon ?? <SlidersHorizontal size={13} />}</span>
+        <span>{title}</span>
+        {collapsed && summary && (
+          <span className="truncate font-normal text-[var(--text-muted)]">{summary}</span>
+        )}
+      </button>
+      {!collapsed && (
+        <div id={contentId} className="mt-1 space-y-2">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CollapsibleToolPanel;

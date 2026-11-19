@@ -23,18 +23,18 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   variant = 'danger',
 }) => {
   const buttonColors = {
-    danger: 'bg-[#dc3545] hover:bg-[#c82333]',
-    warning: 'bg-[#c87d2f] hover:bg-[#b06d20]',
+    danger: 'bg-[var(--danger)] hover:bg-[#c82333]',
+    warning: 'bg-[var(--accent)] hover:bg-[var(--accent-hover)]',
     info: 'bg-[#7c3aed] hover:bg-[#6d28d9]',
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="max-w-sm">
-      <p className="text-[#6b7280] mb-6">{message}</p>
+      <p className="text-[var(--text-secondary)] mb-6">{message}</p>
       <div className="flex justify-end gap-3">
         <button
           onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-[#6b7280] bg-[#f3f2ef] rounded-lg hover:bg-[#e5e2dd] transition-colors"
+          className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-base)] rounded-lg hover:bg-[var(--border-light)] transition-colors"
         >
           {cancelText}
         </button>

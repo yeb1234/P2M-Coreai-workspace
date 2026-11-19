@@ -44,14 +44,14 @@ export const Modal: React.FC<ModalProps> = ({
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className={`${maxWidth} w-full mx-4 bg-[#faf9f7] rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[85vh]`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e2dd] flex-shrink-0">
-          <h2 className="text-lg font-semibold text-[#1a1a1a]">{title}</h2>
+      <div className={`${maxWidth} w-full mx-4 bg-[var(--bg-elevated)] rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[85vh]`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)] flex-shrink-0">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-[#f3f2ef] transition-colors"
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-base)] transition-colors"
           >
-            <X size={20} className="text-[#9ca3af]" />
+            <X size={20} className="text-[var(--text-muted)]" />
           </button>
         </div>
         <div className="px-6 py-4 overflow-y-auto">{children}</div>

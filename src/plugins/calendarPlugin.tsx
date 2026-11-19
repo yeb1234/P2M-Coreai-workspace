@@ -1,6 +1,5 @@
 import { Calendar } from 'lucide-react';
 import type { Plugin } from '../types/plugin';
-import { CalendarPage } from '../components/calendar';
 import { CalendarSummary } from '../components/dashboard/summaries/CalendarSummary';
 
 export const calendarPlugin: Plugin = {
@@ -13,8 +12,5 @@ export const calendarPlugin: Plugin = {
     color: 'text-[#7c3aed]',
     defaultSize: 'small',
     summaryComponent: CalendarSummary,
-  },
-  panel: {
-    component: CalendarPage,
   },
 };

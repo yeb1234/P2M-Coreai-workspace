@@ -39,37 +39,28 @@ def rescan_library() -> dict:
 
 
 def generate_thumbnails_for_ids(video_ids: list[int]) -> dict:
+    """把一批视频投进缩略图队列。
+
+    只负责投递，不等结果 —— 生成速度由 worker 池决定，
+    调用方要查进度请用 thumbnail_worker.status()。
+
+    和旧实现的区别：旧的是每请求起一个 daemon 线程串行跑，
+    两个请求同时来会重复处理同一批视频（竞态），进程重启还会丢任务。
+    现在统一投给进程内的单例 worker，去重 + 线程池并发。
+    """
     if not video_ids:
         return {"generated": 0, "total": 0, "pending": 0}
 
     db = SessionLocal()
     try:
+        # 先过滤掉已经有缩略图的，避免无谓投递
         videos = db.query(Video).filter(Video.id.in_(video_ids), Video.thumbnail.is_(None)).all()
-        pending = len(videos)
-        if pending == 0:
-            return {"generated": 0, "total": len(video_ids), "pending": 0}
-        video_ids_to_generate = [video.id for video in videos]
+        pending_ids = [video.id for video in videos]
     finally:
         db.close()
 
-    def _generate():
-        gen_db = SessionLocal()
-        try:
-            vids = gen_db.query(Video).filter(Video.id.in_(video_ids_to_generate)).all()
-            for video in vids:
-                if video.thumbnail:
-                    continue
-                result = generate_thumbnail(video.filepath, video.id)
-                if result:
-                    video.thumbnail = result
-            gen_db.commit()
-        except Exception:
-            gen_db.rollback()
-        finally:
-            gen_db.close()
-
-    threading.Thread(target=_generate, daemon=True).start()
-    return {"generated": 0, "total": len(video_ids), "pending": pending}
+    added = get_thumbnail_worker().submit(pending_ids)
+    return {"generated": 0, "total": len(video_ids), "pending": added}
 
 
 def whisper_models() -> dict:

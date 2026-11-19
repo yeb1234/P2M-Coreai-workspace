@@ -1,6 +1,26 @@
 # 灵境项目测试流程指南
 
+> 状态：部分现行（最后校对 2026-11-16）。命令与流程仍成立；第 3 节补入当前测试盘点（文件数、口径、覆盖缺口），旧文中与现状不符的例子已更正。
+
 本文档记录项目推荐的测试方法与执行流程，覆盖从代码修改到上线前的完整验证链路。
+
+## 0. 测试盘点（2026-11-16 如实登记，不凑数）
+
+| 层 | 位置 | 数量与口径 | 形态 |
+|---|---|---|---|
+| 前端单元/组件 | `src/__tests__/` | **28** 个 `.test.ts` / `.test.tsx`（口径：该目录下文件计数） | Vitest + jsdom；其中 3 个 dashboard 相关测试（`dashboardCalendarTodoSync` / `dashboardPomodoroStatsSync` / `dashboardTodoNotesSummary`）属未提交的进行中工作流 |
+| 前端契约回归 | `tests/contracts/` | **1** 个 `.test.ts` | Vitest，`vitest.config.ts` 的 `include` 同时覆盖 `src/**/*.test.ts(x)` 与 `tests/contracts/**/*.test.ts` |
+| 前端合计 | `src/__tests__` + `tests/contracts` | **29** 个文件 / **232** 个用例 | 2026-11-16 `npm test` 全通过，20.88s |
+| 前端 E2E | `tests/e2e/` | **1** 个 Playwright 规格 | 3 个 Chromium 项目（桌面 1440×900、窄屏 1024×768、Pixel 7 移动）；**没有** Firefox/WebKit 项目 |
+| 后端单元 | `backend/tests/` | **5** 个 `.py`：`test_ai_job_recovery.py`、`test_ai_job_rules.py`、`test_query_rewrite.py`、`test_sprite_quality.py`、`test_video_reference_intents.py`（口径：该目录下 `.py` 计数，不含 `__init__.py`） | 直接 import service 的单元级断言；2 个 `unittest.TestCase`、3 个裸 `def test_*`；`requirements.txt` 未引 pytest，无 `pytest.ini`/`conftest.py` |
+| 后端在线校验脚本 | `backend/scripts/verify_fixes.py` | 1 个 | 起容器后用 `urllib` 打 `http://127.0.0.1:8000` 的针对性校验脚本，**不是** pytest 套件 |
+| 手动多账号脚本 | `backend/scripts/test_multi_user.py` | 1 个 | 手动脚本，不在自动测试链路里 |
+
+**覆盖缺口（如实写）**：
+
+- **后端没有 API 级集成测试**：没有起 `TestClient`/HTTP 层、按端点断言鉴权与隔离的用例；`backend/tests/` 全部是 service 直连单元测试。
+- `tests/` 顶层只有 `contracts` 与 `e2e` 两个目录，没有第三个测试目录。
+- 前端 E2E 只有 1 条规格，不覆盖全部关键路径。
 
 ---
 
@@ -42,7 +62,7 @@ npm run lint
 npm run dev
 ```
 
-- 在浏览器中打开对应页面，手动验证交互效果
+- dev 端口 `12322`（代理打到 `127.0.0.1:12302`，同源不触发 CORS）；浏览器打开 `http://127.0.0.1:12322` 对应页面，手动验证交互效果
 - 重点检查项：
   - 布局是否错位、溢出
   - 主题色（深色/浅色模式）是否正确
@@ -76,6 +96,7 @@ npm run test:watch
 - **框架**：Vitest + jsdom + `@testing-library/react`
 - **覆盖范围**：工具函数、store 逻辑、组件渲染
 - **策略**：核心工具函数必须覆盖，UI 组件以关键交互为主
+- **盘点**：`src/__tests__/` 28 个文件 + `tests/contracts/` 1 个，合计 29 个文件、232 个用例；口径与清单见第 0 节
 
 ### 3.2 E2E 测试（Playwright）
 
@@ -83,9 +104,24 @@ npm run test:watch
 npm run test:e2e
 ```
 
-- **框架**：Playwright
+- **框架**：Playwright，`testDir: ./tests/e2e`，`baseURL: http://127.0.0.1:12322`（webServer 起 dev 服务，复用已有实例）
 - **覆盖范围**：完整用户流程（登录 → 操作 → 断言）
-- **运行环境**：真实浏览器（Chromium/Firefox/WebKit）
+- **运行环境**：仅 Chromium 三个项目——桌面 1440×900、窄屏 1024×768、Pixel 7 移动；**未配** Firefox/WebKit
+- **盘点**：`tests/e2e/` 目前只有 1 条规格，不覆盖全部关键路径
+- **2026-11-16 实测**：桌面项目 **26 passed / 1 skipped**（14.8s）；三个项目合计 **50 passed / 31 skipped / 0 failed**（25.8s）；明细见 `docs/demo/evaluation.md`
+- **注意**：E2E 走 mock API，不证明真实后端链路；注册关闭后，`prepareApp` 用 `p2m-auth-user-id` 注入登录态，不再依赖“去注册”；3 条桌面专用日历场景在窄屏/移动显式跳过
+
+### 3.3 后端测试
+
+```bash
+# 一条命令跑全部：8 个 unittest + 11 个裸函数
+docker compose exec backend python scripts/run_unit_tests.py
+```
+
+- **现状**：5 个 `.py`，全部是 service 直连的单元级断言；2 个走 `unittest.TestCase`，3 个是裸 `def test_*` 函数
+- **2026-11-16 实测**：`unittest=8 failures=0 errors=0 bare=11/11`，合计 **19 条**
+- **缺口**：**没有 API 级集成测试**（不起 `TestClient`、不按端点鉴权/隔离断言）；在线校验仍靠 `backend/scripts/verify_fixes.py` 这类脚本手动跑
+- `backend/scripts/run_unit_tests.py` 是本轮新增的统一 runner，不依赖 pytest；裸函数不再需要手工 import
 
 ---
 
@@ -130,7 +166,7 @@ npm run build
 3. npm run build              → 确保生产构建通过
 4. 浏览器手动验证所有新增交互
 5. 补充对应测试用例（单元/E2E）
-6. 更新 kiminote 记录
+6. 更新项目文档或变更记录（`docs/`）
 ```
 
 ---
@@ -159,8 +195,8 @@ grep -r "toggleStatus" src/ --include="*.ts" --include="*.tsx"
 修改 store 后，确认 `src/stores/index.ts` 已正确导出新增内容：
 
 ```ts
-export { useTodoStore } from './todoStore';
 export { useScheduleStore } from './scheduleStore';
+export { useNotesStore } from './notesStore';
 // 新增 store 需在此注册
 ```
 
@@ -174,9 +210,9 @@ export { useScheduleStore } from './scheduleStore';
 - [ ] `npm run lint` 无 error/warning
 - [ ] 浏览器手动验证通过（如涉及 UI）
 - [ ] `npm run build` 构建成功
-- [ ] 相关文档已更新（README/changelog/kiminote）
+- [ ] 相关文档已更新（README / CHANGELOG / `docs/`）
 - [ ] 如需，补充了单元测试或 E2E 测试
 
 ---
 
-*最后更新：2026-05-14*
+*最后校对：2026-11-16*

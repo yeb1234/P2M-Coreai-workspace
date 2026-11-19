@@ -1,12 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { Download, Upload, Plus, Trash2, Clock, CalendarDays } from 'lucide-react';
+import { useState } from 'react';
+import { Download, Plus, Trash2, Clock, CalendarDays } from 'lucide-react';
 import { useUIStore } from '../../stores';
 import {
   BUILT_IN_THEME_IDS,
   THEME_PRESETS,
   applyTheme,
   generateThemeCss,
-  parseThemeVarsText,
   themeGroupLabel,
   type ThemeScheduleRule,
   WEEKDAY_LABELS,
@@ -19,13 +18,10 @@ import { ToggleSwitch, SettingsHint } from './SettingsPrimitives';
 export function AppearanceSettings() {
   const themeId = useUIStore((s) => s.themeId);
   const setTheme = useUIStore((s) => s.setTheme);
-  const setCustomTheme = useUIStore((s) => s.setCustomTheme);
   const themeScheduleEnabled = useUIStore((s) => s.themeScheduleEnabled);
   const setThemeScheduleEnabled = useUIStore((s) => s.setThemeScheduleEnabled);
   const themeScheduleRules = useUIStore((s) => s.themeScheduleRules);
   const setThemeScheduleRules = useUIStore((s) => s.setThemeScheduleRules);
-  const importRef = useRef<HTMLInputElement>(null);
-  const [importStatus, setImportStatus] = useState('');
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
 
   const handleThemeClick = (id: string, vars: typeof THEME_PRESETS[number]['vars']) => {
@@ -73,33 +69,6 @@ export function AppearanceSettings() {
     playInteractionSound('success');
   };
 
-  const handleImportTheme = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const text = String(reader.result ?? '');
-        // Keep parsing centralized in themes.ts so CSS and JSON formats evolve together.
-        const vars = parseThemeVarsText(text);
-        if (!vars) {
-          setImportStatus('未识别出有效主题变量');
-          playInteractionSound('error');
-          return;
-        }
-        setCustomTheme(vars);
-        applyTheme('custom', vars);
-        setImportStatus('主题已导入');
-        playInteractionSound('success');
-      } catch {
-        setImportStatus('导入失败');
-        playInteractionSound('error');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   const renderThemeButton = (t: (typeof THEME_PRESETS)[number]) => (
     <button
       key={t.id}
@@ -110,7 +79,7 @@ export function AppearanceSettings() {
           : 'hover:border-[var(--border-medium)]'
       }`}
     >
-      <div className="mb-2 flex h-7 overflow-hidden rounded-md border border-[var(--border-light)]">
+      <div className="mb-2 flex h-7 overflow-hidden rounded-lg border border-[var(--border-light)]">
         <span className="flex-1" style={{ background: t.vars['--bg-base'] }} />
         <span className="flex-1" style={{ background: t.vars['--bg-card'] }} />
         <span className="flex-1" style={{ background: t.vars['--accent'] }} />
@@ -119,7 +88,7 @@ export function AppearanceSettings() {
         <div className="h-3 w-3 rounded-full" style={{ background: t.vars['--accent'] }} />
         <span className="text-xs font-medium text-[var(--text-primary)]">{t.name}</span>
       </div>
-      <p className="text-[10px] leading-4 text-[var(--text-muted)]">{t.description}</p>
+      <p className="text-xs leading-4 text-[var(--text-muted)]">{t.description}</p>
     </button>
   );
 
@@ -163,7 +132,7 @@ export function AppearanceSettings() {
         <div className="mb-3 flex items-center justify-between">
           <label className="block text-xs font-medium text-[var(--text-secondary)]">主题风格</label>
           {themeScheduleEnabled && (
-            <span className="rounded-md bg-[var(--accent-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+            <span className="rounded-lg bg-[var(--accent-bg)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
               自动调度中
             </span>
           )}
@@ -173,7 +142,7 @@ export function AppearanceSettings() {
             <section key={group.title} className="space-y-2">
               <div className="flex items-center gap-2">
                 <h4 className="text-xs font-semibold text-[var(--text-primary)]">{group.title}</h4>
-                <span className="text-[10px] text-[var(--text-muted)]">{group.items.length} 个</span>
+                <span className="text-xs text-[var(--text-muted)]">{group.items.length} 个</span>
               </div>
               <div className="auto-grid-cards">
                 {group.items.map(renderThemeButton)}
@@ -188,12 +157,7 @@ export function AppearanceSettings() {
           <button onClick={handleExportThemeJson} className="flex items-center gap-1 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--accent)]">
             <Download size={12} /> 导出 JSON 包
           </button>
-          <button onClick={() => importRef.current?.click()} className="flex items-center gap-1 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--accent)]">
-            <Upload size={12} /> 导入主题
-          </button>
-          <input ref={importRef} type="file" accept=".css,.json" onChange={handleImportTheme} className="hidden" />
         </div>
-        {importStatus && <p className="mt-2 text-[11px] text-[var(--text-muted)]">{importStatus}</p>}
       </div>
 
       {/* 自动主题调度 */}
@@ -228,13 +192,13 @@ export function AppearanceSettings() {
                         <input
                           value={rule.name}
                           onChange={(e) => handleUpdateRule(rule.id, { name: e.target.value })}
-                          className="flex-1 rounded-md border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]"
+                          className="flex-1 rounded-lg border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]"
                           placeholder="规则名称"
                         />
                         <select
                           value={rule.themeId}
                           onChange={(e) => handleUpdateRule(rule.id, { themeId: e.target.value })}
-                          className="rounded-md border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]"
+                          className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]"
                         >
                           {THEME_PRESETS.map((t) => (
                             <option key={t.id} value={t.id}>{t.name}</option>
@@ -242,19 +206,19 @@ export function AppearanceSettings() {
                         </select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-[var(--text-muted)]">时间</span>
+                        <span className="text-xs text-[var(--text-muted)]">时间</span>
                         <input
                           type="time"
                           value={rule.startTime}
                           onChange={(e) => handleUpdateRule(rule.id, { startTime: e.target.value })}
-                          className="rounded-md border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none"
+                          className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none"
                         />
                         <span className="text-[var(--text-muted)]">~</span>
                         <input
                           type="time"
                           value={rule.endTime}
                           onChange={(e) => handleUpdateRule(rule.id, { endTime: e.target.value })}
-                          className="rounded-md border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none"
+                          className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-base)] px-2 py-1 text-xs outline-none"
                         />
                       </div>
                       <div className="flex items-center gap-1">
@@ -262,7 +226,7 @@ export function AppearanceSettings() {
                           <button
                             key={day}
                             onClick={() => toggleRuleWeekday(rule.id, day)}
-                            className={`h-6 w-6 rounded-md text-[10px] font-medium transition-colors ${
+                            className={`h-6 w-6 rounded-lg text-xs font-medium transition-colors ${
                               rule.weekdays.includes(day)
                                 ? 'bg-[var(--accent)] text-white'
                                 : 'border border-[var(--border-light)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -275,13 +239,13 @@ export function AppearanceSettings() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleUpdateRule(rule.id, { enabled: !rule.enabled })}
-                          className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                          className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)]"
                         >
                           {rule.enabled ? '禁用' : '启用'}
                         </button>
                         <button
                           onClick={() => setEditingRuleId(null)}
-                          className="text-[10px] text-[var(--accent)] hover:underline"
+                          className="text-xs text-[var(--accent)] hover:underline"
                         >
                           完成
                         </button>
@@ -292,7 +256,7 @@ export function AppearanceSettings() {
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs font-medium text-[var(--text-primary)]">{rule.name}</span>
-                          <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                             <span className="flex items-center gap-1">
                               <CalendarDays size={10} />
                               {formatScheduleRuleWeekdays(rule)}
@@ -308,7 +272,7 @@ export function AppearanceSettings() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setEditingRuleId(rule.id)}
-                          className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                          className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)]"
                         >
                           编辑
                         </button>

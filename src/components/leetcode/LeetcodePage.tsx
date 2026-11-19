@@ -14,9 +14,9 @@ const MOCK_PROBLEMS = [
 ];
 
 const DIFF_COLOR: Record<string, string> = {
-  Easy: 'bg-[#f0fdf4] text-[#16a34a]',
-  Medium: 'bg-[#fef7ed] text-[#c87d2f]',
-  Hard: 'bg-[#fef2f2] text-[#dc3545]',
+  Easy: 'bg-[var(--success-bg)] text-[var(--success)]',
+  Medium: 'bg-[var(--bg-accent)] text-[var(--accent)]',
+  Hard: 'bg-[var(--danger-bg)] text-[var(--danger)]',
 };
 
 export const LeetcodePage: React.FC = () => {
@@ -30,55 +30,55 @@ export const LeetcodePage: React.FC = () => {
 
       {/* Stats */}
       <div className="auto-grid-cards">
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#16a34a] mb-2"><CheckCircle size={16} /><span className="text-xs font-medium">已解决</span></div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">128</p>
-          <p className="text-[10px] text-[#9ca3af] mt-1">/ 2500 题库</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--success)] mb-2"><CheckCircle size={16} /><span className="text-xs font-medium">已解决</span></div>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">128</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">/ 2500 题库</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#f59e0b] mb-2"><Flame size={16} /><span className="text-xs font-medium">连续打卡</span></div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">14 天</p>
-          <p className="text-[10px] text-[#16a34a] mt-1">保持势头!</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--warn)] mb-2"><Flame size={16} /><span className="text-xs font-medium">连续打卡</span></div>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">14 天</p>
+          <p className="text-xs text-[var(--success)] mt-1">保持势头!</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
-          <div className="flex items-center gap-2 text-[#2563eb] mb-2"><Target size={16} /><span className="text-xs font-medium">通过率</span></div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">72%</p>
-          <p className="text-[10px] text-[#16a34a] mt-1">+5% vs 上月</p>
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
+          <div className="flex items-center gap-2 text-[var(--info)] mb-2"><Target size={16} /><span className="text-xs font-medium">通过率</span></div>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">72%</p>
+          <p className="text-xs text-[var(--success)] mt-1">+5% vs 上月</p>
         </div>
-        <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-4">
+        <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-4">
           <div className="flex items-center gap-2 text-[#8b5cf6] mb-2"><TrendingUp size={16} /><span className="text-xs font-medium">本周刷题</span></div>
-          <p className="text-2xl font-bold text-[#1a1a1a]">12</p>
-          <p className="text-[10px] text-[#9ca3af] mt-1">目标 15 题</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">12</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">目标 15 题</p>
         </div>
       </div>
 
       {/* Difficulty breakdown */}
       <div className="auto-grid-compact">
         {['Easy', 'Medium', 'Hard'].map((d) => (
-          <div key={d} className="flex-1 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl p-3 text-center">
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${DIFF_COLOR[d]}`}>{d}</span>
-            <p className="text-lg font-bold text-[#1a1a1a] mt-1">{d === 'Easy' ? 68 : d === 'Medium' ? 45 : 15}</p>
+          <div key={d} className="flex-1 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 text-center">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DIFF_COLOR[d]}`}>{d}</span>
+            <p className="text-lg font-bold text-[var(--text-primary)] mt-1">{d === 'Easy' ? 68 : d === 'Medium' ? 45 : 15}</p>
           </div>
         ))}
       </div>
 
       {/* Problem list */}
-      <div className="bg-[#faf9f7] border border-[#e5e2dd] rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-[#e5e2dd] flex items-center justify-between">
-          <h3 className="text-sm font-medium text-[#1a1a1a]">题目列表</h3>
-          <button className="flex items-center gap-1 text-xs text-[#6b7280] hover:text-[#1a1a1a]"><Filter size={12} />筛选</button>
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-[var(--border-light)] flex items-center justify-between">
+          <h3 className="text-sm font-medium text-[var(--text-primary)]">题目列表</h3>
+          <button className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Filter size={12} />筛选</button>
         </div>
-        <div className="divide-y divide-[#e5e2dd]">
+        <div className="divide-y divide-[var(--border-light)]">
           {MOCK_PROBLEMS.map((p) => (
-            <div key={p.id} className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3 hover:bg-[#fef7ed] transition-colors cursor-pointer">
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center ${p.solved ? 'bg-[#16a34a]' : 'bg-[#e5e2dd]'}`}>
+            <div key={p.id} className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3 hover:bg-[var(--bg-accent)] transition-colors cursor-pointer">
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center ${p.solved ? 'bg-[var(--success)]' : 'bg-[var(--border-light)]'}`}>
                 {p.solved && <CheckCircle size={12} className="text-white" />}
               </span>
-              <span className="text-xs font-mono text-[#9ca3af] w-8">{p.id}</span>
-              <span className="min-w-[140px] flex-1 text-sm text-[#1a1a1a]">{p.title}</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full ${DIFF_COLOR[p.difficulty]}`}>{p.difficulty}</span>
-              <span className="text-[10px] px-2 py-0.5 bg-[#f3f2ef] text-[#6b7280] rounded-full">{p.tag}</span>
-              <span className="text-xs text-[#9ca3af] w-14 text-right">{p.time}</span>
+              <span className="text-xs font-mono text-[var(--text-muted)] w-8">{p.id}</span>
+              <span className="min-w-[140px] flex-1 text-sm text-[var(--text-primary)]">{p.title}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${DIFF_COLOR[p.difficulty]}`}>{p.difficulty}</span>
+              <span className="text-xs px-2 py-0.5 bg-[var(--bg-base)] text-[var(--text-secondary)] rounded-full">{p.tag}</span>
+              <span className="text-xs text-[var(--text-muted)] w-14 text-right">{p.time}</span>
             </div>
           ))}
         </div>

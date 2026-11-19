@@ -1,204 +1,120 @@
-"""Vector store service using sqlite-vec for subtitle segment embeddings."""
+"""pgvector 近邻检索（语义块）。
+
+历史沿革
+--------
+这里原本有两条路径：
+  content_chunks      —— 语义块（约 565 字），当前唯一在用的检索单位
+  segment_embeddings  —— 逐句字幕向量（约 9 字），碎片时代的实现
+
+碎片路径已删除。原因不是「代码旧」：
+  1. 碎片做检索单位，一条命中只有「那我们就来看一下」这种句子，没有信息量，
+     必须先按时间窗扩成段落才能给模型用，多一层拼装和去重
+  2. 两条路径的调参完全不同（块模式关掉 trgm 相似度、阈值压到 0.04；
+     碎片模式保留相似度、阈值 0.12），线上行为取决于一个配置项的取值，
+     排查时极难判断当前跑的是哪一套
+  3. 碎片表 71 万向量，而块表 6 万向量覆盖的内容是同一批
+
+现在只剩一条路径，`retrieval_source` 配置项也一并删掉了。
+
+设计要点
+--------
+- 用 SQLAlchemy 连接池底层的 psycopg 连接：`SET LOCAL hnsw.*` 不支持参数占位符，
+  且 qvec 走 psycopg 的 numpy 适配器（二进制），比字符串字面量快一个量级
+- HNSW + 过滤条件同时存在时开启 iterative_scan，避免「先取 top-k 再过滤」导致召回枯竭
+- 返回 score = 1 - cosine_distance，取值 [-1, 1]，越大越相关
+"""
 
 from __future__ import annotations
 
-import struct
-from typing import TYPE_CHECKING
+import logging
+from dataclasses import dataclass
+
+import numpy as np
+import psycopg
+from pgvector.psycopg import register_vector
 
 from app.database import engine, settings
+from app.tables import CONTENT_CHUNKS
 
-if TYPE_CHECKING:
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class VectorHit:
+    segment_id: int
+    video_id: int
+    score: float
+
+
+class VectorStoreError(RuntimeError):
     pass
 
-# Lazy-load sqlite_vec so startup doesn't break if the extension isn't installed yet.
-_vec = None
 
-DEFAULT_DIM = 1024
-
-
-def _load_vec():
-    global _vec
-    if _vec is None:
-        import sqlite_vec
-        _vec = sqlite_vec
-    return _vec
+def _require_postgres() -> None:
+    if not settings.is_postgres:
+        raise VectorStoreError("向量检索依赖 PostgreSQL + pgvector")
 
 
-def _pack_vector(values: list[float]) -> bytes:
-    """Pack a list of floats into a binary blob for sqlite-vec."""
-    return struct.pack(f"{len(values)}f", *values)
-
-
-def _unpack_vector(blob: bytes) -> list[float]:
-    """Unpack a binary blob back to a list of floats."""
-    count = len(blob) // 4
-    return list(struct.unpack(f"{count}f", blob))
-
-
-def get_vec_db():
-    """Get a raw DBAPI connection with sqlite-vec loaded."""
-    raw = engine.raw_connection()
-    _load_vec().load(raw)
-    return raw
-
-
-def ensure_vec_schema(dim: int = DEFAULT_DIM) -> None:
-    """Create the sqlite-vec virtual table if it doesn't exist."""
-    if not settings.database_url.startswith("sqlite"):
-        return
-
-    raw = get_vec_db()
+def _register(conn: psycopg.Connection) -> None:
     try:
-        raw.execute(
-            f"""
-            CREATE VIRTUAL TABLE IF NOT EXISTS subtitle_segment_embeddings USING vec0(
-                segment_id INTEGER PRIMARY KEY,
-                embedding float[{dim}]
-            )
-            """
-        )
-    finally:
-        raw.close()
+        register_vector(conn)
+    except Exception:  # 已注册会抛，忽略
+        pass
 
 
-def upsert_embedding(segment_id: int, embedding: list[float]) -> None:
-    """Insert or replace an embedding for a subtitle segment."""
-    raw = get_vec_db()
-    try:
-        raw.execute(
-            "INSERT OR REPLACE INTO subtitle_segment_embeddings(segment_id, embedding) VALUES (?, ?)",
-            (segment_id, _pack_vector(embedding)),
-        )
-        raw.commit()
-    finally:
-        raw.close()
-
-
-def upsert_embeddings_batch(items: list[tuple[int, list[float]]]) -> None:
-    """Batch insert/replace embeddings."""
-    if not items:
-        return
-    raw = get_vec_db()
-    try:
-        raw.executemany(
-            "INSERT OR REPLACE INTO subtitle_segment_embeddings(segment_id, embedding) VALUES (?, ?)",
-            [(sid, _pack_vector(emb)) for sid, emb in items],
-        )
-        raw.commit()
-    finally:
-        raw.close()
-
-
-def delete_embedding(segment_id: int) -> None:
-    raw = get_vec_db()
-    try:
-        raw.execute(
-            "DELETE FROM subtitle_segment_embeddings WHERE segment_id = ?",
-            (segment_id,),
-        )
-        raw.commit()
-    finally:
-        raw.close()
-
-
-def search_similar(
-    query_embedding: list[float],
-    video_id: int | None = None,
+def search(
+    query_vector: np.ndarray,
+    *,
     top_k: int = 20,
-) -> list[dict]:
-    """Search for similar subtitle segments by vector similarity.
+    category_ids: list[int] | None = None,
+    video_ids: list[int] | None = None,
+    ef_search: int = 100,
+) -> list[VectorHit]:
+    """在语义块上做余弦近邻检索，带过滤条件时启用 iterative_scan 保证召回。
 
-    Returns list of {segment_id, distance} dicts, ordered by closest first.
+    返回字段叫 segment_id（值是 chunk id），是为了不改上层和前端 ——
+    改名要动 hybrid_search / 前端跳转 / 历史日志，收益只有「名字更准」。
     """
-    raw = get_vec_db()
+    _require_postgres()
+
+    where_parts: list[str] = []
+    params: dict = {
+        "qvec": query_vector,
+        "top_k": top_k,
+        "ef": max(ef_search, top_k * 4),
+    }
+    if category_ids:
+        where_parts.append("v.category_id = ANY(%(category_ids)s)")
+        params["category_ids"] = list(category_ids)
+    if video_ids:
+        where_parts.append("c.video_id = ANY(%(video_ids)s)")
+        params["video_ids"] = list(video_ids)
+    where_parts.append("c.embedding IS NOT NULL")
+    where_sql = "WHERE " + " AND ".join(where_parts)
+
+    sql = f"""
+        SELECT c.id, c.video_id, 1 - (c.embedding <=> %(qvec)s) AS score
+        FROM {CONTENT_CHUNKS.name} c
+        JOIN videos v ON v.id = c.video_id
+        {where_sql}
+        ORDER BY c.embedding <=> %(qvec)s
+        LIMIT %(top_k)s
+    """
+
+    raw = engine.raw_connection()
+    conn = raw.driver_connection
     try:
-        if video_id is not None:
-            # sqlite-vec doesn't support JOIN in MATCH queries, so we
-            # fetch more and filter in Python.
-            cursor = raw.execute(
-                """
-                SELECT segment_id, distance
-                FROM subtitle_segment_embeddings
-                WHERE embedding MATCH ?
-                ORDER BY distance
-                LIMIT ?
-                """,
-                (_pack_vector(query_embedding), top_k * 4),
-            )
-            rows = cursor.fetchall()
-            from app.database import SessionLocal
-            db = SessionLocal()
-            try:
-                from app.models import SubtitleSegment
-                segment_ids = [r[0] for r in rows]
-                if not segment_ids:
-                    return []
-                valid_ids = {
-                    sid for sid, in db.query(SubtitleSegment.id)
-                    .filter(SubtitleSegment.id.in_(segment_ids))
-                    .filter(SubtitleSegment.video_id == video_id)
-                    .all()
-                }
-                return [
-                    {"segment_id": r[0], "distance": r[1]}
-                    for r in rows
-                    if r[0] in valid_ids
-                ][:top_k]
-            finally:
-                db.close()
-        else:
-            cursor = raw.execute(
-                """
-                SELECT segment_id, distance
-                FROM subtitle_segment_embeddings
-                WHERE embedding MATCH ?
-                ORDER BY distance
-                LIMIT ?
-                """,
-                (_pack_vector(query_embedding), top_k),
-            )
-            return [{"segment_id": r[0], "distance": r[1]} for r in cursor.fetchall()]
+        _register(conn)
+        with conn.cursor() as cur:
+            cur.execute(f"SET LOCAL hnsw.ef_search = {int(params['ef'])}")
+            if where_sql != "WHERE c.embedding IS NOT NULL":
+                # 带过滤时用 relaxed_order，否则「先取 top-k 再过滤」会让召回枯竭
+                cur.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
+                cur.execute("SET LOCAL hnsw.max_scan_tuples = 200000")
+            cur.execute(sql, params)
+            rows = cur.fetchall()
     finally:
+        conn.rollback()  # 只读，回滚释放 SET LOCAL
         raw.close()
 
-
-def count_embeddings() -> int:
-    raw = get_vec_db()
-    try:
-        cursor = raw.execute("SELECT COUNT(*) FROM subtitle_segment_embeddings")
-        return cursor.fetchone()[0]
-    finally:
-        raw.close()
-
-
-def get_unindexed_segment_ids(limit: int = 1000) -> list[int]:
-    """Get segment IDs that don't have an embedding yet."""
-    from app.database import SessionLocal
-    db = SessionLocal()
-    try:
-        from app.models import SubtitleSegment
-        from sqlalchemy import text as sql_text
-
-        # Use SQL NOT IN to efficiently find unindexed segments
-        rows = db.execute(
-            sql_text(
-                "SELECT s.id FROM subtitle_segments s "
-                "WHERE s.id NOT IN (SELECT segment_id FROM subtitle_segment_embeddings) "
-                "ORDER BY s.id LIMIT :limit"
-            ),
-            {"limit": limit},
-        ).fetchall()
-        return [r[0] for r in rows]
-    finally:
-        db.close()
-
-
-def clear_all_embeddings() -> None:
-    """Drop and recreate the vec table (full rebuild)."""
-    raw = get_vec_db()
-    try:
-        raw.execute("DROP TABLE IF EXISTS subtitle_segment_embeddings")
-        raw.commit()
-    finally:
-        raw.close()
-    ensure_vec_schema()
+    return [VectorHit(segment_id=r[0], video_id=r[1], score=float(r[2])) for r in rows]

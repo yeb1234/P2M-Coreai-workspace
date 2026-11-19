@@ -42,7 +42,7 @@ export const TodoReminderPopup: React.FC = () => {
               <button
                 type="button"
                 onClick={() => close(false)}
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
                 title="关闭"
               >
                 <X size={14} />
@@ -52,7 +52,7 @@ export const TodoReminderPopup: React.FC = () => {
             <button
               type="button"
               onClick={() => close(true)}
-              className="mt-2.5 inline-flex h-7 items-center gap-1.5 rounded-md bg-[var(--accent)] px-2.5 text-xs font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
+              className="mt-2.5 inline-flex h-7 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-2.5 text-xs font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
             >
               <Check size={12} />
               知道了

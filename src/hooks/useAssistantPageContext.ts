@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getAssistantPageContext } from '../lib/assistantPageContext';
-import { useNotesStore, useUIStore, useVideoStore } from '../stores';
+import { useInterviewContextStore, useNotesStore, useUIStore, useVideoStore } from '../stores';
 
 export function useAssistantPageContext(active: boolean) {
   const activeView = useUIStore((state) => state.activeView);
   const activeNoteId = useUIStore((state) => state.activeNoteId);
   const currentVideo = useVideoStore((state) => state.currentVideo);
   const notes = useNotesStore((state) => state.notes);
+  const interviewTab = useInterviewContextStore((state) => state.tab);
+  const activeInterviewQuestion = useInterviewContextStore((state) => state.activeQuestion);
   const [pageContext, setPageContext] = useState(() => getAssistantPageContext());
 
   const notesFingerprint = useMemo(() => {
@@ -27,6 +29,9 @@ export function useAssistantPageContext(active: boolean) {
     currentVideo?.transcription,
     currentVideo?.transcript_segments,
     notesFingerprint,
+    interviewTab,
+    activeInterviewQuestion?.id,
+    activeInterviewQuestion?.title,
   ]);
 
   return [pageContext, setPageContext] as const;

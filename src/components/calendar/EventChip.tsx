@@ -10,7 +10,7 @@ export const EventChip: React.FC<EventChipProps> = React.memo(({ event, onClick 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left px-1.5 py-0.5 text-[11px] leading-tight rounded truncate transition-colors hover:opacity-80"
+      className="w-full text-left px-1.5 py-0.5 text-xs leading-tight rounded truncate transition-colors hover:opacity-80"
       style={{
         backgroundColor: event.color,
         color: '#fff',

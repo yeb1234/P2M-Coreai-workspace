@@ -1,203 +1,180 @@
-# SiteYeb / P2M CoreAI Workspace
+# SiteYeb / P2M 个人 IT 学习工作台
 
-当前版本：5.0
+> 状态：现行（最后校对 2026-11-20）
+> 当前发布：6.0.0 SmartAgents（2026-11-20）
 
-一个还在持续生长的个人工作台。
+一个本地优先的个人学习工作台：React 前端 + FastAPI 后端 + PostgreSQL 17（pgvector）+ Redis（RQ 队列）。把视频学习、笔记、待办、日历、番茄钟、时间中心、AI 助手和长期记忆放在一个界面里，本机和局域网都能用。
 
-SiteYeb 最开始是为个人学习、看视频、做笔记、跑番茄钟、管理待办和调用本地 AI 准备的。现在它已经慢慢长成一个本地优先的 CoreAI 工作空间：前端是 React，后端是 FastAPI，数据主要落在 SQLite，本机和局域网都能用。
+项目目前偏个人使用，也欢迎拿去研究、改造和提交想法。定位是个人、家庭、小团队在可信局域网里使用的内部工具底座，不是开箱即用的公网 SaaS；要对外暴露前需要自行做权限、审计和安全加固。
 
-这个项目目前仍然偏个人使用，但我很欢迎开源社区里的朋友拿去研究、改造、提交想法。它不追求一上来就变成大而全的企业系统，更适合个人、家庭、小团队、工作室在可信局域网里用，或者在此基础上继续加固、加权限、加审计，改造成自己的内部工具。
+数据基线（截至 2026-11-16）：`videos` 14,327；`content_chunks` 60,259（向量覆盖 100%）；`subtitle_segments` 3,593,723；有字幕视频 8,785。
 
 ## 适合谁
 
 - 想把待办、日历、番茄钟、笔记、本地视频学习和 AI 助手放到一个工作台里的人。
-- 有一堆本地课程/会议/学习视频，希望转录、总结、续播和管理的人。
+- 有一堆本地课程 / 会议 / 学习视频，希望转录、总结、续播和管理的人。
 - 想在局域网里给自己几台设备或小团队共用一个轻量工具的人。
-- 想研究 React + FastAPI + SQLite + 本地/外部 LLM 工作流的人。
+- 想研究 React + FastAPI + PostgreSQL/pgvector + 本地 / 外部 LLM 工作流的人。
 
-如果你要直接暴露到公网，请先认真做安全加固。当前定位更接近“个人和小团体内网工具”，不是开箱即用的公网 SaaS。
+直接暴露到公网前请先做安全加固；当前版本更接近「个人和小团体内网工具」。
 
 ## 当前能力
 
-- 工作台：左侧插件导航、顶部快捷入口、右侧灵境小助手、通知面板。
-- 待办：优先级、截止日期、番茄计划、时间提醒。
-- 日历：查看待办、提醒、番茄专注记录和普通事件。
-- 番茄钟：专注/休息循环、背景音、统计、历史记录。
-- 时间中心：模拟时钟、世界时钟、自定义时区、正计时、倒计时、闹钟、提醒、待办提醒。
-- IT视频站：本地视频扫描、文件夹导航、继续观看、字幕、AI 总结、AI 任务中心。
-- 字幕转录王：文件夹勾选、批量转写、AI 任务管理、队列控制、模型下载状态可视化。
-- AI 助手：支持本地 LLM 和 OpenAI-compatible 外部 LLM，后续会接入更多页面。
-- 设置：主题（含自动主题切换调度）、AI、转录、通知、数据管理等配置。Header 右上角可直接呼出主题调色板弹窗快速切换。
+### 日常
 
-未来会继续接大量 AI 功能，前端页面也会尽量统一接入左侧插件系统，而不是散落在不同入口里。
+- 工作台：左侧插件导航、顶部快捷入口、右侧灵境小助手、通知面板；5 个工作台插件（日历、番茄钟、快捷统计、最近笔记、待办）。
+- 待办：优先级、截止日期、番茄计划、时间提醒；与周历、统计、隐私设置共用同一份后端排程数据。
+- 日历：日历看板（月视图）+ 周历，查看待办、提醒、番茄专注记录和普通事件。
+- 番茄钟：专注 / 休息循环、背景音、统计、历史记录；本地每秒计时 + 后台关键事件与快照同步。
+- 时间中心：模拟时钟、世界时钟、自定义时区、正计时、倒计时、闹钟、提醒。
+- 笔记：共享 / 私有区分，私有笔记只有本人能读写。
 
-## 5.0 做了什么
+### 学习
 
-这一版把 AI 助手从「正则 + 关键词检索」推成一条完整的检索增强链，同时把仓库整理成别人 clone 下来能直接跑的状态。
+- IT 视频站：本地视频扫描、文件夹导航、继续观看、字幕、AI 总结、AI 任务中心；搜索支持「标题 / 文件夹」与「字幕内容」两种模式。
+- 学习路径：规划 Agent 按画像与目标产出分步路径，每一步绑定视频库里真实存在的视频，可直接跳转；进度会被对话 Agent 读取。
+- 学习轨迹：等级、本周对比、连续天数、成就徽章、90 天热力图。
+- 字幕转录王：文件夹勾选批量转写、AI 任务队列控制、模型下载状态可视化。
 
-### 检索链重构
+### AI 助手与记忆
 
-- **意图识别前置**：`intent_recognition.py` 先把问题归一到 search / summary / chat / video_context 四类，决定后面走哪条路径——精确找片段，还是覆盖式召回再交给 LLM 总结。
-- **查询改写**：`query_enhancer.py` 做同义词扩展（JS→JavaScript、爬虫→crawler/scraping）、缩写补全和变体拆解；中文技术词用一份词表做最长匹配，避免「依赖注入怎么实现」整句被当成一个 token。
-- **混合检索**：`hybrid_retriever.py` 把 FTS5 关键词检索和 sqlite-vec 向量检索并行跑，再用 RRF（倒数排名融合）合并两路结果。字面命中与语义召回互补，单靠一路时那种「问法和字幕用词不一样就搜不到」的问题被压下去了。
-- **重排**：`reranker.py` 调 bge-reranker-v2-m3 对 query-doc 对打分重排，`/rerank` 不可用时降级到 LLM 输出排序，再降级到关键词覆盖率兜底，三级都在。
-- **后处理**：`retrieval_postprocessor.py` 按相关性阈值过滤、合并相邻字幕片段、控制总 token 量，避免把一整段没切好的字幕塞进上下文。
-- **编排**：`rag_chain.py` 和 `langchain_chat.py` 把上面几步串成链路，对外仍然是原来的 `/api/assistant` 接口，前端不用改调用方式。
+- 灵境小助手：LangChain ReAct Agent，SSE 流式输出，支持中止生成。6.0 共 13 个受治理工具：检索片段、搜视频标题、视频摘要、学习画像、近期活动、学习目标、我的路径、推荐视频、搜笔记，以及保存笔记、总结另存、安排日历、创建 Todo。
+- **6.0 SmartAgents 的核心是「工具契约与模型通道解耦」**：意图只决定本轮工具集，工具仍由同一套注册表、预算、超时、熔断和审计层执行；本地 LLM 与外部 LLM 可以按兜底策略切换，模型换了，工具契约和权限边界不变。
+- 写动作走人工确认：保存笔记、日历、Todo 由 LangGraph `interrupt` 弹出确认卡，确认后才写库；每轮最多 1 个写动作，写入后生成动作回执，可在消息里撤回。审计落在 `AgentAction`，工具轨迹落在 `AgentRun.steps`。
+- 支持本地 LLM 与 OpenAI-compatible 外部 LLM，按设置页兜底策略在两个通道间切换；429 / 5xx / 超时退避重试，鉴权与路径错误立即换下一家。
+- 意图识别在前端完成（根目录 `prompts/clientPrompts.ts`）：6 类有序正则（课程推荐 / 学习路径 / 学习总结 / 代码助手 / 任务拆解 / 知识问答），识别不出才退回手选模板。
+- 记忆系统四层：`ChatMessage` 原文 / 会话摘要（超 24 条压缩、保留最近 10 条）/ `MemoryItem` 长期记忆条目（类型、重要度、置信度、置顶、过期、命中次数）/ `UserData` 档案 KV；对话结束后异步抽取记忆，不拖慢回答。
+- 检索三路召回：词法（pg_trgm + ILIKE）+ 向量（HNSW halfvec）+ 视频级元数据，加权 RRF 融合；`RRF_K=60`，权重 lexical `0.8` / vector `1.2` / meta `1.5`，`candidate_k=30`，`rerank_top_n=20`；重排 API 失败时退回 LLM 重排。
 
-### 仓库治理
+> 「相关片段」卡片 2026-11-16 起由 `src/config/features.ts` 的 `FEATURES.chatVideoReferences` 开关关闭（默认 `false`）。关闭只影响渲染：`ReferenceBlock`、`dedupeReferences` 和后端 `chat_agent` 的 references 生成都保留，改回 `true` 重建前端即恢复；后端仍照常生成 references，只是前端不渲染。
 
-- **数据和向量不进版本库**。这个项目的向量不是独立服务，而是 sqlite-vec 把 embedding 存在 `learning_os.db` 同一个文件里；`.gitignore` 的 `*.db` 一挡，业务数据、字幕、向量索引全部留在本地。
-- **新增 `.env.example`**：53 项配置分组建注释，密钥一律留空，数据库默认指向本地 SQLite。clone 下来不配数据库也能启动，后端会自动建表。
-- 移除误跟踪的 Redis 快照（`dump.rdb`）、桌面端安装包（78 MB）、测试音频和浏览器缓存目录。
+### 界面与配置
 
-## 2.94 做了什么
-
-这一版聚焦 RAG 检索全链路增强，大幅提升视频字幕检索的精准度和覆盖率：
-
-- **检索模式区分**：`search`（精确检索字幕片段）vs `summary`（覆盖式检索 + LLM 总结）。
-- **查询改写**：同义词扩展（JS→JavaScript、爬虫→crawler）、缩写补全、多变体检索提升召回率。
-- **意图识别统一**：前端 regex 给 `intent_hint`，后端 LLM 参考 hint 做最终裁决，新增 `summary` 意图类型。
-- **Reranker 模型**：通过 LM Studio 调用 bge-reranker-v2-m3 对检索结果重排序，含三级降级兜底。
-- **Filter + Compressor**：相关性阈值过滤低分结果，相邻字幕片段合并，总 token 量控制。
-
-## 2.93 做了什么
-
-这一版聚焦灵境小助手的场景化体验，引入意图识别和自动模板切换：
-
-- **正则意图识别**：发消息前自动检测用户意图（搜索 / 总结 / 提问），纯正则匹配，无需 LangGraph。
-- **自动模板切换**：命中意图后自动切换到对应提示词模板，UI 闪烁提示 "→ 已切搜索/总结/问答"，3 秒后消失。
-- **页面上下文推断**：首页无上下文时短输入默认走搜索；视频页/笔记页短输入默认走总结。
-- **模板扩展**：默认模板从 3 个扩展到 6 个，新增"内容搜索""总结提炼""知识问答"和"通用对话"，保留"代码助手""任务拆解"。
-- 13 条单元测试覆盖全部意图检测场景。
-
-## 2.91 做了什么
-
-这一版重点围绕字幕转录、AI 任务中心和侧边栏体验继续打磨：
-
-- 新增字幕转录王页面（TranscriberPage）：独立插件，支持左侧文件夹勾选、右侧批量转写预览与入队、AI 任务中心队列控制。
-- AI 任务中心打磨：批量操作支持预览/应用当前设置/入队三按钮；右侧控制中心全部按钮接入（暂停队列/取消/恢复/清除/批处理）。
-- 视频字幕手动纠错：播放视频时双击字幕文字区域弹出编辑弹窗，确认后永久保存到后端并同步更新 VTT 字幕文件。
-- Whisper 模型下载状态可视化：前端状态升级为 `Record<string, {status, error}>`，下拉选项实时显示下载中/失败/完成/未安装，防重复点击，组件 mount 后自动轮询状态。
-- 转录设置优化：Faster-Whisper 与 Whisper.cpp 双路线预设按钮，CUDA 自动检测修复，VAD 过滤开关错位修复，设置双向同步（转录王面板 ↔ 设置页）。
-- 批量入队性能优化：后端删除循环内逐条 commit，统一事务提交；前端自动分块（100 个/批），合并预览结果，解决 600+ 视频 Failed to fetch 超时。
-- 转录任务取消/暂停/恢复会真正终止 ffmpeg/whisper-cli 子进程，faster-whisper 迭代中可被中断。
-- IT 视频站文件夹系统修复：breadcrumb 重复点击爆炸、CategoryTree React key 重复、切换文件夹后 children 不更新。
-- 侧边栏拖拽排序和隐藏状态刷新后丢失修复：`reorderNav` 始终返回新数组引用触发 persist；`merge` 增加异常格式防御检查避免 hydration 崩溃。
-- 自动主题切换（05-16 追加）：按时间表自动切换主题，支持多规则、星期/时间/主题配置、手动覆盖、精确时间调度（setTimeout 非轮询）。Header 右上角新增 Palette 图标按钮，点击弹出主题调色板弹窗，以三色竖条色块直观展示所有主题，一键切换。
-- 全量测试覆盖 190/190 通过（Vitest）。
-
-## 2.7.0 做了什么
-
-这一版围绕日常真实使用体验继续打磨，重点修持久化、时区和交互细节：
-
-- 修复主题和工作台插件布局刷新后丢失的问题：`idbStorage` 的 debounce 写入补了 `pagehide` 刷新机制，开发模式（未登录）也能正常保存主题。
-- 修复左侧侧边栏图标拖拽排序和隐藏状态刷新后丢失：`uiStore` 的 `reorderNav` 始终返回新数组引用以触发 persist，`merge` 增加异常格式防御检查避免 hydration 崩溃。
-- 修复时区偏移导致的刷新后时间错乱：日期时间工具统一输出本地时间字符串（不带 `Z`），避免 UTC 转换导致的 8 小时偏移。
-- Todo 表单时间输入默认整点填充，结束时间自动 +1h，支持跨天。
-- 日历2 支持拖拽事件项下边缘调整时长，15 分钟对齐，松开自动保存。
-- 番茄钟"本轮"显示按关联任务的 `pomodoroRounds` 动态显示（如 2 个番茄的任务显示 0/2）。
-- 番茄钟完成目标番茄数后自动勾选待办完成。
-- 笔记编辑模式 Alt+Enter 正确换行，解决浏览器默认行为不一致导致无响应的问题。
-- AI 设置页提示词模板支持完整管理：列出、切换、编辑名称和内容、新建、删除、重置默认。
-- 后端补注册 `calendar_events` 路由，修复日历页面大量 405 Method Not Allowed 报错。
-- 全量 ESLint 0 errors 0 warnings。
-- 前端开发端口从 8000 改为 5002，避免和常见后端框架冲突。
-- 修复 80 端口构建时 `dist/assets` 被 nginx 占用导致构建失败：`vite.config.ts` 临时添加 `emptyOutDir: false`。
-- 修复 IT 视频站文件夹系统崩溃：`useMemo` 依赖改为真实状态值、breadcrumb 防重复入栈、key 加索引兜底、CategoryTree 渲染前去重。
-- Whisper 模型下载状态可视化：状态从 per-click 字符串升级为 Record-based `downloadStates`，下拉选项显示下载中/失败/完成状态，按钮增加旋转图标和重试提示，防重复点击，刷新后仍可恢复下载状态。
-
-## 2.6.0 做了什么
-
-这一版主要修真实使用中暴露出来的状态和预览体验问题：
-
-- 番茄钟运行状态改为本地即时持久化，重置、跳过、刷新后的状态边界更清楚。
-- 番茄钟同步升级为混合模式：浏览器本地每秒计时，后台只保存关键事件和 15 秒运行快照，局域网多设备刷新后能接上当前状态。
-- 番茄钟设置、完成历史和当前运行态拆成 `p2m-pomodoro-config-v2`、`p2m-pomodoro-history-v2`、`p2m-pomodoro-runtime-v2` 三类后端用户数据，不再用旧的大 JSON 当权威状态。
-- `p2m-pomodoro-config-v2` 会保存完整番茄参数、环境音策略、当前选中背景音、各背景音音量和上次播放状态。
-- Todo、日历1、日历2 统一使用后台 `schedule_items`，开始时间和截止时间都按分钟级保存；Todo 右侧专注按钮会按开始/截止时间自动计算番茄数。
-- 日历2 支持同一时间段任务分列层叠显示，避免重叠事件互相盖住；拖动更新仍回写同一条排程数据。
-- 番茄钟背景音按钮状态统一到 `ambientSound`：专注开始时会按保存的按钮状态自动播放默认背景音，重置或 Todo 覆盖启动会同步清理选择。
-- 环境音会在用户数据恢复后优先预加载上次选择的声音，并给 `/sounds/` 音频文件加 7 天浏览器缓存。
-- 主题刷新恢复改为读取 hydrated 后的 UI 状态，不再靠延迟 `setTimeout` 猜时机。
-- 视频播放器雪碧图预览增加加载/失败状态，前端用背景定位读取帧，避免图片对象定位失效。
-- 视频主列表支持桌面端 hover 后按需加载雪碧图预览，不进页面就批量请求。
-- 雪碧图默认单帧从 `160x90` 提升到 `320x180`，并支持 `.env` 调整清晰度和采样间隔。
-- 老的低清雪碧图会被识别为过期，下次访问自动重建。
-- 补充 Vitest、Playwright 和后端 unittest，锁住番茄钟持久化、雪碧图质量和视频卡片按需预览。
+- 左侧三组导航：日常 7 项 / 学习 9 项 / 工具 13 项，共 29 个注册页面（`src/config/pageRegistry.tsx`）；部分工具类页面仍是静态占位，带「施工中」标记。
+- 主题系统（含按时间表自动切换调度）、声音 / 背景音、通知；Header 右上角可呼出主题调色板弹窗。
 
 ## 运行方式
 
-### 日常使用
+**全部跑在 Docker 里。** pgvector、Redis、ffmpeg 三件硬依赖由容器提供，本机不再直接跑 uvicorn + `npm run dev` 作为主链路。细节和排障见 [docs/run.md](docs/run.md)。
 
-后端监听 80 端口，局域网内可以直接用机器 IP 访问：
+### 前置准备
 
 ```bash
-cd backend
-.venv311/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+cp .env.example .env
+# 至少填：POSTGRES_PASSWORD、JWT_SECRET（长度 >= 32）、EXTERNAL_LLM_API_KEY（用外部 LLM 时）
 ```
 
-- 本机访问：http://localhost
-- 局域网访问：`http://你的电脑IP`
+### 启动
 
-如果只改前端生产包，执行 `npm run build` 后刷新浏览器即可。
+Windows 双击 `start.bat`，菜单选择：
 
-### 前端开发
+- `[1]` 全套：postgres + redis + backend + worker + frontend（要 AI 转写 / 索引选这个）
+- `[2]` 仅页面：postgres + redis + backend + frontend，不起 worker
+- `[7]` 全停（数据卷保留）
 
-前端测试和开发使用 5002 端口，支持 Vite 热更新：
+命令行（WSL / macOS / Linux）：
+
+```bash
+./start.sh            # 完整（含 AI worker）
+./start.sh web        # 只要页面，不起 worker
+./start.sh stop       # 全停（数据卷保留）
+./start.sh status     # 容器状态 + 探针
+./start.sh logs       # 跟后端日志
+```
+
+也可以直接用 compose：
+
+```bash
+docker compose up -d                                              # 完整
+docker compose up -d postgres redis backend frontend              # 不用 AI 助手（不起 worker）
+```
+
+访问 http://localhost （第二入口 http://localhost:12302）。
+
+### 服务与依赖
+
+compose 项目名 `p2-siteyeb`，共五个服务；镜像标签 `3.0`，backend 与 worker 共用后端镜像。容器名由 compose 生成（如 `p2-siteyeb-backend-1`），compose 文件里不写死 `container_name`。
+
+| 服务 | 镜像 | 作用 | 不用 AI 助手时 |
+|---|---|---|---|
+| `postgres` | `pgvector/pgvector:pg17` | PostgreSQL 17 + pgvector | 必须 |
+| `redis` | `redis:7-alpine` | RQ 队列存储 | 跟着起（backend 依赖其 healthy），只占几 MB |
+| `backend` | `p2-siteyeb-backend:3.0` | FastAPI：API、缩略图生成、文件监听、Agent 链路 | 必须 |
+| `worker` | `p2-siteyeb-backend:3.0`（复用后端镜像） | RQ `SimpleWorker`，消费 `ai_jobs` + `background` 两个队列：转写、建块、向量化、缩略图 | 可以不起 |
+| `frontend` | `p2-siteyeb-frontend:3.0` | nginx：静态页面 + `/api` 反代到 backend | 必须 |
+
+不起 worker 时：浏览、播放、搜索、笔记、待办、路径查看全部正常；新发起的转写和向量化会堆在队列里没人消费。
+
+### 前端开发（改 UI 时）
+
+Vite 热更新可用，后端跑在容器里：
 
 ```bash
 npm install
-npm run dev
+npm run dev        # http://localhost:12322，/api 代理到 http://127.0.0.1:12302
 ```
-
-- 前端开发地址：http://localhost:5002
-- API 会代理到 80 端口后端
 
 ## 端口说明
 
+端口按 `<服务前缀><两位项目号>` 分配：123 前端 Web、124 后端 API、125 数据库、126 缓存/中间件，P2 尾号 02。
+
 | 端口 | 用途 | 说明 |
 | --- | --- | --- |
-| 80 | 后端 / 生产入口 | FastAPI，同时可提供构建后的前端；局域网直接访问这个端口 |
-| 5002 | 前端开发 | Vite 热更新，适合调 UI |
-| 1234 | 本地 LLM | LM Studio / OpenAI-compatible 常用端口 |
-| 11434 | Ollama | Ollama 默认端口 |
+| 80 | 生产入口 | nginx：静态页面 + `/api` 反代到 `backend:8000`；裸 localhost 只回流 P2 |
+| 12302 | 第二前端入口 | `WEB_PORT`，同一个 nginx；dev 代理也打到这里 |
+| 12402 | 后端 API | 只绑 `127.0.0.1` 的宿主回环映射（容器内 8000）；对外仍走 `http://localhost/api`，12402 仅供宿主调试直连 |
+| 12322 | 前端开发 | Vite 热更新，只在 `npm run dev` 时占用；`/api` 代理到 `127.0.0.1:12302` |
+| 12502 | PostgreSQL | 只绑 `127.0.0.1`，不对外 |
+| 12602 | Redis | 只绑 `127.0.0.1`，不对外 |
+| 监控 | 未分配 | 监控段未分配；旧 11162 作废，不再预留 |
+| 1234 / 1235 | 宿主机本地模型 | LM Studio；容器内用 `host.docker.internal:1234` / `1235` |
+| 11434 | Ollama | 备选本地 LLM |
 
-## 视频转录说明
+`worker` 不暴露宿主端口；`backend` 仅把容器内 `8000` 映射到回环 `12402`，对外请求仍全部经 nginx `/api` 转发。
 
-视频转录目前有两条路线：
+## 视频转录
+
+目前两条路线：
 
 - CPU 路线：`faster-whisper`，相对通用，CPU 部分正常。
 - 外部引擎路线：`whisper.cpp`，本机为了 A 卡做过 Windows 兼容层。
 
-因为 A 卡/GPU 这块和本机环境绑定比较深，如果你不是类似环境，视频转录的 GPU 部分可能需要大改。CPU 转录逻辑更通用，适合先跑通流程。
+A 卡 / GPU 部分和本机环境绑定较深，换机器、换显卡或换系统可能需要大改。建议先用 CPU 路线跑通流程，再按自己的硬件折腾 GPU。
 
 ## 技术栈
 
 | 模块 | 技术 |
 | --- | --- |
-| 前端 | React 19、TypeScript 6、Vite 8 |
-| UI | Tailwind CSS、lucide-react |
-| 状态 | Zustand、IndexedDB/Dexie、后端 SQLite |
-| 后端 | FastAPI、SQLAlchemy、SQLite、JWT |
-| 视频/AI | ffmpeg、Faster-Whisper、whisper.cpp、LM Studio/OpenAI-compatible API |
-| 测试 | Vitest、jsdom、Playwright |
+| 前端 | React 19.2、TypeScript ~6.0、Vite 8、react-router-dom 7（HashRouter） |
+| UI | Tailwind CSS 3.4、lucide-react |
+| 状态 | Zustand 5、IndexedDB / Dexie 4、后端 PostgreSQL |
+| 后端 | FastAPI 0.115、SQLAlchemy 2.0.36、Alembic 1.13.3、psycopg3、pgvector、Pydantic 2.9、PyJWT 2.9 |
+| Agent / LLM | langchain-core 1.x、langchain-openai 1.x、langgraph 1.x（prebuilt `create_react_agent`） |
+| 队列 / 缓存 | RQ 1.16、Redis 5 |
+| 视频 / AI | ffmpeg、Faster-Whisper 1.0.3、whisper.cpp、LM Studio / OpenAI-compatible API |
+| 测试 | Vitest 4、jsdom、Playwright 1.57；后端 pytest |
 
 ## 项目结构
 
 ```text
 SiteYeb/
   src/                  React 前端
+    config/             页面注册表 pageRegistry、功能开关 features
     components/         页面、布局、通用组件
-    stores/             Zustand 状态
-    lib/                API、声音、主题、工具函数
-    hooks/              跨模块同步和恢复逻辑
-    plugins/            插件注册
+    stores/             Zustand 状态（13 个）
+    hooks/              跨模块同步和恢复逻辑（13 个）
+    plugins/            工作台插件（5 个）
+    lib/                API、提示词、工具函数
     types/              TypeScript 类型
+  prompts/              前端提示词与意图识别（clientPrompts.ts）
   backend/app/          FastAPI 后端
-    routers/            API 路由
-    services/           扫描、转录、AI、管理服务
-    worker.py           AI 任务 worker
+    routers/            API 路由（14 个业务路由）
+    services/           扫描、转录、检索、AI、记忆、管理服务（39 个）
+    agents/             chat_agent / plan_agent / tools
+    models.py           21 个 ORM 模型
+    worker.py           RQ worker（ai_jobs + background 两个队列）
   docs/                 设计记录、踩坑记录、更新日志
+  scripts/              诊断、日志查询、检索评估等脚本
   public/sounds/        本地提示音和背景音
 ```
 
@@ -207,10 +184,12 @@ SiteYeb/
 npm test
 npm run build
 npm run test:e2e
-cd backend && .venv311/Scripts/python -m compileall app
+cd backend && python -m compileall app
 ```
 
-日常改前端时，至少跑：
+测试盘点（截至 2026-11-16）：`src/__tests__` 28 个前端测试文件；`backend/tests` 5 个后端测试文件；仓库根 `tests/` 下只有 `contracts` 与 `e2e` 两个目录，后端没有 API 级集成测试。
+
+日常改前端时至少跑：
 
 ```bash
 npm test
@@ -219,9 +198,9 @@ npm run build
 
 ## 参与和改造
 
-欢迎 issue、PR、二次开发和各种实验性想法。这个项目的方向是“先让个人工作流真的好用”，再逐步把 AI、视频学习、时间管理和插件系统打磨得更稳。
+欢迎 issue、PR、二次开发和各种实验性想法。方向是先让个人工作流真的好用，再逐步把 AI、视频学习、时间管理和插件系统打磨得更稳。
 
-如果你准备给小团队使用，建议优先补：
+准备给小团队使用时，建议优先补：
 
 - 更严格的账号和权限策略。
 - 数据备份和恢复。
@@ -229,17 +208,28 @@ npm run build
 - AI 接口额度、日志和审计。
 - 视频文件目录的权限隔离。
 
+## 排障
+
+站点异常时第一条命令（只读，不改任何状态）：
+
+```bash
+bash scripts/diagnose.sh
+```
+
+打出容器状态、健康探针最后输出、PG 长事务 / 锁等待、worker 注册与队列积压、nginx 错误。
+
+查日志：
+
+```bash
+bash scripts/logq.sh errors --since 1h    # 错误（含异常类型与 request_id）
+bash scripts/logq.sh req <request_id>    # 一次请求 / 一个任务的完整日志
+bash scripts/logq.sh stats --since 24h  # 按级别 / logger / 状态码聚合
+```
+
 ## 文档
 
-- [更新日志](docs/changelog.md)
-- [2.91 技术改进报告](docs/2026-05-13-2.91-technical-report.md)
-- [2.7 技术改进报告](docs/2026-05-12-2.7-technical-report.md)
-- [2.6 技术改进报告](docs/2026-05-11-2.6-technical-report.md)
-- [2.5 技术改进报告](docs/2026-05-11-2.5-technical-report.md)
-- [今日踩坑与维护记录](docs/today-fixes-and-pitfalls.md)
-- [待办、提醒时间和番茄快捷输入规则](docs/todo-reminder-input-rules.md)
-- [主题导入导出说明](docs/theme-import-export.md)
-- [后续改进 Todo](docs/next-improvement-todo.md)
+设计记录、踩坑记录、更新日志与部署说明的完整索引见 [docs/README.md](docs/README.md)（文档索引统一维护）。
+根目录 `CHANGELOG.md` 记录用户可感知的功能变化，`BUGFIXES.md` 记录缺陷修复，`PERFORMANCE.md` 记录性能改动。
 
 ## License
 

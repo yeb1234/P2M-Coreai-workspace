@@ -1,58 +1,503 @@
+# 项目名 = 端口号段 = 容器/网络前缀。一个 P 号贯穿全栈：
+#   p2-siteyeb  ->  宿主端口 <服务前缀><两位项目号>，P2 即尾号 02：
+#                   12302 前端 Web（另占 80 作本地 localhost 入口）
+#                   12402 后端 API / 12322 前端 dev（= 12302 + 20，沿用旧号惯例）
+#                   12502 PostgreSQL / 12602 Redis（这三个只绑 127.0.0.1）
+#                   12702 监控与运维（预留，当前未启用）
+# 固定项目名：否则在不同目录（主仓库 / worktree）执行 compose 会被识别成
+# 不同 project，导致同名容器互相冲突
+name: p2-siteyeb
+
+# P2 Learning OS 全栈编排
+#
+# 一键启动：
+#   cp .env.example .env   # 填 DATABASE_URL 里的密码、外部 LLM key 等
+#   docker compose up -d --build
+#   open http://localhost
+#
+# 只想起数据库做本地开发（后端跑在宿主机 venv 里）：
+#   docker compose -f docker-compose.pg.yml --env-file .env up -d
+#
+# GPU 转写（需要 NVIDIA 驱动 + WSL2 GPU 支持）：
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# 注意：embedding / 本地 LLM 跑在宿主机时，容器内要用 host.docker.internal，
+# 不能用 localhost（那是容器自己）。
+
 services:
+  postgres:
+    image: docker.m.daocloud.io/pgvector/pgvector:pg17
+    # 不写 container_name：交给 compose 生成 p2-siteyeb-postgres-1。
+    # 手写死名字会让两个 worktree 抢同一个容器，也让 --scale 直接报错。
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    restart: unless-stopped
+    # Docker 默认 /dev/shm 只有 64MB，而 PostgreSQL 的 posix 共享内存
+    # 就走这里。并行查询（work_mem 64MB × 2 worker）会直接把它撑爆，
+    # 报 "could not resize shared memory segment ... No space left on device"，
+    # 看着像磁盘满，其实是共享内存不够。
+    shm_size: 3gb  # HNSW 建索引实测要 2.14GB（60431 条 halfvec(1024)）
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-p2learning}
+      POSTGRES_USER: ${POSTGRES_USER:-p2user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必须在 .env 中设置}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    command:
+      - postgres
+      - -c
+      - shared_buffers=2GB
+      - -c
+      - maintenance_work_mem=2GB
+      - -c
+      - work_mem=64MB
+      - -c
+      - effective_cache_size=6GB
+      - -c
+      - max_connections=120
+      - -c
+      - max_parallel_maintenance_workers=4
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - jit=off
+      - -c
+      - log_min_duration_statement=500
+    ports:
+      # 只绑回环地址：容器之间走内部网络，宿主机工具能连，公网扫不到。
+      # 原来绑 0.0.0.0，机器一旦有公网 IP，5432 就是对全世界开放的。
+      - "127.0.0.1:${POSTGRES_PORT:-12502}:5432"
+    volumes:
+      - siteyeb-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-p2user} -d ${POSTGRES_DB:-p2learning}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
   redis:
     image: docker.m.daocloud.io/library/redis:7-alpine
-    container_name: siteyeb-redis
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
+    # RQ 队列不能淘汰任务：内存满时宁可写入失败，也不能悄悄丢掉待处理任务。
+    # 之前没设上限（maxmemory 0 = 不限），队列堆积时会把宿主机内存吃光。
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - "256mb"
+      - --maxmemory-policy
+      - noeviction
     ports:
-      - "6379:6379"
+      # Redis 没有密码，绝不能暴露到 0.0.0.0
+      - "127.0.0.1:${REDIS_PORT:-12602}:6379"
+    volumes:
+      - siteyeb-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: siteyeb-backend
+      args:
+        INSTALL_CUDA: ${INSTALL_CUDA:-false}
+        PIP_INDEX: ${PIP_INDEX:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    image: p2-siteyeb-backend:3.0
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
-    volumes:
-      # Persistent data
-      - siteyeb-db:/data/db
-      - siteyeb-output:/data/output
-      - siteyeb-thumbnails:/data/thumbnails
-      - siteyeb-sprites:/data/sprites
-      # Mount your video folder (edit the left side to your path)
-      - D:/ITJC:/videos:ro
-      # Mount whisper models (edit to your path)
-      - C:/SiteYeb/tools/models:/models:ro
-    environment:
-      - DATABASE_URL=sqlite:////data/db/learning_os.db
-      - VIDEO_FOLDER=/videos
-      - WORK_DIR=/data/work
-      - OUTPUT_DIR=/data/output
-      - THUMBNAIL_DIR=/data/thumbnails
-      - SPRITE_DIR=/data/sprites
-      - WHISPER_CPP_EXE=/models/whisper.cpp/whisper-cli.exe
-      - WHISPER_CPP_MODEL=/models/whisper/ggml-large-v3.bin
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OPENAI_BASE_URL=http://host.docker.internal:1234/v1
-      - EXTERNAL_LLM_BASE_URL=${EXTERNAL_LLM_BASE_URL}
-      - EXTERNAL_LLM_API_KEY=${EXTERNAL_LLM_API_KEY}
-      - EXTERNAL_LLM_MODEL=${EXTERNAL_LLM_MODEL}
-      - REDIS_URL=redis://redis:6379/0
+    # API：12402 = 124（后端 API 段）+ 02（项目号）。只绑回环 ——
+    # 宿主调试和前端 dev 代理能连，公网扫不到；对外仍走 nginx /api。
+    ports:
+      - "127.0.0.1:${API_PORT:-12702}:8000"
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:      # worker 由下面的独立服务负责，API 进程不要再内嵌一个 ——
+      # 两个 RQ worker 会抢同一队列并互相清掉注册
+      AI_WORKER_EMBEDDED: "false"
+      # ---- 数据库 ----
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-p2user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-p2learning}
+      # backend 主要承受短请求；给迁移、健康检查留出连接余量
+      DB_POOL_SIZE: "10"
+      DB_MAX_OVERFLOW: "10"
+      # ---- 路径 ----
+      VIDEO_FOLDER: /videos
+      # ---- 日志 ----
+      # 落盘到挂载出来的 ./logs，容器重建后历史还在
+      LOG_DIR: /data/logs
+      LOG_FILE_NAME: backend
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      WORK_DIR: /data/work
+      AUDIO_CACHE_DIR: /data/audio-cache
+      OUTPUT_DIR: /data/output
+      THUMBNAIL_DIR: /data/thumbnails
+      SPRITE_DIR: /data/sprites
+      # 数据库里的 filepath 是容器化之前写入的 Windows 绝对路径，
+      # 这里声明宿主机前缀 -> 容器内路径的映射（最长前缀优先）
+      PATH_MAP: "${PATH_MAP:-${VIDEO_HOST_PATH:-./video-library}/thumbnails=/data/thumbnails;${VIDEO_HOST_PATH:-./video-library}/sprites=/data/sprites;${VIDEO_HOST_PATH:-./video-library}/output=/data/output;${VIDEO_HOST_PATH:-./video-library}/work=/data/work;${VIDEO_HOST_PATH:-./video-library}=/videos}"
+      # ---- 本地模型（跑在宿主机）----
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL_DOCKER:-http://host.docker.internal:1234/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-lm-studio}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-bge-m3@q8_0}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-256}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL_DOCKER:-http://host.docker.internal:1234/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-lm-studio}
+      OPENAI_MODEL: ${OPENAI_MODEL:-qwen3-4b}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434}
+      # ---- 外部 LLM ----
+      EXTERNAL_LLM_BASE_URL: ${EXTERNAL_LLM_BASE_URL}
+      EXTERNAL_LLM_API_KEY: ${EXTERNAL_LLM_API_KEY}
+      EXTERNAL_LLM_MODEL: ${EXTERNAL_LLM_MODEL:-deepseek-v4.1-flash-1017}
+      EXTERNAL_LLM_THINKING: ${EXTERNAL_LLM_THINKING:-false}
+      LLM_USAGE_POLICY: ${LLM_USAGE_POLICY:-external_first}
+      # ---- 转写 ----
+      # 这组变量之前完全没透传，容器一直在用代码默认值（faster-whisper + small + int8），
+      # .env 里配的 whisper.cpp / large-v3 从来没生效过 —— 而且 Linux 容器也跑不了 Windows exe。
+      WHISPER_ENGINE: ${WHISPER_ENGINE:-faster-whisper}
+      DEFAULT_WHISPER_MODEL: ${DEFAULT_WHISPER_MODEL:-small}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      DEVICE_TYPE: ${DEVICE_TYPE:-auto}
+      # 模型从国内镜像拉，否则 3GB 下载会卡死
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
+      HF_HOME: /data/hf
+      # ---- 重排 ----
+      # 注意：compose 的 environment 是白名单，.env 里多写的键不会自动传进来。
+      # 这个坑在 whisper、embedding、rerank 上各踩过一次。
+      RERANK_API_URL: ${RERANK_API_URL:-}
+      RERANK_API_KEY: ${RERANK_API_KEY:-}
+      RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
+      RERANK_MIN_SCORE: ${RERANK_MIN_SCORE:-0.02}
+      # ---- 检索 ----
+      # chunks = 语义块（565 字/块），segments = 逐句字幕（9 字/条）
+      # 切到 chunks 前必须确认 content_chunks 的向量覆盖率 > 95%，
+      # 否则部分块没有向量，会漏召回
+      # ---- 队列 ----
+      REDIS_URL: redis://redis:6379/0
+      # ---- 安全 ----
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 必须设置且长度 >= 32}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-12}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:12302,http://localhost:12322,http://127.0.0.1,http://127.0.0.1:12302,http://127.0.0.1:12322}
+      # 注册默认关闭：公网/局域网被扫到就会有人灌号。
+      # 首个账号建好后保持 false，后续账号由管理员通过 /api/auth/create-user 开通。
+      # 需要临时开放时，在 .env 里显式设 ALLOW_REGISTRATION=true。
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      # 逗号分隔的管理员用户名白名单
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      # 接口文档默认不对外。要调试时临时设 true
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
+      # 会话 Cookie：令牌放 httpOnly Cookie，JS 读不到
+      # 生产（HTTPS）必须设 COOKIE_SECURE=true，否则 Cookie 会明文过网
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-p2m_session}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      # ---- 启动开关 ----
+      MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
+      SQLITE_SOURCE_PATH: /data/source/learning_os.db
+      TZ: Asia/Shanghai
+    volumes:
+      # 视频库只读挂载；改成你的实际路径
+      - ${VIDEO_HOST_PATH:-./video-library}:/videos:ro
+      # 桌面端客户端识别中间件：本机调试时直接热挂 main.py，
+      # 避免每次改一行中间件都要重建后端镜像。
+      - ./backend/app/main.py:/app/app/main.py:ro
+      # schema 自举锁：backend 和 worker 必须用同一份 database.py，
+      # 否则容器里跑的还是旧的无锁版本。
+      - ./backend/app/database.py:/app/app/database.py:ro
+      - ./backend/app/utils/files.py:/app/app/utils/files.py:ro
+      # 产物目录直接绑宿主机，复用已有的缩略图/雪碧图/字幕，
+      # 否则 1.4 万个视频的缩略图要在容器里从头再生成一遍
+      - ${VIDEO_HOST_PATH:-./video-library}/thumbnails:/data/thumbnails
+      - ${VIDEO_HOST_PATH:-./video-library}/sprites:/data/sprites
+      - ${VIDEO_HOST_PATH:-./video-library}/output:/data/output
+      - ${VIDEO_HOST_PATH:-./video-library}/work:/data/work
+      # CPU 抽出的 WAV 独立放 SSD；GPU worker 只读这里，避免和视频 HDD 抢 I/O
+      - ${AUDIO_CACHE_HOST_PATH:-./data/audio-cache}:/data/audio-cache
+      # 日志挂出来：容器重建后 docker logs 就没了，历史只能靠这份
+      - ./logs:/data/logs
+      # 需要从 SQLite 迁移时，把旧库放到这里（只读）
+      - ${SQLITE_SOURCE_DIR:-./.migration}:/data/source:ro
+      # faster-whisper 模型缓存。不挂载的话每次重建容器都要重下 3GB
+      - ./data/hf:/data/hf
+    extra_hosts:
+      # Linux 下 host.docker.internal 不自动存在，显式声明
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────
+  # CPU 音频预提取
+  #
+  # 只做 ffmpeg：读 /videos（HDD），写 /data/audio-cache（SSD）。
+  # GPU worker 不再负责抽音频，命中缓存就直接转写；这样 GPU 不会
+  # 在 ffmpeg 阶段空转，也不会和视频盘的随机读抢带宽。
+  # ─────────────────────────────────────────────────────────────
+  audio-prep:
+    image: p2-siteyeb-backend:3.0-batch
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    # 抽音频会为每个任务拉起 ffmpeg。它本身是 Docker 内的常驻 poller，
+    # 不是宿主脚本；机器重启后必须自动回来，否则 GPU worker 会重新退回
+    # 自己抽 WAV，失去 CPU/GPU 分工。
+    restart: unless-stopped
+    command: ["python", "-m", "app.audio_prep"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-p2user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-p2learning}
+      DB_POOL_SIZE: "2"
+      DB_MAX_OVERFLOW: "2"
+      REDIS_URL: redis://redis:6379/0
+      VIDEO_FOLDER: /videos
+      LOG_DIR: /data/logs
+      LOG_FILE_NAME: audio-prep
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      WORK_DIR: /data/work
+      AUDIO_CACHE_DIR: /data/audio-cache
+      OUTPUT_DIR: /data/output
+      PATH_MAP: "${PATH_MAP:-${VIDEO_HOST_PATH:-./video-library}/thumbnails=/data/thumbnails;${VIDEO_HOST_PATH:-./video-library}/sprites=/data/sprites;${VIDEO_HOST_PATH:-./video-library}/output=/data/output;${VIDEO_HOST_PATH:-./video-library}/work=/data/work;${VIDEO_HOST_PATH:-./video-library}=/videos}"
+      AUDIO_PREP_CONCURRENCY: ${AUDIO_PREP_CONCURRENCY:-1}
+      AUDIO_PREP_MAX_FILES: ${AUDIO_PREP_MAX_FILES:-20000}
+      AUDIO_PREP_MAX_BYTES: ${AUDIO_PREP_MAX_BYTES:-429496729600}
+      AUDIO_PREP_LOOKAHEAD: ${AUDIO_PREP_LOOKAHEAD:-5000}
+      AUDIO_PREP_POLL_SECONDS: ${AUDIO_PREP_POLL_SECONDS:-5}
+      POOL_SYNC_SECONDS: ${POOL_SYNC_SECONDS:-300}
+      TZ: Asia/Shanghai
+    volumes:
+      - ${VIDEO_HOST_PATH:-./video-library}:/videos:ro
+      - ${AUDIO_CACHE_HOST_PATH:-./data/audio-cache}:/data/audio-cache
+      - ./logs:/data/logs
+      # 池刷新逻辑和队列工具热挂，避免每次改同步策略都重建 5GB 镜像
+      - ./backend/app/audio_prep.py:/app/app/audio_prep.py:ro
+      - ./backend/app/services/admin_ai_queue.py:/app/app/services/admin_ai_queue.py:ro
+    healthcheck:
+      disable: true
+
+  # ─────────────────────────────────────────────────────────────
+  # AI 转写任务队列消费者
+  #
+  # 这个服务之前不在 compose 里 —— worker 靠手工在宿主机启动，
+  # 机器一重启就没了，队列里的任务没人消费，前端一直转圈。
+  # 现在交给 Docker 管，restart: unless-stopped 保证重启后自动拉起。
+  #
+  # 复用 backend 镜像（不重新构建），只换启动命令。
+  # 环境和挂载必须和 backend 完全一致：worker 要连同一个库、
+  # 读 /videos 里的源文件、往 /data/output 写结果。
+  # ─────────────────────────────────────────────────────────────
+  worker:
+    image: p2-siteyeb-backend:3.0
+    # worker 复用 API 镜像，只换启动命令
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        # backend 先完成 schema 自举（PG advisory lock 串行化）
+        condition: service_healthy
+    environment:
+      # ---- 数据库 ----
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-p2user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-p2learning}
+      DB_POOL_SIZE: "4"
+      DB_MAX_OVERFLOW: "4"
+      # ---- 路径 ----
+      VIDEO_FOLDER: /videos
+      # ---- 日志 ----
+      # 落盘到挂载出来的 ./logs，容器重建后历史还在
+      LOG_DIR: /data/logs
+      LOG_FILE_NAME: worker
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      WORK_DIR: /data/work
+      AUDIO_CACHE_DIR: /data/audio-cache
+      OUTPUT_DIR: /data/output
+      THUMBNAIL_DIR: /data/thumbnails
+      SPRITE_DIR: /data/sprites
+      # 数据库里的 filepath 是容器化之前写入的 Windows 绝对路径，
+      # 这里声明宿主机前缀 -> 容器内路径的映射（最长前缀优先）
+      PATH_MAP: "${PATH_MAP:-${VIDEO_HOST_PATH:-./video-library}/thumbnails=/data/thumbnails;${VIDEO_HOST_PATH:-./video-library}/sprites=/data/sprites;${VIDEO_HOST_PATH:-./video-library}/output=/data/output;${VIDEO_HOST_PATH:-./video-library}/work=/data/work;${VIDEO_HOST_PATH:-./video-library}=/videos}"
+      # ---- 本地模型（跑在宿主机）----
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL_DOCKER:-http://host.docker.internal:1234/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-lm-studio}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-bge-m3@q8_0}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-256}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL_DOCKER:-http://host.docker.internal:1234/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-lm-studio}
+      OPENAI_MODEL: ${OPENAI_MODEL:-qwen3-4b}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434}
+      # ---- 外部 LLM ----
+      EXTERNAL_LLM_BASE_URL: ${EXTERNAL_LLM_BASE_URL}
+      EXTERNAL_LLM_API_KEY: ${EXTERNAL_LLM_API_KEY}
+      EXTERNAL_LLM_MODEL: ${EXTERNAL_LLM_MODEL:-deepseek-v4.1-flash-1017}
+      EXTERNAL_LLM_THINKING: ${EXTERNAL_LLM_THINKING:-false}
+      LLM_USAGE_POLICY: ${LLM_USAGE_POLICY:-external_first}
+      # ---- 转写 ----
+      # 这组变量之前完全没透传，容器一直在用代码默认值（faster-whisper + small + int8），
+      # .env 里配的 whisper.cpp / large-v3 从来没生效过 —— 而且 Linux 容器也跑不了 Windows exe。
+      WHISPER_ENGINE: ${WHISPER_ENGINE:-faster-whisper}
+      DEFAULT_WHISPER_MODEL: ${DEFAULT_WHISPER_MODEL:-small}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      DEVICE_TYPE: ${DEVICE_TYPE:-auto}
+      # 模型从国内镜像拉，否则 3GB 下载会卡死
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
+      HF_HOME: /data/hf
+      # ---- 重排 ----
+      # 注意：compose 的 environment 是白名单，.env 里多写的键不会自动传进来。
+      # 这个坑在 whisper、embedding、rerank 上各踩过一次。
+      RERANK_API_URL: ${RERANK_API_URL:-}
+      RERANK_API_KEY: ${RERANK_API_KEY:-}
+      RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
+      RERANK_MIN_SCORE: ${RERANK_MIN_SCORE:-0.02}
+      # ---- 检索 ----
+      # chunks = 语义块（565 字/块），segments = 逐句字幕（9 字/条）
+      # 切到 chunks 前必须确认 content_chunks 的向量覆盖率 > 95%，
+      # 否则部分块没有向量，会漏召回
+      # ---- 队列 ----
+      REDIS_URL: redis://redis:6379/0
+      # ---- 安全 ----
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 必须设置且长度 >= 32}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-12}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:12302,http://localhost:12322,http://127.0.0.1,http://127.0.0.1:12302,http://127.0.0.1:12322}
+      # 注册默认关闭：公网/局域网被扫到就会有人灌号。
+      # 首个账号建好后保持 false，后续账号由管理员通过 /api/auth/create-user 开通。
+      # 需要临时开放时，在 .env 里显式设 ALLOW_REGISTRATION=true。
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      # 逗号分隔的管理员用户名白名单
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      # 接口文档默认不对外。要调试时临时设 true
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
+      # 会话 Cookie：令牌放 httpOnly Cookie，JS 读不到
+      # 生产（HTTPS）必须设 COOKIE_SECURE=true，否则 Cookie 会明文过网
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-p2m_session}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      # ---- 启动开关 ----
+      MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
+      SQLITE_SOURCE_PATH: /data/source/learning_os.db
+      TZ: Asia/Shanghai
+    volumes:
+      # 视频库只读挂载；改成你的实际路径
+      - ${VIDEO_HOST_PATH:-./video-library}:/videos:ro
+      # 产物目录直接绑宿主机，复用已有的缩略图/雪碧图/字幕，
+      # 否则 1.4 万个视频的缩略图要在容器里从头再生成一遍
+      - ${VIDEO_HOST_PATH:-./video-library}/thumbnails:/data/thumbnails
+      - ${VIDEO_HOST_PATH:-./video-library}/sprites:/data/sprites
+      - ${VIDEO_HOST_PATH:-./video-library}/output:/data/output
+      - ${VIDEO_HOST_PATH:-./video-library}/work:/data/work
+      # CPU 抽出的 WAV 独立放 SSD；GPU worker 只读这里，避免和视频 HDD 抢 I/O
+      - ${AUDIO_CACHE_HOST_PATH:-./data/audio-cache}:/data/audio-cache
+      # 日志挂出来：容器重建后 docker logs 就没了，历史只能靠这份
+      - ./logs:/data/logs
+      # 需要从 SQLite 迁移时，把旧库放到这里（只读）
+      - ${SQLITE_SOURCE_DIR:-./.migration}:/data/source:ro
+      # faster-whisper 模型缓存。不挂载的话每次重建容器都要重下 3GB
+      - ./data/hf:/data/hf
+      # 启动恢复/队列回填修复：worker 代码热挂，避免每次改锁逻辑都要
+      # 重建 5GB 镜像。worker2 extends worker，会继承这些挂载。
+      - ./backend/app/database.py:/app/app/database.py:ro
+      - ./backend/app/worker.py:/app/app/worker.py:ro
+      - ./backend/app/utils/files.py:/app/app/utils/files.py:ro
+      - ./backend/app/services/admin_ai_queue.py:/app/app/services/admin_ai_queue.py:ro
+      - ./backend/app/services/ai_jobs.py:/app/app/services/ai_jobs.py:ro
+      - ./backend/app/services/ai_job_tasks.py:/app/app/services/ai_job_tasks.py:ro
+      - ./backend/app/services/rq_client.py:/app/app/services/rq_client.py:ro
+      - ./backend/app/services/background_tasks.py:/app/app/services/background_tasks.py:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # 镜像自带的 HEALTHCHECK 探的是 8000 端口（uvicorn）——
+    # worker 不提供 HTTP，继承下来会一直 unhealthy，必须关掉。
+    healthcheck:
+      disable: true
 
   frontend:
+    # 本机开发：直接挂宿主机 dist，省掉「改完前端要重建镜像」这一环。
+    # 生产部署时删掉这两行，靠镜像内的 COPY --from=build 提供静态文件。
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      # 局域网演示中心：独立挂在 /demo-site，nginx 再用 /demo/ alias 暴露。
+      - "C:/SiteYeb/demo-hub/site:/demo-site:ro"
+      - "C:/SiteYeb/demo-hub/nginx-demo.conf:/etc/nginx/conf.d/demo.conf:ro"
+      # P2 镜像使用自定义 nginx.conf（不自动 include conf.d），这里挂一份
+      # 带 demo include 的完整副本；主站限流、代理、安全头规则原样保留。
+      - "C:/SiteYeb/demo-hub/nginx-p2-demo.conf:/etc/nginx/nginx.conf:ro"
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: siteyeb-frontend
+      args:
+        # 构建期注入，留空则走 nginx 同源代理
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    image: p2-siteyeb-frontend:3.0
+    # docker 侧兜底轮转：应用自己已有 RotatingFileHandler，
+    # 但 stdout 同样会被 docker 落盘，不设上限迟早写满磁盘
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     restart: unless-stopped
-    ports:
-      - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    ports:
+      # 裸 localhost（80）只回流到 P2 这一个项目；别的项目一律不占 80
+      - "80:80"
+      - "${WEB_PORT:-12302}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
-  siteyeb-db:
-  siteyeb-output:
-  siteyeb-thumbnails:
-  siteyeb-sprites:
+  siteyeb-pgdata:
+    name: siteyeb-pgdata
+  siteyeb-redis:
+    name: siteyeb-redis
+

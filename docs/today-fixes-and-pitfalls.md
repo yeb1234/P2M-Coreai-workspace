@@ -1,5 +1,23 @@
 # 2026-05-10 改进与踩坑记录
 
+> 状态：部分现行（最后校对 2026-11-16）。本文是 2026-05-10 至 2026-05-14 期间的踩坑合集，价值在经验而非时效；仍适用于当前代码的坑按主题保留，随重构失效或变更的条目在下方表中和正文注记里标出。代码基线：分支 `polish/design-system-refresh`，HEAD `9a13650`。
+
+## 现行性复核总表（2026-11-16）
+
+| 类别 | 复核结论 |
+| --- | --- |
+| Windows 中文编码污染；Git 大文件堆积；`.gitignore` 排除数据库/工具/缓存 | 仍适用：`.gitignore:17,18,28,32` 仍排除 `*.db`、`*.db.bak-*`、`tools/`、`__pycache__/` |
+| Zustand persist `merge` 类型防御；改数组必须返回新引用触发 persist | 仍适用：`src/stores/uiStore.ts:233,240` 仍有双重类型检查 |
+| `useMemo` 依赖必须是会变的数据；React list key 加索引兜底；异步状态用 `Record` 按实体记 | 仍适用 |
+| 模型下载走后台线程 + 状态轮询 + 前端防重入 | 仍适用；触发下载端点方法改为 `POST`，查询状态仍为 `GET`（`backend/app/routers/admin.py:218,223`） |
+| 背景音命令序号 / 手动-专注状态机；声音统一走 `soundController` | 仍适用：`src/lib/ambientSoundRules.ts`、`src/hooks/useAmbientSoundController.ts`、`src/lib/sounds.ts` 仍在 |
+| 容器自适应网格；主题硬编码排查；router 不依赖 service 反向；提醒走全局链路；日历拖动更新原记录；番茄运行态与历史分离 | 仍适用 |
+| 缩略图后台补图开关 `THUMBNAIL_BACKGROUND_ENABLED` | 已变更：该开关 2026-11 删除（`backend/app/database.py:127`）；`thumbnail_background_idle_cycles` 保留 |
+| `backend/app/services/job_lifecycle.py` | 已变更：并入 `backend/app/services/rq_client.py`（Redis 取消标记 + RQ kill horse） |
+| `src/lib/todoCalendarSyncPlan.ts` 同步计划函数 | 已变更：文件移除，Todo/日历联动改走 `src/stores/scheduleStore.ts` |
+| SQLite / `learning_os.db.bak-*` 本地库环境 | 已变更：主库迁 PostgreSQL + pgvector，SQLite 仅作迁移来源；Git 忽略规则仍适用 |
+| 模型名 `deepseek-v4-flash` / `qwen3-4b` | 历史快照，当前默认模型以设置页运行时配置为准 |
+
 本文记录今天对 SiteYeb / P2M CoreAI 工作台的主要改进、涉及技术、踩坑点和后续维护原则。
 
 ## 视频站交互
@@ -182,6 +200,8 @@ THUMBNAIL_BACKGROUND_IDLE_CYCLES=10
 THUMBNAIL_BACKGROUND_LIMIT=1
 ```
 
+> 后续变化（2026-11-16 现状）：`THUMBNAIL_BACKGROUND_ENABLED` 开关 2026-11 已删除（`backend/app/database.py:127`）；`thumbnail_background_idle_cycles` 与 `thumbnail_background_limit` 保留（`database.py:133-134`）。
+
 - 雪碧图保持按需生成，不在首页打开时批量生成。
 - AI 任务支持恢复卡住任务、暂停队列、恢复队列、清除已完成和清除全部。
 
@@ -347,6 +367,8 @@ python -m compileall backend/app
 - 和模型执行有关的显示，应以运行时配置为准，不要只读旧的前端持久化字段。
 - 外部模型和本地模型要分别显示，避免用户误判请求链路。
 
+> 后续变化（2026-11-16 现状）：文中 `deepseek-v4-flash`、`qwen3-4b` 是 2026-05 时期的模型名快照；当前外部/本地模型以设置页运行时配置为准。「显示以运行时配置为准」这条原则仍适用。
+
 ## 番茄钟背景音
 
 现象：
@@ -507,6 +529,8 @@ python -m compileall backend/app
 - 不提交 SQLite 数据库、数据库备份、Python 缓存、构建产物和本机工具目录。
 - 如果没有 GitHub CLI 或 token，推送分支后保留 PR 创建链接即可。
 
+> 后续变化（2026-11-16 现状）：主库已迁 PostgreSQL + pgvector，`learning_os.db` 这类本地 SQLite 仅作迁移来源；`.gitignore` 对 `*.db`、`*.db.bak-*`、`tools/`、`__pycache__/` 的排除规则仍适用（`.gitignore:17,18,28,32`）。
+
 ## 后端设置层拆分
 
 现象：
@@ -605,6 +629,8 @@ python -m compileall backend/app
 - 新增 `useAssistantPageContext`，灵境小助手上下文改为订阅页面、视频、笔记变化。
 - 新增 `todoCalendarSyncPlan.ts`，Todo 到日历同步先生成 add/update/delete 计划，再执行 store 写入。
 - 补充 `notificationPanelPosition`、`notificationTime`、`videoFormat`、`todoCalendarSyncPlan` 单元测试。
+
+> 后续变化（2026-11-16 现状）：`todoCalendarSyncPlan.ts` 计划函数文件后续重构中移除，Todo/日历联动改走 `src/stores/scheduleStore.ts`，同步逻辑在 `src/hooks/useCrossModuleSync.ts` 内；对应旧测试文件已不存在。
 - 扩展 `regressionContracts.test.ts`，锁住懒加载、共享时钟、媒体查询、通知定位、视频进度、AI 上下文、Todo 日历同步这些结构边界。
 
 维护原则：
@@ -1103,3 +1129,5 @@ python -m compileall backend/app
 - 轮询的触发条件应该是"有没有活跃任务"，而不是"用户有没有点过按钮"。
 - 按钮的 `disabled`、`onClick` 和显示文案必须基于同一套状态，避免"disable 但还能点"或"点了没反馈"。
 - 后端已有防重入时，前端也要做同样的检查，减少无效请求。
+
+> 后续变化（2026-11-16 现状）：下载触发端点改为 `POST /api/admin/download-whisper-model/{model_id}`，`GET` 仅用于查询状态（`backend/app/routers/admin.py:218,223`）；`downloadStates` Record、mount 初始化查询、按活跃任务轮询、前端防重入这套做法仍适用。

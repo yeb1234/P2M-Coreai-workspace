@@ -4,7 +4,6 @@ import type { ID, PomodoroConfig, PomodoroSession, PomodoroTimerState } from '..
 export const POMODORO_REMOTE_RUNTIME_KEY = 'p2m-pomodoro-runtime-v2';
 export const POMODORO_REMOTE_CONFIG_KEY = 'p2m-pomodoro-config-v2';
 export const POMODORO_REMOTE_HISTORY_KEY = 'p2m-pomodoro-history-v2';
-export const POMODORO_LEGACY_REMOTE_RUNTIME_KEY = 'p2m-pomodoro-runtime';
 
 export interface PomodoroRemoteRuntimeSnapshot {
   kind: 'pomodoro-runtime-v2';

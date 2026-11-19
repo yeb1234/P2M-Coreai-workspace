@@ -17,9 +17,3 @@ export interface CalendarEvent {
   createdAt: ISODateTimeString;
 }
 
-export const EVENT_TYPE_COLORS: Record<EventType, string> = {
-  todo: '#3b82f6',
-  event: '#8b5cf6',
-  pomodoro: '#10b981',
-  reminder: '#f59e0b',
-};

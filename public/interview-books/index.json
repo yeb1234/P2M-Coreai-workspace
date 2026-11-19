@@ -1,0 +1,31 @@
+{
+  "books": [
+    {
+      "id": "B",
+      "title": "AI Agent 应用开发宝典",
+      "subtitle": "解析分册 · 26 章 / 34 道题 / 10 张清单",
+      "kind": "question",
+      "page_count": 304,
+      "toc_count": 26,
+      "file": "/interview-books/B.json"
+    },
+    {
+      "id": "C",
+      "title": "AI Agent 后端九件套",
+      "subtitle": "学习教辅 · 20 章 / 151 问 / 64 份代码",
+      "kind": "backend",
+      "page_count": 172,
+      "toc_count": 20,
+      "file": "/interview-books/C.json"
+    },
+    {
+      "id": "D",
+      "title": "后端工程学习宝典",
+      "subtitle": "12 篇 / 53 节 / 3 附录 · 面向 AI Agent 应用开发",
+      "kind": "backend",
+      "page_count": 127,
+      "toc_count": 53,
+      "file": "/interview-books/D.json"
+    }
+  ]
+}

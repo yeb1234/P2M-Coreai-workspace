@@ -1,7 +1,31 @@
 import { create } from 'zustand';
 import type { CalendarEvent, CalendarViewType, ID, ISODateString } from '../types';
-import { createCalendarEvent, deleteCalendarEvent, fetchCalendarEvents } from '../lib/calendarApi';
+import { createCalendarEvent, fetchCalendarEvents } from '../lib/calendarApi';
 
+/**
+ * 日历的 UI 状态 + 只读事件缓存。
+ *
+ * ## 这个 store 现在只管两件事
+ *
+ *   1. 视图状态：当前月、当前视图、选中日期（CalendarGrid / Toolbar / WeekView 在用）
+ *   2. 一份事件缓存：给 StatsPage 和 PrivacyDataSettings 做「有多少条」的统计
+ *
+ * ## 为什么删掉了 7 个 action
+ *
+ * 2026-11 清理时删了 updateEvent / deleteEvent / getEventsForDate /
+ * getEventsForMonth / getPomodoroHeatMap / getEventsByTodoId /
+ * deleteEventsByTodoId —— 全项目零调用。
+ *
+ * 原因是这个项目里存在**两套并行的日历数据模型**：
+ *   - 这个 store + CalendarEvent（后端 /api/calendar-events）
+ *   - useScheduleStore + ScheduleItem（后端 /api/schedule-items）
+ * 实际的新建/编辑/删除都走 scheduleStore，CalendarEventForm 也是。
+ * 这个 store 只剩 addEvent 一处真实用途：番茄钟完成时补一条日历记录
+ * （useCrossModuleSync.ts），只写不读改删。
+ *
+ * 所以 addEvent 必须留着，其余写操作是历史残留。
+ * 真要彻底合并两套模型是另一件事，不在这次清理范围。
+ */
 interface CalendarState {
   events: Record<ID, CalendarEvent>;
   currentMonth: Date;
@@ -10,20 +34,13 @@ interface CalendarState {
   loading: boolean;
   error: string | null;
   addEvent: (data: Omit<CalendarEvent, 'id' | 'createdAt'> & { id?: string }) => Promise<ID>;
-  updateEvent: (id: ID, updates: Partial<CalendarEvent>) => void;
-  deleteEvent: (id: ID) => void;
   loadEvents: () => Promise<void>;
   setCurrentMonth: (date: Date) => void;
   setView: (view: CalendarViewType) => void;
   setSelectedDate: (date: ISODateString | null) => void;
-  getEventsForDate: (date: ISODateString) => CalendarEvent[];
-  getEventsForMonth: (year: number, month: number) => CalendarEvent[];
-  getPomodoroHeatMap: (year: number, month: number) => Record<ISODateString, number>;
-  getEventsByTodoId: (todoId: ID) => CalendarEvent[];
-  deleteEventsByTodoId: (todoId: ID) => void;
 }
 
-export const useCalendarStore = create<CalendarState>()((set, get) => ({
+export const useCalendarStore = create<CalendarState>()((set) => ({
   events: {},
   currentMonth: new Date(),
   currentView: 'month',
@@ -37,28 +54,6 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
       events: { ...state.events, [event.id]: event },
     }));
     return event.id;
-  },
-
-  updateEvent: (id, updates) => {
-    set((state) => {
-      const event = state.events[id];
-      if (!event) return state;
-      return {
-        events: {
-          ...state.events,
-          [id]: { ...event, ...updates },
-        },
-      };
-    });
-  },
-
-  deleteEvent: async (id) => {
-    await deleteCalendarEvent(id).catch(() => null);
-    set((state) => {
-      const events = { ...state.events };
-      delete events[id];
-      return { events };
-    });
   },
 
   loadEvents: async () => {
@@ -75,42 +70,4 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
   setCurrentMonth: (date) => set({ currentMonth: date }),
   setView: (view) => set({ currentView: view }),
   setSelectedDate: (date) => set({ selectedDate: date }),
-
-  getEventsForDate: (date) => {
-    return Object.values(get().events).filter((event) => event.date === date);
-  },
-
-  getEventsForMonth: (year, month) => {
-    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-    return Object.values(get().events).filter((event) =>
-      event.date.startsWith(monthStr)
-    );
-  },
-
-  getPomodoroHeatMap: (year, month) => {
-    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const heatMap: Record<ISODateString, number> = {};
-    Object.values(get().events)
-      .filter((event) => event.type === 'pomodoro' && event.date.startsWith(monthStr))
-      .forEach((event) => {
-        heatMap[event.date] = (heatMap[event.date] || 0) + 1;
-      });
-    return heatMap;
-  },
-
-  getEventsByTodoId: (todoId) => {
-    return Object.values(get().events).filter((event) => event.todoId === todoId);
-  },
-
-  deleteEventsByTodoId: (todoId) => {
-    set((state) => {
-      const events: Record<ID, CalendarEvent> = {};
-      Object.entries(state.events).forEach(([id, event]) => {
-        if (event.todoId !== todoId) {
-          events[id] = event;
-        }
-      });
-      return { events };
-    });
-  },
 }));

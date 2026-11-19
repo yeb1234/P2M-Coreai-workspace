@@ -3,6 +3,16 @@ SUBTITLE_CORRECTION_DEFAULT = (
     "保持原意，不扩写，不翻译，不合并或拆分字幕，不改变时间轴。"
 )
 
+# 这个文件被 backend/app/services/prompts.py 用 importlib 动态加载，
+# 同时被 Dockerfile COPY 进镜像。前端另有 prompts/clientPrompts.ts，两者无关。
+#
+# 2026-11 清理时删掉了 4 个符号（ASSISTANT_SYSTEM_DEFAULT、
+# ASSISTANT_CONTEXT_INSTRUCTION、build_assistant_learning_prompt、
+# build_contextual_user_message）—— 它们唯一的消费者是已删除的
+# services/assistant.py（被 agents/chat_agent.py 取代，后者有自己的 BASE_PROMPT）。
+#
+# 现在这里只剩「字幕校对」和「摘要」两类，都是转写流水线在用的。
+
 SUBTITLE_CORRECTION_SYSTEM = (
     "/no_thinking\n"
     "你是字幕校对助手。只修正每条字幕 text 中明显的语音识别错误、错别字、专有名词和大小写。\n"
@@ -10,54 +20,6 @@ SUBTITLE_CORRECTION_SYSTEM = (
     "不要输出思考过程、解释、Markdown 或代码块。只返回严格 JSON 数组，格式为 "
     '[{"index": 0, "text": "修正后的字幕"}]。'
 )
-
-ASSISTANT_SYSTEM_DEFAULT = (
-    "你是中文学习助手。必须始终使用简体中文回答，禁止用英文回答；"
-    "引用英文资料时也要翻译成中文表达。"
-)
-
-ASSISTANT_CONTEXT_INSTRUCTION = (
-    "请结合下面的当前页面上下文回答用户问题；如果上下文和问题无关，可以忽略上下文。"
-    "不要在回答中说“我探测到页面”，直接回答。"
-)
-
-
-def build_assistant_learning_prompt(message: str, context: str, depth: str = "basic") -> str:
-    depth_instruction = (
-        "先给简洁的一轮回答；如果问题需要展开，最后用一句中文提示用户可以继续追问。"
-        if depth == "basic"
-        else "给出更深入的解释，包含学习路径、前置知识、易错点和可执行的下一步。"
-    )
-    return f"""你是一个面向个人视频库的中文学习助手。
-必须始终使用简体中文回答，禁止用英文回答；即使用户问题、视频标题、字幕片段或模型默认输出倾向是英文，也要翻译并组织成中文。
-只根据下面提供的参考字幕片段回答用户的学习问题，不要编造没有依据的视频内容。
-推荐课程或片段时，要写出视频标题和时间点（秒）。
-如果参考片段不足以回答，要用中文说明缺少什么，并建议先生成或补全字幕。
-回答要简洁、具体、可执行，直接给结论，不要输出推理过程。
-深度要求：{depth_instruction}
-
-用户问题：
-{message}
-
-参考字幕片段：
-{context}
-"""
-
-
-def build_contextual_user_message(message: str, page_context: str) -> str:
-    safe_context = (page_context or "").strip()
-    if not safe_context:
-        return message
-    return (
-        f"{ASSISTANT_CONTEXT_INSTRUCTION}\n\n"
-        "<当前页面上下文>\n"
-        f"{safe_context[:12000]}\n"
-        "</当前页面上下文>\n\n"
-        "<用户问题>\n"
-        f"{message}\n"
-        "</用户问题>"
-    )
-
 
 def build_summary_prompt(transcript: str, word_limit: int) -> str:
     return (

@@ -41,6 +41,11 @@ const mockVideo = {
 async function prepareApp(page: Page, route = '/') {
   await mockApi(page);
   await page.addInitScript((testNowIso) => {
+    // 3.0 的会话标记从旧 localStorage token 换成了数字 user id；
+    // 注册默认关闭后，E2E 不能再依赖“登录页去注册”来建立登录态。
+    // /api/auth/me 已在 mockApi 里返回 Playwright，设置 id 即可跳过登录页。
+    window.localStorage.setItem('p2m-auth-user-id', '1');
+    window.localStorage.setItem('p2m-role', 'member');
     window.localStorage.setItem('p2m-current-user', 'Playwright');
     const fixedTime = new Date(testNowIso).getTime();
     const NativeDate = Date;
@@ -110,8 +115,15 @@ async function mockApi(page: Page) {
   await page.route('**/api/auth/me', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ username: 'playwright', display_name: 'Playwright' }),
+      body: JSON.stringify({ id: 1, username: 'playwright', display_name: 'Playwright', role: 'member' }),
     });
+  });
+  await page.route('**/api/calendar-events**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: [] }) });
+      return;
+    }
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({}) });
   });
   await page.route('**/api/user-data/**', async (route) => {
     if (route.request().method() === 'GET') {
@@ -251,6 +263,9 @@ async function mockApi(page: Page) {
   });
   await page.route('**/api/admin/ai-jobs/queue', async (route) => {
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ paused: false, running: 0, queued: 0, failed: 0, completed: 1 }) });
+  });
+  await page.route('**/api/admin/generate-thumbnails', async (route) => {
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ started: false }) });
   });
   await page.route('**/api/admin/assistant-settings', async (route) => {
     await route.fulfill({
@@ -402,15 +417,15 @@ test.describe('layout regression', () => {
   test('time center plugin fits desktop layout', async ({ page }) => {
     await prepareApp(page, '/#/timecenter');
     await expect(page.getByText('时间中心').first()).toBeVisible();
-    await expect(page.getByText('时间任务表')).toBeVisible();
-    await expect(page.getByText('统一管理计时、倒计时、闹钟与提醒')).toBeVisible();
+    await expect(page.getByText('当前时间').first()).toBeVisible();
+    await expect(page.getByText('正计时').first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expect(page.locator('main.app-main')).toHaveScreenshot('time-center-layout.png');
   });
 
   test('calendar2 week view supports drag selection', async ({ page }) => {
     await prepareApp(page, '/#/calendar2');
-    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByText('周历').first()).toBeVisible();
     const grid = getCalendar2Grid(page);
     const box = await grid.boundingBox();
     expect(box).toBeTruthy();
@@ -430,13 +445,14 @@ test.describe('layout regression', () => {
     await expect(page.locator('[data-calendar-event]').filter({ hasText: '测试拖拽日程' }).first()).toBeVisible();
 
     await page.goto('/#/todo');
-    await expect(page.locator('main.app-main').getByText('测试拖拽日程', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('main.app-main').getByText('测试拖拽日程', { exact: true })).toHaveCount(1);
     await expectNoHorizontalOverflow(page);
   });
 
-  test('calendar2 supports dragging calendar lanes and events', async ({ page }) => {
+  test('calendar2 supports dragging calendar lanes and events', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium-desktop', '窄屏/移动端侧栏折叠，桌面拖拽场景不适用');
     await prepareApp(page, '/#/calendar2');
-    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByText('周历').first()).toBeVisible();
 
     const grid = getCalendar2Grid(page);
     const box = await grid.boundingBox();
@@ -461,7 +477,7 @@ test.describe('layout regression', () => {
 
   test('calendar2 shows overlapping events side by side', async ({ page }) => {
     await prepareApp(page, '/#/calendar2');
-    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByText('周历').first()).toBeVisible();
 
     const grid = getCalendar2Grid(page);
     const box = await grid.boundingBox();
@@ -502,9 +518,10 @@ test.describe('layout regression', () => {
     expect(boxes[0].width).toBeLessThan((await grid.boundingBox())!.width / 2);
   });
 
-  test('calendar2 right panel only shows concrete todos for this week', async ({ page }) => {
+  test('calendar2 right panel only shows concrete todos for this week', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium-desktop', '窄屏/移动端不展示右侧待办面板');
     await prepareApp(page, '/#/calendar2');
-    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByText('周历').first()).toBeVisible();
     await expect(page.getByText('本周还没有具体事项')).toBeVisible();
 
     const grid = getCalendar2Grid(page);
@@ -530,7 +547,7 @@ test.describe('layout regression', () => {
 
   test('calendar2 closing draft modal clears pending selection', async ({ page }) => {
     await prepareApp(page, '/#/calendar2');
-    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByText('周历').first()).toBeVisible();
 
     const grid = getCalendar2Grid(page);
     const box = await grid.boundingBox();
@@ -575,9 +592,10 @@ test.describe('layout regression', () => {
     await expect(createdEvent).toBeHidden();
   });
 
-  test('calendar2 month picker collapses and switches weeks', async ({ page }) => {
+  test('calendar2 month picker collapses and switches weeks', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium-desktop', '窄屏/移动端周切换入口不同');
     await prepareApp(page, '/#/calendar2');
-    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByText('周历').first()).toBeVisible();
     await expect(page.getByTitle('切换到 2026-05-18 所在周')).toBeVisible();
     await page.getByTitle('切换到 2026-05-18 所在周').click();
     await expect(page.locator('main.app-main').getByText('18').first()).toBeVisible();
@@ -591,14 +609,14 @@ test.describe('layout regression', () => {
   test('calendar2 narrows to four visible days on low width', async ({ page }) => {
     await page.setViewportSize({ width: 980, height: 820 });
     await prepareApp(page, '/#/calendar2');
-    await expect(page.getByText('日历2').first()).toBeVisible();
-    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('周一-周四');
+    await expect(page.getByText('周历').first()).toBeVisible();
+    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('一–四');
     await expect(page.locator('main.app-main').getByText('周五').first()).toBeHidden();
     await page.getByTitle('切换显示前半周/后半周').click();
-    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('周二-周五');
+    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('二–五');
     await expect(page.locator('main.app-main').getByText('周五').first()).toBeVisible();
     await page.getByTitle('切换显示前半周/后半周').click();
-    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('周三-周六');
+    await expect(page.getByTitle('切换显示前半周/后半周')).toHaveText('三–六');
     await expectNoHorizontalOverflow(page);
   });
 
@@ -621,7 +639,7 @@ test.describe('layout regression', () => {
   test('calendar2 full-width desktop view avoids internal horizontal scrolling', async ({ page }) => {
     await page.setViewportSize({ width: 1680, height: 900 });
     await prepareApp(page, '/#/calendar2');
-    await expect(page.getByText('日历2').first()).toBeVisible();
+    await expect(page.getByText('周历').first()).toBeVisible();
     await expect.poll(() => getCalendar2VisibleDayCount(page)).toBe(7);
     await expectCalendar2NoInternalHorizontalOverflow(page);
   });

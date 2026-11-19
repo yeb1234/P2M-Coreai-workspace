@@ -369,7 +369,13 @@ export function useAiJobCenter(
 
     const schedule = () => {
       clearTimer();
-      const delay = document.visibilityState === 'visible' ? 3000 : 10000;
+      // 转写任务动辄几十分钟，3 秒一次的轮询纯属浪费：
+      // 每次 tick 要拉 job 列表 + 当前视频详情（两个请求），
+      // 一天开着的页面会累积上千次无意义查询，还会和后端的
+      // 检索/对话抢 DB 连接池。
+      // 5 秒的体感延迟可以忽略（进度条本来就按 1/60 秒精度显示）。
+      // 页面切到后台时进一步降到 20 秒。
+      const delay = document.visibilityState === 'visible' ? 5000 : 20000;
       timer = window.setTimeout(tick, delay);
     };
 

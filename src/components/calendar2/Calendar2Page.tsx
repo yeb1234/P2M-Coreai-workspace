@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, Plus, X } from 'lucide-react';
 import { PageTitle } from '../shared';
-import { usePomodoroStore, useScheduleStore, useTodoStore } from '../../stores';
+import { usePomodoroStore, useScheduleStore } from '../../stores';
 import { toISODateString, formatDate } from '../../lib/date';
 import { playInteractionSound } from '../../lib/sounds';
 import { PRIORITY_COLORS, type ScheduleItem, type TodoPriority, type TodoStatus } from '../../types';
@@ -209,7 +209,25 @@ function layoutWeekEvents(events: WeekEvent[]): LaidOutWeekEvent[] {
 }
 
 export const Calendar2Page: React.FC = () => {
-  const todos = useTodoStore((s) => s.todos);
+  // 待办数据统一从 scheduleStore 取（后端 schedule_items 表）。
+  // 待办数据统一从这里取：
+  // 待办页加了东西，日历2 看不到；日历2 改了，待办页也不知道。
+  //
+  // ScheduleItem 用 startAt/dueAt，Todo 用 startDate/dueDate，
+  // 这里做字段映射，后面的渲染逻辑不用动。
+  const scheduleItems = useScheduleStore((s) => s.items);
+  const todos = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(scheduleItems)
+          .filter(([, item]) => item.type === 'todo' && !item.deletedAt)
+          .map(([id, item]) => [
+            id,
+            { ...item, startDate: item.startAt, dueDate: item.dueAt, tags: [] as string[] },
+          ]),
+      ),
+    [scheduleItems],
+  );
   const items = useScheduleStore((s) => s.items);
   const addTodo = useScheduleStore((s) => s.addTodo);
   const addEvent = useScheduleStore((s) => s.addEvent);
@@ -232,6 +250,15 @@ export const Calendar2Page: React.FC = () => {
   const [resizing, setResizing] = useState<{ id: string; startMinutes: number; dayIndex: number; newEndMinutes: number } | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
+  /* 左侧面板可折叠。
+   *
+   * 这一页原来有三层横向结构：主侧栏 → 页面内左栏(240px) → 网格。
+   * 主侧栏收不起来，页面内这 240px 又常驻，网格只剩一半宽度，
+   * 时间轴的「上午7点」挤成一行、事件块动不动就重叠。
+   *
+   * 折叠后网格拿到全部宽度，ResizeObserver 会自动重算 dayWidth。
+   */
+  const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const gridFrameRef = useRef<HTMLElement | null>(null);
   const dragOffsetRef = useRef(0);
 
@@ -265,6 +292,9 @@ export const Calendar2Page: React.FC = () => {
   const showDesktopPanel = pageWidth >= DESKTOP_PANEL_BREAKPOINT;
   const visibleDayCount = useMemo(() => {
     if (!pageWidth) return 7;
+    // 手机竖屏只放 3 天：4 列在 390px 下每天要 112px，
+    // 加上左侧时间轴会被容器裁掉半列，右侧日期根本看不到。
+    if (pageWidth < 480) return 3;
     if (pageWidth < 870) return 4;
     if (pageWidth < 1080) return 5;
     if (pageWidth < 1280) return 6;
@@ -292,6 +322,7 @@ export const Calendar2Page: React.FC = () => {
     if (!widthSource) return DEFAULT_DAY_WIDTH;
     const available = Math.max(0, widthSource - LEFT_GUTTER - 1);
     const preferred = Math.floor(available / visibleDayCount);
+    if (visibleDayCount === 3) return clamp(preferred, 72, 140);
     if (visibleDayCount === 4) return clamp(preferred, 112, 180);
     if (visibleDayCount === 5) return clamp(preferred, 104, 200);
     if (visibleDayCount === 6) return clamp(preferred, 96, 220);
@@ -348,7 +379,7 @@ export const Calendar2Page: React.FC = () => {
   const laidOutEvents = useMemo(() => layoutWeekEvents(events), [events]);
 
   const monthTitle = `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月`;
-  const compactDayLabel = `${DAYS[visibleDayOffset]}-${DAYS[visibleDayOffset + visibleDayCount - 1]}`;
+  const compactDayLabel = `${DAYS[visibleDayOffset].replace('周', '')}–${DAYS[visibleDayOffset + visibleDayCount - 1].replace('周', '')}`;
   const nextCompactOffset = visibleDayOffset >= maxCompactOffset ? 0 : Math.min(maxCompactOffset, visibleDayOffset + 1);
 
   const startSelection = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -499,7 +530,7 @@ export const Calendar2Page: React.FC = () => {
     } catch {
       setDraft(null);
     }
-  }, [dayWidth, items, updateItem, visibleDayCount, visibleDayOffset, weekDateStrings]);
+  }, [dayWidth, items, maxTodoMinutes, updateItem, visibleDayCount, visibleDayOffset, weekDateStrings]);
 
   const handleEventContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>, item: WeekEvent) => {
     event.preventDefault();
@@ -537,24 +568,31 @@ export const Calendar2Page: React.FC = () => {
 
       <div className="mx-auto flex w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-[0_18px_42px_rgba(15,23,42,0.08)]" style={{ maxWidth: '100%' }}>
         {showDesktopPanel && (
-          <aside className="w-[240px] shrink-0 border-r border-[var(--border-light)] bg-[var(--bg-base)] p-4">
+          <aside
+            className={`shrink-0 overflow-hidden bg-[var(--bg-base)] transition-[width,padding] duration-200 ${
+              sidePanelOpen ? 'w-[240px] border-r border-[var(--border-light)] p-4' : 'w-0 border-r-0 p-0'
+            }`}
+          >
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[var(--text-primary)]">{monthTitle}</p>
               <div className="flex gap-1">
-                <button type="button" onClick={() => setWeekStart((date) => addDays(date, -7))} className="grid h-7 w-7 place-items-center rounded-md hover:bg-[var(--bg-elevated)]" title="上一周"><ChevronLeft size={15} /></button>
-                <button type="button" onClick={() => setWeekStart((date) => addDays(date, 7))} className="grid h-7 w-7 place-items-center rounded-md hover:bg-[var(--bg-elevated)]" title="下一周"><ChevronRight size={15} /></button>
-                <button type="button" onClick={() => setMonthCollapsed((value) => !value)} className="grid h-7 w-7 place-items-center rounded-md hover:bg-[var(--bg-elevated)]" title={monthCollapsed ? '展开月历' : '折叠月历'}><ChevronDown size={15} className={`transition-transform ${monthCollapsed ? '-rotate-90' : ''}`} /></button>
+                <button type="button" onClick={() => setWeekStart((date) => addDays(date, -7))} className="grid h-7 w-7 place-items-center rounded-lg hover:bg-[var(--bg-elevated)]" title="上一周"><ChevronLeft size={15} /></button>
+                <button type="button" onClick={() => setWeekStart((date) => addDays(date, 7))} className="grid h-7 w-7 place-items-center rounded-lg hover:bg-[var(--bg-elevated)]" title="下一周"><ChevronRight size={15} /></button>
+                <button type="button" onClick={() => setMonthCollapsed((value) => !value)} className="grid h-7 w-7 place-items-center rounded-lg hover:bg-[var(--bg-elevated)]" title={monthCollapsed ? '展开月历' : '折叠月历'}><ChevronDown size={15} className={`transition-transform ${monthCollapsed ? '-rotate-90' : ''}`} /></button>
+                {/* 收起整个侧栏。用双箭头是为了和「上一周」的单箭头区分开 ——
+                    两个都是左箭头的话，很容易点错。 */}
+                <button type="button" onClick={() => setSidePanelOpen(false)} className="grid h-7 w-7 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]" title="收起侧栏"><ChevronsLeft size={15} /></button>
               </div>
             </div>
             {!monthCollapsed && (
-              <div className="mt-5 grid grid-cols-7 gap-y-1 text-center text-[11px] text-[var(--text-muted)]">
+              <div className="mt-5 grid grid-cols-7 gap-y-1 text-center text-xs text-[var(--text-muted)]">
                 {'一二三四五六日'.split('').map((day) => <span key={day} className="py-1">{day}</span>)}
                 {monthGridDays.map((date) => {
                   const dateStr = toISODateString(date);
                   const inMonth = date.getMonth() === weekStart.getMonth();
                   const isToday = dateStr === toISODateString(new Date());
                   return (
-                    <button key={dateStr} type="button" onClick={() => setWeekStart(startOfWeek(date))} className={`mx-auto grid h-7 w-7 place-items-center rounded-full text-[11px] transition-colors ${isToday ? 'bg-[color-mix(in_srgb,var(--accent)_18%,white)] font-semibold text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_30%,transparent)]' : inMonth ? 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]' : 'text-[var(--text-muted)] opacity-45 hover:bg-[var(--bg-elevated)]'}`} title={`切换到 ${dateStr} 所在周`}>
+                    <button key={dateStr} type="button" onClick={() => setWeekStart(startOfWeek(date))} className={`mx-auto grid h-7 w-7 place-items-center rounded-md text-xs transition-colors ${isToday ? 'bg-[color-mix(in_srgb,var(--accent)_16%,transparent)] font-semibold text-[var(--accent)]' : inMonth ? 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]' : 'text-[var(--text-muted)] opacity-45 hover:bg-[var(--bg-elevated)]'}`} title={`切换到 ${dateStr} 所在周`}>
                       {date.getDate()}
                     </button>
                   );
@@ -565,7 +603,7 @@ export const Calendar2Page: React.FC = () => {
             <div className="mt-6">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold text-[var(--text-muted)]">本周待办</p>
-                <span className="text-[10px] text-[var(--text-muted)]">{todoPool.length} 项</span>
+                <span className="text-xs text-[var(--text-muted)]">{todoPool.length} 项</span>
               </div>
               <div className="space-y-1.5">
                 {todoPool.length === 0 ? (
@@ -573,12 +611,12 @@ export const Calendar2Page: React.FC = () => {
                 ) : (
                   todoPool.map((item) => (
                     <div key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-elevated)]">
-                      <span className="h-3.5 w-3.5 rounded-sm border-2" style={{ borderColor: PRIORITY_COLORS[item.priority], background: `${PRIORITY_COLORS[item.priority]}1f` }} />
+                      <span className="h-3.5 w-3.5 rounded-lg border-2" style={{ borderColor: PRIORITY_COLORS[item.priority], background: `${PRIORITY_COLORS[item.priority]}1f` }} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate">{item.title}</p>
-                        <p className="text-[10px] text-[var(--text-muted)]">{item.startAt ? datePart(item.startAt) : '未排期'}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{item.startAt ? datePart(item.startAt) : '未排期'}</p>
                       </div>
-                      <span draggable onDragStart={(event) => handleTodoDragStart(event, item)} className="cursor-grab rounded px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--bg-card)] active:cursor-grabbing" title="拖到周视图时间格进行排程">拖入</span>
+                      <span draggable onDragStart={(event) => handleTodoDragStart(event, item)} className="cursor-grab rounded px-1.5 py-0.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-card)] active:cursor-grabbing" title="拖到周视图时间格进行排程">拖入</span>
                     </div>
                   ))
                 )}
@@ -591,9 +629,9 @@ export const Calendar2Page: React.FC = () => {
                 {CALENDAR_LANES.map((lane) => (
                   <label key={lane.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-elevated)]">
                     <input type="checkbox" checked={visiblePriorities[lane.id]} onChange={(event) => setVisiblePriorities((current) => ({ ...current, [lane.id]: event.target.checked }))} className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]" />
-                    <span className="h-3.5 w-3.5 rounded-sm border-2" style={{ borderColor: lane.color, background: `${lane.color}1f` }} />
+                    <span className="h-3.5 w-3.5 rounded-lg border-2" style={{ borderColor: lane.color, background: `${lane.color}1f` }} />
                     {lane.title}
-                    <span draggable onDragStart={(event) => handleLaneDragStart(event, lane)} className="ml-auto cursor-grab rounded px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--bg-card)] active:cursor-grabbing" title="拖到周视图时间格快速创建">拖入</span>
+                    <span draggable onDragStart={(event) => handleLaneDragStart(event, lane)} className="ml-auto cursor-grab rounded px-1.5 py-0.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-card)] active:cursor-grabbing" title="拖到周视图时间格快速创建">拖入</span>
                   </label>
                 ))}
               </div>
@@ -614,13 +652,29 @@ export const Calendar2Page: React.FC = () => {
           </aside>
         )}
 
-        <section ref={gridFrameRef} className="min-w-0 flex-1 overflow-hidden bg-[var(--bg-card)]">
+        <section ref={gridFrameRef} className="relative min-w-0 flex-1 overflow-hidden bg-[var(--bg-card)]">
+
           <div className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg-card)]" style={{ width: gridWidth }}>
             <div className="grid" style={{ gridTemplateColumns: `${LEFT_GUTTER}px repeat(${visibleDayCount}, ${dayWidth}px)` }}>
-              <div className="border-r border-[var(--border-light)] px-2 py-3 text-[11px] text-[var(--text-muted)]">
-                <span>GMT+08</span>
+              <div className="border-r border-[var(--border-medium)] px-2 py-3 text-xs text-[var(--text-muted)]">
+                {/* 侧栏收起后，展开按钮放在表头第一格。
+                    之前试过浮在网格左边缘中间，但白色按钮压在白底网格上
+                    只剩一条线，根本看不出是能点的。 */}
+                {!sidePanelOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setSidePanelOpen(true)}
+                    title="展开侧栏"
+                    aria-label="展开侧栏"
+                    className="flex h-6 w-full items-center justify-center rounded-[var(--r-1)] border border-[var(--border-medium)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition-colors hover:text-[var(--accent)]"
+                  >
+                    <ChevronRight size={13} />
+                  </button>
+                ) : (
+                  <span>GMT+08</span>
+                )}
                 {visibleDayCount < 7 && (
-                  <button type="button" onClick={() => setCompactDayOffset(nextCompactOffset)} className="mt-2 block rounded-md border border-[var(--border-light)] px-1.5 py-1 text-[10px] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]" title="切换显示前半周/后半周">
+                  <button type="button" onClick={() => setCompactDayOffset(nextCompactOffset)} className="calendar2-compact-range mt-2 block rounded-lg border border-[var(--border-light)] px-1.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]" title="切换显示前半周/后半周">
                     {compactDayLabel}
                   </button>
                 )}
@@ -628,11 +682,27 @@ export const Calendar2Page: React.FC = () => {
               {visibleWeekDays.map((item) => {
                 const dateStr = toISODateString(item.date);
                 const isToday = dateStr === toISODateString(new Date());
-                const dateCircleSize = Math.min(40, dayWidth * 0.38);
                 return (
-                  <div key={item.date.toISOString()} className="border-r border-[var(--border-light)] px-3 py-2 text-center last:border-r-0">
-                    <p className="text-[11px] font-medium text-[var(--text-secondary)]">{item.label}</p>
-                    <p className={`mx-auto mt-1 grid place-items-center rounded-full text-2xl font-semibold ${isToday ? 'bg-[color-mix(in_srgb,var(--accent)_15%,white)] text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`} style={{ width: dateCircleSize, height: dateCircleSize, fontSize: dateCircleSize * 0.5 }}>
+                  <div
+                    key={item.date.toISOString()}
+                    className={`border-r border-[var(--border-medium)] px-3 py-2 text-center last:border-r-0 ${
+                      isToday ? 'bg-[color-mix(in_srgb,var(--accent)_5%,transparent)]' : ''
+                    }`}
+                  >
+                    <p className={`text-xs font-medium ${isToday ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}>
+                      {item.label}
+                    </p>
+                    {/* 今天不再用圆环。
+                        圆环的问题不只是「像打卡 app」：它把字号和圈一起放大了
+                        （dateCircleSize * 0.5），导致今天的数字明显比其他天大，
+                        整行日期基线参差。现在所有日期同字号，
+                        今天是「强调色 + 整列淡底」表示 —— 底色从表头贯穿到
+                        网格底部，滚动到下午也知道在哪一列。 */}
+                    <p
+                      className={`mt-1 text-xl font-semibold tabular-nums ${
+                        isToday ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'
+                      }`}
+                    >
                       {item.date.getDate()}
                     </p>
                   </div>
@@ -663,10 +733,10 @@ export const Calendar2Page: React.FC = () => {
           >
             {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, index) => START_HOUR + index).map((hour) => (
               <React.Fragment key={hour}>
-                <div className="absolute left-0 w-[64px] border-r border-[var(--border-light)] pr-2 text-right text-[11px] text-[var(--text-muted)]" style={{ top: minutesToTop(hour * 60) - 8 }}>
+                <div className="absolute left-0 w-[64px] border-r border-[var(--border-medium)] pr-2 text-right text-xs text-[var(--text-muted)]" style={{ top: Math.max(0, minutesToTop(hour * 60) - 8) }}>
                   {formatHourLabel(hour)}
                 </div>
-                <div className="absolute left-[64px] right-0 border-t border-[var(--border-light)]" style={{ top: minutesToTop(hour * 60) }} />
+                <div className="absolute left-[64px] right-0 border-t border-[var(--border-medium)]" style={{ top: minutesToTop(hour * 60) }} />
               </React.Fragment>
             ))}
 
@@ -675,8 +745,25 @@ export const Calendar2Page: React.FC = () => {
             ))}
 
             {Array.from({ length: visibleDayCount + 1 }, (_, index) => (
-              <div key={index} className="absolute top-0 bottom-0 border-l border-[var(--border-light)]" style={{ left: LEFT_GUTTER + index * dayWidth }} />
+              <div key={index} className="absolute top-0 bottom-0 border-l border-[var(--border-medium)]" style={{ left: LEFT_GUTTER + index * dayWidth }} />
             ))}
+
+            {/* 今天整列淡底。
+                原来「今天」只靠表头那个圆环表示，滚到下午就完全看不出
+                今天在哪一列 —— 而周历最容易看错的就是「这是哪一天」。
+                铺一层极淡的强调色，滚动时始终能定位。 */}
+            {(() => {
+              const todayIndex = visibleWeekDays.findIndex(
+                (item) => toISODateString(item.date) === toISODateString(new Date())
+              );
+              if (todayIndex < 0) return null;
+              return (
+                <div
+                  className="pointer-events-none absolute top-0 bottom-0 bg-[color-mix(in_srgb,var(--accent)_5%,transparent)]"
+                  style={{ left: LEFT_GUTTER + todayIndex * dayWidth, width: dayWidth }}
+                />
+              );
+            })()}
 
             {laidOutEvents.filter((event) => event.dayIndex >= visibleDayOffset && event.dayIndex < visibleDayOffset + visibleDayCount).map((event) => {
               const displayEndMinutes = resizing?.id === event.id ? resizing.newEndMinutes : event.endMinutes;
@@ -695,7 +782,7 @@ export const Calendar2Page: React.FC = () => {
                   draggable
                   onDragStart={(dragEvent) => handleEventDragStart(dragEvent, event)}
                   onContextMenu={(contextEvent) => handleEventContextMenu(contextEvent, event)}
-                  className="absolute z-10 cursor-grab overflow-hidden rounded-md px-2 text-white shadow-sm active:cursor-grabbing"
+                  className="absolute z-10 cursor-grab overflow-hidden rounded-lg px-2 text-white shadow-sm active:cursor-grabbing"
                   style={{
                     left: eventLeft,
                     top: minutesToTop(event.startMinutes) + 4,
@@ -706,9 +793,9 @@ export const Calendar2Page: React.FC = () => {
                     paddingBottom: isShortEvent ? 2 : 4,
                   }}
                 >
-                  <p className={`truncate font-semibold leading-none ${isShortEvent ? 'text-[11px]' : 'text-[10px]'}`}>{event.title}</p>
+                  <p className={`truncate font-semibold leading-none ${isShortEvent ? 'text-xs' : 'text-xs'}`}>{event.title}</p>
                   {!isShortEvent && (
-                    <p className={`truncate font-medium opacity-95 ${isCompactEvent ? 'mt-0.5 text-[8px] leading-none' : 'mt-1 text-[9px] leading-none'}`}>
+                    <p className={`truncate font-medium opacity-95 ${isCompactEvent ? 'mt-0.5 text-xs leading-none' : 'mt-1 text-xs leading-none'}`}>
                       {formatTime(event.startMinutes)} - {formatTime(displayEndMinutes)}
                     </p>
                   )}
@@ -754,8 +841,8 @@ export const Calendar2Page: React.FC = () => {
             })}
 
             {draft && (
-              <div className="absolute z-20 rounded-md border border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_22%,transparent)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_28%,transparent)]" style={{ left: LEFT_GUTTER + (draft.dayIndex - visibleDayOffset) * dayWidth + 8, top: minutesToTop(draft.startMinutes) + 4, width: dayWidth - 16, height: durationToHeight(draft.startMinutes, draft.endMinutes) - 8 }}>
-                <div className="px-2 py-1 text-[11px] font-semibold text-[var(--accent)]">
+              <div className="absolute z-20 rounded-lg border border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_22%,transparent)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_28%,transparent)]" style={{ left: LEFT_GUTTER + (draft.dayIndex - visibleDayOffset) * dayWidth + 8, top: minutesToTop(draft.startMinutes) + 4, width: dayWidth - 16, height: durationToHeight(draft.startMinutes, draft.endMinutes) - 8 }}>
+                <div className="px-2 py-1 text-xs font-semibold text-[var(--accent)]">
                   {formatTime(draft.startMinutes)} - {formatTime(draft.endMinutes)}
                 </div>
               </div>
@@ -769,7 +856,7 @@ export const Calendar2Page: React.FC = () => {
           <div className="mx-auto w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[var(--text-primary)]">新建日程</p>
-              <button type="button" onClick={closeDraftEditor} className="grid h-7 w-7 place-items-center rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]"><X size={15} /></button>
+              <button type="button" onClick={closeDraftEditor} className="grid h-7 w-7 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]"><X size={15} /></button>
             </div>
             <p className="mt-1 text-xs text-[var(--text-muted)]">
               {weekDays[editingDraft.dayIndex].label} {formatTime(editingDraft.startMinutes)} - {formatTime(editingDraft.endMinutes)}

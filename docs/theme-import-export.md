@@ -1,5 +1,7 @@
 # 主题 CSS / JSON 导入导出说明
 
+> 状态：现行（最后校对 2026-11-16）。涉及文件、解析函数、五个深色主题 ID 与 `src/lib/themes.ts` 当前实现一致。
+
 SiteYeb 的主题只允许通过一组 CSS 变量控制。运行时通用类（例如 `theme-card`、`theme-surface`）和深色兜底层放在 `src/index.css`，不会再混入导出的主题文件。
 
 ## 两种导出格式

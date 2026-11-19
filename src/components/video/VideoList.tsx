@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckSquare, ChevronRight, Folder, RefreshCw, Search, Square, Star } from 'lucide-react';
+import { AlertCircle, CheckSquare, ChevronRight, Folder, PlayCircle, RefreshCw, Search, Square } from 'lucide-react';
+import { markVideoAutoplay, openVideoAt } from '../../lib/videoNavigation';
+import { userScopedStorage } from '../../lib/userScopedStorage';
 import { useVideoStore } from '../../stores/videoStore';
 import {
   fetchContinueVideo,
@@ -17,7 +19,7 @@ const MAX_THUMBNAIL_BATCH_SIZE = 12;
 
 function loadVideoGridColumns(): number {
   try {
-    const raw = Number(localStorage.getItem(VIDEO_GRID_COLUMNS_KEY));
+    const raw = Number(userScopedStorage.getItem(VIDEO_GRID_COLUMNS_KEY));
     return Number.isFinite(raw) && raw >= 2 && raw <= 8 ? raw : DEFAULT_VIDEO_GRID_COLUMNS;
   } catch {
     return DEFAULT_VIDEO_GRID_COLUMNS;
@@ -84,49 +86,46 @@ function groupFoldersByParent(items: CategoryTree[], allFolders: CategoryTree[])
 const FolderTile = React.memo(function FolderTile({
   category,
   checked,
-  isFavorite,
   onSelect,
   onEnter,
-  onToggleFavorite,
 }: {
   category: CategoryTree;
   checked: boolean;
-  isFavorite: boolean;
   onSelect: (id: number) => void;
   onEnter: (id: number, name: string) => void;
-  onToggleFavorite: (id: number) => void;
 }) {
   const displayName = folderDisplayName(category);
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all group">
+    <div className="flex items-center gap-2 p-3 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl hover:shadow-md hover:border-[var(--accent)] transition-all group">
       <button
         onClick={(e) => { e.stopPropagation(); onSelect(category.id); }}
         className="shrink-0"
         title={checked ? '取消筛选' : '筛选此文件夹'}
       >
         {checked
-          ? <CheckSquare size={16} className="text-[#c87d2f]" />
-          : <Square size={16} className="text-[#b8b4ac] group-hover:text-[#6b7280]" />
+          ? <CheckSquare size={16} className="text-[var(--accent)]" />
+          : <Square size={16} className="text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]" />
         }
       </button>
       <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
-        <Folder size={20} className="text-[#c87d2f] shrink-0" />
+        <Folder size={20} className="text-[var(--accent)] shrink-0" />
         <div className="min-w-0 flex-1">
-          <p title={category.full_path} className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
-          <p className="text-[10px] text-[#9ca3af]">{category.video_count} 个视频</p>
+          <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">{displayName}</p>
+          <p className="text-xs text-[var(--text-muted)]">{category.video_count} 个视频</p>
         </div>
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggleFavorite(category.id); }}
-        className="shrink-0 rounded-md p-1 transition-colors hover:bg-[#f3f2ef]"
-        title={isFavorite ? '取消收藏文件夹' : '收藏文件夹'}
-      >
-        <Star size={14} className={isFavorite ? 'text-[#fbbf24]' : 'text-[#d1cdc6] group-hover:text-[#9ca3af]'} fill={isFavorite ? 'currentColor' : 'none'} />
       </button>
     </div>
   );
 });
+
+/** 秒 → mm:ss。片段搜索里显示时间点用。 */
+function formatClock(sec: number): string {
+  const total = Math.max(0, Math.round(sec));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 const SearchFolderTile = React.memo(function SearchFolderTile({
   category,
@@ -139,12 +138,12 @@ const SearchFolderTile = React.memo(function SearchFolderTile({
   const parentPath = folderParentPath(category);
 
   return (
-    <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-3 p-3 bg-[#faf9f7] border border-[#e5e2dd] rounded-xl hover:shadow-md hover:border-[#c87d2f] transition-all text-left group">
-      <Folder size={20} className="text-[#c87d2f] shrink-0" />
+    <button onClick={() => onEnter(category.id, displayName)} className="flex items-center gap-3 p-3 bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl hover:shadow-md hover:border-[var(--accent)] transition-all text-left group">
+      <Folder size={20} className="text-[var(--accent)] shrink-0" />
       <div className="min-w-0 flex-1">
-        <p title={category.full_path} className="text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#c87d2f] transition-colors">{displayName}</p>
-        {parentPath && <p className="text-[10px] text-[#b8b4ac] truncate">{parentPath}</p>}
-        <p className="text-[10px] text-[#9ca3af]">{category.video_count} 个视频</p>
+        <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">{displayName}</p>
+        {parentPath && <p className="text-xs text-[var(--text-muted)] truncate">{parentPath}</p>}
+        <p className="text-xs text-[var(--text-muted)]">{category.video_count} 个视频</p>
       </div>
     </button>
   );
@@ -160,22 +159,22 @@ const FolderSearchGroupCard = React.memo(function FolderSearchGroupCard({
   onEnterFolder: (id: number, name: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-[#e5e2dd] bg-[#faf9f7]/60 p-2.5">
+    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)]/60 p-2.5">
       <div className="mb-2 flex items-center gap-2">
-        <Folder size={15} className="shrink-0 text-[#c87d2f]" />
+        <Folder size={15} className="shrink-0 text-[var(--accent)]" />
         {group.parent ? (
           <button
             type="button"
             onClick={() => onEnterParent(group.parent!.id, group.parentLabel)}
             className="min-w-0 text-left"
           >
-            <span title={group.parentPath || group.parentLabel} className="block truncate text-xs font-semibold text-[#1a1a1a] hover:text-[#c87d2f]">{group.parentLabel}</span>
-            {group.parentPath && <span className="block truncate text-[10px] text-[#9ca3af]">{group.parentPath}</span>}
+            <span className="block truncate text-xs font-semibold text-[var(--text-primary)] hover:text-[var(--accent)]">{group.parentLabel}</span>
+            {group.parentPath && <span className="block truncate text-xs text-[var(--text-muted)]">{group.parentPath}</span>}
           </button>
         ) : (
           <div className="min-w-0">
-            <span className="block truncate text-xs font-semibold text-[#1a1a1a]">{group.parentLabel}</span>
-            <span className="block truncate text-[10px] text-[#9ca3af]">视频目录根层级</span>
+            <span className="block truncate text-xs font-semibold text-[var(--text-primary)]">{group.parentLabel}</span>
+            <span className="block truncate text-xs text-[var(--text-muted)]">视频目录根层级</span>
           </div>
         )}
       </div>
@@ -192,10 +191,17 @@ export function VideoList() {
   const {
     videos, total, page, totalPages, loading, error, loadVideos, loadCurrentVideo,
     searchQuery, setSearchQuery, categoryTree, breadcrumb, currentCategoryId,
-    loadCategoryTree, enterCategory, goToBreadcrumb, getCurrentChildren, restoreNavigation, selectedFolderIds, setSelectedFolderIds, toggleFavorite,
-    favoriteCategoryIds, toggleFavoriteCategory,
+    loadCategoryTree, enterCategory, goToBreadcrumb, getCurrentChildren,
+    restoreNavigation, selectedFolderIds, setSelectedFolderIds, toggleFavorite,
+    searchResults, doSearch,
   } = useVideoStore();
   const [inputVal, setInputVal] = useState('');
+  // 搜索范围：标题/文件夹（默认，走 loadVideos）
+  //        vs 字幕内容（走 hybrid_search，带章节线索和 rerank）
+  //
+  // 后者原来只有 AI 助手能用 —— 用户想找「哪段字幕提到 XX」只能去问助手。
+  // 后端 /api/videos/search/segments 已改走同一条混合检索链路。
+  const [searchMode, setSearchMode] = useState<'title' | 'segments'>('title');
   const [navRestored, setNavRestored] = useState(false);
   const [continueVideo, setContinueVideo] = useState<VideoItem | null>(null);
   const [historyVideos, setHistoryVideos] = useState<VideoItem[]>([]);
@@ -229,8 +235,8 @@ export function VideoList() {
       setRecentVideosFallback(recent.fallback);
       const history = await fetchRecentHistory(30);
       setHistoryVideos(history);
-    } catch (e: any) {
-      setRescanMsg(`刷新失败: ${e?.message ?? '未知错误'}`);
+    } catch (e: unknown) {
+      setRescanMsg(`刷新失败: ${e instanceof Error ? e.message : '未知错误'}`);
       setTimeout(() => setRescanMsg(''), 4000);
     } finally {
       setRefreshLoading(false);
@@ -327,6 +333,11 @@ export function VideoList() {
 
   const handleSearch = useCallback(() => {
     const query = inputVal.trim();
+    if (searchMode === 'segments') {
+      // 字幕搜索：不走分页视频列表，直接打混合检索
+      void doSearch(query);
+      return;
+    }
     const previousQuery = searchQuery.trim();
     if (query === previousQuery && selectedFolderIds.length === 0) return;
     setGridMode('normal');
@@ -334,13 +345,13 @@ export function VideoList() {
     selectionChangedRef.current = false;
     setSelectedFolderIds([]);
     loadVideos(1, query || undefined);
-  }, [inputVal, loadVideos, searchQuery, selectedFolderIds.length, setSearchQuery, setSelectedFolderIds]);
+  }, [inputVal, loadVideos, searchQuery, selectedFolderIds.length, setSearchQuery, setSelectedFolderIds, searchMode, doSearch]);
 
   const handleColumnsPerRowChange = useCallback((columns: number) => {
     const next = Math.max(2, Math.min(8, columns));
     setColumnsPerRow(next);
     try {
-      localStorage.setItem(VIDEO_GRID_COLUMNS_KEY, String(next));
+      userScopedStorage.setItem(VIDEO_GRID_COLUMNS_KEY, String(next));
     } catch {
       // ignore storage quota or private mode failures
     }
@@ -399,6 +410,9 @@ export function VideoList() {
     ? `文件夹列表（${total} 个视频）`
     : undefined;
   const playVideo = useCallback((videoId: number) => {
+    // 点卡片就是明确的“播放”动作，不是打开详情页看封面。
+    // 标记给播放器，等 metadata 就绪后自动开始，避免用户看到画面却停在暂停态。
+    markVideoAutoplay(videoId);
     void loadCurrentVideo(videoId);
   }, [loadCurrentVideo]);
   const toggleVideoFavorite = useCallback((videoId: number, nextFavorite: boolean) => {
@@ -419,9 +433,35 @@ export function VideoList() {
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="搜索视频或文件夹..."
+          placeholder={searchMode === 'segments' ? '搜索字幕内容，例：闭包是什么' : '搜索视频或文件夹...'}
           className="w-full rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] py-2.5 pl-10 pr-4 text-sm"
         />
+        {/* 搜索范围切换。默认「标题/文件夹」保持老行为；
+            「字幕内容」走混合检索，能找到「哪段话里提到过」。 */}
+        <div className="mt-2 flex items-center gap-1.5">
+          {([
+            ['title', '标题 / 文件夹'],
+            ['segments', '字幕内容'],
+          ] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSearchMode(mode)}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                searchMode === mode
+                  ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                  : 'border-[var(--border-light)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {searchMode === 'segments' && (
+            <span className="ml-1 text-[11px] text-[var(--text-muted)]">
+              按语义检索字幕片段，结果带课程 / 章节线索
+            </span>
+          )}
+        </div>
       </div>
 
       {!isSearching && currentCategoryId && (
@@ -460,18 +500,79 @@ export function VideoList() {
               key={cat.id}
               category={cat}
               checked={selectedFolderIdSet.has(cat.id)}
-              isFavorite={favoriteCategoryIds.includes(cat.id)}
               onSelect={toggleFolderSelection}
               onEnter={enterFolderFromList}
-              onToggleFavorite={toggleFavoriteCategory}
             />
           ))}
         </div>
       )}
 
+      {/* 字幕内容搜索结果。只在「字幕内容」模式下渲染 ——
+          「标题 / 文件夹」模式看的是视频网格，不该出现片段列表。 */}
+      {searchMode === 'segments' && inputVal.trim() && (
+        <div>
+          <p className="mb-2 text-xs text-[var(--text-muted)]">
+            匹配的片段 ({searchResults.length})
+            {searchResults.length > 0 && (
+              <span className="ml-1 opacity-70">· 点击跳到对应时间点</span>
+            )}
+          </p>
+          {searchResults.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] px-3 py-4 text-sm text-[var(--text-secondary)]">
+              没有匹配的字幕片段。换个说法试试，比如用更具体的术语。
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {searchResults.map((item) => {
+                const pos = item.meta?.position && item.meta?.total
+                  ? `第 ${item.meta.position}/${item.meta.total} 节`
+                  : '';
+                const path = item.meta?.display || item.folder_path || '';
+                return (
+                  <button
+                    key={`${item.video_id}-${item.start_sec}`}
+                    type="button"
+                    onClick={() => openVideoAt(item.video_id, item.start_sec)}
+                    className="flex w-full items-start gap-2.5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-2.5 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
+                  >
+                    <PlayCircle size={15} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+                    <div className="min-w-0 flex-1">
+                      {path && (
+                        <p
+                          className="truncate text-[10px] text-[var(--text-muted)]"
+                          title={item.meta?.meta_text || path}
+                        >
+                          {path}
+                          {pos && <span className="ml-1 text-[var(--accent)]">{pos}</span>}
+                        </p>
+                      )}
+                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                        {item.video_title}
+                      </p>
+                      <p className="text-xs text-[var(--accent)]">
+                        {formatClock(item.start_sec)}
+                        {item.end_sec > item.start_sec + 5 ? ` – ${formatClock(item.end_sec)}` : ''}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-5 text-[var(--text-secondary)]" style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}>
+                        {item.text}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {isSearching && matchedFolders.length > 0 && (
         <div>
-          <p className="text-xs text-[#9ca3af] mb-2">匹配的文件夹 ({matchedFolders.length})</p>
+          <p className="text-xs text-[var(--text-muted)] mb-2">匹配的文件夹 ({matchedFolders.length})</p>
           <div className="space-y-3">
             {groupedMatchedFolders.map((group) => (
               <FolderSearchGroupCard
@@ -500,7 +601,7 @@ export function VideoList() {
       )}
 
       {error && (
-        <div className="flex items-center gap-2 p-3 bg-[#fef2f2] border border-[#fecaca] rounded-lg text-sm text-[#dc3545]">
+        <div className="flex items-center gap-2 p-3 bg-[var(--danger-bg)] border border-[#fecaca] rounded-lg text-sm text-[var(--danger)]">
           <AlertCircle size={16} />
           {error}
         </div>

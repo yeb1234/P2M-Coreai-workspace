@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useUIStore, useTodoStore, usePomodoroStore, usePluginStore, useNotesStore, useNotificationStore, useTimeCenterStore, useTranscriptionStore } from '../stores';
+import { useUIStore, usePomodoroStore, usePluginStore, useNotesStore, useMdNotesStore, useNotificationStore, useTimeCenterStore, useTranscriptionStore } from '../stores';
 
 const ALL_STORES = [
   useUIStore,
-  useTodoStore,
   usePomodoroStore,
   usePluginStore,
   useNotesStore,
+  useMdNotesStore,
   useNotificationStore,
   useTimeCenterStore,
   useTranscriptionStore,
@@ -28,6 +28,11 @@ export function useRehydrateStores(currentUser: string | null) {
     void Promise.allSettled(
       ALL_STORES.map((store) => Promise.resolve(store.persist.rehydrate())),
     ).then(() => {
+      // 临时诊断：看 rehydrate 后 store 里到底有没有数据
+      const dbg = (window as unknown as Record<string, unknown>).__p2mDebug as Record<string, unknown> | undefined;
+      if (dbg) {
+        dbg.storeNames = ALL_STORES.map((s) => (s as unknown as { persist?: { getOptions?: () => { name?: string } } }).persist?.getOptions?.().name);
+      }
       if (!cancelled) setReady(true);
     });
 

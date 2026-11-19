@@ -57,7 +57,7 @@ const STATUS_FILTERS = [
 const BATCH_MODES: Array<{ value: AiJobBatchMode; label: string; desc: string }> = [
   { value: 'unfinished', label: '继续未完成', desc: '跳过已有字幕和总结的视频，只补没完成的。' },
   { value: 'missing_subtitles', label: '只处理无字幕', desc: '只给没有字幕的视频生成字幕和总结。' },
-  { value: 'missing_summary', label: '只补总结', desc: '已有字幕但没有总结时才入队。' },
+  { value: 'missing_summary', label: '只补总结', desc: '已有字幕但没有总结时才入队，直接读现有字幕，不重跑 Whisper。' },
   { value: 'failed_only', label: '只重试失败', desc: '只把最近失败的视频重新入队。' },
   { value: 'all', label: '全部重跑', desc: '清空旧 AI 输出后重新生成。' },
 ];
@@ -248,7 +248,7 @@ function IconButton({
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
         danger
           ? 'text-[var(--danger)] hover:border-[color-mix(in_srgb,var(--danger)_38%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]'
           : 'text-[var(--text-secondary)] hover:border-[var(--border-light)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]'
@@ -322,43 +322,32 @@ export function VideoAiJobCenter({
 
   return (
     <div className="theme-surface min-w-0 overflow-hidden rounded-xl border px-5 py-4">
-      <div className="flex min-w-0 items-center gap-2">
+      {/* 三行布局：右侧栏只有 200px 左右，一行塞不下「折叠+标题+5个按钮+统计」。
+          原来全挤在同一行，统计被按钮组压成「0 运」「本」这种残缺文字。 */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]"
+          aria-expanded={!collapsed}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-accent)] hover:text-[var(--accent)]"
           title={collapsed ? '展开 AI 任务中心' : '收起 AI 任务中心'}
           aria-label={collapsed ? '展开 AI 任务中心' : '收起 AI 任务中心'}
         >
           {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
         </button>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="shrink-0 text-sm font-semibold leading-5 text-[var(--text-primary)]">AI 任务中心</h3>
-            <span className="text-[11px] leading-5 text-[var(--text-muted)]">
-              {totalActive > 0 ? `${jobs?.running ?? 0} 运行 / ${jobs?.queued ?? 0} 排队` : '队列空闲'}
-            </span>
-            {queuePaused && (
-              <span className="rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border-light))] bg-[var(--accent-bg)] px-2 py-0.5 text-[10px] text-[var(--accent)]">
-                已暂停
-              </span>
-            )}
-          </div>
-          {!collapsed && batchProgress && (
-            <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
-              本轮 {batchProgress.completed}/{batchProgress.total}，运行 {batchProgress.running}，排队 {batchProgress.queued}，失败 {batchProgress.failed}
-            </p>
-          )}
-        </div>
+        <h3 className="shrink-0 text-sm font-semibold leading-5 text-[var(--text-primary)]">AI 任务中心</h3>
 
         {!collapsed && (
-          <div className="flex shrink-0 flex-nowrap items-center gap-1 pl-1">
+          /* 按钮组靠左，和标题、统计共用框的左边缘。
+             原来用 ml-auto 把它推到最右，换行后按钮组起点比统计还靠右，
+             整个框的内容左边缘乱掉。 */
+          <div className="flex shrink-0 flex-nowrap items-center gap-1">
             <button
               type="button"
               onClick={canToggleQueue ? onToggleQueue : undefined}
               disabled={!canToggleQueue}
-              className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+              className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                 queuePaused || queueStuck
                   ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'
                   : 'border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
@@ -392,15 +381,38 @@ export function VideoAiJobCenter({
             </IconButton>
           </div>
         )}
+
+        {/* 统计独占整行：w-full 强制换行。
+            去掉 pl-10 —— 用户要「相对框的左边对齐」，缩进反而让统计比按钮组右一截。 */}
+        <div className="w-full min-w-0 space-y-0.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="whitespace-nowrap text-xs leading-5 text-[var(--text-muted)]">
+              {totalActive > 0 ? `${jobs?.running ?? 0} 运行 / ${jobs?.queued ?? 0} 排队` : '队列空闲'}
+            </span>
+            {queuePaused && (
+              <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--accent)_35%,var(--border-light))] bg-[var(--accent-bg)] px-2 py-0.5 text-xs text-[var(--accent)]">
+                已暂停
+              </span>
+            )}
+          </div>
+          {!collapsed && batchProgress && (
+            <p
+              className="truncate text-xs text-[var(--text-muted)]"
+              title={`本轮 ${batchProgress.completed}/${batchProgress.total}，运行 ${batchProgress.running}，排队 ${batchProgress.queued}，失败 ${batchProgress.failed}`}
+            >
+              本轮 {batchProgress.completed}/{batchProgress.total}，运行 {batchProgress.running}，排队 {batchProgress.queued}，失败 {batchProgress.failed}
+            </p>
+          )}
+        </div>
       </div>
 
       {!collapsed && (
         <div className="mt-4 min-w-0 space-y-4">
-          <div className="min-w-0 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
             <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-[var(--text-primary)]">批处理{batchScopeLabel}</p>
-                <p className="truncate text-[11px] text-[var(--text-muted)]">
+                <p className="truncate text-xs text-[var(--text-muted)]">
                   来源：{batchScopeLabel} {batchCount} 个视频，规则：{currentBatchMode.label}，预计新增 {previewEnqueueCount} 个任务
                 </p>
               </div>
@@ -409,7 +421,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onPreviewBatchFolder}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
                 >
                   <SearchCheck size={13} />
                   预览
@@ -418,7 +430,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onApplySettings}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[var(--border-light)] px-2 text-[11px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--border-light)] px-2 text-xs text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-45"
                   title="将左侧当前转写设置保存到后端并同步给排队中的任务"
                 >
                   <RefreshCw size={13} />
@@ -428,7 +440,7 @@ export function VideoAiJobCenter({
                   type="button"
                   onClick={onBatchFolder}
                   disabled={batchLoading}
-                  className="inline-flex h-7 items-center gap-1 rounded-md bg-[var(--accent)] px-2 text-[11px] text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
+                  className="inline-flex h-7 items-center gap-1 rounded-lg bg-[var(--accent)] px-2 text-xs text-white hover:bg-[var(--accent-hover)] disabled:opacity-45"
                 >
                   {batchLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                   入队
@@ -442,7 +454,7 @@ export function VideoAiJobCenter({
                   key={mode.value}
                   type="button"
                   onClick={() => onBatchModeChange?.(mode.value)}
-                  className={`min-w-0 truncate rounded-md border px-2 py-1.5 text-left text-[11px] transition-colors ${
+                  className={`min-w-0 truncate rounded-lg border px-2 py-1.5 text-left text-xs transition-colors ${
                     batchMode === mode.value
                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                       : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
@@ -453,12 +465,12 @@ export function VideoAiJobCenter({
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-[11px] leading-5 text-[var(--text-muted)]">
+            <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
               {currentBatchMode.desc}
             </p>
 
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-[11px] text-[var(--text-secondary)]">
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--border-light)] px-2 py-1.5 text-xs text-[var(--text-secondary)]">
                 <span className="shrink-0">最多新增入队</span>
                 <input
                   value={limitDraft}
@@ -471,7 +483,7 @@ export function VideoAiJobCenter({
                   className="min-w-0 flex-1 border-0 bg-transparent px-1 py-0 text-right text-xs text-[var(--text-primary)] outline-none"
                 />
               </label>
-              <label className="flex min-w-[145px] shrink-0 items-center justify-between gap-3 rounded-md border border-[var(--border-light)] px-2 py-1.5 text-[11px] text-[var(--text-secondary)]">
+              <label className="flex min-w-[145px] shrink-0 items-center justify-between gap-3 rounded-lg border border-[var(--border-light)] px-2 py-1.5 text-xs text-[var(--text-secondary)]">
                 <span>同时校对字幕</span>
                 <input
                   type="checkbox"
@@ -483,7 +495,7 @@ export function VideoAiJobCenter({
             </div>
 
             {batchPreview && (
-              <div className="mt-2 min-w-0 rounded-md border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] leading-5 text-[var(--text-muted)]">
+              <div className="mt-2 min-w-0 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-2 py-1.5 text-xs leading-5 text-[var(--text-muted)]">
                 <p>
                   共 {batchPreview.requested}，可处理 {batchPreview.eligible}，本次入队 {batchPreview.enqueued || previewEnqueueCount}，跳过 {batchPreview.skipped}
                   {batchPreview.active ? `，活动中 ${batchPreview.active}` : ''}
@@ -513,14 +525,14 @@ export function VideoAiJobCenter({
                   key={filter.value ?? 'all'}
                   type="button"
                   onClick={() => onStatusChange(filter.value)}
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                  className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs transition-colors ${
                     selectedStatus === filter.value
                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                       : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
                   }`}
                 >
                   <span>{filter.label}</span>
-                  <span className="rounded-full bg-[var(--bg-accent)] px-1 text-[10px] tabular-nums text-[var(--text-muted)]">
+                  <span className="rounded-full bg-[var(--bg-accent)] px-1 text-xs tabular-nums text-[var(--text-muted)]">
                     {count}
                   </span>
                 </button>
@@ -553,7 +565,7 @@ export function VideoAiJobCenter({
                             {job.video_title || `视频 ${job.video_id}`}
                           </p>
                           {job.duration != null && (
-                            <span className="shrink-0 rounded bg-[var(--bg-accent)] px-1 py-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
+                            <span className="shrink-0 rounded bg-[var(--bg-accent)] px-1 py-0.5 text-xs tabular-nums text-[var(--text-muted)]">
                               {(() => {
                                 const sec = Math.round(job.duration);
                                 const h = Math.floor(sec / 3600);
@@ -564,9 +576,9 @@ export function VideoAiJobCenter({
                               })()}
                             </span>
                           )}
-                          <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{compactDate(job.updated_at)}</span>
+                          <span className="shrink-0 text-xs text-[var(--text-muted)]">{compactDate(job.updated_at)}</span>
                         </div>
-                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--text-muted)]">
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)]">
                           <span>{statusLabel(job.status)}</span>
                           <span>{stageLabel(job.stage)}</span>
                           <span className="min-w-0 truncate">{runtimeParts(job)}</span>
@@ -580,7 +592,7 @@ export function VideoAiJobCenter({
                               return (
                                 <span
                                   key={step.key}
-                                  className={`rounded-full border px-1.5 py-0.5 text-[9px] leading-none ${
+                                  className={`rounded-full border px-1.5 py-0.5 text-xs leading-none ${
                                     active
                                       ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
                                       : done
@@ -597,10 +609,10 @@ export function VideoAiJobCenter({
                           </div>
                         )}
                         {message && (
-                          <div className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                          <div className="mt-1 flex items-center gap-1 text-xs text-[var(--text-secondary)]">
                             <span className="truncate" title={job.message}>{message}</span>
                             {job.status === 'completed' && job.duration != null && job.started_at != null && (
-                              <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] px-1.5 py-0.5 text-[9px] leading-none text-[var(--success)]">
+                              <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] px-1.5 py-0.5 text-xs leading-none text-[var(--success)]">
                                 {(() => {
                                   const started = new Date(job.started_at!).getTime();
                                   const ended = new Date(job.updated_at).getTime();
@@ -613,7 +625,7 @@ export function VideoAiJobCenter({
                           </div>
                         )}
                         {(job.error || job.summary_error) && (
-                          <p className="mt-1 line-clamp-2 text-[11px] text-[var(--danger)]" title={job.error || job.summary_error || undefined}>
+                          <p className="mt-1 line-clamp-2 text-xs text-[var(--danger)]" title={job.error || job.summary_error || undefined}>
                             {job.error || job.summary_error}
                           </p>
                         )}
@@ -624,8 +636,22 @@ export function VideoAiJobCenter({
                             <RotateCcw size={13} />
                           </IconButton>
                         )}
+                        {/* running 现在可以取消了 —— 后端走优雅取消：
+                            设 Redis flag，转写循环每处理一个字幕段就检查一次
+                            （实测 5 秒内从 transcribing 变 cancelled）。
+                            原来的 disabled 是「后端不支持所以前端禁掉」，
+                            后端上一轮已经支持，按钮忘了放开。 */}
                         {job.status === 'running' && (
-                          <IconButton title="运行中不可停止" disabled>
+                          <IconButton
+                            title="停止这个任务（当前步骤结束后退出，通常几秒内）"
+                            onClick={() => onCancelJob?.(job.id)}
+                            danger
+                          >
+                            <X size={13} />
+                          </IconButton>
+                        )}
+                        {job.status === 'cancelling' && (
+                          <IconButton title="正在取消，等待当前步骤结束" disabled>
                             <X size={13} className="opacity-45" />
                           </IconButton>
                         )}
