@@ -14,10 +14,14 @@ dist-ssr
 
 # Runtime config and generated data
 .env
+.env.*
+!.env.example
 *.db
 *.db.bak-*
 *.db-shm
 *.db-wal
+*.rdb
+dump.rdb
 output/
 thumbnails/
 sprites/
@@ -25,6 +29,13 @@ work/
 
 # Local tool binaries and AI models
 tools/
+
+# 桌面端安装包（构建产物，走 GitHub Release 分发，不进仓库）
+desktop-release/*.exe
+desktop-release/*.blockmap
+desktop-release/*.zip
+desktop-release/*.dmg
+desktop-release/*.AppImage
 
 # Python backend local environment/cache
 backend/.venv*/
@@ -34,6 +45,13 @@ __pycache__/
 # Local screenshots
 QQ*.png
 test-results/
+
+# 临时音频/试验产物
+tmp/
+
+# 浏览器自动化产生的缓存（Edge 用户数据目录）
+.edge-shot/
+*.db-journal
 
 # Editor directories and files
 .vscode/*
