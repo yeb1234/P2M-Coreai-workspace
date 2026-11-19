@@ -4,7 +4,7 @@
 
 这份索引管全项目的文档：哪个文件讲什么、现在还可不可信、最后一次对照代码是哪天。写新文档或改老文档前，先在这里定位，不要另起一套。
 
-代码基线：release 分支 `release/6.0-smartagents`，发布标签 `v6.0.0`（基于 `polish/design-system-refresh` 的 112 个提交）。
+代码基线：主线 `P2U-3.0-LangChain`，发布标签 `v6.0.0`；`release/6.0-smartagents` 保留为发布分支。
 
 ## 状态怎么读
 
