@@ -130,16 +130,26 @@ def backend_health() -> dict:
         running = db.query(AiJob).filter(AiJob.status == "running").count()
         failed = db.query(AiJob).filter(AiJob.status == "failed").count()
         videos = db.query(Video).count()
+        try:
+            queue_paused = _is_queue_paused()
+            queue_ok = True
+            queue_message = f"运行 {running}，排队 {queued}，失败 {failed}"
+        except Exception as exc:
+            # Redis 没起时，健康检查不应该整个 500；把队列状态标成不可用，
+            # 让设置页仍能看到其他检查项。
+            queue_paused = None
+            queue_ok = False
+            queue_message = f"运行 {running}，排队 {queued}，失败 {failed}；Redis 不可用: {exc}"
         checks.append(health_item(
             "AI 队列",
-            True,
-            f"运行 {running}，排队 {queued}，失败 {failed}",
+            queue_ok,
+            queue_message,
             {
                 "running": running,
                 "queued": queued,
                 "failed": failed,
                 "worker_concurrency": settings.ai_worker_concurrency,
-                "paused": _is_queue_paused(),
+                "paused": queue_paused,
             },
         ))
         checks.append(health_item("视频库", True, f"{videos} 个视频", {"videos": videos}))

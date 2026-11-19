@@ -141,13 +141,38 @@ def recover_stuck_ai_jobs(minutes: int = 60, correction_minutes: int = 15, force
 
 def pause_ai_queue() -> dict:
     get_redis_connection().set(_PAUSE_KEY, "1")
-    return {"paused": True}
+    db = SessionLocal()
+    try:
+        queue = ai_jobs_queue()
+        # 将 RQ 队列中等待执行的 job 移除，阻止 worker 继续执行
+        for rq_job in queue.get_jobs():
+            rq_job.delete()
+        # 更新 DB 中所有 queued 任务的 message，让前端显示「已暂停」
+        jobs = db.query(AiJob).filter(AiJob.status == "queued").all()
+        now = datetime.now()
+        for job in jobs:
+            job.message = "Paused by user"
+            job.updated_at = now
+        db.commit()
+        return {"paused": True, "dequeued": len(jobs)}
+    finally:
+        db.close()
 
 
 def resume_ai_queue() -> dict:
     get_redis_connection().delete(_PAUSE_KEY)
     sync_db_queue_to_rq()
-    return {"paused": False}
+    db = SessionLocal()
+    try:
+        jobs = db.query(AiJob).filter(AiJob.status == "queued", AiJob.message == "Paused by user").all()
+        now = datetime.now()
+        for job in jobs:
+            job.message = "Queued for processing"
+            job.updated_at = now
+        db.commit()
+        return {"paused": False, "resumed": len(jobs)}
+    finally:
+        db.close()
 
 
 def cancel_ai_job(job_id: str) -> dict:
@@ -401,6 +426,8 @@ def sync_db_queue_to_rq() -> int:
         if not queued_jobs:
             return 0
         queue = ai_jobs_queue()
+        # 获取队列中实际等待的 job ID（排除 Redis 中残留但不属于队列的 job 数据）
+        existing_job_ids = set(queue.get_job_ids())
         enqueued = 0
         skipped = 0
         for job in queued_jobs:
@@ -422,8 +449,7 @@ def sync_db_queue_to_rq() -> int:
                     skipped += 1
                     continue
 
-                rq_job = queue.fetch_job(job.id)
-                if rq_job is None:
+                if job.id not in existing_job_ids:
                     queue.enqueue(
                         "app.services.ai_job_tasks.run_ai_job_task",
                         args=(job.id,),

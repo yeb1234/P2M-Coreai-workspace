@@ -307,6 +307,22 @@ class SegmentSearchResult(BaseModel):
     score_hint: float = 0
 
 
+class AssistantIntentCreate(BaseModel):
+    message: str = Field(min_length=1)
+    page_context: str = ""
+    intent_hint: str = ""  # 前端 regex 意图判断，传给后端 LLM 做参考
+
+
+class AssistantIntentOut(BaseModel):
+    intent: str = Field(default="general",
+        description="search, summary, question, general")
+    confidence: float = Field(default=0.0, ge=0, le=1)
+    cleaned_query: str = Field(default="",
+        description="去除意图词后的纯净查询")
+    keywords: list[str] = Field(default_factory=list)
+    reasoning: str = Field(default="")
+
+
 class AssistantChatCreate(BaseModel):
     message: str = Field(min_length=1)
     page_context: str = ""
@@ -318,6 +334,9 @@ class AssistantChatCreate(BaseModel):
     use_web_search: bool = False
     use_deep_research: bool = False
     limit: int = Field(default=6, ge=1, le=20)
+    cleaned_query: str = ""
+    intent: str = ""  # search / summary / video_context / learning_plan / chat — 由前端意图识别传入
+    intent_hint: str = ""  # 前端 regex 意图判断，传给后端 LLM 做参考
 
 
 class AssistantReference(BaseModel):

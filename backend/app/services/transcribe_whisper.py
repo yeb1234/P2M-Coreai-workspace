@@ -168,19 +168,24 @@ def _apply_thread_env(cpu_threads: int) -> None:
 
 
 def _resolve_device(device_type: Optional[str] = None) -> str:
+    import time
     value = (device_type or "auto").strip().lower()
     if value == "cpu":
-        return "cpu"
-    # auto or cuda: probe ctranslate2 and fall back gracefully when no GPU.
-    try:
-        import ctranslate2
-        if ctranslate2.get_cuda_device_count() > 0:
-            return "cuda"
-    except Exception:
-        pass
-    if value == "cuda":
-        logger.warning("[whisper] device_type=cuda requested but no CUDA device detected; falling back to cpu")
-    return "cpu"
+        raise RuntimeError("GPU-only mode: CPU device is not allowed for whisper transcription")
+    last_exc = None
+    for attempt in range(3):
+        try:
+            import ctranslate2
+            if ctranslate2.get_cuda_device_count() > 0:
+                return "cuda"
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("[whisper] CUDA device probe failed (attempt %d/3): %s", attempt + 1, exc)
+            if attempt < 2:
+                time.sleep(2.0)
+    if last_exc is not None:
+        raise RuntimeError(f"GPU-only mode: failed to probe CUDA devices after 3 attempts: {last_exc}") from last_exc
+    raise RuntimeError("GPU-only mode: no CUDA device detected after 3 attempts; refusing to fall back to CPU")
 
 
 def _looks_like_cuda_dll_error(exc: BaseException) -> bool:
@@ -225,41 +230,39 @@ def get_whisper_model(model_size: str, cpu_threads: Optional[int] = None, comput
         return _MODEL_CACHE[key]
 
     from faster_whisper import WhisperModel
+    import time
 
-    try:
-        _MODEL_CACHE[key] = WhisperModel(
-            actual_model,
-            device=resolved_device,
-            compute_type=resolved_compute_type,
-            cpu_threads=resolved_threads,
-            num_workers=1,
-        )
-    except Exception as exc:
+    last_exc = None
+    for attempt in range(3):
+        try:
+            _MODEL_CACHE[key] = WhisperModel(
+                actual_model,
+                device=resolved_device,
+                compute_type=resolved_compute_type,
+                cpu_threads=resolved_threads,
+                num_workers=1,
+            )
+            break
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("[whisper] WhisperModel load failed (attempt %d/3): %s", attempt + 1, exc)
+            if attempt < 2:
+                time.sleep(3.0)
+    else:
+        exc = last_exc
         if resolved_device == "cuda" and _looks_like_cuda_dll_error(exc):
             probe = _probe_cuda_runtime_libs()
-            logger.warning(
-                "[whisper] CUDA 加载失败 (%s)；缺失库: %s。自动回退到 CPU",
-                exc, probe.get("missing") or "unknown",
-            )
-            cpu_compute, _ = _validate_compute_type("cpu", resolved_compute_type)
-            fallback_key = (actual_model, cpu_compute, resolved_threads, "cpu")
-            if fallback_key not in _MODEL_CACHE:
-                _MODEL_CACHE[fallback_key] = WhisperModel(
-                    actual_model,
-                    device="cpu",
-                    compute_type=cpu_compute,
-                    cpu_threads=resolved_threads,
-                    num_workers=1,
-                )
-            _MODEL_CACHE[key] = _MODEL_CACHE[fallback_key]
-        else:
-            msg = str(exc)
-            if "Invalid model size" in msg or "Connection" in msg or "HTTP" in msg or "timeout" in msg.lower():
-                raise RuntimeError(
-                    f"无法加载模型 {model_size}（repo={actual_model}）。"
-                    f"请检查网络连接，或设置 HF_ENDPOINT 镜像（如 https://hf-mirror.com）后重试。"
-                ) from exc
-            raise
+            raise RuntimeError(
+                f"GPU-only mode: CUDA 加载失败 ({exc})；缺失库: {probe.get('missing') or 'unknown'}。"
+                "拒绝回退到 CPU。"
+            ) from exc
+        msg = str(exc)
+        if "Invalid model size" in msg or "Connection" in msg or "HTTP" in msg or "timeout" in msg.lower():
+            raise RuntimeError(
+                f"无法加载模型 {model_size}（repo={actual_model}）。"
+                f"请检查网络连接，或设置 HF_ENDPOINT 镜像（如 https://hf-mirror.com）后重试。"
+            ) from exc
+        raise
     return _MODEL_CACHE[key]
 
 

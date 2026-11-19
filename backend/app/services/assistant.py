@@ -1,18 +1,13 @@
-import json
-from collections import defaultdict
+import re
 
-from sqlalchemy import desc, or_, text
-
-from app.database import SessionLocal, settings
-from app.models import ChatMessage, ChatSession, SubtitleSegment, Video
+from app.database import settings
 from app.services.admin_settings import load_assistant_runtime_settings, load_transcription_settings
+from app.services.langchain_chat import ensure_session
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 from app.services.prompts import (
     ASSISTANT_SYSTEM_DEFAULT,
     build_assistant_learning_prompt,
-    build_contextual_user_message,
 )
-from app.utils.files import unique_suffix
 
 
 def llm_usage_policy() -> str:
@@ -38,261 +33,62 @@ def assistant_runtime_settings() -> dict:
         }
 
 
-def build_reference(segment: SubtitleSegment, video: Video, score_hint: float) -> dict:
-    return {
-        "video_id": video.id,
-        "video_title": video.title,
-        "start_sec": segment.start_sec,
-        "end_sec": segment.end_sec,
-        "text": segment.text,
-        "score_hint": score_hint,
-    }
+# ─── 搜索查询清洗 ───
 
-
-def search_references(query: str, video_id: int | None = None, limit: int = 6) -> list[dict]:
-    keywords = [item.strip().lower() for item in query.split() if item.strip()]
-    if not keywords:
-        keywords = [query.strip().lower()]
-
-    db = SessionLocal()
-    try:
-        try:
-            fts_sql = """
-                SELECT s.id, s.video_id, s.segment_index, s.start_sec, s.end_sec, s.text,
-                       v.id AS v_id, v.title AS v_title
-                FROM subtitle_segments_fts f
-                JOIN subtitle_segments s ON s.id = f.rowid
-                JOIN videos v ON v.id = s.video_id
-                WHERE subtitle_segments_fts MATCH :query_text
-            """
-            params = {"query_text": query.strip(), "limit": limit * 4}
-            if video_id:
-                fts_sql += " AND s.video_id = :video_id"
-                params["video_id"] = video_id
-            fts_sql += " ORDER BY bm25(subtitle_segments_fts) LIMIT :limit"
-            fts_rows = db.execute(text(fts_sql), params).fetchall()
-        except Exception:
-            fts_rows = []
-
-        if fts_rows:
-            results = []
-            grouped_best = defaultdict(float)
-            for row in fts_rows:
-                text_lower = (row.text or "").lower()
-                score_hint = sum(1 for keyword in keywords if keyword in text_lower) or 0.5
-                if score_hint <= grouped_best[(row.video_id, row.start_sec)]:
-                    continue
-                grouped_best[(row.video_id, row.start_sec)] = score_hint
-                results.append(
-                    {
-                        "video_id": row.video_id,
-                        "video_title": row.v_title,
-                        "start_sec": row.start_sec,
-                        "end_sec": row.end_sec,
-                        "text": row.text,
-                        "score_hint": float(score_hint),
-                    }
-                )
-            results.sort(key=lambda item: item["score_hint"], reverse=True)
-            return results[:limit]
-
-        filters = [SubtitleSegment.text.contains(keyword) for keyword in keywords]
-        query_stmt = db.query(SubtitleSegment, Video).join(Video, Video.id == SubtitleSegment.video_id)
-        if video_id:
-            query_stmt = query_stmt.filter(SubtitleSegment.video_id == video_id)
-        rows = query_stmt.filter(or_(*filters)).limit(limit * 4).all()
-
-        if not rows:
-            fallback = db.query(Video)
-            if video_id:
-                fallback = fallback.filter(Video.id == video_id)
-            videos = fallback.order_by(desc(Video.is_favorite), desc(Video.favorited_at), desc(Video.updated_at)).limit(limit).all()
-            return [
-                {
-                    "video_id": video.id,
-                    "video_title": video.title,
-                    "start_sec": 0,
-                    "end_sec": min(video.duration or 0, 90),
-                    "text": (video.summary or video.transcription or "No transcript available yet.")[:220],
-                    "score_hint": 0.1,
-                }
-                for video in videos
-            ]
-
-        results = []
-        grouped_best = defaultdict(float)
-        for segment, video in rows:
-            text_lower = segment.text.lower()
-            score_hint = sum(1 for keyword in keywords if keyword in text_lower)
-            if score_hint <= grouped_best[(video.id, segment.start_sec)]:
-                continue
-            grouped_best[(video.id, segment.start_sec)] = score_hint
-            results.append(build_reference(segment, video, float(score_hint or 0.1)))
-
-        results.sort(key=lambda item: item["score_hint"], reverse=True)
-        return results[:limit]
-    finally:
-        db.close()
-
-
-def ensure_session(session_id: str | None, video_id: int | None) -> ChatSession:
-    db = SessionLocal()
-    try:
-        if session_id:
-            session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
-            if session:
-                return session
-
-        session = ChatSession(
-            id=unique_suffix(),
-            title="Learning Assistant",
-            scope="video" if video_id else "global",
-            video_id=video_id,
-        )
-        db.add(session)
-        db.commit()
-        db.refresh(session)
-        return session
-    finally:
-        db.close()
-
-
-def store_message(session_id: str, role: str, content: str, references: list[dict] | None = None) -> None:
-    db = SessionLocal()
-    try:
-        db.add(
-            ChatMessage(
-                id=unique_suffix(),
-                session_id=session_id,
-                role=role,
-                content=content,
-                references_json=json.dumps(references or [], ensure_ascii=False),
-            )
-        )
-        db.commit()
-    finally:
-        db.close()
-
-
-def compose_reference_context(references: list[dict]) -> str:
-    lines = []
-    for idx, ref in enumerate(references, start=1):
-        lines.append(
-            f"{idx}. Video: {ref['video_title']}\n"
-            f"   Time: {int(ref['start_sec'])}s - {int(ref['end_sec'])}s\n"
-            f"   Transcript: {ref['text']}"
-        )
-    return "\n".join(lines)
-
-
-def answer_with_ollama(message: str, references: list[dict], depth: str = "basic", system_prompt: str = "") -> str:
-    context = compose_reference_context(references)
-    prompt = build_assistant_learning_prompt(message, context, depth=depth)
-    if system_prompt.strip():
-        prompt = f"{system_prompt.strip()}\n\n{prompt}"
-    return OllamaClient(base_url=settings.ollama_base_url, timeout_s=180).generate(
-        model=settings.ollama_model,
-        prompt=prompt,
-        temperature=0.2,
+def _clean_search_query(query: str) -> str:
+    """去除搜索意图词，提取核心搜索内容。'搜Python教程' → 'Python教程'"""
+    cleaned = re.sub(
+        r'^(搜[索找]?|找[到出]?|查[询找]?|检索|帮我[搜查找]|查找|搜索|关于|有没有|看看?有没有|给我?[找搜])\s*',
+        '',
+        query.strip(),
+        flags=re.IGNORECASE,
     )
+    return cleaned.strip() or query.strip()
 
 
-def answer_with_external_llm(message: str, references: list[dict], depth: str = "deepen", system_prompt: str = "") -> str:
-    runtime = assistant_runtime_settings()
-    if not runtime["external_api_key"] or not runtime["external_base_url"] or not runtime["external_model"]:
-        raise RuntimeError("External LLM API key is not configured")
+# ─── 四种模式的系统提示词 ───
 
-    context = compose_reference_context(references)
-    prompt = build_assistant_learning_prompt(message, context, depth=depth)
-    return OpenAICompatibleClient(
-        base_url=runtime["external_base_url"],
-        api_key=runtime["external_api_key"],
-        timeout_s=180,
-    ).chat_completion(
-        model=runtime["external_model"],
-        messages=[
-            {
-                "role": "system",
-                "content": system_prompt.strip() or ASSISTANT_SYSTEM_DEFAULT,
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.2,
-    )
+CHAT_SYSTEM_PROMPT = (
+    "你是灵境小助手，一个智能 AI 助手。\n"
+    "必须始终使用简体中文回答，禁止用英文回答；引用英文资料时也要翻译成中文表达。\n"
+    "回答要简洁、有用、直接。"
+)
 
+VIDEO_CONTEXT_SYSTEM_PROMPT = (
+    "你是面向个人视频库的中文学习助手。\n"
+    "必须始终使用简体中文回答，禁止用英文回答；引用英文资料时也要翻译成中文表达。\n"
+    "用户正在看一个视频，下面是当前视频的上下文。基于视频内容回答用户的学习问题。\n"
+    "推荐具体知识点时，写出时间点。如果视频上下文不足以回答，说明缺少什么。"
+)
 
-def answer_with_openai_compatible_llm(message: str, references: list[dict], depth: str = "basic", system_prompt: str = "") -> str:
-    runtime = assistant_runtime_settings()
-    context = compose_reference_context(references)
-    prompt = build_assistant_learning_prompt(message, context, depth=depth)
-    return OpenAICompatibleClient(
-        base_url=runtime["local_base_url"],
-        api_key=runtime["local_api_key"],
-        timeout_s=180,
-    ).chat_completion(
-        model=runtime["local_model"],
-        messages=[
-            {
-                "role": "system",
-                "content": system_prompt.strip() or ASSISTANT_SYSTEM_DEFAULT,
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.2,
-    )
+SEARCH_SYSTEM_PROMPT = (
+    "你是面向个人视频库的中文学习助手。\n"
+    "必须始终使用简体中文回答，禁止用英文回答；引用英文资料时也要翻译成中文表达。\n"
+    "根据参考字幕片段回答学习问题，推荐课程时写出视频标题和时间点（秒）。\n"
+    "如果参考片段不足以回答，说明缺少什么，建议先生成或补全字幕。"
+)
 
+SUMMARY_SYSTEM_PROMPT = (
+    "你是面向个人视频库的中文学习助手。\n"
+    "必须始终使用简体中文回答，禁止用英文回答；引用英文资料时也要翻译成中文表达。\n"
+    "根据参考字幕片段，对视频内容进行总结和概括。\n"
+    "要求：\n"
+    "- 提炼核心知识点和要点\n"
+    "- 给出结构化的大纲（分点列出）\n"
+    "- 标注关键内容对应的时间点（秒）\n"
+    "- 如果参考片段不足以完整总结，说明缺少什么部分"
+)
 
-def answer_with_configured_llm(
-    message: str,
-    references: list[dict],
-    depth: str = "basic",
-    system_prompt: str = "",
-) -> tuple[str, str]:
-    provider = (settings.assistant_llm_provider or "local").lower()
-    policy = llm_usage_policy()
-    errors = []
-
-    def answer_with_local() -> str:
-        if provider in ("openai", "lmstudio"):
-            return answer_with_openai_compatible_llm(message, references, depth=depth, system_prompt=system_prompt)
-        return answer_with_ollama(message, references, depth=depth, system_prompt=system_prompt)
-
-    def answer_with_external() -> str:
-        return answer_with_external_llm(message, references, depth=depth, system_prompt=system_prompt)
-
-    attempts = [("local", answer_with_local), ("external", answer_with_external)]
-    if policy == "external_first" or depth == "deepen":
-        attempts.reverse()
-    elif policy == "local_only":
-        attempts = [("local", answer_with_local)]
-    elif policy == "external_only":
-        attempts = [("external", answer_with_external)]
-
-    for label, runner in attempts:
-        try:
-            answer = runner()
-            if label == "local":
-                return answer, "openai" if provider in ("openai", "lmstudio") else "ollama"
-            return answer, "external"
-        except Exception as exc:
-            errors.append(f"{label} failed: {exc}")
-
-    fallback = build_fallback_answer(message, references)
-    if errors:
-        fallback = fallback + "\n\nLLM fallback note: " + " | ".join(errors)
-    return fallback, "fallback"
-
-
-def build_fallback_answer(message: str, references: list[dict]) -> str:
-    if not references:
-        return "我还没有找到匹配的字幕片段。建议先为更多视频生成或补全字幕。"
-
-    lines = [f"我找到了这些和“{message}”相关的学习片段：", ""]
-    for ref in references[:3]:
-        minute = int(ref["start_sec"] // 60)
-        second = int(ref["start_sec"] % 60)
-        lines.append(f"- {ref['video_title']}，{minute}:{second:02d}：{ref['text'][:120]}")
-    return "\n".join(lines)
+LEARNING_PLAN_SYSTEM_PROMPT = (
+    "你是学习路线规划助手。\n"
+    "必须始终使用简体中文回答，禁止用英文回答。\n"
+    "根据用户想学习的方向，给出结构化的学习路线规划。要求：\n"
+    "- 分阶段（入门→进阶→深入），每个阶段列出核心知识点\n"
+    "- 每个知识点建议 1-2 个学习资源或实践方式\n"
+    "- 标注预计学习时长\n"
+    "- 给出可执行的下一步行动\n"
+    "回答要具体、可执行，不要泛泛而谈。"
+)
 
 
 def run_assistant_chat(
@@ -307,27 +103,105 @@ def run_assistant_chat(
     use_web_search: bool = False,
     use_deep_research: bool = False,
     limit: int = 6,
+    cleaned_query: str = "",
+    intent: str = "",
+    intent_hint: str = "",
 ) -> dict:
+    """运行 AI 助手聊天（五模式路由）。
+
+    模式：
+    - chat           → 通用对话，不搜索，不注入视频上下文
+    - video_context  → 基于当前视频上下文学习，不搜索其他视频
+    - search         → 精确检索字幕片段 + LLM 生成
+    - summary        → 覆盖式检索 + LLM 总结概括
+    - learning_plan  → 学习路线规划（当前用 LLM 知识，后续接 RAG）
+    """
+    from app.services.langchain_chat import chat_with_memory
+    from app.services.rag_chain import create_rag_chain
+
+    # 1. 获取或创建会话
     session = ensure_session(session_id, video_id)
-    references = search_references(message, video_id=video_id, limit=limit)
-    store_message(session.id, "user", message)
-
     safe_depth = "deepen" if depth == "deepen" else "basic"
-    llm_message = build_contextual_user_message(message, page_context)
-    answer, mode = answer_with_configured_llm(
-        llm_message,
-        references,
-        depth=safe_depth,
-        system_prompt=system_prompt,
-    )
 
-    store_message(session.id, "assistant", answer, references=references)
+    # 2. 五模式路由
+    if intent == "search":
+        # ── 精确检索模式：搜索全库字幕片段 ──
+        prompt = system_prompt.strip() or SEARCH_SYSTEM_PROMPT
+        search_text = _clean_search_query(cleaned_query or message)
+        rag_chain = create_rag_chain()
+        answer, references, mode = rag_chain.qa(
+            query=search_text,
+            video_id=video_id,
+            limit=limit,
+            system_prompt=prompt,
+            page_context=page_context,
+            depth=safe_depth,
+            session_id=session.id,
+            intent="search",
+        )
+
+    elif intent == "summary":
+        # ── 总结检索模式：覆盖式检索 + LLM 总结 ──
+        prompt = system_prompt.strip() or SUMMARY_SYSTEM_PROMPT
+        search_text = _clean_search_query(cleaned_query or message)
+        rag_chain = create_rag_chain()
+        # 总结模式用更大的 limit 以覆盖更多内容
+        summary_limit = max(limit, 15)
+        answer, references, mode = rag_chain.qa(
+            query=search_text,
+            video_id=video_id,
+            limit=summary_limit,
+            system_prompt=prompt,
+            page_context=page_context,
+            depth=safe_depth,
+            session_id=session.id,
+            intent="summary",
+        )
+
+    elif intent == "video_context":
+        # ── 视频上下文模式：基于当前视频学习 ──
+        prompt = system_prompt.strip() or VIDEO_CONTEXT_SYSTEM_PROMPT
+        answer, mode = chat_with_memory(
+            message=message,
+            session_id=session.id,
+            system_prompt=prompt,
+            page_context=page_context,  # 注入当前视频上下文
+            depth=safe_depth,
+        )
+        references = []
+
+    elif intent == "learning_plan":
+        # ── 学习路线规划模式 ──
+        # 当前：用 LLM 自身知识生成学习路线
+        # 后续：接入 RAG，检索自定义路线图数据
+        prompt = system_prompt.strip() or LEARNING_PLAN_SYSTEM_PROMPT
+        answer, mode = chat_with_memory(
+            message=message,
+            session_id=session.id,
+            system_prompt=prompt,
+            page_context="",  # 不注入页面上下文
+            depth="deepen",   # 学习路线默认深入模式
+        )
+        references = []
+
+    else:
+        # ── 聊天模式（默认）：通用对话 ──
+        prompt = system_prompt.strip() or CHAT_SYSTEM_PROMPT
+        answer, mode = chat_with_memory(
+            message=message,
+            session_id=session.id,
+            system_prompt=prompt,
+            page_context="",  # 不注入页面上下文
+            depth=safe_depth,
+        )
+        references = []
+
     return {
         "session_id": session.id,
         "answer": answer,
         "mode": mode,
         "depth": safe_depth,
-        "rag_enabled": use_rag,
+        "rag_enabled": intent in ("search", "summary"),
         "web_search_enabled": use_web_search,
         "deep_research_enabled": use_deep_research,
         "references": references,

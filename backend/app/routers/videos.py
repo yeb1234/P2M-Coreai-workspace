@@ -176,6 +176,7 @@ def get_videos(
     category_id: int | None = None,
     category_ids: str | None = None,
     search: str | None = None,
+    is_favorite: bool | None = Query(None),
     db: Session = Depends(get_db),
 ):
     query = db.query(Video)
@@ -190,6 +191,8 @@ def get_videos(
         query = query.filter(Video.category_id.in_(all_ids))
     if search:
         query = query.filter(Video.title.contains(search))
+    if is_favorite is not None:
+        query = query.filter(Video.is_favorite.is_(is_favorite))
 
     total = query.count()
     offset = (page - 1) * page_size

@@ -95,6 +95,13 @@ def configure_sqlite_connection(dbapi_connection, _connection_record):
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA busy_timeout=30000")
     cursor.close()
+    # Load sqlite-vec extension if available
+    try:
+        dbapi_connection.enable_load_extension(True)
+        import sqlite_vec
+        sqlite_vec.load(dbapi_connection)
+    except Exception:
+        pass
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine)
@@ -216,6 +223,20 @@ def ensure_runtime_schema() -> None:
                 connection.execute(text("INSERT INTO subtitle_segments_fts(subtitle_segments_fts) VALUES ('rebuild')"))
         except Exception:
             # Some SQLite builds omit FTS5; substring fallback search remains available.
+            pass
+
+        # Create sqlite-vec virtual table for subtitle segment embeddings
+        try:
+            connection.exec_driver_sql(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS subtitle_segment_embeddings USING vec0(
+                    segment_id INTEGER PRIMARY KEY,
+                    embedding float[1024]
+                )
+                """
+            )
+        except Exception:
+            # sqlite-vec extension may not be available; vector search will fall back silently.
             pass
 
         # Migration: categories.name was globally unique, now composite (name, parent_id)
