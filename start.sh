@@ -28,7 +28,7 @@ fi
 wait_healthy() {
     echo -n "  waiting for backend"
     for _ in $(seq 1 30); do
-        status=$(docker inspect -f '{{.State.Health.Status}}' siteyeb-backend 2>/dev/null || echo "missing")
+        status=$(docker inspect -f '{{.State.Health.Status}}' p2-siteyeb-backend-1 2>/dev/null || echo "missing")
         if [ "$status" = "healthy" ]; then
             echo " -> healthy"
             return 0
@@ -77,7 +77,7 @@ case "$CMD" in
         echo "  (LM Studio on the host; see EMBEDDING_BASE_URL in .env)."
         ;;
     logs)
-        docker logs -f --tail 60 siteyeb-backend
+        docker logs -f --tail 60 p2-siteyeb-backend-1
         ;;
     *)
         echo "unknown command: $CMD" >&2

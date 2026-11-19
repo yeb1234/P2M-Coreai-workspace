@@ -60,6 +60,8 @@ class VideoOut(BaseModel):
     transcription: Optional[str] = None
     transcript_segments: list[TranscriptSegment] = Field(default_factory=list)
     summary: Optional[str] = None
+    has_subtitles: bool = False
+    has_summary: bool = False
     markdown_path: Optional[str] = None
     subtitle_path: Optional[str] = None
     subtitle_url: Optional[str] = None
@@ -125,6 +127,7 @@ class AiJobOut(BaseModel):
     whisper_model: str
     language: str
     do_summary: bool
+    summary_only: bool = False
     word_limit: int
     ollama_model: Optional[str] = None
     device_type: Optional[Literal["auto", "cuda", "cpu"]] = None
@@ -155,6 +158,7 @@ class AiJobListItem(BaseModel):
     whisper_model: str
     language: str
     do_summary: bool
+    summary_only: bool = False
     word_limit: int
     cpu_threads: Optional[int] = None
     compute_type: Optional[str] = None
@@ -319,9 +323,32 @@ class SegmentSearchResult(BaseModel):
     meta: dict | None = None
 
 
+class AssistantPageNote(BaseModel):
+    """当前笔记的保存上下文。只在用户要求保存时由聊天工具读取。"""
+
+    title: str = Field(default="", max_length=240)
+    markdown: str = Field(default="", max_length=60_000)
+
+
+class AssistantResume(BaseModel):
+    """HITL 中断后继续执行。
+
+    run_id 是 LangGraph checkpoint 的 thread_id；前端从 interrupt 事件拿回。
+    selected 是 A/B/C 选项 id，text 是「其它」里的自定义补充。
+    original_message 只用于恢复引用检索和指代消解，不会重新写进历史。
+    """
+
+    run_id: str = Field(min_length=1)
+    interrupt_id: str = ""
+    selected: str = ""
+    text: str = ""
+    original_message: str = ""
+
+
 class AssistantChatCreate(BaseModel):
     message: str = Field(min_length=1)
     page_context: str = ""
+    page_note: AssistantPageNote | None = None
     system_prompt: str = ""
     session_id: str | None = None
     video_id: int | None = None
@@ -334,6 +361,7 @@ class AssistantChatCreate(BaseModel):
     intent: str | None = None
     use_deep_research: bool = False
     limit: int = Field(default=6, ge=1, le=20)
+    resume: AssistantResume | None = None
 
 
 class AssistantReference(BaseModel):
@@ -594,7 +622,9 @@ class HybridSearchHit(BaseModel):
 class HybridSearchOut(BaseModel):
     query: str
     hits: list[HybridSearchHit]
-    timings: dict[str, float] = {}
+    # timings 里除了毫秒数还有查询向量缓存状态（"hit"/"miss"），
+    # 不能只声明 float，否则匿名/首次搜索会被 Pydantic 校验成 500。
+    timings: dict[str, float | str] = {}
     degraded: list[str] = []
     rerank_used: bool = False
     rerank_mode: str | None = None

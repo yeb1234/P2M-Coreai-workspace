@@ -9,7 +9,7 @@ import { apiFetch } from '../../lib/videoApi';
  * 学习轨迹。
  *
  * 这个页面不回答「我该学什么」（那是学习路径的活），只回答「我走到哪了」。
- * 数据来自五个地方：观看、完成、笔记、日程、番茄钟 —— 之前它们各在各的地方，
+ * 数据来自五个地方：观看、完成、便签、日程、番茄钟 —— 之前它们各在各的地方，
  * 没人把它们放在一起看，所以用户感觉不到自己在进步。
  */
 
@@ -157,7 +157,7 @@ export const JourneyPage: React.FC = () => {
         <div>
           <h1 className="text-xl font-semibold text-[var(--text-primary)]">学习轨迹</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            把观看、专注、笔记、日历里的记录合在一起，看你走到了哪
+            把观看、专注、便签、日历里的记录合在一起，看你走到了哪
           </p>
         </div>
         <button
@@ -254,7 +254,7 @@ export const JourneyPage: React.FC = () => {
           {[
             { label: '观看', value: fmtMinutes(sources.watch_minutes) },
             { label: '专注', value: sources.focus_minutes > 0 ? fmtMinutes(sources.focus_minutes) : '—' },
-            { label: '手写笔记', value: sources.notes > 0 ? `${sources.notes} 篇` : '—' },
+            { label: '便签', value: sources.notes > 0 ? `${sources.notes} 篇` : '—' },
             { label: '看完视频', value: `${sources.videos_completed} 个` },
             { label: '涉猎领域', value: `${sources.categories} 个` },
           ].map((s) => (

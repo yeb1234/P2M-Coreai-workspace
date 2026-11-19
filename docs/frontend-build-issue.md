@@ -1,8 +1,11 @@
-# 前端构建链路问题（未解决，留待明天）
+# 前端构建链路问题（2026-11-16 凌晨排障留档）
+
+> 状态：历史记录（问题已不存在，仅留档）
+>
+> 2026-11-16 复核：`journey` 条目现存于 `src/config/pageRegistry.tsx:122` 与 `src/stores/uiStore.ts:15`，侧边栏入口代码已在；本文记录的是当时「代码写了但界面上没有」的排查过程与教训，不作为当前仍存在的坑。`docker-compose.yml:378-379` 的 `./dist:/usr/share/nginx/html:ro` 挂载是开发期便利配置，生产部署应删掉，靠镜像内 `COPY --from=build` 提供静态文件。
 
 时间：2026-11-16 03:30 – 05:05
-现象：新增的「学习轨迹」页面代码写完了，通过 `http://localhost/#/journey` 能正常访问，
-但**侧边栏没有入口**。
+现象：新增的「学习轨迹」页面代码写完了，通过 `http://localhost/#/journey` 能正常访问，但**侧边栏没有入口**。
 
 ---
 
@@ -67,10 +70,11 @@ persist 没有写入，所以 `navOrder` 用的是 `DEFAULT_NAV_ORDER`。
 ### 3. Docker 镜像缓存？—— 部分排除
 
 `docker compose build --no-cache frontend` 只用了 23 秒，镜像创建时间仍是旧的（02:23）。
-后来用 `docker build --no-cache -t siteyeb-frontend:3.0 -f Dockerfile .` 直接构建，
-日志显示 `npm run build` 跑了 7.2 秒、`COPY --from=build /app/dist` 完成、镜像 tag 更新了。
+后来直接构建镜像，日志显示 `npm run build` 跑了 7.2 秒、`COPY --from=build /app/dist` 完成、镜像 tag 更新了。
 
 **但容器里 `index.html` 引用的还是 `index-DM1H2Eov.js`**。
+
+> 留档备注：当前 compose 的前端镜像名是 `p2-siteyeb-frontend:3.0`（`docker-compose.yml:386`）；当时手工打的 `siteyeb-frontend:3.0` 标签只是临时排查命令。
 
 ### 4. dist 残留多个 chunk 导致 index.html 没更新？—— 排除
 
@@ -90,7 +94,7 @@ rm -rf dist && npm run build
 - 而且 `journey` 这个配置在 `stores-*.js` 里，**不在 index chunk 里**
 - `index-*.js` 不含 "journey" 是正常的
 
-### 6. 绕道方案：挂载 dist（已做）
+### 6. 绕道方案：挂载 dist（当时已做）
 
 `docker-compose.yml` 给 frontend 加了：
 
@@ -102,14 +106,16 @@ volumes:
 挂载生效了（容器能读到本地 dist 的文件），但 `index.html` 引用还是旧的 —— 因为本地 dist 的
 `index.html` 本身就引用 `index-DM1H2Eov.js`。
 
+> 留档备注：这条挂载现在仍在 compose 里（`docker-compose.yml:378-379`），定位是开发期便利配置；生产部署要删掉，避免容器挂着旧的本机 dist。
+
 ---
 
-## 四、我的判断（下次从这里开始）
+## 四、当时的判断（下次从这里开始）
 
 `index-DM1H2Eov.js` 里不含 `journey` 是**正常的**（配置在 stores chunk）。
 真正要查的是：**Sidebar 组件编译到哪个 chunk，它有没有用上 `orderedNav`**。
 
-下次用这个方式一次定位：
+当时计划的定位方式：
 
 ```bash
 # 1. 找 Sidebar 在哪个 chunk（搜它的一个独有字符串，比如 dt 拖拽相关或 "hiddenNavItems"）
@@ -131,7 +137,7 @@ grep -c "PAGES" dist/assets/<找到的 chunk>
 
 ---
 
-## 五、当前可用状态
+## 五、当时可用状态
 
 **功能可用**，只是入口缺失：
 
@@ -139,7 +145,7 @@ grep -c "PAGES" dist/assets/<找到的 chunk>
 http://localhost/#/journey    直接访问，页面完整
 ```
 
-生产部署前必须解决（用户不可能手输 URL）。
+生产部署前必须解决（用户不可能手输 URL）。该入口后续已在代码中补齐，见文首复核备注。
 
 ---
 
@@ -147,7 +153,7 @@ http://localhost/#/journey    直接访问，页面完整
 
 **这个问题的诊断成本远超修复成本。**
 
-我从 03:30 查到 05:05，中间走了三条弯路：
+当时从 03:30 查到 05:05，中间走了三条弯路：
 
 1. 以为 `--no-cache` 构建生效了（看输出 "Built" 就信了，没核对镜像时间）
 2. 以为 grep 中文查不到 = 改动没进去（实际是 unicode 转义）

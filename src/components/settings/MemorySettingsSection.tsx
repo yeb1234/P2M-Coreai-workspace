@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Lock, Pin, Plus, Save, Trash2 } from 'lucide-react';
 import { apiFetch } from '../../lib/videoApi';
+import { WeeklyHoursPicker } from '../shared';
 import {
   SettingsFieldLabel, SettingsHint, SettingsSectionTitle, SettingsTextInput,
 } from './SettingsPrimitives';
@@ -190,13 +191,11 @@ export const MemorySettingsSection: React.FC = () => {
               placeholder="如：三个月内拿到 AI Agent 工程师 offer"
             />
           </div>
-          <div>
-            <SettingsFieldLabel>每周可投入（小时）</SettingsFieldLabel>
-            <SettingsTextInput
-              type="number"
-              value={String(profile.weekly_hours || '')}
-              onChange={(e) => setProfile({ ...profile, weekly_hours: Number(e.target.value) || 0 })}
-              placeholder="15"
+          <div className="col-span-2">
+            <SettingsFieldLabel>每天 / 每周可投入</SettingsFieldLabel>
+            <WeeklyHoursPicker
+              weeklyHours={profile.weekly_hours}
+              onChange={(hours) => setProfile({ ...profile, weekly_hours: hours })}
             />
           </div>
           <div>

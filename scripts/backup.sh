@@ -13,7 +13,7 @@
 #   0 3 * * * cd /path/to/project && ./scripts/backup.sh >> backups/backup.log 2>&1
 set -euo pipefail
 
-CONTAINER="${PG_CONTAINER:-siteyeb-pg}"
+CONTAINER="${PG_CONTAINER:-p2-siteyeb-postgres-1}"
 DB_USER="${POSTGRES_USER:-p2user}"
 DB_NAME="${POSTGRES_DB:-p2learning}"
 KEEP_DAYS="${KEEP_DAYS:-7}"

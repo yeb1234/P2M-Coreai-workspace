@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { VideoItem, SegmentSearchResult, TranscriptSegment, CategoryTree } from '../lib/videoApi';
 import { fetchVideos, fetchVideo, searchSegments, startAiJob, fetchCategoryTree, setVideoFavorite } from '../lib/videoApi';
+import { userScopedStorage } from '../lib/userScopedStorage';
 
 const VIDEO_ID_KEY = 'p2m_current_video_id';
 const NAV_STATE_KEY = 'p2m_video_nav_state';
@@ -56,7 +57,7 @@ interface SavedNavState {
 
 function saveNavState(state: { currentCategoryId: number | null; breadcrumb: { id: number | null; name: string }[]; searchQuery: string; page: number }) {
   try {
-    localStorage.setItem(NAV_STATE_KEY, JSON.stringify({
+    userScopedStorage.setItem(NAV_STATE_KEY, JSON.stringify({
       categoryId: state.currentCategoryId,
       breadcrumb: state.breadcrumb,
       searchQuery: state.searchQuery,
@@ -67,7 +68,7 @@ function saveNavState(state: { currentCategoryId: number | null; breadcrumb: { i
 
 function loadNavState(): SavedNavState | null {
   try {
-    const raw = localStorage.getItem(NAV_STATE_KEY);
+    const raw = userScopedStorage.getItem(NAV_STATE_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as SavedNavState;
   } catch { return null; }
@@ -203,17 +204,17 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
 
   selectVideo: (video) => {
     currentVideoRequestSeq += 1;
-    localStorage.setItem(VIDEO_ID_KEY, String(video.id));
+    userScopedStorage.setItem(VIDEO_ID_KEY, String(video.id));
     applyCurrentVideo(set, video);
   },
 
   loadCurrentVideo: async (videoId) => {
     const requestSeq = ++currentVideoRequestSeq;
-    localStorage.setItem(VIDEO_ID_KEY, String(videoId));
+    userScopedStorage.setItem(VIDEO_ID_KEY, String(videoId));
     try {
       const fresh = await fetchVideo(videoId);
       if (requestSeq !== currentVideoRequestSeq) return;
-      if (localStorage.getItem(VIDEO_ID_KEY) !== String(videoId)) return;
+      if (userScopedStorage.getItem(VIDEO_ID_KEY) !== String(videoId)) return;
       applyCurrentVideo(set, fresh);
     } catch {
       // ignore
@@ -222,7 +223,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
 
   clearSelection: () => {
     currentVideoRequestSeq += 1;
-    localStorage.removeItem(VIDEO_ID_KEY);
+    userScopedStorage.removeItem(VIDEO_ID_KEY);
     set({
       currentVideo: null,
       currentSegments: [],
@@ -235,7 +236,7 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
   },
 
   restoreCurrentVideo: async () => {
-    const savedId = localStorage.getItem(VIDEO_ID_KEY);
+    const savedId = userScopedStorage.getItem(VIDEO_ID_KEY);
     if (!savedId) return;
     const id = Number(savedId);
     if (!id) return;
@@ -244,12 +245,12 @@ export const useVideoStore = create<VideoState>()((set, get) => ({
     try {
       const fresh = await fetchVideo(id);
       if (requestSeq !== currentVideoRequestSeq) return;
-      if (localStorage.getItem(VIDEO_ID_KEY) !== String(id)) return;
+      if (userScopedStorage.getItem(VIDEO_ID_KEY) !== String(id)) return;
       if (get().currentVideo && get().currentVideo?.id !== id) return;
       applyCurrentVideo(set, fresh);
     } catch {
-      if (requestSeq === currentVideoRequestSeq && localStorage.getItem(VIDEO_ID_KEY) === String(id)) {
-        localStorage.removeItem(VIDEO_ID_KEY);
+      if (requestSeq === currentVideoRequestSeq && userScopedStorage.getItem(VIDEO_ID_KEY) === String(id)) {
+        userScopedStorage.removeItem(VIDEO_ID_KEY);
       }
     }
   },

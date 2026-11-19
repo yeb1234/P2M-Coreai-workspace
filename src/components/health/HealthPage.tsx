@@ -83,7 +83,7 @@ export const HealthPage: React.FC = () => {
       {/* Weight trend */}
       <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-5">
         <h3 className="text-sm font-medium text-[var(--text-primary)] mb-4">本周体重趋势</h3>
-        <div className="min-w-[300px] flex items-end gap-3 h-32">
+        <div className="min-w-0 flex items-end gap-3 h-32">
           {WEEK_WEIGHT.map((d) => {
             const minW = 68;
             const maxW = 70;
@@ -120,3 +120,4 @@ export const HealthPage: React.FC = () => {
     </div>
   );
 };
+

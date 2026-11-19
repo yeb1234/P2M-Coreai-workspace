@@ -33,9 +33,10 @@ const PHASE_BG_COLORS = {
 
 interface PomodoroTimerProps {
   settingsControl?: React.ReactNode;
+  desktop?: boolean;
 }
 
-export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl }) => {
+export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl, desktop = false }) => {
   const timer = usePomodoroStore((s) => s.timer);
   const sessions = usePomodoroStore((s) => s.sessions);
   const startTimer = usePomodoroStore((s) => s.startTimer);
@@ -169,15 +170,15 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
   }, [ambientVolume, updateAmbientVolume]);
 
   return (
-    <div className="flex min-w-0 flex-col items-center rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-card))] p-4 shadow-sm md:p-6">
+    <div className={`pomodoro-timer-card flex min-w-0 flex-col items-center rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-card))] p-4 shadow-sm ${desktop ? 'md:p-5' : 'md:p-6'}`}>
       {linkedTodo && (
-        <div className="mb-3 md:mb-5 px-3 py-1.5 bg-[var(--bg-elevated)] rounded-lg">
+        <div className={`${desktop ? 'mb-2 md:mb-3' : 'mb-3 md:mb-5'} pomodoro-linked-todo px-3 py-1.5 bg-[var(--bg-elevated)] rounded-lg`}>
           <p className="text-xs text-[var(--text-muted)]">当前专注</p>
           <p className="text-sm font-medium text-[var(--text-primary)]">{linkedTodo.title}</p>
         </div>
       )}
 
-      <div className="relative mb-4 aspect-square w-full max-w-[260px] md:max-w-[300px]">
+      <div className={`pomodoro-timer-ring relative aspect-square w-full ${desktop ? 'mb-3 max-w-[260px]' : 'mb-4 max-w-[260px] md:max-w-[300px]'}`}>
         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r="45" fill="none" stroke="var(--border-light)" strokeWidth="5" />
           <circle
@@ -190,7 +191,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-4xl md:text-6xl font-bold font-mono ${PHASE_COLORS[timer.phase]}`}>
+          <span className={`pomodoro-time-text text-4xl md:text-6xl font-bold font-mono ${PHASE_COLORS[timer.phase]}`}>
             {formatTime(timer.timeRemaining)}
           </span>
           <span className={`mt-1 text-xs md:text-sm font-medium ${PHASE_COLORS[timer.phase]}`}>
@@ -199,7 +200,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mb-3 md:mb-4">
+      <div className={`pomodoro-timer-actions flex items-center gap-3 ${desktop ? 'mb-2 md:mb-3' : 'mb-3 md:mb-4'}`}>
         {timer.status === 'idle' || timer.status === 'paused' ? (
           <button
             onClick={handleStart}
@@ -237,12 +238,12 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
         )}
       </div>
 
-      <div className="flex items-center gap-4 text-xs text-[var(--text-muted)]">
-        <span>本轮: {completedPomodoros}/{plannedPomodoros}</span>
+      <div className="pomodoro-timer-meta flex items-center gap-4 text-xs text-[var(--text-muted)]">
+        <span>已完成 {completedPomodoros} · 目标 {plannedPomodoros}</span>
         <span>今日: {todayPomodoros}</span>
       </div>
 
-      <div className="mt-3 w-full border-t border-[var(--border-light)] pt-3">
+      <div className="pomodoro-ambient mt-3 w-full border-t border-[var(--border-light)] pt-3">
         <div className="mx-auto flex w-full max-w-[380px] flex-col gap-2.5">
           <div className="flex min-w-0 items-center gap-2">
             {settingsControl}
@@ -280,7 +281,10 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
               <button
                 key={sound}
                 onClick={() => void toggleAmbient(sound)}
-                className={`flex h-7 min-w-0 items-center justify-center rounded-lg transition-colors ${
+                aria-label={AMBIENT_SOUNDS[sound].name}
+                className={`flex min-w-0 items-center justify-center rounded-lg transition-colors ${
+                  desktop ? 'h-11 flex-col gap-1 px-1' : 'h-7'
+                } ${
                   ambientSound === sound
                     ? 'bg-[var(--accent-bg)] text-[var(--accent)]'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
@@ -288,6 +292,11 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settingsControl })
                 title={AMBIENT_SOUNDS[sound].name}
               >
                 {AMBIENT_ICONS[sound]}
+                {desktop && (
+                  <span className="max-w-full truncate text-[10px] leading-none">
+                    {AMBIENT_SOUNDS[sound].name}
+                  </span>
+                )}
               </button>
             ))}
           </div>

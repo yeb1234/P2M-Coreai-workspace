@@ -20,13 +20,24 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage, ToolMessage
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
+from langgraph.types import Command, interrupt
 
-from app.agents.tools import ALL_TOOLS, set_tool_user
+from app.agents.tool_runtime import build_governed_toolset
+from app.agents.tools import (
+    ask_user,
+    begin_search_trace,
+    set_tool_note_context,
+    set_tool_run,
+    set_tool_user,
+    take_search_hits,
+)
 from app.database import SessionLocal
 from app.models import AgentRun, Video
 from app.services.learning_context import active_path_text
+from app.services.agent_actions import actions_for_run
 from app.services.llm import (
     ERR_UNKNOWN,
     build_chat_model,
@@ -35,7 +46,7 @@ from app.services.llm import (
     fallback_order,
 )
 from app.services.memory import load_conversation, memory_text
-from app.services.profile import profile_summary_text, recompute_profile
+from app.services.profile import get_profile_data, profile_summary_text
 from app.utils.files import unique_suffix
 
 logger = logging.getLogger(__name__)
@@ -94,6 +105,25 @@ BASE_PROMPT = """你是「灵境小助手」，一个长在本地视频学习平
 「你连续 22 天都在学，但单次只有 8.8 分钟——腰酸大概率是坐姿，不是学太久」
 比「注意身体健康」有用得多。
 
+## 主动澄清、补充与确认
+
+你有一个 `ask_user` 工具，可以在执行前暂停并给用户 A/B/C 选项。它不是装饰，
+是避免「猜错意图后白跑一轮」的刹车。只有下面三种情况才用：
+
+1. **意图澄清**：同一句话存在两种以上合理解释，且选错会改变答案方向。
+   例：用户说「帮我规划一下学习」，先问是「按现有路径继续 / 换一个方向 / 先做能力诊断」。
+2. **人工补充**：缺少执行必需的关键信息，例如目标岗位、时间预算、要保存的标题或范围。
+3. **人工确认**：保存笔记、总结后另存、创建日历、创建 Todo 等写操作由运行时确认闸门自动暂停，
+   不要提前用 `ask_user` 问「要不要执行」，直接调用对应写工具，图会在真正写入前弹出确认卡。
+   覆盖/删除类操作仍用 `ask_user` 的 confirm 先问清范围。
+
+使用规则：
+- 一次只问一个问题，2-4 个选项，选项要短、互斥、能直接执行；前端会自动补「其它（自己填写）」。
+- 能从上下文、画像、历史记录里查到的信息，不要问。
+- 简单知识问答、明确检索、闲聊不要调用 `ask_user`，不要为了显得礼貌而打断用户。
+- 用户回答后必须按选择继续执行，不要换个说法重复问同一个问题。
+- 保存类写操作不要预先调用 `ask_user`；运行时确认闸门会兜底，用户确认前不会落库。
+
 ## 输出长度
 默认 150-400 字。除非用户明确要求展开，否则不要写长文。"""
 
@@ -104,6 +134,9 @@ class AgentContext:
     user_id: int | None = None
     video_id: int | None = None
     page_context: str = ""
+    # 当前笔记的完整标题/正文。page_context 只放前 800 字给模型看，
+    # 保存工具需要全文，所以单独放在请求体并在工具层用 ContextVar 取。
+    note_context: dict[str, str] | None = None
     system_prompt_extra: str = ""
     history_limit: int = 10
     # 前端 detectIntent() 识别的意图 id。用来决定要不要生成「相关片段」卡片 ——
@@ -120,6 +153,8 @@ class AgentContext:
 # 所以从「按意图白名单」收紧成「按意图 + 问题内容双重判断」：
 #
 #   course-recommend  用户明确要课程/视频推荐 → 一定给
+#   question-answer   直接讲代码/技术概念，正文不依赖视频库；相关片段
+#                     只作为回答后的延伸推荐，因此也生成 references
 #   knowledge-qa      要看问题里有没有「视频 / 课程 / 哪节课 / 讲过」这类
 #                     明确指向「找某个视频」的词。问「什么是 GC 算法」
 #                     这种纯知识问题不该配视频卡片 —— 模型直接回答就好，
@@ -128,6 +163,8 @@ class AgentContext:
 # 其余意图（学习总结 / 路径规划 / 代码助手 / 任务拆解）一律不给。
 # intent 为空时也走内容判断（而不是无脑给），避免再出现"答 Python 推前端"。
 _COURSE_INTENT = "course-recommend"
+_QUESTION_ANSWER_INTENT = "question-answer"
+_INTERVIEW_INTENT = "interview-question"
 
 # 「我要找某个视频/课程」的信号词。宁可窄一点：漏给卡片只是少个便利，
 # 错给卡片会让用户怀疑整个检索是坏的。
@@ -139,12 +176,29 @@ _VIDEO_SEEKING_RE = re.compile(
 def _needs_video_references(intent: str | None, message: str = "") -> bool:
     if intent == _COURSE_INTENT:
         return True
+    # 问题解答的正文来自通用知识，相关视频是回答后的延伸入口；
+    # 前端只对该意图渲染卡片。
+    if intent == _QUESTION_ANSWER_INTENT:
+        return True
+    # 面试题讲解默认不推视频；只有用户明确要视频/课程，或在题目详情里点
+    # “推荐相关视频”时才生成引用卡片，避免每道题都挂一堆不相关课程。
+    if intent == _INTERVIEW_INTENT:
+        return bool(_VIDEO_SEEKING_RE.search(message or ""))
     if intent == "knowledge-qa":
         return bool(_VIDEO_SEEKING_RE.search(message or ""))
     # 认不出意图时按内容判断：问题里明确要视频才给
     if not intent:
         return bool(_VIDEO_SEEKING_RE.search(message or ""))
     return False
+
+
+def _tools_for_intent(intent: str | None, user_id: int | None = None):
+    """兼容旧调用：返回该意图对应的 governed tool 列表。
+
+    真正的策略在 `app.agents.skills` 里：question-answer 是零工具包，
+    其他意图只拿自己那组工具，不再把全部工具无脑挂给模型。
+    """
+    return build_governed_toolset(intent, user_id=user_id).tools
 
 
 @dataclass
@@ -162,6 +216,152 @@ class AgentResult:
 
 
 _MEMORY_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mem-extract")
+
+# HITL（human-in-the-loop）中断状态只保存在进程内。
+# 单机/单容器足够支撑一次「问一句 → 用户点选项 → 继续」；
+# 多 worker 或重启后要恢复，需要换 SqliteSaver/PostgresSaver 或落库。
+_HITL_CHECKPOINTER = MemorySaver()
+
+# 写操作的人工确认不能只靠提示词：模型完全可能直接传 confirm=true。
+# 这里在图层面加一道闸门，模型刚生成 tool_calls、工具还没执行时先中断。
+# 注意：hook 在 LangGraph 图节点里运行，不能把它包进线程池，否则会丢暂停上下文。
+_WRITE_TOOL_NAMES = {
+    "save_note",
+    "summarize_and_save_note",
+    "create_calendar_event",
+    "create_todo",
+}
+_WRITE_TOOL_LABELS = {
+    "save_note": "保存笔记",
+    "summarize_and_save_note": "总结并另存笔记",
+    "create_calendar_event": "创建日历日程",
+    "create_todo": "创建 Todo",
+}
+
+
+def _tool_call_name(call) -> str:
+    if isinstance(call, dict):
+        return str(call.get("name") or "")
+    return str(getattr(call, "name", "") or "")
+
+
+def _tool_call_args(call) -> dict:
+    if isinstance(call, dict):
+        args = call.get("args")
+        return args if isinstance(args, dict) else {}
+    args = getattr(call, "args", None)
+    return args if isinstance(args, dict) else {}
+
+
+def _write_call_preview(name: str, args: dict) -> str:
+    """确认卡上给用户看的具体对象，不要只写工具名。"""
+    title = str(args.get("title") or "").strip()
+    if name in {"save_note", "summarize_and_save_note"}:
+        body = str(args.get("content") or "").strip()
+        suffix = f"（{len(body)} 字）" if body else "（当前页面笔记）"
+        return f"《{title or '未命名笔记'}》{suffix}"
+    if name == "create_calendar_event":
+        when = " ".join(
+            part for part in (
+                str(args.get("date") or "").strip(),
+                str(args.get("start_time") or "").strip(),
+            ) if part
+        )
+        return f"《{title or '未命名日程'}》{f'（{when}）' if when else ''}"
+    if name == "create_todo":
+        due = str(args.get("due_date") or "").strip()
+        return f"《{title or '未命名 Todo'}》{f'（截止 {due}）' if due else ''}"
+    return title or name
+
+
+def _write_confirmation_hook(state):
+    """模型决定写个人数据后、ToolNode 真正落库前，暂停一次并等待人工确认。
+
+    返回空 dict 表示放行；返回一条新的 AIMessage 表示取消本轮写操作。
+    取消时不要保留原 AIMessage 的 tool_calls，否则图还会继续调度工具。
+    """
+    messages = state.get("messages") or ()
+    if not messages:
+        return {}
+    last = messages[-1]
+    tool_calls = list(getattr(last, "tool_calls", None) or [])
+    write_calls = [
+        call for call in tool_calls
+        if _tool_call_name(call) in _WRITE_TOOL_NAMES
+    ]
+    if not write_calls:
+        return {}
+
+    # 一次只确认一个动作。模型如果一口气生成多个写调用，全部拒绝，
+    # 避免用户点一次「确认」实际改了笔记 + 日历 + Todo 三处。
+    if len(write_calls) > 1:
+        names = "、".join(_tool_call_name(call) for call in write_calls)
+        return {
+            "messages": [
+                AIMessage(
+                    content=(
+                        f"检测到一次性发起了 {len(write_calls)} 个写动作（{names}）。"
+                        "本轮一个都没有执行。请只保留一个动作，等我确认后再继续。"
+                    )
+                )
+            ]
+        }
+
+    name = _tool_call_name(write_calls[0])
+    args = _tool_call_args(write_calls[0])
+    label = _WRITE_TOOL_LABELS.get(name, name)
+    preview = _write_call_preview(name, args)
+    answer = interrupt(
+        {
+            "kind": "confirm",
+            "question": f"执行前确认：准备{label}。确认写入吗？",
+            "options": [
+                {"id": "A", "label": "确认执行"},
+                {"id": "B", "label": "取消，不写入"},
+            ],
+            "allow_custom": True,
+            "context": f"将要执行：{label} {preview}。确认后才会写入；取消不会产生任何改动。",
+        }
+    )
+
+    selected = ""
+    label_text = ""
+    text = ""
+    if isinstance(answer, dict):
+        selected = str(answer.get("selected") or answer.get("selected_id") or "").strip()
+        text = str(answer.get("text") or "").strip()
+        for option in ({"id": "A", "label": "确认执行"}, {"id": "B", "label": "取消，不写入"}):
+            if selected == option["id"] or selected == option["label"]:
+                selected = option["id"]
+                label_text = option["label"]
+                break
+    elif answer is not None:
+        text = str(answer).strip()
+        if text in {"A", "a", "A.", "a."}:
+            selected = "A"
+
+    approved = (
+        selected == "A"
+        or "确认" in label_text
+        or (not selected and text and "确认" in text)
+    ) and selected != "B"
+    if approved:
+        # 人工确认通过后，把工具参数里的 confirm 置为 True，避免模型
+        # 原本传了 confirm=false 又被工具自身的二次确认挡回来。
+        if isinstance(write_calls[0], dict):
+            call_args = write_calls[0].setdefault("args", {})
+            if isinstance(call_args, dict):
+                call_args["confirm"] = True
+        return {}
+
+    suffix = f" 你的补充：{text}" if text else ""
+    return {
+        "messages": [
+            AIMessage(
+                content=f"已取消写入，没有保存任何内容。{suffix} 需要调整标题、正文或保存位置时，直接告诉我。"
+            )
+        ]
+    }
 
 
 def _schedule_memory_extract(ctx: AgentContext, user_message: str, answer: str) -> None:
@@ -203,8 +403,8 @@ def build_system_prompt(ctx: AgentContext) -> str:
     db = SessionLocal()
     try:
         try:
-            profile = recompute_profile(db, ctx.user_id)
-            parts.append(f"## 学习者真实数据\n{profile_summary_text(profile)}")
+            profile_data = get_profile_data(db, ctx.user_id)
+            parts.append(f"## 学习者真实数据\n{profile_summary_text(profile_data)}")
         except Exception as exc:
             logger.warning("画像读取失败: %s", exc)
 
@@ -265,7 +465,86 @@ def build_system_prompt(ctx: AgentContext) -> str:
         db.close()
 
     if ctx.page_context.strip():
-        parts.append(f"## 当前页面上下文\n{ctx.page_context.strip()[:800]}")
+        parts.append(f"## 当前页面上下文\n{ctx.page_context.strip()[:2200]}")
+
+    # 日期要显式给模型：模型本身不知道「今天」是哪天，安排日历/ Todo 时会算错。
+    now = datetime.now()
+    parts.append(
+        "## 当前时间\n"
+        f"{now.strftime('%Y-%m-%d %H:%M')}（Asia/Shanghai）\n"
+        "安排日历或 Todo 时以这个时间为基准；日期写成 YYYY-MM-DD，时间写成 HH:MM。"
+    )
+
+    # 个人动作工具在所有意图下都可用，但必须把「写」和「说」分开。
+    # 这里专门堵住历史问题：模型没调工具，却在回答里说「确认卡应该弹出来了」。
+    parts.append(
+        "## 个人动作工具（任何意图下都可调用）\n"
+        "- 保存笔记：save_note；总结后保存：summarize_and_save_note；\n"
+        "- 安排日历：create_calendar_event；创建待办：create_todo。\n"
+        "- 用户明确要求执行时，直接调用对应工具，不要先用 ask_user 问「要不要」；\n"
+        "  运行时会在真正写入前弹出确认卡，用户确认后才落库。\n"
+        "- 一次只执行一个写动作，不要把同一个计划拆成多个笔记、多个日程或多个 Todo。\n"
+        "  Todo 只创建一个汇总大块，把步骤写进同一个 content，不拆碎项。\n"
+        "- 没有真正调用工具时，绝对不要声称「确认卡已弹出」「已保存」「已加入日历」\n"
+        "  或「已创建 Todo」。只有工具返回了成功结果，才能说已经写入。\n"
+        "- 用户说「可以 / 好 / 行」承接上一轮保存/排期建议时，按上一轮的具体对象执行，\n"
+        "  不要把确认卡当成已经发生过的事实。\n"
+        "- 承接上一轮「保存这份清单/这段回答」时，把要保存的正文完整写进 content；\n"
+        "  只传标题不传正文，工具会在确认后报「没有可保存的内容」。"
+    )
+
+    if ctx.intent == "note-save" and ctx.note_context and ctx.note_context.get("markdown"):
+        title = ctx.note_context.get("title") or "未命名笔记"
+        length = len(ctx.note_context.get("markdown") or "")
+        parts.append(
+            "## 当前笔记（保存目标）\n"
+            f"标题：{title}\n正文长度：{length} 字（完整正文已随请求传给工具，不在提示词里展开）\n"
+            "用户本轮要求保存笔记。工具选择：\n"
+            "- 只保存原文：调用 save_note，content 留空；\n"
+            "- 总结后保存：调用 summarize_and_save_note，content 留空，工具会读取完整正文并生成总结；\n"
+            "- 两个工具都只在用户明确要求保存时直接调用；confirm 由运行时人工确认闸门补上，\n"
+            "  不要在回答里假装已经保存；\n"
+            "- 不要用回答正文冒充笔记保存，也不要把原文改写后再保存。"
+        )
+    elif ctx.intent == "note-save":
+        parts.append(
+            "## 本轮意图：保存笔记\n"
+            "当前没有打开笔记正文。如果用户在本轮给出了要保存的内容，或明确要求保存"
+            "上一轮回答，把完整正文写进 save_note 的 content 再调用；"
+            "如果用户既没给正文也没说要保存什么，先让用户提供内容，不要空调用。"
+        )
+
+    if ctx.intent == _QUESTION_ANSWER_INTENT:
+        parts.append(
+            "## 本轮意图：问题解答（优先于上面的检索分流）\n"
+            "用户问的是具体的代码/技术概念，不是让你找站内视频。\n"
+            "- 直接依据通用知识与最小可验证示例回答，先把概念讲清楚；\n"
+            "- 不调用任何工具，不声称「视频库里讲过」，不编造视频标题或时间点；\n"
+            "- 站内视频只作为回答后的延伸推荐。若回答已经完整，结尾用一句话自然引导："
+            "「如果你想更系统地看，我可以按这个方向给你推荐站内相关视频。」"
+        )
+
+    if ctx.intent == _INTERVIEW_INTENT:
+        parts.append(
+            "## 本轮意图：面试题讲解（当前页面是面试题库）\n"
+            "先读「当前页面上下文」里的当前标签、题号、题干、评分点和追问。\n"
+            "- 用户说「这题 / 继续 / 展开 / 再讲讲 / 标准答案」时，默认指当前题号，"
+            "不要反问是哪一道；先给答题骨架，再展开关键点和易错点。\n"
+            "- 页面上下文只有题目开头，需要完整参考答案时调用 get_interview_question；"
+            "用户提到另一道题，也先用它按题号/标题取题。\n"
+            "- 用户要同类题、下一题、按分组/题型练：调用 search_interview_questions。\n"
+            "- 用户问原理、争议、版本演进、设计取舍：调用 search_interview_knowledge，"
+            "并保留文章标题与来源链接。\n"
+            "- 视频推荐只在用户明确说「视频 / 课程 / 相关视频 / 推荐视频」时做："
+            "调用 search_videos；需要核对某门课的时长/摘要时再用 get_video_summary。"
+            "正文必须写《视频标题》和 mm:ss，找不到就如实说，不要拿无关课程凑数。"
+            "不要用 search_video_titles 搜「ReAct」这类词，它会把前端 React 课也带进来。\n"
+            "- 当前标签对应的功能：题库/项目题 → 题目讲解与同类题；模拟面试 → 按评分点"
+            "给追问和追问方向；知识库 → 先检索专题；原书 → 引用书页。"
+            "用户问「这个页面还能做什么」时，只按当前标签回答，不要编造不存在的页面功能。\n"
+            "- 不要直接粘贴整篇参考答案；先给结论/骨架，再给 3-5 个关键点，"
+            "最后给 1-2 个面试官可能追问的问题。"
+        )
 
     return "\n\n".join(parts)
 
@@ -341,7 +620,13 @@ def _log_channel_failure(provider: str, exc: Exception, *, channel: str) -> None
     )
 
 
-def _invoke_with_fallback(order: list[str], system_prompt: str, messages: list[dict]):
+def _invoke_with_fallback(
+    order: list[str],
+    system_prompt: str,
+    messages: list[dict],
+    *,
+    tools: list | None = None,
+):
     """按兜底方案依次尝试 provider，返回 (结果, 实际用的 provider, 降级来源)。
 
     原来这里写死 `build_chat_model("external")`：既不看设置页的「兜底方案」，
@@ -349,10 +634,11 @@ def _invoke_with_fallback(order: list[str], system_prompt: str, messages: list[d
     现在 401/403/404 或 429/5xx 重试耗尽后都会自动换另一套模型。
     """
     last_exc: Exception | None = None
+    active_tools = tools if tools is not None else []
     for index, provider in enumerate(order):
         try:
             model = build_chat_model(provider, temperature=0.3)
-            agent = create_react_agent(model, ALL_TOOLS, prompt=system_prompt)
+            agent = create_react_agent(model, active_tools, prompt=system_prompt)
             result = agent.invoke(
                 {"messages": messages},
                 config={"recursion_limit": 12},  # 防止工具调用死循环
@@ -376,6 +662,22 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
 
     # 工具靠这个知道「是谁在问」，否则会读到别人的画像与路径
     set_tool_user(ctx.user_id)
+    set_tool_run(run_id, ctx.session_id)
+    set_tool_note_context(ctx.note_context)
+    # 同步路径原来没有清空检索轨迹，引用区可能继承上一轮命中；这里补上。
+    begin_search_trace()
+    toolset = build_governed_toolset(ctx.intent, user_id=ctx.user_id)
+    logger.info(
+        "agent_toolset",
+        extra={
+            "extra_fields": {
+                "skill": toolset.skill.name,
+                "skill_version": toolset.skill.version,
+                "tools": list(toolset.tool_names),
+                "max_tool_calls": toolset.budget.max_total_calls,
+            }
+        },
+    )
 
     # 先按兜底方案决定第一顺位，AgentRun 里记的就是这个
     order = fallback_order()
@@ -399,7 +701,12 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
         )
         db.commit()
 
-        result, used_provider, degraded_from = _invoke_with_fallback(order, system_prompt, messages)
+        result, used_provider, degraded_from = _invoke_with_fallback(
+            order,
+            system_prompt,
+            messages,
+            tools=toolset.tools,
+        )
         out_messages = result.get("messages", [])
         answer = ""
         for item in reversed(out_messages):
@@ -448,26 +755,56 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
         db.close()
 
 
-async def stream_chat(ctx: AgentContext, message: str):
+async def stream_chat(
+    ctx: AgentContext,
+    message: str,
+    *,
+    resume: dict | None = None,
+    run_id: str | None = None,
+    original_message: str | None = None,
+):
     """异步流式执行，yield SSE 事件字典。
 
-    事件类型：token / tool_start / tool_end / done / error
+    事件类型：token / tool_start / tool_end / interrupt / done / error
+
+    普通请求使用 `messages` 启动；HITL 中断后用同一个 run_id + `Command(resume)`
+    续跑。中断状态存在 `_HITL_CHECKPOINTER`，所以续跑时不需要把上一轮
+    用户消息再塞一遍——否则模型会看到两条相同问题。
     """
     started = time.perf_counter()
-    run_id = unique_suffix()
+    run_id = run_id or unique_suffix()
+    source_message = (original_message or message).strip()
     system_prompt = build_system_prompt(ctx)
-    history = _build_history(ctx)
+    history = _build_history(ctx) if not resume else []
 
     # 同上：工具需要知道当前用户。异步流式路径里工具仍在本协程上下文执行，
     # ContextVar 能正常传递。
     set_tool_user(ctx.user_id)
+    set_tool_run(run_id, ctx.session_id)
+    set_tool_note_context(ctx.note_context)
+    # 清空上一轮的检索命中：引用卡片只认本轮工具实际召回的片段
+    begin_search_trace()
+    toolset = build_governed_toolset(ctx.intent, user_id=ctx.user_id)
+    logger.info(
+        "agent_toolset",
+        extra={
+            "extra_fields": {
+                "skill": toolset.skill.name,
+                "skill_version": toolset.skill.version,
+                "tools": [*toolset.tool_names, "ask_user"],
+                "max_tool_calls": toolset.budget.max_total_calls,
+                "hitl": bool(resume),
+            }
+        },
+    )
 
     # 按兜底方案决定第一顺位（原来写死 external，设置页的「兜底方案」形同虚设）
     order = fallback_order()
     model = build_chat_model(order[0], temperature=0.3, streaming=True)
 
     messages: list[dict] = list(history)
-    messages.append({"role": "user", "content": message})
+    if not resume:
+        messages.append({"role": "user", "content": message})
 
     collected: list[str] = []
     steps: list[dict] = []
@@ -476,54 +813,232 @@ async def stream_chat(ctx: AgentContext, message: str):
 
     db = SessionLocal()
     try:
-        db.add(
-            AgentRun(
-                id=run_id,
-                session_id=ctx.session_id,
-                user_id=ctx.user_id,
-                kind="chat",
-                status="running",
-                input_text=message,
-                model=getattr(model, "model_name", None),
+        run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
+        if run:
+            run.status = "running"
+            run.error = None
+            # HITL resume 是同一轮执行的续跑，上一段已经发生的工具轨迹
+            # 存在 AgentRun.steps 里；不能从空列表重新开始，否则审计丢前半段。
+            if resume and isinstance(run.steps, list):
+                steps = [dict(item) for item in run.steps if isinstance(item, dict)]
+        else:
+            db.add(
+                AgentRun(
+                    id=run_id,
+                    session_id=ctx.session_id,
+                    user_id=ctx.user_id,
+                    kind="chat",
+                    status="running",
+                    input_text=source_message,
+                    model=getattr(model, "model_name", None),
+                )
             )
-        )
         db.commit()
     finally:
         db.close()
 
+    graph_input = Command(resume=resume) if resume else {"messages": messages}
+    started_tool_calls = {
+        str(step.get("tool_call_id"))
+        for step in steps
+        if step.get("tool_call_id")
+    }
+
     try:
         for index, provider in enumerate(order):
             model = build_chat_model(provider, temperature=0.3, streaming=True)
-            agent = create_react_agent(model, ALL_TOOLS, prompt=system_prompt)
+            agent = create_react_agent(
+                model,
+                [*toolset.tools, ask_user],
+                prompt=system_prompt,
+                checkpointer=_HITL_CHECKPOINTER,
+                post_model_hook=_write_confirmation_hook,
+            )
             try:
-                async for event in agent.astream_events(
-                    {"messages": messages},
-                    config={"recursion_limit": 12},
-                    version="v2",
+                async for mode, payload in agent.astream(
+                    graph_input,
+                    config={
+                        "recursion_limit": 12,
+                        "configurable": {"thread_id": run_id},
+                    },
+                    stream_mode=["messages", "updates"],
                 ):
-                    kind = event.get("event")
-                    if kind == "on_chat_model_stream":
-                        chunk = event.get("data", {}).get("chunk")
+                    if mode == "messages":
+                        chunk, metadata = payload
+                        if metadata.get("langgraph_node") != "agent":
+                            continue
+                        if not isinstance(chunk, (AIMessage, AIMessageChunk)):
+                            continue
                         text = getattr(chunk, "content", "")
                         if isinstance(text, str) and text:
                             collected.append(text)
                             yield {"type": "token", "text": text}
-                    elif kind == "on_tool_start":
-                        step = {
-                            "tool": event.get("name"),
-                            "args": event.get("data", {}).get("input"),
-                            "ok": None,
+
+                        # tool_start 从模型返回的 tool_calls 里取；
+                        # ask_user 不展示成普通工具步骤，避免前端出现
+                        # 「调用工具…」转圈后被中断卡片打断。
+                        for call in getattr(chunk, "tool_calls", None) or []:
+                            call_id = str(call.get("id") or "")
+                            name = str(call.get("name") or "")
+                            if not call_id or call_id in started_tool_calls or name == "ask_user":
+                                continue
+                            started_tool_calls.add(call_id)
+                            step = {
+                                "tool": name,
+                                "args": call.get("args"),
+                                "ok": None,
+                                "tool_call_id": call_id,
+                            }
+                            steps.append(step)
+                            yield {"type": "tool_start", "tool": name}
+                        continue
+
+                    # updates 里才会出现真正的 __interrupt__。
+                    # 这是 HITL 的暂停点：流在这里结束，前端渲染 A/B/C 卡片。
+                    if "__interrupt__" in payload:
+                        interrupts = payload["__interrupt__"] or ()
+                        first = interrupts[0] if interrupts else None
+                        value = getattr(first, "value", None)
+                        if not isinstance(value, dict):
+                            value = {}
+                        interrupt_id = str(getattr(first, "id", "") or "")
+                        db = SessionLocal()
+                        try:
+                            run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
+                            if run:
+                                run.status = "awaiting_input"
+                                run.latency_ms = round((time.perf_counter() - started) * 1000)
+                                # 中断时也要先把已发生的工具调用落盘：
+                                # resume 会以这份 steps 为前半段轨迹继续补全。
+                                run.steps = steps
+                                db.commit()
+                        finally:
+                            db.close()
+                        yield {
+                            "type": "interrupt",
+                            "run_id": run_id,
+                            "session_id": ctx.session_id,
+                            "interrupt_id": interrupt_id,
+                            "kind": value.get("kind", "clarify"),
+                            "question": value.get("question", ""),
+                            "options": value.get("options", []),
+                            "allow_custom": bool(value.get("allow_custom", True)),
+                            "context": value.get("context", ""),
+                            "intent": ctx.intent,
+                            "original_message": source_message,
                         }
-                        steps.append(step)
-                        yield {"type": "tool_start", "tool": step["tool"]}
-                    elif kind == "on_tool_end":
-                        output = event.get("data", {}).get("output")
-                        content = getattr(output, "content", output)
-                        preview = str(content)[:200]
-                        if steps:
-                            steps[-1]["ok"] = not preview.startswith(("Error", "Traceback"))
-                            steps[-1]["result_preview"] = preview
-                        yield {"type": "tool_end", "tool": event.get("name"), "ok": steps[-1].get("ok") if steps else None}
+                        return
+
+                    # updates.agent.messages 里有完整 tool_calls 参数；
+                    # 只靠 messages 流的 chunk.tool_calls，写进 AgentRun 的
+                    # args 经常是 {}（截图里 search_video_titles 就是这样）。
+                    # 这里用完整消息把同一个 tool_call_id 的 args 补齐。
+                    if "agent" in payload:
+                        for message in payload.get("agent", {}).get("messages", []) or []:
+                            if not isinstance(message, AIMessage):
+                                continue
+                            for call in getattr(message, "tool_calls", None) or []:
+                                call_id = str(call.get("id") or "")
+                                if not call_id:
+                                    continue
+                                full_args = call.get("args")
+                                matched = next(
+                                    (item for item in steps if item.get("tool_call_id") == call_id),
+                                    None,
+                                )
+                                if matched is None:
+                                    matched = {
+                                        "tool": str(call.get("name") or ""),
+                                        "args": full_args,
+                                        "ok": None,
+                                        "tool_call_id": call_id,
+                                    }
+                                    steps.append(matched)
+                                else:
+                                    matched["args"] = full_args
+
+                    if "tools" in payload:
+                        tool_messages = payload.get("tools", {}).get("messages", [])
+                        for tool_message in tool_messages:
+                            if not isinstance(tool_message, ToolMessage):
+                                continue
+                            if tool_message.name == "ask_user":
+                                continue
+                            call_id = str(getattr(tool_message, "tool_call_id", "") or "")
+                            content = getattr(tool_message, "content", "")
+                            preview = str(content)[:200]
+                            matched = next(
+                                (item for item in steps if item.get("tool_call_id") == call_id),
+                                steps[-1] if steps else None,
+                            )
+                            if matched is not None:
+                                matched["ok"] = not preview.startswith(("Error", "Traceback"))
+                                matched["result_preview"] = preview
+                            yield {
+                                "type": "tool_end",
+                                "tool": tool_message.name,
+                                "ok": matched.get("ok") if matched else None,
+                            }
+
+                # 有些模型工具返回后只补一小段“我先检索一下”就结束，
+                # 真正的答案留在最终状态里而不在 stream token 里。
+                # 当前可见文本过短时，再从最终状态补一次正文，避免用户
+                # 只看到一句工具预告。
+                current_text = "".join(collected).strip()
+                if len(current_text) < 30:
+                    try:
+                        snapshot = await agent.aget_state(
+                            {"configurable": {"thread_id": run_id}}
+                        )
+                        values = getattr(snapshot, "values", None) or {}
+                        for item in reversed(values.get("messages", [])):
+                            if not isinstance(item, AIMessage):
+                                continue
+                            content = item.content
+                            if not isinstance(content, str) or not content.strip():
+                                continue
+                            final_text = content.strip()
+                            if final_text and final_text not in current_text:
+                                collected.append(final_text)
+                                yield {"type": "token", "text": final_text}
+                            break
+                    except Exception:  # noqa: BLE001 - 兜底展示，不影响主流程
+                        logger.debug("读取最终回答失败", exc_info=True)
+
+                # 写操作确认放行后，工具会真正执行；有些模型在工具返回后
+                # 不再补一句自然语言，直接拿“确认前”的旧文本会误导用户。
+                # 优先用最后一个成功写工具的结果作为可见回答。
+                if not collected:
+                    write_steps = [
+                        step for step in steps
+                        if step.get("tool") in _WRITE_TOOL_NAMES and step.get("ok")
+                    ]
+                    if write_steps:
+                        result_text = str(write_steps[-1].get("result_preview") or "").strip()
+                        if result_text:
+                            collected.append(result_text)
+                            yield {"type": "token", "text": result_text}
+
+                # post_model_hook 取消写操作时返回的是一条 AIMessage，
+                # 它不属于 `agent` 的流式 token；这里从最终状态补一次正文，
+                # 否则用户点“取消”后会看到空白回答。
+                if not collected:
+                    try:
+                        snapshot = await agent.aget_state(
+                            {"configurable": {"thread_id": run_id}}
+                        )
+                        values = getattr(snapshot, "values", None) or {}
+                        for item in reversed(values.get("messages", [])):
+                            if not isinstance(item, AIMessage):
+                                continue
+                            content = item.content
+                            if isinstance(content, str) and content.strip():
+                                collected.append(content)
+                                yield {"type": "token", "text": content}
+                                break
+                    except Exception:  # noqa: BLE001 - 兜底展示，不影响主流程
+                        logger.debug("读取 HITL 最终状态失败", exc_info=True)
+
                 used_provider = provider
                 degraded_from = order[0] if index > 0 else None
                 break
@@ -542,10 +1057,11 @@ async def stream_chat(ctx: AgentContext, message: str):
         # 走工具轨迹解析太脆弱（返回的是给人读的格式化文本），
         # 这里多花约 30ms 换前端可直接跳转的结构化片段。
         #
-        # 只有「课程推荐 / 知识问答」才做这一步 —— 学习总结、任务拆解这类
-        # 问题甩三条不相关视频出来只会干扰阅读，还白花一次 rerank 调用。
+        # 只有「课程推荐 / 问题解答 / 明确找视频的知识问答」才做这一步 ——
+        # 学习总结、任务拆解这类问题甩三条不相关视频出来只会干扰阅读，
+        # 还白花一次 rerank 调用。
         references: list[dict] = []
-        if _needs_video_references(ctx.intent, message):
+        if _needs_video_references(ctx.intent, source_message):
             try:
                 from app.services.hybrid_search import hybrid_search
                 from app.utils.textclean import clean_promo_text
@@ -570,29 +1086,64 @@ async def stream_chat(ctx: AgentContext, message: str):
 
                 prev_user: str | None = None
                 for _m in reversed(history):
-                    if _m.get("role") == "user" and (_m.get("content") or "").strip() != message.strip():
+                    if _m.get("role") == "user" and (_m.get("content") or "").strip() != source_message.strip():
                         prev_user = _m.get("content")
                         break
-                retrieval_query = resolve_anaphora(message, prev_user)
+                retrieval_query = resolve_anaphora(source_message, prev_user)
 
-                ref_result = hybrid_search(retrieval_query, top_k=6, candidate_k=30, use_rerank=True)
-                # 只保留真正相关的片段：低于 0.5 的多是「词面沾边」，点了也是浪费时间
-                strong = [h for h in ref_result["hits"] if (h.vector_score or 0) >= 0.5]
-                picked = strong[:5] if strong else ref_result["hits"][:3]
-                # 显式按相关度降序，不依赖上游顺序。
+                # 引用卡片的数据源：优先用模型**真正看过**的那批命中。
                 #
-                # 前端「相关片段」是按数组顺序从上往下渲染的，用户扫这个列表
-                # 是从上往下读 —— 所以最相关的必须排第一。
-                # 这和聊天消息相反（消息是时间序，最新的在底部），
-                # 两套排法混在一起就容易反。上游改了排序策略也不会影响这里。
-                #
-                # 用 vector_score 排而不是 rrf score：UI 上展示的分数就是
-                # vector_score，排序键和显示值必须一致，否则看起来是乱的。
-                picked = sorted(
-                    picked,
-                    key=lambda h: (h.vector_score or 0, h.score or 0),
-                    reverse=True,
-                )
+                # 旧实现是回答生成完再跑一次 hybrid_search 取结构化字段，
+                # 于是正文和引用区来自两轮不同的检索 —— 实测会出现
+                # 「正文点名了某视频，下面引用卡片却没有它」，或者卡片有、
+                # 正文没提。参数对齐只能降低概率，消不掉。
+                traced = take_search_hits()
+                if traced:
+                    cited = [
+                        re.sub(
+                            r"\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*-\s*\d{1,2}:\d{2}(?::\d{2})?)?\s*$",
+                            "",
+                            raw,
+                        ).strip()
+                        for raw in re.findall(r"《([^》]{2,120})》", answer or "")
+                    ]
+                    cited = [item for item in cited if len(item) >= 2]
+
+                    def _hit_cited(hit, _titles=cited) -> bool:
+                        title = hit.video_title or ""
+                        return any(t in title or title in t for t in _titles)
+
+                    # 正文点名的排前面，其余按相关度补位；最多 5 张卡，
+                    # 再多用户点不过来，还挤压正文。
+                    picked = sorted(
+                        traced[:12],
+                        key=lambda h: (
+                            1 if _hit_cited(h) else 0,
+                            h.vector_score or 0,
+                            h.score or 0,
+                        ),
+                        reverse=True,
+                    )[:5]
+                else:
+                    # 模型没调检索工具（纯概念题 / 闲聊），退化成一次独立检索
+                    ref_result = hybrid_search(retrieval_query, top_k=6, candidate_k=30, use_rerank=True)
+                    # 只保留真正相关的片段：低于 0.5 的多是「词面沾边」，点了也是浪费时间
+                    strong = [h for h in ref_result["hits"] if (h.vector_score or 0) >= 0.5]
+                    picked = strong[:5] if strong else ref_result["hits"][:3]
+                    # 显式按相关度降序，不依赖上游顺序。
+                    #
+                    # 前端「相关片段」是按数组顺序从上往下渲染的，用户扫这个列表
+                    # 是从上往下读 —— 所以最相关的必须排第一。
+                    # 这和聊天消息相反（消息是时间序，最新的在底部），
+                    # 两套排法混在一起就容易反。上游改了排序策略也不会影响这里。
+                    #
+                    # 用 vector_score 排而不是 rrf score：UI 上展示的分数就是
+                    # vector_score，排序键和显示值必须一致，否则看起来是乱的。
+                    picked = sorted(
+                        picked,
+                        key=lambda h: (h.vector_score or 0, h.score or 0),
+                        reverse=True,
+                    )
                 references = [
                     {
                         "video_id": hit.video_id,
@@ -666,6 +1217,7 @@ async def stream_chat(ctx: AgentContext, message: str):
             logger.warning("匹配正文视频链接失败: %s", exc)
 
         db = SessionLocal()
+        action_records: list[dict] = []
         try:
             run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
             if run:
@@ -674,6 +1226,7 @@ async def stream_chat(ctx: AgentContext, message: str):
                 run.steps = steps
                 run.latency_ms = latency_ms
                 db.commit()
+            action_records = actions_for_run(db, user_id=ctx.user_id, run_id=run_id)
         finally:
             db.close()
 
@@ -683,6 +1236,7 @@ async def stream_chat(ctx: AgentContext, message: str):
             "session_id": ctx.session_id,
             "latency_ms": latency_ms,
             "steps": steps,
+            "actions": action_records,
             "references": references,
             "mentioned_videos": mentioned_videos,
             # 前端据此提示「已降级到本地 LLM」：变慢/变差时用户能知道原因

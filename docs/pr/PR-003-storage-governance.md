@@ -1,5 +1,7 @@
 # PR-003 存储治理：统计信息与内存上限
 
+> 状态：历史参考（截至 2026-11-15，最后校对 2026-11-16）。与当前实现差异：① 提交时的手动容器名 `siteyeb-pg` / `siteyeb-redis` 已不存在，现由 compose 生成 `p2-siteyeb-postgres-1` / `p2-siteyeb-redis-1`（命令已按现名改写）；② 旧向量表 `segment_embeddings` 已删除，当前对应大表为 `content_chunks`；③ 截至 2026-11-16，`subtitle_segments` 基线 3,593,723 行（下文 3,577,042 为提交当时实测）。Redis `256mb` + `noeviction` 配置现行有效。
+
 - **分支**：`fix/storage-governance`
 - **合并提交**：`157a42c`
 - **影响面**：数据库查询计划、Redis 稳定性
@@ -55,6 +57,8 @@ maxmemory_human:   0B          ← 0 = 不限制
 ("videos", 0.05),
 ```
 
+> 现状注记：`segment_embeddings` 表后续已删除，当前 `app/migrations.py` 同位置的第二张表是 `content_chunks`（0.02）；`subtitle_segments`、`videos` 两行未变。
+
 0.02 意味着 359 万行的表在变 7 万次后就会重新分析一次，比默认积极 5 倍。
 同时 `autovacuum_analyze_threshold = 1000`，小表也能及时分析。
 
@@ -75,20 +79,20 @@ maxmemory_human:   0B          ← 0 = 不限制
 ## 怎么验证
 
 ```bash
-# 统计信息修好
-docker exec siteyeb-pg psql -U p2user -d p2learning -c "
+# 统计信息修好（容器名按 2026-11-16 现网 compose 生成名；提交当时为 siteyeb-pg）
+docker exec p2-siteyeb-postgres-1 psql -U p2user -d p2learning -c "
 SELECT relname, n_live_tup FROM pg_stat_user_tables
 WHERE relname='subtitle_segments';"
-# 期望：3577042
+# 提交当时实测：3577042；截至 2026-11-16 基线 3,593,723
 
 # 查询计划走索引，不是全表扫
-docker exec siteyeb-pg psql -U p2user -d p2learning -c "
+docker exec p2-siteyeb-postgres-1 psql -U p2user -d p2learning -c "
 EXPLAIN (COSTS OFF) SELECT id FROM subtitle_segments
 WHERE text ILIKE '%事件循环%' LIMIT 10;"
 # 期望：Bitmap Index Scan on ix_subtitle_segments_text_trgm
 
-# Redis 配置
-docker exec siteyeb-redis redis-cli CONFIG GET maxmemory maxmemory-policy
+# Redis 配置（提交当时容器名 siteyeb-redis）
+docker exec p2-siteyeb-redis-1 redis-cli CONFIG GET maxmemory maxmemory-policy
 # 期望：268435456 / noeviction
 ```
 

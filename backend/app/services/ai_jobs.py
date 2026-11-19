@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +17,8 @@ from app.services.transcribe_whisper import transcribe_wav
 from app.services.write_md import write_markdown_output
 from app.utils.files import resolve_media_path, safe_stem, unique_suffix
 from app.utils.serialization import dump_segments
+
+logger = logging.getLogger(__name__)
 
 
 def _external_llm_ready() -> bool:
@@ -38,6 +42,9 @@ def _assistant_runtime_settings() -> dict:
 
 
 def _llm_usage_policy() -> str:
+    override = (os.getenv("LLM_USAGE_POLICY_OVERRIDE") or "").strip()
+    if override in {"local_first", "external_first", "local_only", "external_only"}:
+        return override
     try:
         value = _assistant_runtime_settings().get("llm_usage_policy") or load_transcription_settings().get("llm_usage_policy")
     except Exception:
@@ -146,13 +153,22 @@ def _apply_job_options(job: AiJob, options: AiJobOptions) -> None:
     job.subtitle_correction_prompt = options.subtitle_correction_prompt
 
 
+def _wav_cache_dir() -> Path:
+    """音频临时 WAV 的落盘目录。
+
+    CPU 预提取和 GPU 转写必须看到同一个目录；优先用 SSD 缓存目录，
+    没配时兼容旧部署回退到 work_dir。
+    """
+    return Path(settings.audio_cache_dir or settings.work_dir)
+
+
 def _build_job_paths(video: Video, job: AiJob) -> AiJobPaths:
     # 容器内视频挂载在 /videos，数据库存的是宿主机绝对路径，需要映射
     source_path = resolve_media_path(video.filepath)
     base_name = safe_stem(source_path.stem) or f"video-{video.id}"
     return AiJobPaths(
         source=source_path,
-        wav=Path(settings.work_dir) / f"{base_name}-{job.id}.wav",
+        wav=_wav_cache_dir() / f"{base_name}-{job.id}.wav",
         markdown=Path(settings.output_dir) / "notes" / f"{base_name}-{job.id}.md",
         subtitle=Path(settings.output_dir) / "subtitles" / f"{base_name}-{job.id}.vtt",
     )
@@ -352,16 +368,24 @@ def replace_subtitle_segments(db, video: Video, segments: list[dict]) -> None:
     db.commit()
 
 
-def requeue_interrupted_ai_jobs() -> int:
+def requeue_interrupted_ai_jobs(summary_only: bool | None = None) -> int:
     """Recover after worker restart:
     - 'running' rows have no live worker → requeue them
     - 'cancelling' rows had a cancel signal but the worker died before finalizing
       → finalize them as 'cancelled' so they don't get stuck forever
+
+    summary_only=None 表示不分队列；worker 在只消费 ai_jobs 时必须传
+    False，否则会把笔记本正在跑的 summary_only 任务也重置成 queued。
     """
     db = SessionLocal()
     try:
-        running_jobs = db.query(AiJob).filter(AiJob.status == "running").all()
-        cancelling_jobs = db.query(AiJob).filter(AiJob.status == "cancelling").all()
+        running_query = db.query(AiJob).filter(AiJob.status == "running")
+        cancelling_query = db.query(AiJob).filter(AiJob.status == "cancelling")
+        if summary_only is not None:
+            running_query = running_query.filter(AiJob.summary_only == summary_only)
+            cancelling_query = cancelling_query.filter(AiJob.summary_only == summary_only)
+        running_jobs = running_query.all()
+        cancelling_jobs = cancelling_query.all()
         affected_video_ids = {job.video_id for job in running_jobs} | {job.video_id for job in cancelling_jobs}
         # running 的任务重启后要重新跑。清掉可能残留的取消 flag ——
         # 用户主动取消的 job 状态会是 cancelling（走下面的分支），
@@ -398,15 +422,48 @@ def requeue_interrupted_ai_jobs() -> int:
         db.close()
 
 
+def _whisper_direct_media_enabled(job) -> bool:
+    """Let faster-whisper decode the source video directly.
+
+    The old pipeline always ran ffmpeg first to write a 16k mono WAV, then read
+    that WAV back. For thousands of HDD-backed videos this doubles I/O and
+    leaves the GPU idle during extraction. faster-whisper (PyAV) can decode the
+    audio track from the source file itself, so direct mode removes that step.
+    Whisper.cpp still needs a WAV and keeps the old path.
+    """
+    if os.getenv("WHISPER_DIRECT_MEDIA", "1") == "0":
+        return False
+    engine = (job.whisper_engine or settings.whisper_engine or "").strip().lower()
+    return engine not in {"whisper.cpp", "whisper_cpp", "whisper-cpp"}
+
+
 def _step_extract_audio(db, job, video, paths, job_id: str):
     update_job_state(db, job, video, status="running", stage="extracting", message="Extracting audio")
-    extract_wav_16k_mono(paths.source, paths.wav, cpu_threads=job.cpu_threads, job_id=job_id)
+    if _whisper_direct_media_enabled(job):
+        logger.info("video=%s direct media decode, skip ffmpeg wav extraction", video.id)
+        return
+    # CPU 预提取进程会把 WAV 提前放到 SSD 缓存；GPU worker 命中时直接跳过
+    # ffmpeg，避免再去读 /videos 所在的 HDD。
+    if paths.wav.exists() and paths.wav.stat().st_size > 0:
+        logger.info("video=%s audio cache hit -> %s", video.id, paths.wav)
+        return
+    tmp_path = paths.wav.with_name(f"{paths.wav.name}.{job_id}.part")
+    try:
+        extract_wav_16k_mono(paths.source, tmp_path, cpu_threads=job.cpu_threads, job_id=job_id)
+        os.replace(tmp_path, paths.wav)
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def _step_transcribe(db, job, video, paths, job_id: str):
     update_job_state(db, job, video, status="running", stage="transcribing", message="Transcribing audio")
+    audio_path = paths.source if _whisper_direct_media_enabled(job) else paths.wav
     result = transcribe_wav(
-        wav_path=paths.wav,
+        wav_path=audio_path,
         engine=job.whisper_engine,
         model_size=job.whisper_model,
         language=job.language,
@@ -495,23 +552,31 @@ def _step_summarize(db, job, video, transcript):
     if not job.do_summary:
         return None, None
 
+    transcript = transcript or ""
+    if not transcript.strip():
+        return None, "转录文本为空，无法生成总结"
+
     update_job_state(db, job, video, status="running", stage="summarizing", message="Summarizing content")
     policy = _llm_usage_policy()
     runtime = _assistant_runtime_settings()
+    local_base_url = (os.getenv("LOCAL_LLM_BASE_URL_OVERRIDE") or "").strip() or runtime["local_base_url"]
+    local_model = (os.getenv("LOCAL_LLM_MODEL_OVERRIDE") or "").strip() or job.ollama_model or runtime["local_model"]
+    local_api_key = (os.getenv("LOCAL_LLM_API_KEY_OVERRIDE") or "").strip() or runtime["local_api_key"]
     try:
         def summarize_with_local():
             if settings.assistant_llm_provider in ("openai", "lmstudio"):
                 return summarize_with_openai(
                     transcript=transcript,
                     word_limit=job.word_limit,
-                    model=job.ollama_model or runtime["local_model"],
-                    base_url=runtime["local_base_url"],
-                    api_key=runtime["local_api_key"],
+                    model=local_model,
+                    base_url=local_base_url,
+                    api_key=local_api_key,
+                    disable_thinking=True,
                 )
             return summarize_with_ollama(
                 transcript=transcript,
                 word_limit=job.word_limit,
-                model=job.ollama_model or settings.ollama_model,
+                model=local_model or settings.ollama_model,
                 base_url=settings.ollama_base_url,
             )
 
@@ -544,7 +609,7 @@ def _step_summarize(db, job, video, transcript):
         summary, meta = call_with_fallback(
             policy,
             attempts,
-            retries_per_provider=2,
+            retries_per_provider=3,
             base_delay_s=1.0,
         )
         if not isinstance(summary, str):
@@ -564,6 +629,7 @@ def _step_summarize(db, job, video, transcript):
     except Exception as exc:
         # 总结失败不阻塞转写：字幕和转录已经拿到了，只是没总结。
         # 原因用统一的翻译函数，前端能直接显示（而不是 "local: ..., external: ..."）
+        logger.exception("总结失败 video=%s job=%s", video.id, job.id)
         return None, humanize_job_error(exc, job)[0]
 
 
@@ -720,7 +786,21 @@ def humanize_job_error(exc: BaseException | str, job: AiJob | None = None) -> tu
             "如果是外部服务，检查网络与设置页的地址、API Key。",
         )
 
-    # ④ LLM 鉴权/限流
+    # ④ LLM 余额/配额：这种错等多久都不会恢复，必须和限流区分开
+    if any(
+        hint in lowered
+        for hint in (
+            "insufficient_quota", "insufficient quota", "quota exceeded",
+            "余额不足", "额度不足", "欠费", "payment required", "billing",
+            "credit balance", "out of credits",
+        )
+    ) or "402" in raw:
+        return (
+            "LLM 账户额度不足",
+            "服务商提示余额或配额已用尽，重试不会恢复；请充值或换一个 API Key 再试。",
+        )
+
+    # ⑤ LLM 鉴权/限流
     if "401" in raw or "403" in raw or "unauthorized" in lowered or "invalid api key" in lowered:
         return (
             "LLM 鉴权失败",
@@ -729,17 +809,17 @@ def humanize_job_error(exc: BaseException | str, job: AiJob | None = None) -> tu
     if "429" in raw or "rate limit" in lowered or "too many requests" in lowered:
         return (
             "LLM 限流（请求过于频繁）",
-            "等 1-2 分钟后重试；批量处理时可以降低批次数量。",
+            "已自动等待重试仍未恢复；等 1-2 分钟再试，批量处理时降低批次数量。",
         )
 
-    # ⑤ 源文件问题
+    # ⑥ 源文件问题
     if "video file does not exist" in lowered or "no such file" in lowered:
         return (
             "找不到视频源文件",
             "确认外接盘已挂载、文件没有被移动或重命名，然后重试。",
         )
 
-    # ⑥ 兜底：保留原始信息但截断，别让前端撑爆
+    # ⑦ 兜底：保留原始信息但截断，别让前端撑爆
     short = raw.strip().splitlines()[0][:200] if raw.strip() else "未知错误"
     return (short, "可以直接重试；若反复失败，把这条错误码反馈给管理员。")
 

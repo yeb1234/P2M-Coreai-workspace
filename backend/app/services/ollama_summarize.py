@@ -1,5 +1,6 @@
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 from app.services.prompts import build_summary_prompt
+from app.services.subtitle_cleaner import clean_transcript
 from app.database import settings
 
 SUMMARY_COMPRESSION_THRESHOLD = 0.9
@@ -107,19 +108,45 @@ def _summarize_direct_with_ollama(transcript: str, word_limit: int, model: str, 
     )
 
 
-def _summarize_direct_with_openai(transcript: str, word_limit: int, model: str, base_url: str, api_key: str, timeout_s: int) -> str:
+def _summarize_direct_with_openai(
+    transcript: str,
+    word_limit: int,
+    model: str,
+    base_url: str,
+    api_key: str,
+    timeout_s: int,
+    *,
+    disable_thinking: bool = False,
+) -> str:
     limit = _clamp_word_limit(word_limit)
-    prompt = _build_prompt(transcript, limit)
+    prompt = _build_prompt(transcript or "", limit)
     return OpenAICompatibleClient(base_url=base_url, api_key=api_key, timeout_s=timeout_s).chat_completion(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
-        max_tokens=max(128, min(4096, int(limit * 1.8))),
+        # 思考型模型会先消耗一大段 reasoning；max_tokens 给太少会导致
+        # content 为空、只剩 reasoning_content。给足预算（至少 2048）。
+        max_tokens=max(2048, min(4096, int(limit * 1.8))),
+        # LM Studio 对 Qwen3 这几组参数都认；同时传是为了兼容不同版本：
+        # reasoning_effort=none 是标准 OpenAI 字段，enable_thinking /
+        # chat_template_kwargs 是 Qwen3 模板开关。只传 chat_template_kwargs
+        # 在实测里仍会先吐 reasoning，content 为空。
+        extra_body=(
+            {
+                "reasoning_effort": "none",
+                "enable_thinking": False,
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
+            if disable_thinking
+            else None
+        ),
     )
 
 
 def _summarize_compressed(transcript: str, word_limit: int, direct_summarize) -> str:
-    text = transcript.strip()
+    # 总结和向量共用同一套轻量清洗：只去口头语/重复，不改事实。
+    # 原始 transcription 仍留在 videos 表，可回看。
+    text = clean_transcript(transcript)
     if not text:
         return ""
 
@@ -156,11 +183,11 @@ def summarize_with_ollama(
     base_url: str = "http://localhost:11434",
     timeout_s: int = 180,
 ) -> str:
-    if not transcript.strip():
+    if not (transcript or "").strip():
         return ""
 
     return _summarize_compressed(
-        transcript,
+        transcript or "",
         word_limit,
         lambda text, limit: _summarize_direct_with_ollama(text, limit, model, base_url, timeout_s),
     )
@@ -173,12 +200,16 @@ def summarize_with_openai(
     base_url: str = "http://localhost:1234/v1",
     api_key: str = "lm-studio",
     timeout_s: int = 180,
+    *,
+    disable_thinking: bool = False,
 ) -> str:
-    if not transcript.strip():
+    if not (transcript or "").strip():
         return ""
 
     return _summarize_compressed(
-        transcript,
+        transcript or "",
         word_limit,
-        lambda text, limit: _summarize_direct_with_openai(text, limit, model, base_url, api_key, timeout_s),
+        lambda text, limit: _summarize_direct_with_openai(
+            text, limit, model, base_url, api_key, timeout_s, disable_thinking=disable_thinking
+        ),
     )

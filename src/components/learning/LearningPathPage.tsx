@@ -3,7 +3,7 @@ import {
   Route, Target, Sparkles, RefreshCw, CheckCircle2, Circle, PlayCircle,
   Clock, TrendingUp, AlertCircle, CircleDot, ChevronDown, ChevronRight,
 } from 'lucide-react';
-import { PageTitle } from '../shared';
+import { PageTitle, WeeklyHoursPicker } from '../shared';
 import {
   fetchLearningProfile,
   fetchPaths,
@@ -16,6 +16,7 @@ import {
   type PathStep,
   type StepStatus,
 } from '../../lib/learningApi';
+import { userScopedStorage } from '../../lib/userScopedStorage';
 
 const PENDING_VIDEO_KEY = 'p2m_pending_recommended_video_id';
 
@@ -44,7 +45,7 @@ function formatClock(totalSec: number): string {
 /** 跳到视频页并自动播放。复用聊天面板那套 hash + 事件机制，避免两条路径各自实现。 */
 function openVideo(videoId: number) {
   try {
-    localStorage.setItem(PENDING_VIDEO_KEY, String(videoId));
+    userScopedStorage.setItem(PENDING_VIDEO_KEY, String(videoId));
   } catch {
     /* 隐私模式下写不进去，退化为正常跳转 */
   }
@@ -288,6 +289,13 @@ export const LearningPathPage: React.FC = () => {
     setBusyStep(true);
     try {
       await updateStepStatus(step.id, status);
+      // 标记完成后自动把下一关展开：否则静默刷新只保留当前 step，
+      // 用户完成 STEP 4 后还要再手动点一次 STEP 5。
+      if (status === 'done' && activePath) {
+        const currentIndex = activePath.steps.findIndex((item) => item.id === step.id);
+        const nextStep = currentIndex >= 0 ? activePath.steps[currentIndex + 1] : null;
+        if (nextStep) setOpenStepId(nextStep.id);
+      }
       // 静默刷新：保持展开状态与滚动位置，用户才能连着点「开始 → 完成」
       await load({ silent: true });
     } catch (err) {
@@ -415,17 +423,10 @@ export const LearningPathPage: React.FC = () => {
                 className="w-full rounded-lg border border-[var(--border-light)] bg-white px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
               />
             </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-[var(--text-secondary)]">每周可投入（小时）</span>
-              <input
-                type="number"
-                min={1}
-                max={80}
-                value={weeklyHours}
-                onChange={(e) => setWeeklyHours(Number(e.target.value) || 10)}
-                className="w-full rounded-lg border border-[var(--border-light)] bg-white px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-              />
-            </label>
+            <div className="block md:col-span-2">
+              <span className="mb-1 block text-xs text-[var(--text-secondary)]">每天 / 每周想投入多少</span>
+              <WeeklyHoursPicker weeklyHours={weeklyHours} onChange={setWeeklyHours} />
+            </div>
             <label className="block md:col-span-2">
               <span className="mb-1 block text-xs text-[var(--text-secondary)]">要覆盖的技能（逗号分隔）</span>
               <input

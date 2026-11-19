@@ -1,0 +1,19 @@
+FROM p2-siteyeb-backend:3.0
+
+USER root
+
+# faster-whisper 1.1+ 才有 BatchedInferencePipeline；1.0.3 没有。
+# 只装包，不动现有 ctranslate2/tokenizers/av 依赖，避免把 CUDA 环境一起升级坏。
+RUN pip install --no-cache-dir --no-deps \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    faster-whisper==1.2.1
+
+# 直接读源视频（PyAV 解码），跳过 ffmpeg 抽 WAV 的重复 I/O。
+COPY app/services/transcribe_whisper.py /app/app/services/transcribe_whisper.py
+COPY app/services/ai_jobs.py /app/app/services/ai_jobs.py
+COPY app/worker.py /app/app/worker.py
+
+ENV WHISPER_BATCH_SIZE=8 \
+    WHISPER_DIRECT_MEDIA=1
+
+USER appuser

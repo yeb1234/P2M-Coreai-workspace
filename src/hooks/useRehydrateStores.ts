@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useUIStore, usePomodoroStore, usePluginStore, useNotesStore, useNotificationStore, useTimeCenterStore, useTranscriptionStore } from '../stores';
+import { useUIStore, usePomodoroStore, usePluginStore, useNotesStore, useMdNotesStore, useNotificationStore, useTimeCenterStore, useTranscriptionStore } from '../stores';
 
 const ALL_STORES = [
   useUIStore,
   usePomodoroStore,
   usePluginStore,
   useNotesStore,
+  useMdNotesStore,
   useNotificationStore,
   useTimeCenterStore,
   useTranscriptionStore,

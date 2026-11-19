@@ -4,17 +4,17 @@ import { idbStorage } from '../lib/idbStorage';
 import { type ThemeVars, type ThemeScheduleRule, THEME_PRESETS, applyTheme, DEFAULT_THEME_SCHEDULE_RULES } from '../lib/themes';
 import { VIEW_PATH } from '../config/pageRegistry';
 
-export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'pomodoro' | 'timecenter' | 'learning' | 'journey' | 'video' | 'transcriber' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
+export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'mdnotes' | 'pomodoro' | 'timecenter' | 'learning' | 'journey' | 'video' | 'transcriber' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
 
 export type FontSize = 'sm' | 'md' | 'lg';
 export type ThemeId = string;
 export type NoteEnterBehavior = 'enter_save' | 'enter_newline';
 
 const DEFAULT_NAV_ORDER: ActiveView[] = [
-  'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'pomodoro', 'timecenter',
-  'health', 'learning', 'journey', 'video', 'transcriber', 'compare', 'shop', 'esports',
+  'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'mdnotes', 'pomodoro', 'timecenter',
+  'health', 'bookmarks', 'learning', 'journey', 'video', 'transcriber', 'compare', 'shop', 'esports',
   'stats', 'reader', 'snippets', 'habits',
-  'flashcards', 'bookmarks', 'tokens',
+  'flashcards', 'tokens',
   'leetcode', 'interview', 'codenav', 'aiagent', 'openclaw', 'hermes',
 ];
 
@@ -183,10 +183,10 @@ export const useUIStore = create<UIState>()(
       // 的循环依赖（TDZ: Cannot access 'h' before initialization），已回退。
       // 正确的位置是这里：在状态恢复时做一次迁移，把新页面按默认顺序插入，
       // 而不是追加到末尾。
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version: number) => {
         const state = (persisted ?? {}) as Record<string, unknown>;
-        if (version < 2 && Array.isArray(state.navOrder)) {
+        if (version < 3 && Array.isArray(state.navOrder)) {
           const stored = state.navOrder as ActiveView[];
           const storedSet = new Set(stored);
           const merged: ActiveView[] = [];

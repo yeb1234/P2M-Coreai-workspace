@@ -6,6 +6,7 @@
   「那如果我想学 Java 呢」—— 上下文依赖
 """
 
+from app.services.lexical import extract_tokens
 from app.services.query_rewrite import (
     extract_keywords,
     needs_context,
@@ -26,6 +27,22 @@ def test_term_expansion_keeps_original():
     out = rewrite_query("垃圾回收")
     assert "垃圾回收" in out
     assert "garbage collection" in out.lower()
+
+
+def test_two_char_latin_tokens_do_not_enter_content_lexical():
+    """正文词法不能吃 DI 这种两字符 token。
+
+    依赖注入的改写会追加 DI；正文层 ILIKE '%di%' 会命中 6,000+ 个块，
+    把一次 29ms 的词法检索拖到约 700ms。元数据通道仍保留两字符能力。
+    """
+    query = "依赖注入 dependency injection DI"
+    content_tokens = extract_tokens(query)
+    assert "di" not in content_tokens
+    assert "dependency" in content_tokens
+    assert "injection" in content_tokens
+
+    meta_tokens = extract_tokens(query, min_latin_len=2)
+    assert "di" in meta_tokens
 
 
 def test_needs_context_is_conservative():

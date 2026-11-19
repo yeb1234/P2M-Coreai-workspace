@@ -109,7 +109,7 @@ export const TokensPage: React.FC = () => {
           <Clock size={14} className="text-[var(--text-secondary)]" />
           <h3 className="text-sm font-medium text-[var(--text-primary)]">本周花费趋势</h3>
         </div>
-        <div className="min-w-[300px] flex items-end gap-3 h-28">
+        <div className="min-w-0 flex items-end gap-3 h-28">
           {WEEKLY_SPEND.map((d) => (
             <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
               <span className="text-xs text-[var(--text-muted)]">${d.amount}</span>
@@ -189,3 +189,4 @@ export const TokensPage: React.FC = () => {
     </div>
   );
 };
+

@@ -1,5 +1,7 @@
 # 待办、提醒时间和番茄快捷输入规则
 
+> 状态：部分现行（最后校对 2026-11-16）。快捷解析器已落地（`src/lib/todoQuickInput.ts` 的 `parseTodoQuickInput`），时间/日期/颜色/`/tN` 规则与代码一致；番茄自动估算的两个时长示例与当前 `calculatePomodoroRounds` 不符，已按代码改写。
+
 这份文档用于固定待办输入框后续要遵守的语义，避免“提醒时间”“日历同步”“番茄计划”各写各的。
 
 ## 一句话原则
@@ -106,12 +108,12 @@
 
 当前优先规则：只要 Todo 设置过开始时间和截止时间，Todo 条右侧专注箭头就按这个时间段自动估算番茄数，不需要再勾选番茄钟时间。
 
-估算规则：
+估算规则（`src/lib/pomodoroPlanning.ts` 的 `calculatePomodoroRounds`）：
 
-- 按当前番茄设置里的 `work + shortBreak` 完整周期向下取整。
-- 默认 `25 + 5` 分钟时，2 小时给 4 个番茄。
-- 如果是 `35 + 5` 分钟，2 小时给 3 个番茄。
+- 按当前番茄设置的完整周期（`work`、`shortBreak`、`longBreak`、`longBreakInterval`）算轮次，不足一个完整长休息周期时按 `work + shortBreak` 周期向下取整。
+- 结果夹到当前配置允许的档位内（默认 `interval=4` 时可选 `[1,2,3,4,6,7,8]`，跳过 `interval+1` 那一档）。
 - 优先保证 focus 轮次跑完，不为了填满时间强行增加跑不完的半轮。
+- 具体个数随 `workDuration / shortBreakDuration / longBreakDuration / longBreakInterval` 变化，不要在文档里写死「几小时给几个」。
 
 ### `/tN`
 
@@ -172,9 +174,9 @@
 - 番茄计划：2 个番茄
 - 颜色/优先级：粉色
 
-## 推荐实现顺序
+## 实现位置（2026-11-16 核对）
 
-1. 抽出统一解析函数，例如 `parseTodoQuickInput(text, now)`。
-2. 快速输入框和待办编辑标题都调用同一个解析函数。
-3. 为 `下午4点`、`明天`、`后天`、`/t1`、开始/截止时间自动估算番茄写单元测试。
-4. 再接入 UI 文案提示，避免用户猜规则。
+1. 统一解析函数：`src/lib/todoQuickInput.ts` 的 `parseTodoQuickInput(input, nowDate)`，返回 `title / priority / dueDate / reminderAt / pomodoroRounds`。
+2. 调用点：`src/components/todo/InlineAddInput.tsx`（快速输入框）与 `src/components/todo/TodoForm.tsx`（编辑标题）共用同一解析函数。
+3. 单元测试：`src/__tests__/todoFormDefaults.test.ts`，覆盖 `下午4点`、`明天`、`后天`、`/t1`、颜色快捷符与模糊时间推导。
+4. UI 文案提示仍按需补充；解析规则以 `todoQuickInput.ts` 为准。

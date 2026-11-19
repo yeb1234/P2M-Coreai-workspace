@@ -11,16 +11,65 @@ watch_history 只有「当前进度」一个快照，算不出真实观看时长
 
 from __future__ import annotations
 
+import json
 import logging
+import threading
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
 from sqlalchemy import distinct, func, text
 from sqlalchemy.orm import Session
 
+from app.database import settings
 from app.models import Note, ScheduleItem, User, UserProfile, Video, WatchEvent, WatchHistory
 
 logger = logging.getLogger(__name__)
+
+PROFILE_CACHE_TTL_SECONDS = 300
+_PROFILE_CACHE_PREFIX = "profile:v1:"
+_PROFILE_REDIS = None
+_PROFILE_REDIS_LOCK = threading.Lock()
+
+
+def _cache_client():
+    """懒加载 Redis；连不上就返回 None，画像读取不因缓存故障失败。"""
+    global _PROFILE_REDIS
+    if _PROFILE_REDIS is not None:
+        return _PROFILE_REDIS
+    with _PROFILE_REDIS_LOCK:
+        if _PROFILE_REDIS is not None:
+            return _PROFILE_REDIS
+        try:
+            import redis
+
+            _PROFILE_REDIS = redis.Redis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=0.2,
+                socket_timeout=0.2,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("画像缓存 Redis 不可用: %s", exc)
+            return None
+    return _PROFILE_REDIS
+
+
+def _profile_cache_key(user_id: int) -> str:
+    return f"{_PROFILE_CACHE_PREFIX}{user_id}"
+
+
+def invalidate_profile_cache(user_id: int | None) -> None:
+    """删除画像缓存。观看事件、进度写入或手动重算时调用。"""
+    if user_id is None:
+        return
+    client = _cache_client()
+    if client is None:
+        return
+    try:
+        client.delete(_profile_cache_key(user_id))
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("画像缓存失效失败 user=%s: %s", user_id, exc)
+
 
 VALID_EVENT_TYPES = {"play", "pause", "seek", "rate", "heartbeat", "ended", "close"}
 
@@ -287,9 +336,40 @@ def profile_to_dict(profile: UserProfile) -> dict:
     }
 
 
-def profile_summary_text(profile: UserProfile) -> str:
-    """压成一段话喂给 LLM，避免把整个 JSON 塞进 prompt。"""
+def get_profile_data(db: Session, user_id: int | None = None) -> dict:
+    """读取画像 dict，优先走 5 分钟 Redis 缓存。
+
+    缓存的是 profile_to_dict 的可序列化结果，不是 ORM 对象；
+    这样 session 关闭后不会触发 lazy load，也不会把连接绑在缓存里。
+    """
+    resolved_id = resolve_user_id(db, user_id)
+    key = _profile_cache_key(resolved_id)
+    client = _cache_client()
+    if client is not None:
+        try:
+            cached = client.get(key)
+            if cached:
+                return json.loads(cached)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("画像缓存读取失败 user=%s: %s", resolved_id, exc)
+
+    profile = recompute_profile(db, resolved_id)
     data = profile_to_dict(profile)
+    if client is not None:
+        try:
+            client.setex(
+                key,
+                PROFILE_CACHE_TTL_SECONDS,
+                json.dumps(data, ensure_ascii=False),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("画像缓存写入失败 user=%s: %s", resolved_id, exc)
+    return data
+
+
+def profile_summary_text(profile: UserProfile | dict) -> str:
+    """压成一段话喂给 LLM，避免把整个 JSON 塞进 prompt。"""
+    data = profile if isinstance(profile, dict) else profile_to_dict(profile)
     parts = [
         f"累计观看 {data['total_watch_minutes']} 分钟，"
         f"接触 {data['videos_started']} 个视频，完成 {data['videos_completed']} 个"
@@ -304,8 +384,7 @@ def profile_summary_text(profile: UserProfile) -> str:
         best_hours = sorted(data["active_hours"].items(), key=lambda kv: kv[1], reverse=True)[:3]
         parts.append("最常学习时段：" + "、".join(f"{h}点" for h, _ in best_hours))
     if data["notes_count"]:
-        # Note 表没有 user_id：它是 AI 转写产物，属于共享视频库。
-        # 不加这个限定，模型会把「库里有 8770 篇笔记」读成「你记了 8770 篇笔记」，
-        # 进而给出「你只记不看」这种错误结论。
-        parts.append(f"视频库内已有 {data['notes_count']} 篇转写笔记（全库统计，非个人记录）")
+        # 这里统计的是 recompute_profile 里按 user_id 过滤后的 private 笔记，
+        # 不能再写成“视频库全库转写笔记”，否则模型会把个人记录误读成共享库数量。
+        parts.append(f"你已记录 {data['notes_count']} 篇私人笔记")
     return "；".join(parts) + "。"

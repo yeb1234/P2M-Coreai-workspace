@@ -1,5 +1,5 @@
 import { API_BASE, resolveApiPath } from './apiBase';
-import { clearSession } from './authApi';
+import { clearSession, getSessionUserId } from './authApi';
 
 type ApiFetchInit = RequestInit & { timeoutMs?: number };
 
@@ -76,9 +76,13 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   }
 
   if (res.status === 401) {
-    // 会话过期或已被撤销（改密码 / 管理员踢下线），统一回到登录态
+    // 会话过期或已被撤销（改密码 / 管理员踢下线），统一回到登录态。
+    // 先带上旧用户 id：authStore 需要在会话标记被删前把旧裸 key 归到旧账号。
+    const expiredUserId = getSessionUserId();
+    window.dispatchEvent(new CustomEvent('p2m:auth-expired', {
+      detail: { userId: expiredUserId },
+    }));
     clearSession();
-    window.dispatchEvent(new CustomEvent('p2m:auth-expired'));
     throw new ApiError('登录已失效，请重新登录', { status: 401 });
   }
 
@@ -112,6 +116,8 @@ export interface VideoItem {
   transcription: string | null;
   transcript_segments: TranscriptSegment[];
   summary: string | null;
+  has_subtitles?: boolean;
+  has_summary?: boolean;
   markdown_path: string | null;
   subtitle_path: string | null;
   subtitle_url: string | null;
@@ -440,10 +446,38 @@ export async function searchSegments(q: string, limit = 20): Promise<SegmentSear
   return apiFetch<SegmentSearchResult[]>(`/api/videos/search/segments?${params}`);
 }
 
+export interface AssistantHitlOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface AssistantResumePayload {
+  runId: string;
+  interruptId?: string;
+  selected?: string;
+  text?: string;
+  originalMessage?: string;
+}
+
 export type ChatStreamEvent =
   | { type: 'token'; text: string }
   | { type: 'tool_start'; tool: string }
   | { type: 'tool_end'; tool: string; ok: boolean | null }
+  | {
+      /** HITL 暂停点：任务停下来等用户选 A/B/C 或补充信息 */
+      type: 'interrupt';
+      run_id: string;
+      session_id?: string;
+      interrupt_id: string;
+      kind: 'clarify' | 'supplement' | 'confirm' | string;
+      question: string;
+      options: AssistantHitlOption[];
+      allow_custom: boolean;
+      context?: string;
+      intent?: string | null;
+      original_message?: string;
+    }
   | {
       type: 'done';
       run_id: string;
@@ -464,6 +498,18 @@ export type ChatStreamEvent =
         text: string;
         video_id: number;
       }>;
+      /** 本轮真正落库的个人动作（笔记/日历/Todo），用于执行回执与撤回 */
+      actions?: Array<{
+        id: string;
+        action_type: 'note' | 'calendar' | 'todo' | string;
+        status: 'applied' | 'failed' | 'undone' | string;
+        title: string;
+        summary?: string | null;
+        target_id?: string | null;
+        created_at?: string | null;
+        undone_at?: string | null;
+        can_undo?: boolean;
+      }>;
       /** 实际用的 LLM 通道（local / external） */
       provider?: string;
       /** 主通道失败、切到备用时，这里是失败的那家。空/缺省表示没降级。 */
@@ -481,10 +527,14 @@ export async function streamAssistantChat(
   options: {
     sessionId?: string;
     pageContext?: string;
+    /** 当前笔记完整正文，供聊天工具保存；不放进提示词 */
+    pageNote?: { title: string; markdown: string };
     systemPrompt?: string;
     videoId?: number;
     /** 前端 detectIntent() 识别到的意图 id，随请求存库，历史会话还原时用 */
     intent?: string | null;
+    /** HITL 中断后继续；携带 runId + 用户选择，不重新写一条用户消息 */
+    resume?: AssistantResumePayload;
     onEvent: (event: ChatStreamEvent) => void;
     signal?: AbortSignal;
   }
@@ -495,10 +545,20 @@ export async function streamAssistantChat(
     body: JSON.stringify({
       message,
       page_context: options.pageContext ?? '',
+      page_note: options.pageNote ?? undefined,
       system_prompt: options.systemPrompt ?? '',
       session_id: options.sessionId || undefined,
       video_id: options.videoId ?? undefined,
       intent: options.intent ?? undefined,
+      resume: options.resume
+        ? {
+            run_id: options.resume.runId,
+            interrupt_id: options.resume.interruptId ?? '',
+            selected: options.resume.selected ?? '',
+            text: options.resume.text ?? '',
+            original_message: options.resume.originalMessage ?? '',
+          }
+        : undefined,
     }),
     signal: options.signal,
   });
@@ -840,4 +900,41 @@ export async function saveAssistantRuntimeSettings(settings: AssistantRuntimeSet
     method: 'PUT',
     body: JSON.stringify(settings),
   });
+}
+
+/** 撤回一条助手动作（笔记删除 / 日历事件删除 / Todo 软删）。 */
+export async function undoAgentAction(actionId: string): Promise<{
+  ok: boolean;
+  already?: boolean;
+  action?: {
+    id: string;
+    action_type: string;
+    status: string;
+    title: string;
+    can_undo?: boolean;
+    undone_at?: string | null;
+  };
+}> {
+  return apiFetch(`/api/agent-actions/${encodeURIComponent(actionId)}/undo`, {
+    method: 'POST',
+    timeoutMs: 15000,
+  });
+}
+
+/** 查询当前用户的动作执行记录；用于聊天面板的“执行记录”抽屉。 */
+export async function fetchAgentActions(limit = 30): Promise<{
+  items: Array<{
+    id: string;
+    action_type: 'note' | 'calendar' | 'todo' | string;
+    status: string;
+    title: string;
+    summary?: string | null;
+    target_id?: string | null;
+    created_at?: string | null;
+    undone_at?: string | null;
+    can_undo?: boolean;
+  }>;
+  count: number;
+}> {
+  return apiFetch(`/api/agent-actions?limit=${Math.max(1, Math.min(100, limit))}`);
 }

@@ -23,6 +23,8 @@ output/
 thumbnails/
 sprites/
 work/
+# Video library is mounted here (junction/symlink or copied directory); never commit media
+video-library/
 
 # Local tool binaries and AI models
 tools/
@@ -68,3 +70,15 @@ data/
 /demo/
 shots/
 backup-*.sql
+
+# 本机 QA 截图与临时审计产物（不入 release）
+/*.png
+/mobile-audit/
+/tmp-logger-scan.py
+docs/reports/*backup*.jsonl
+
+# 本地环境备份与工具链（体积大，不入库）
+docker-compose.yml.bak*
+/desktop-shell/
+/cuda-wheels/
+

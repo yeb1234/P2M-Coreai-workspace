@@ -1,172 +1,96 @@
 # 怎么把服务跑起来
 
-> 这份文档回答两个问题：**为什么启动方式和以前不一样了**，以及
-> **不用 AI 助手时到底要开哪几个容器**。
+> 状态：事实已核实（核对基线 2026-11-16）
 
----
+这份文档回答两个问题：**为什么启动方式和以前不一样了**，以及**本机/服务器上分别怎么起、起完看哪里**。容器组成、镜像、卷的口径见 `docs/docker.md`。
 
-## 一、为什么 `start.bat` 变了
+## 一、为什么不再本机直跑
 
-以前的启动脚本是：
+应用依赖 PostgreSQL + pgvector 扩展、Redis、ffmpeg；这些由 compose 栈提供。旧的「本机 uvicorn + `npm run dev`」直跑方式不再作为默认入口，原因是环境容易和容器侧不一致。本机 venv 只留给调试和测试，端口口径见第四节。
 
-```bat
-backend\  .venv311\python -m uvicorn app.main:app --port 80
-根目录\    npm run dev          :: 前端 dev server，端口 5002
-```
+## 二、容器启动（默认路径）
 
-两个进程，跑在 Windows 本机上。
-
-现在这条路走不通了，不是因为"改成 Docker 更时髦"，而是有三件硬依赖：
-
-| 依赖 | 为什么不能在本机跑 |
-|---|---|
-| **pgvector** | `content_chunks.embedding` 是 `halfvec(1024)`，需要 PostgreSQL 装了 vector 扩展。本机 PG 没装就建不出这张表，检索直接不可用 |
-| **Redis** | RQ 队列的存储。转写任务、向量化任务都靠它排队 |
-| **ffmpeg** | 抽缩略图、雪碧图、转码音频。容器镜像里带好了，本机要自己装 |
-
-所以现在是 **5 个容器**，由 `docker-compose.yml` 编排。
-
----
-
-## 二、服务清单：哪个是必须的
-
-| 容器 | 端口 | 作用 | 不用 AI 助手时 |
-|---|---|---|---|
-| `siteyeb-pg` | 127.0.0.1:5432 | PostgreSQL + pgvector | **必须** |
-| `siteyeb-backend` | 内部 8000 | FastAPI：所有 API、缩略图生成、文件监听 | **必须** |
-| `siteyeb-frontend` | 80 | nginx：静态页面 + 反向代理到 backend | **必须** |
-| `siteyeb-redis` | 127.0.0.1:6379 | RQ 队列 | 可不起，但见下方说明 |
-| `siteyeb-worker` | — | RQ worker：转写、建块、向量化 | **可以不起** |
-
-访问入口只有一个：**http://localhost**（80 端口）。
-`backend` 和 `worker` 都不对外暴露端口，全部经 nginx 转发。
-
-### 关于 Redis 的一个说明
-
-严格来说，不用 AI 助手时 Redis 也不需要。但 `docker-compose.yml` 里
-`backend` 声明了 `depends_on: redis (service_healthy)` —— 少了它后端起不来。
-
-Redis 只占几 MB 内存，所以启动脚本的做法是**照常起 Redis，只是不起 worker**。
-这样既是最小组合，又不用改 compose 的依赖关系。
-
-### 不起 worker 会怎样
-
-| 功能 | 还行吗 |
-|---|---|
-| 浏览视频、播放、字幕 | ✅ 正常 |
-| 搜索（词法 + 语义） | ✅ 正常（向量已经在库里，共 60,422 块） |
-| 笔记、待办、日历、番茄钟 | ✅ 正常 |
-| 学习路径查看 | ✅ 正常 |
-| **发起新的 AI 转写** | ❌ 任务会进队列，但没人消费 |
-| **生成新的学习路径** | ⚠️ 走的是 backend 内部线程，不依赖 worker，仍可用 |
-| **新视频的建块 + 向量化** | ❌ 同上，卡在队列里 |
-
-需要这些时，用 `[1] 完整启动` 或单独 `docker compose start worker`。
-
----
-
-## 三、三种启动方式
-
-### 方式 A：双击 `start.bat`（Windows，推荐）
-
-菜单选 `[1]` 或 `[2]`：
+### Windows：`start.bat`
 
 ```
-[1] Full stack      db + redis + backend + worker + web   ← 要 AI 功能选这个
-[2] Web only        db + redis + backend + web            ← 只用页面选这个
+[1] Full stack   db + redis + backend + worker + web（AI 转写/索引需要 worker）
+[2] Web only     db + redis + backend + web（不带 worker：AI 任务不消费，其余正常）
+[3] Restart backend only   重建并重启 backend + worker
+[4] Restart frontend only  重建并重启 frontend
+[5] Status       服务状态 + /health、/ready 探针
+[6] Follow backend log      跟后端日志
+[7] Stop everything  停止，卷保留
+[0] Exit
 ```
 
-脚本会等后端 healthy 再打开浏览器。
+依据：`start.bat:48-59`。
 
-### 方式 B：命令行（WSL / macOS / Linux）
+### Linux / macOS / WSL：`start.sh`
 
 ```bash
-./start.sh            # 完整（含 worker）
-./start.sh web        # 只要页面，不起 worker
-./start.sh status     # 看容器状态 + 探针
-./start.sh logs       # 跟后端日志
-./start.sh stop       # 全停（数据卷保留）
+./start.sh            # full，全部服务（默认）
+./start.sh web        # web-only，不带 worker
+./start.sh backend    # 重建 + 重启 backend & worker
+./start.sh frontend   # 重建 + 重启 frontend
+./start.sh stop       # 停止，卷保留
+./start.sh status     # 服务状态 + 探针
+./start.sh logs        # 跟后端日志
 ```
 
-### 方式 C：直接 compose（最透明）
+依据：`start.sh:9-16,44-87`。
+
+两条脚本在 Docker 未运行、缺 `docker-compose.yml`、缺 `.env` 时先做 sanity check（`start.bat:20-40`；`start.sh:23-26`）。
+
+## 三、端口与访问入口
+
+端口规则：`<服务前缀><两位项目号>`，P2 尾号 02（`docker-compose.yml:1-6`）。
+
+| 端口 | 服务 | 绑定 | 说明 | 依据 |
+|---|---|---|---|---|
+| `12302` | frontend:80 | — | 浏览器入口，`WEB_PORT` 默认 12302；另占裸 80 | `docker-compose.yml:407-408` |
+| `12402` | backend:8000 | 只绑 `127.0.0.1` | API 回环口，供宿主调试；对外访问仍走 nginx `/api` | `docker-compose.yml:134-135` |
+| `11112` | — | — | 已作废（2026-11-16 起换号，后端 API 见 12402） | `docker-compose.yml:3,135` |
+| `12322` | Vite dev | `127.0.0.1` | dev = 12302 + 20，代理到 `127.0.0.1:12302` | `vite.config.ts:12,16`；`playwright.config.ts:12,17` |
+| `12502` | postgres:5432 | 只绑 `127.0.0.1` | `POSTGRES_PORT` 可覆盖 | `docker-compose.yml:75` |
+| `12602` | redis:6379 | 只绑 `127.0.0.1` | `REDIS_PORT` 可覆盖 | `docker-compose.yml:107` |
+| 监控段 | — | — | 未分配；旧 11162 作废 | `docker-compose.yml:6` |
+
+起完访问：`http://localhost:12302`（或 `http://localhost`）。API 路径同源 `/api`；本机直连后端调试用 `http://127.0.0.1:12402`，公网不经过这个口。
+
+### 启动后先看探针
 
 ```bash
-# 完整
-docker compose up -d
-
-# 只要页面（不起 worker）
-docker compose up -d postgres redis backend frontend
-
-# 只重启后端
-docker compose up -d --build backend worker
-
-# 全停
-docker compose down
+curl -s http://localhost/health    # 进程 + 数据库 + 事务健康度
+curl -s http://localhost/ready     # database / vectors / transactions / embedding / llm，失败 503
 ```
 
----
+`/ready` 返回 503 通常是 embedding 服务不可达；站点仍可用，语义检索退化为词法检索。探针口径见 `docs/deploy.md` 第四节。
 
-## 四、起完之后检查什么
+## 四、本机开发（非默认路径）
 
-```bash
-# 三个都应该 200
-curl -i http://localhost/health
-curl -i http://localhost/ready
-curl -i http://localhost/api/videos
-```
+- 后端：venv 下 `uvicorn app.main:app --port 8100 --reload`（`README_cn.md:72` 口径；本次未复核 venv 启动命令）。
+- 前端：`npm run dev`，Vite 端口 12322，`/api` 代理到 `127.0.0.1:12302`（`vite.config.ts:12,16`），不需要再单独配 `VITE_API_BASE_URL`。
+- embedding：本机跑 LM Studio 等兼容服务时，容器侧用 `EMBEDDING_BASE_URL_DOCKER=http://host.docker.internal:1234/v1`（`docker-compose.yml:164`；`.env.example:100`）。
 
-`/health` 会返回事务健康度（长事务数、锁等待），`/ready` 会返回
-数据库、向量覆盖率、embedding 服务、LLM 四项检查。
+## 五、当前数据基线（2026-11-16 口径）
 
-**`/ready` 返回 503 不代表站点坏了**，看 `checks` 里哪一项 fail：
+以下为核对基线，不是运行承诺值；实时数字以 `/api/stats` 与管理接口为准：
 
-| fail 项 | 含义 | 影响 |
-|---|---|---|
-| `embedding_model` | 宿主机 LM Studio 没启动，或端口不对 | 语义检索退化为纯词法；新内容无法向量化 |
-| `llm` | 外部 LLM 不可达 | AI 对话不可用，其他正常 |
-| `vectors` | 向量覆盖率低 | 检索召回不全 |
+- 视频 14,327
+- 语义块（content_chunks）60,259
+- 字幕片段 3,593,723
+- 有字幕视频 8,785
 
-embedding 服务的地址在 `.env`：
+## 六、起不来 / 页面打不开时
 
-```bash
-EMBEDDING_BASE_URL=http://localhost:1234/v1              # 宿主机直接跑时
-EMBEDDING_BASE_URL_DOCKER=http://host.docker.internal:1235/v1   # 容器里访问宿主机
-```
+先跑 `bash scripts/diagnose.sh`（只读，八段输出）：容器状态 → 探针最后输出 → PG 长事务/锁等待 → 队列注册与积压 → 后端最近错误 → nginx 最近错误 → worker 日志 → 应用日志文件（`scripts/diagnose.sh:34-109`）。
 
-**这两个端口不一样是正常的**：一个是本机开发用，一个是容器内访问宿主机
-（`host.docker.internal` 映射到宿主）。如果 LM Studio 只在 1234 监听，
-把 `_DOCKER` 那个也改成 1234。
+- 整站 502 且 backend 不健康：看第 3 段，有 `idle in transaction` + 锁等待，说明迁移卡在 DDL，后端还没监听端口。
+- backend 健康但仍 502：看第 6 段 nginx 错误。
+- 转写一直排队：看第 4 段 worker 注册数（正常 1；0 没有消费者，2+ 是重复 worker）。
+- 接口 500 但日志没细节：`bash scripts/logq.sh errors`，再按 `request_id` 用 `logq.sh req <id>` 拉全量；日志口径见 `docs/logging.md`。
 
----
+## 待用户确认
 
-## 五、常见故障
-
-| 现象 | 原因 | 怎么看 |
-|---|---|---|
-| 整站 502 | nginx 连不上 backend | `docker compose ps` 看 backend 是否 healthy；`./start.sh logs` |
-| 容器 Up 但 unhealthy | 迁移卡在锁上 | `bash scripts/diagnose.sh`（第 3 段看锁等待） |
-| 页面能开但接口 500 | 后端异常 | `bash scripts/logq.sh errors --since 1h` |
-| 索引/缩略图不动 | worker 没起 | `docker compose ps`；`curl localhost/ready` 看队列 |
-
-排障入口只有一个：
-
-```bash
-bash scripts/diagnose.sh
-```
-
-只读，一次打出容器状态、探针历史、PG 锁等待、worker 注册、nginx 错误。
-
----
-
-## 六、数据在哪
-
-| 卷 / 目录 | 内容 | 删了会怎样 |
-|---|---|---|
-| `siteyeb-pgdata`（卷） | 全部业务数据 | 全丢 |
-| `siteyeb-redis`（卷） | 队列与缓存 | 队列丢，数据不丢 |
-| `D:/ITJC/videos`（挂载） | 视频原文件 | 视频丢 |
-| `D:/ITJC/output`（挂载） | 字幕、笔记 md、转写产物 | 需重新转写 |
-| `D:/ITJC/work`（挂载） | 临时文件、私有笔记 | 私有笔记需重建 |
-| `./logs`（挂载） | 应用日志 JSONL | 只丢日志 |
-
-`docker compose down` **不会**删卷。要清空数据得显式 `down -v`。
+- `start.bat:125,143` 与 `start.sh:31,80` 已改用 compose 生成名 `p2-siteyeb-backend-1` 取日志/探针状态。
+- 本机后端 8100 启动命令来自 `README_cn.md`，本次没有在 venv 里实跑复核。

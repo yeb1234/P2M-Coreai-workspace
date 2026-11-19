@@ -1,8 +1,8 @@
 """A/B/C 三组修复的针对性验证。
 
 跑法（容器内）：
-    docker cp scripts/verify_fixes.py siteyeb-backend:/tmp/
-    docker exec siteyeb-backend python /tmp/verify_fixes.py
+    docker cp scripts/verify_fixes.py p2-siteyeb-backend-1:/tmp/
+    docker exec p2-siteyeb-backend-1 python /tmp/verify_fixes.py
 
 每条都验证「修之前会错、修之后对」，不是「接口返回 200」。
 """

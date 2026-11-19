@@ -20,7 +20,7 @@ from sqlalchemy import desc, func
 from app.auth import get_current_user, get_optional_user
 from app.database import SessionLocal
 from app.models import User, Video, WatchEvent
-from app.services.profile import VALID_EVENT_TYPES, recompute_profile
+from app.services.profile import VALID_EVENT_TYPES, invalidate_profile_cache, recompute_profile
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,10 @@ def ingest_watch_events(
         if rows:
             db.add_all(rows)
             db.commit()
+            # 心跳每 15 秒一批；如果每批都删缓存，5 分钟 TTL 等于不存在。
+            # 播放/暂停/拖动/结束这类事件才失效，累计时长最多陈旧一个 TTL。
+            if user_id is not None and any(event.event_type != "heartbeat" for event in rows):
+                invalidate_profile_cache(user_id)
     finally:
         db.close()
 
@@ -158,6 +162,7 @@ def recompute(user: User = Depends(get_current_user)):
     db = SessionLocal()
     try:
         profile = recompute_profile(db, user.id)
+        invalidate_profile_cache(user.id)
         return {
             "user_id": profile.user_id,
             "videos_started": profile.videos_started,

@@ -1,5 +1,7 @@
 # Codex 改进记录
 
+> 状态：部分现行（2026-11-16 校对）。早期结构拆分、维护原则与编码约定仍成立；文中引用的旧文件、行号、SQLite 结论已按当前代码复核，失效处见各节标注。
+
 本文记录当前这一轮对 SiteYeb / P2M CoreAI 工作台做过的架构、性能、接口和 UI 改进，方便后续继续接手。
 
 ## 总体目标
@@ -47,7 +49,7 @@
 
 复用位置：
 
-- `assistant.py`：AI 助手聊天。
+- 助手聊天：`routers/assistant.py` + `agents/chat_agent.py`（旧 `services/assistant.py` 整模块已删除，见 `release-3.0.0-beta.md` 第 7 节）。
 - `ollama_summarize.py`：视频总结。
 - `subtitle_corrector.py`：字幕校对。
 
@@ -133,7 +135,7 @@ THUMBNAIL_BACKGROUND_LIMIT=1
 - AI 任务中心轮询改为页面可见时 3 秒、后台 10 秒，并避免后台刷新当前视频详情。
 - 灵境小助手上下文改为 `useAssistantPageContext`，订阅 activeView、当前视频、当前笔记变化，不再 1.5 秒固定刷新。
 - Todo 提醒按最近提醒时间设定下一次唤醒；没有待提醒任务时不保留固定轮询。
-- Todo 到日历同步拆为 `todoCalendarSyncPlan`，先计算 add/update/delete，再执行 store 写入。
+- Todo 到日历同步拆为 `todoCalendarSyncPlan`，先计算 add/update/delete，再执行 store 写入。（**该文件后已作为死代码删除**，当前 0 引用；日历派生口径见 `src/lib/projections/` 与 `components/calendar/calendarDerivedData.ts`。）
 - 视频播放器拆出 `useVideoProgressScrubber` 和 `useVideoElementEvents`，减少 `VideoPage.tsx` 的事件逻辑。
 - 视频列表观看进度统一通过 `videoFormat.ts`，播放列表没有真实总时长时不再显示估算进度条。
 - 通知面板定位和时间文案拆成纯 helper，并补单测。
@@ -201,22 +203,22 @@ python -m compileall backend/app
 
 已有防护：
 
-- `worker.py:31-32`：启动时自动调用 `requeue_interrupted_ai_jobs()`
-- `ai_jobs.py:354-372`：把 `status == "running"` 的任务重置为 `queued`
-- `database.py:89-92`：SQLite WAL 模式，崩溃后数据库可自动恢复
-- `ai_jobs.py:643-650`：`finally` 块清理临时 WAV 文件
-- `ai_jobs.py:602-651`：`run_ai_job` 整体 try-except 包裹，失败自动标记 `failed`
+- `worker.py`：启动时自动调用 `requeue_interrupted_ai_jobs()`
+- `ai_jobs.py`：把 `status == "running"` 的任务重置为 `queued`
+- ~~`database.py:89-92`：SQLite WAL 模式，崩溃后数据库可自动恢复~~ **已失效旧结论**：现行部署是 PostgreSQL，SQLite 的 PRAGMA WAL 只在迁移读取分支生效，不参与运行时恢复。
+- `ai_jobs.py`：`finally` 块清理临时 WAV 文件
+- `ai_jobs.py`：`run_ai_job` 整体 try-except 包裹，失败自动标记 `failed`
 
-隐患：
+隐患（2026-11-16 复核）：
 
-- **队列暂停状态丢失**：`ai_queue.py:6` 的 `_paused` 是纯内存 `threading.Event`，worker 重启后恢复为未暂停，用户手动暂停的设置会失效。
-- **Worker 线程异常没兜底**：`worker.py:64-65` 的 `future.result()` 没有 try-except，某个任务抛异常可能导致整个 worker 线程崩溃。
+- **队列暂停状态丢失**：旧 `ai_queue.py` 的内存 `threading.Event` 已不存在；现行暂停状态存 Redis key `ai_queue:paused`（`admin_ai_queue.py:36`）。仍待核实：Redis 未持久化时重启是否丢暂停态。
+- **Worker 线程异常没兜底**：**已修**，`worker.py:119-120` 对 worker 运行包了 `except Exception: logger.exception("Worker error")`。
 
 ### 2. 整机断电重启
 
 恢复机制：
 
-1. SQLite WAL 保证数据库完整。
+1. 现行部署靠 PostgreSQL 持久化卷保证数据完整（旧 SQLite WAL 结论不再适用）。
 2. Worker 启动后所有 `running` 任务被 requeue。
 3. 重新认领后从头执行。
 
@@ -232,9 +234,9 @@ python -m compileall backend/app
 
 已有防护：
 
-- `idbStorage.ts:236-240`：`pagehide` / `visibilitychange` 时 flush pending 写入
+- `idbStorage.ts`：`flushAllPending` 在 `pagehide` / `visibilitychange` 时 flush pending 写入
 - `IMMEDIATE_LOCAL_STORAGE_NAMES` 中的 store 跳过 debounce
-- `useRehydrateStores.ts:28-30`：登录切换时强制 rehydrate
+- `useRehydrateStores.ts`：登录切换时强制 rehydrate
 
 问题：
 
@@ -244,11 +246,11 @@ python -m compileall backend/app
 
 ### 4. 额外需要考虑的地方
 
-| 优先级 | 问题 | 建议 |
-| --- | --- | --- |
-| **高** | 队列暂停状态重启丢失 | 把 `_paused` 持久化到 `app_settings` 表，启动时读取 |
-| **高** | Worker 线程异常可能整体崩溃 | `worker.py:65` 的 `future.result()` 包上 try-except |
-| **中** | 没有断点续传，崩溃后全部重做 | 大改动；短期可考虑在 `_step_write_outputs` 中间增加 checkpoint（比如转写完成后把结果写进 job 的 `transcript_segments` 字段，下次检测到已有结果可跳过转写） |
-| **中** | 没有定时自动 recover stuck jobs | `recover_stuck_ai_jobs` 只能手动调用，建议 worker idle 时或 health check 中自动执行（比如 running > 60 分钟无更新自动 requeue） |
-| **低** | 临时文件可能泄漏 | 崩溃残留的 `.wav` 和 `.json` 可能积累，可加启动时清理逻辑 |
-| **低** | 前端筛选状态不持久化 | 把 `aiJobStatusFilter`、`batchMode` 等存入 `localStorage` 或 IndexedDB |
+| 优先级 | 问题 | 建议 | 复核状态（2026-11-16） |
+| --- | --- | --- | --- |
+| **高** | 队列暂停状态重启丢失 | 把 `_paused` 持久化到 `app_settings` 表，启动时读取 | 🟡 已改存 Redis key `ai_queue:paused`；Redis 未持久化时的重启丢失风险待核实 |
+| **高** | Worker 线程异常可能整体崩溃 | `worker.py` 的任务执行包上 try-except | ✅ 已修（`worker.py:119-120`） |
+| **中** | 没有断点续传，崩溃后全部重做 | 大改动；短期可考虑在 `_step_write_outputs` 中间增加 checkpoint（比如转写完成后把结果写进 job 的 `transcript_segments` 字段，下次检测到已有结果可跳过转写） | ⬜ 仍未做 |
+| **中** | 没有定时自动 recover stuck jobs | worker idle 时或 health check 中自动执行（比如 running > 60 分钟无更新自动 requeue） | 🟡 启动时有 `requeue_stale_tasks` / `requeue_interrupted_ai_jobs`；运行中的定时 recover 待核实 |
+| **低** | 临时文件可能泄漏 | 崩溃残留的 `.wav` 和 `.json` 可能积累，可加启动时清理逻辑 | ⬜ 未复核 |
+| **低** | 前端筛选状态不持久化 | 把 `aiJobStatusFilter`、`batchMode` 等存入 `localStorage` 或 IndexedDB | ⬜ 未复核 |

@@ -12,6 +12,7 @@ import { playInteractionSound } from '../../lib/sounds';
 import { datePart, hasScheduleTime } from '../../lib/scheduleTime';
 import { usePomodoroStore } from '../../stores';
 import { calculateSchedulePomodoroRounds } from '../../lib/pomodoroPlanning';
+import { selectTodoProjection, sortTodosByPriority, splitTodoItems } from '../../lib/projections/todo';
 
 export const TodoList: React.FC = () => {
   const items = useScheduleStore((s) => s.items);
@@ -45,26 +46,23 @@ export const TodoList: React.FC = () => {
   const [collapsedFilters, setCollapsedFilters] = useState(false);
   const trashRef = useRef<HTMLDivElement>(null);
 
-  const todos = useMemo(() => Object.values(items).filter((item) => item.type === 'todo' && !item.deletedAt), [items]);
+  // 基础集合与计数和工作台待办卡片走同一份投影，不在页面这边另写一套过滤/排序
+  const todos = useMemo(() => splitTodoItems(items), [items]);
+  const { counts } = useMemo(() => selectTodoProjection(items, undefined, itemOrder), [items, itemOrder]);
   const filteredTodos = useMemo(() => {
     const query = filter.searchQuery.trim().toLowerCase();
     const orderIndex = new Map(itemOrder.map((id, index) => [id, index]));
-    const priorityOrder: Record<ScheduleItem['priority'], number> = { high: 0, medium: 1, low: 2, green: 3 };
 
-    return todos
-      .filter((todo) => {
-        if (filter.priority && todo.priority !== filter.priority) return false;
-        if (filter.status !== 'all' && todo.status !== filter.status) return false;
-        if (!query) return true;
-        return todo.title.toLowerCase().includes(query) || todo.description.toLowerCase().includes(query);
-      })
-      .sort((a, b) => {
-        if (a.status === 'completed' && b.status !== 'completed') return 1;
-        if (a.status !== 'completed' && b.status === 'completed') return -1;
-        const orderDiff = (orderIndex.get(a.id) ?? Number.POSITIVE_INFINITY) - (orderIndex.get(b.id) ?? Number.POSITIVE_INFINITY);
-        if (orderDiff !== 0) return orderDiff;
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
-      });
+    return sortTodosByPriority(
+      todos
+        .filter((todo) => {
+          if (filter.priority && todo.priority !== filter.priority) return false;
+          if (filter.status !== 'all' && todo.status !== filter.status) return false;
+          if (!query) return true;
+          return todo.title.toLowerCase().includes(query) || todo.description.toLowerCase().includes(query);
+        }),
+      orderIndex,
+    );
   }, [filter, itemOrder, todos]);
 
   const trashedTodos = useMemo(() => getTrashedScheduleItems(items).filter(({ item }) => item.type === 'todo'), [items]);
@@ -141,7 +139,7 @@ export const TodoList: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <CheckSquare size={16} className="text-[var(--accent)]" />
             <h2 className="text-sm font-bold text-[var(--text-primary)]">待办</h2>
-            <span className="text-xs text-[var(--text-muted)]">({activeTodos.length + completedTodos.length})</span>
+            <span className="text-xs text-[var(--text-muted)]">({counts.total})</span>
           </div>
           <div className="flex items-center gap-0.5">
             <button onClick={() => setShowToolbar(!showToolbar)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showToolbar ? 'text-[var(--accent)] bg-[var(--bg-accent)]' : 'text-[var(--text-muted)]'}`} title="筛选">

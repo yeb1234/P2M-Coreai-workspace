@@ -1,8 +1,8 @@
 # 检索元数据（路径 / 文件名）设计与实测
 
-> 日期：2026-11-16
-> 范围：`app/services/hybrid_search.py`、`app/services/lexical.py`、新增 `app/services/retrieval_meta.py`、`app/schemas.py`
-> 数据快照：`siteyeb-pg` / `p2learning`，60,307 个语义块，8,785 个已索引视频，14,327 个视频
+> 状态：现行（最后校对 2026-11-16）
+> 范围：`app/services/hybrid_search.py`、`app/services/lexical.py`、`app/services/retrieval_meta.py`、`app/schemas.py`
+> 数据基线：截至 2026-11-16，`videos` 14,327、`content_chunks` 60,259（向量覆盖 100%）、`subtitle_segments` 3,593,723、有字幕视频 8,785。文中改造前的实测数字均为 2026-11-16 凌晨那批测量，本次校对未连库重跑；无法核实的数字标「未核实」。
 
 ## 0. 一句话结论
 
@@ -36,26 +36,26 @@ RETRIEVAL_META_ENABLED=0
 | 向量化 | `embedding_pipeline._embed_pending` | `content_chunks.text` | ❌ |
 | 向量检索 | `vector_store.search` | `content_chunks.embedding` | ❌ |
 | 词法检索 | `lexical.lexical_search` | `s.text ILIKE :term` | ❌（`v.title` / `v.filepath` 只出现在 SELECT 里，没进 WHERE） |
-| 融合 | `hybrid_search.hybrid_search` | 两路 RRF：`lexical 0.8` / `vector 1.2` | ❌ |
-| 重排 | `_api_rerank`（cross-encoder）/ `_llm_rerank` | 只有 `hit.text` | ❌ |
+| 融合 | `hybrid_search.hybrid_search` | 三路加权 RRF：`lexical 0.8` / `vector 1.2` / `meta 1.5`，`RRF_K=60`（`hybrid_search.py:33,503`） | ❌ |
+| 重排 | `_api_rerank`（cross-encoder）/ `_llm_rerank` | meta 通道开启时送 `f"{meta_text}。{hit.text}"`；关闭时只有 `hit.text`（`hybrid_search.py:318-324`） | ❌ |
 | 标题检索 | `lexical.title_search` | `videos.title` | ⚠️ 存在，但只被 `agents/tools.py` 的独立工具调用，不参与 `/api/search/hybrid` |
 
 结论：**课程名、章名、课时名在检索链路里完全不可见**。
 唯一例外是 `title_search`，它只被 agent 的「按标题找视频」工具使用。
 
-### 1.2 数据形态（只读 SQL 实测）
+### 1.2 数据形态
 
-| 事实 | 数值 |
+| 事实 | 数值（截至 2026-11-16，除标注外均为库内查询基线） |
 | --- | --- |
-| 已索引视频 / 视频总数 | 8,785 / 14,327 |
-| 语义块总数 / 缺向量 | 60,307 / 0（覆盖率 100%） |
-| 每视频块数：均值 / 中位数 / 最大 | 6.86 / 5 / 422 |
-| 路径层级（按 `/` 切分） | 5–9 层为主（5,060 条 7 层） |
-| `filepath` 含 `itjc8` 等站名 | 13,421 / 14,327（93.7%） |
-| `filename` 含站名 | 7,839 / 14,327 |
-| `title` 含站名 | **1 / 14,327**（入库时已用 `clean_video_title` 清洗） |
-| 有 LLM 摘要（`videos.summary`） | **40 / 14,327（0.28%）** |
-| 体积：heap / HNSW / trgm / 合计 | 147MB / 143MB / 326MB / 781MB |
+| 已索引（有字幕）视频 / 视频总数 | 8,785 / 14,327 |
+| 语义块总数 / 缺向量 | 60,259 / 0（覆盖率 100%） |
+| 每视频块数：均值 / 中位数 / 最大 | 未核实（改造前实测 6.86 / 5 / 422，本次未连库重跑） |
+| 路径层级（按 `/` 切分） | 未核实（改造前实测 5–9 层为主，5,060 条 7 层） |
+| `filepath` 含 `itjc8` 等站名 | 未核实（改造前实测 13,421 / 14,327，93.7%） |
+| `filename` 含站名 | 未核实（改造前实测 7,839 / 14,327） |
+| `title` 含站名 | 未核实（改造前实测 1 / 14,327；入库时已用 `clean_video_title` 清洗） |
+| 有 LLM 摘要（`videos.summary`） | 未核实（改造前实测 40 / 14,327，0.28%） |
+| 体积：heap / HNSW / trgm / 合计 | 未核实（改造前实测 147MB / 143MB / 326MB / 781MB） |
 
 关键差异：**标题是干净的，路径不干净**。所以用「路径」做检索线索之前必须先清洗，
 清洗函数现成：`app/utils/textclean.py::clean_video_title`（只删高置信度的
@@ -88,7 +88,7 @@ RETRIEVAL_META_ENABLED=0
 
 ### 2.1 规则
 
-1. **切根前缀**：`/videos/`、`/itjc/`、`D:/ITJC/`（沿用 `app/utils/paths.py` 的口径），保留大小写。
+1. **切根前缀**：`/videos/`、`/itjc/`、`d:/itjc/`（`retrieval_meta.py:81`，匹配前先转小写），保留剩余部分大小写。
 2. **逐层清洗**：每一层目录、文件名都过 `clean_video_title`（去站名、去 `(1)` 后缀）。
 3. **丢噪音层**：只承担「装东西」的层级不参与语义 ——
    `视频` / `01、视频` / `02-视频` / `4.视频` / `录播` / `直播回放`。
@@ -199,10 +199,10 @@ RETRIEVAL_META_ENABLED=0
   「同视频内部的一致性」，而这恰恰是我们**不需要**的那部分：
   用户问「jQuery 动画」，要的是「02-获取位置」而不是「随便哪个块」。
   块数越多（库里最多 422 块）这个效应越强。
-- **存储**：向量条数不变（60,307 × 2KB ≈ 118MB 向量本体），但**全部要重算**。
-- **耗时（实测 42ms/块，batch=64，LM Studio bge-m3）**：
+- **存储**：向量条数不变（当时 60,307 × 2KB ≈ 118MB 向量本体；截至 2026-11-16 为 60,259 块），但**全部要重算**。
+- **耗时（改造前实测 42ms/块，batch=64，LM Studio bge-m3）**：
   60,307 × 42ms ≈ **42 分钟纯计算**，加分批 UPDATE 约 50–60 分钟；
-  HNSW 索引重建（143MB）另计。
+  HNSW 索引重建另计（索引体积未核实）。
 - **风险**：半途失败会造成「一半块带路径、一半不带」，检索分数不可比；
   需要一次全量重跑，且回滚也要再跑一次。
 
@@ -210,7 +210,7 @@ RETRIEVAL_META_ENABLED=0
 
 - **质量**：LLM 总结能补足「这门课在讲什么」的语义，理论上对课程型查询最友好，
   也是用户设想的「拼出更准确的视频描述」。
-- **成本（硬约束）**：**当前只有 40 / 14,327 个视频有 `videos.summary`（0.28%）**。
+- **成本（硬约束）**：改造前实测只有 40 / 14,327 个视频有 `videos.summary`（0.28%）；截至 2026-11-16 的覆盖率未核实。
   要对全库生效，等于新增 1.4 万次 LLM 调用；按本地 `qwen2.5:7b` 的经验值
   单视频数十秒算，是一个「跑一整晚」级别的批处理（**具体吞吐待验证**，
   本次没有实测，不要拍数字）。
@@ -226,7 +226,7 @@ RETRIEVAL_META_ENABLED=0
 | --- | --- | --- | --- | --- |
 | 课程型查询 | ❌ | ✅ | ✅ | ✅（实测 top-1 正确） |
 | 内容型查询 | ✅ | ⚠️ 段内区分度下降 | ⚠️ 更严重 | ✅ 不受影响（向量未改） |
-| 重建索引 | 无 | 60,307 块全量（~50min） | 14,327 次 LLM + 全量向量 | **0** |
+| 重建索引 | 无 | 60,259 块全量（按改造前测算 ~50min） | 14,327 次 LLM + 全量向量 | **0** |
 | 回滚 | — | 再跑一次 | 再跑一次 | **改环境变量，立即生效** |
 | 新增延迟 | 0 | 0 | 0 | +100~200ms |
 | 可解释性 | 低 | 低 | 中 | 高（命中标题/路径/章节可逐项解释） |
@@ -257,17 +257,29 @@ RETRIEVAL_META_ENABLED=0
 ### 4.2 `app/services/lexical.py`：新增第三路召回
 
 - `_document_frequency(terms)`：一条 `count(*) FILTER (...)` 统计所有词在
-  `title + filepath` 上的文档频率（14k 行扫一遍约 40–70ms），带 10 分钟进程内缓存。
+  `title + filepath` 上的文档频率（14k 行扫一遍约 40–70ms），带 10 分钟进程内缓存
+  （`_DF_CACHE`，TTL 600 秒、上限 512 条，`lexical.py:49-50,375`）。
+- **同义词排除 / 展开（2026-11-16 新增，`lexical.py:73-92`）**：
+  - `_TOKEN_EXCLUDE`：`java` 排除 `javascript` / `java script` / `javascrtipt`（ASR 错拼）。
+    命中条件与 df 统计**同口径**带 `NOT ILIKE ANY(...)`（`lexical.py:193-198,346-358,459-467`）。
+  - `_TOKEN_EXPAND`：`java` 展开 `springboot` / `spring boot` / `junit` / `jvm` / `maven`，
+    作为额外 ILIKE 分支并进候选池；`meta_search` 把展开词并入 terms 后去重
+    （`lexical.py:428-430`）。排序仍交给向量 / rerank，展开词不直接顶到前面。
+  - **df 口径（`java`）**：子串口径（`ILIKE '%java%'`，含 JavaScript 课）命中 **1,119** 个视频；
+    排除口径（与命中条件同口径 `NOT ILIKE ANY`）df=**11**（`lexical.py:68,346-358`）。
+    另据库内查询（截至 2026-11-16）：标题含 `java` 且排除 JavaScript 仅 **12** 条；
+    SpringBoot 视频 22 个（第 5 章 8 / 第 6 章 14），标题与分类名里都没有 `java` 字样，只能靠展开词召回。
 - `meta_search(query, ...)`：
-  - **闸门 1（df 上限 2000）**：丢泛词。实测 df：黑马前端 6230 / 算法 810 /
-    面试 758 / 第五章 524 / jQuery 117 / 组件通信 47 / 闭包 40 / GC算法 1。
-  - **闸门 2（至少一个 df ≤ 600）**：整条查询都是泛词时，交回内容通道，不由路径决策。
+  - **闸门 1（df 上限 `META_MAX_DF=2000`）**：丢泛词。改造前实测 df：黑马前端 6230 / 算法 810 /
+    面试 758 / 第五章 524 / jQuery 117 / 组件通信 47 / 闭包 40 / GC算法 1
+    （`lexical.py:26-38` 注释同值，本次未连库重跑）。
+  - **闸门 2（至少一个 df ≤ `META_MIN_SPECIFIC_DF=600`）**：整条查询都是泛词时，交回内容通道，不由路径决策（`lexical.py:39,436`）。
   - **打分**：`Σ(词权重 × 命中位置系数) / Σ(词权重)`，词权重 `1/log2(2+df)`，
-    位置系数 标题 1.0 / 文件名 0.95 / 路径 0.85。
+    位置系数 标题 1.0 / 文件名 0.95 / 路径 0.85（`lexical.py:479-484`）。
     **先比命中几个词，再比命中在哪里** —— 早期版本给路径 0.5，导致
     「路径同时命中 jQuery + 第五章」的视频（0.85）输给「只有标题含 jQuery」的视频（1.0）。
-  - **分数下限 0.30**：RRF 只看排名不看分数，0.15 分的「什么是 X」噪声排第 2
-    照样能压过向量第 1（实测「什么是 GC 算法」top-2~5 全是这种噪声）。
+  - **分数下限 `META_MIN_SCORE=0.30`**（`lexical.py:45,547`）：RRF 只看排名不看分数，0.15 分的「什么是 X」噪声排第 2
+    照样能压过向量第 1（改造前实测「什么是 GC 算法」top-2~5 全是这种噪声）。
   - **一个视频一条**：取「该视频内第一次提到查询词的块」，没有则取第 0 块。
     比固定取第 0 块更贴近用户想听的位置（第 0 块常常是「课程介绍」）。
   - **CTE 先截断视频候选再回块表**：不截断时，泛词（vue df=1520）会让相关子查询
@@ -282,8 +294,9 @@ RETRIEVAL_META_ENABLED=0
   meta_score: Optional[float] = None
   ```
   在加字段之前，Pydantic 会把这两个键静默丢掉，接口返回里没有「这条属于哪门课、第几节」。
-  加完之后响应里有字段了，但**界面尚未渲染**（见 §8 第 1 条）。
-- 融合从两路变三路：`{"lexical": 0.8, "vector": 1.2, "meta": 1.5}`。
+  加完之后响应里有字段了；前端卡片渲染状态见 §8 第 1 条。
+- 融合从两路变三路：`{"lexical": 0.8, "vector": 1.2, "meta": 1.5}`，`RRF_K=60`
+  （`hybrid_search.py:33,503`）。
   meta 权重高于 vector 是有意的：它只在「路径能证明这条对」时出现，
   且一个视频只出一条；但仍低于「能证明这一段对」的重排，留出纠正空间。
 - `_api_rerank` 送进 cross-encoder 的文档改为 `f"{meta_text}。{text}"`。
@@ -344,8 +357,8 @@ RETRIEVAL_META_ENABLED=0
 | `meta_seq_ms`（同目录顺序） | 20–40ms |
 | 关闭开关 | 0 |
 
-测量条件（写报告时请带上限定语）：**全库 14,327 个视频 / 60,307 个块**，
-单机 `siteyeb-pg` + 本机 LM Studio 的 bge-m3，串行执行。
+测量条件（写报告时请带上限定语）：改造前实测，全库 14,327 个视频 / 60,307 个块（截至 2026-11-16 为 60,259 块），
+单机 PostgreSQL 容器（现名 `p2-siteyeb-postgres-1`，当时写作 `siteyeb-pg`）+ 本机 LM Studio 的 bge-m3，串行执行。
 
 「冷/热」的含义（**两档，不要只写一档**）：df 缓存是**进程内**的
 （`_DF_CACHE`，写入后 10 分钟过期、上限 512 条），所以：
@@ -365,7 +378,8 @@ RETRIEVAL_META_ENABLED=0
 
 「什么是 GC 算法」的正确视频正文是 ASR 错字版（「JC算法」）。
 只把路径拼进**索引**而不给 reranker 看，cross-encoder 判它不相关 →
-`rerank_min_score=0.10` 直接过滤，用户仍然看不到正确答案。
+低于 `rerank_min_score` 的条目直接过滤（当前 `.env` 生效值 `RERANK_MIN_SCORE=0.10`，
+`database.py:93` 的 settings 默认值是 `0.02`，`.env.example:117` 同为 `0.02`），用户仍然看不到正确答案。
 所以「路径进检索」和「路径进重排」必须同时做，否则等于白做。
 
 ### 5.4 顺带发现（未改）
@@ -388,7 +402,7 @@ RETRIEVAL_META_ENABLED=0
 - **路径+文件名+字幕（B）**：能修课程型查询，但要付出全量重算向量
   （~50min）+ 段内区分度下降（同视频余弦 0.61 → 0.78）+ 不可灰度。
 - **再加 LLM 总结（C）**：它解决的是「视频级描述」缺失。但：
-  - 现在 14,327 个视频里只有 40 个有 summary，等于要从零做 1.4 万次调用；
+  - 改造前 14,327 个视频里只有 40 个有 summary（当前覆盖率未核实），等于要从零做 1.4 万次调用；
   - 总结会随字幕变化过期，需要新的新鲜度机制；
   - 幻觉会直接污染向量，且不易发现。
 - **本次采用（D）**：用「文件名 + 最近 3 层目录」当**免费的视频级描述**，
@@ -404,7 +418,7 @@ top-5 命中率。只有当 summary 带来的提升显著高于「路径」时�
 
 | 不做 | 原因 |
 | --- | --- |
-| 重建 60,307 个块的向量 | 收益不确定（§3.2 稀释），且要停机窗口；当前方案不需要 |
+| 重建 60,259 个块（截至 2026-11-16）的向量 | 收益不确定（§3.2 稀释），且要停机窗口；当前方案不需要 |
 | 给 `content_chunks` 加列存 meta_text | 需要 migration + 回填 6 万行；纯计算已经够快（<1ms/条） |
 | 全量生成 LLM 摘要 | 40/14,327 的覆盖率，成本与风险都不成比例（§3.3） |
 | 改 `videos.title` 的清洗口径 | 标题只有 1 条带站名，动数据不可逆 |
@@ -422,7 +436,7 @@ top-5 命中率。只有当 summary 带来的提升显著高于「路径」时�
 **触发条件（精确版）**：查询拆出的关键词里有 **不足 3 个字符**的词
 （`算法`、`闭包`、`gc`）。`lexical_search` 用 `s.text ILIKE '%词%'` 匹配，
 而 pg_trgm 的 GIN 索引要求模式里至少有 3 个字符才能抽出 trigram ——
-**2 字符的词用不上索引**，退化成 60,307 行全表扫描。
+**2 字符的词用不上索引**，退化成全表扫描（改造前 60,307 行；截至 2026-11-16 为 60,259 行）。
 3 个字符以上（`vue`、`组件通信`、`jQuery`）都能走索引。
 
 **执行计划实证**（同一张表、同样返回少量行）：
@@ -434,7 +448,7 @@ top-5 命中率。只有当 summary 带来的提升显著高于「路径」时�
 
 多个词之间是 `OR`，每个 2 字符词都触发一次全表扫描，叠加后接近 1s。
 
-**实测（端到端 `timings.lexical_ms`，全库 60,307 块）**：
+**实测（端到端 `timings.lexical_ms`，改造前全库 60,307 块；截至 2026-11-16 为 60,259 块）**：
 
 | 查询 | lexical_ms | 说明 |
 | --- | --- | --- |
@@ -461,14 +475,17 @@ top-5 命中率。只有当 summary 带来的提升显著高于「路径」时�
 
 ## 8. 遗留风险
 
-1. **`meta` 的展示层：对话侧已接，视频库搜索页未接**（对话侧见 commit `35dfb1d`）
-   **已修（接口）**：`schemas.py::HybridSearchHit` 加了 `meta` / `meta_score`，
-   `GET /api/search/hybrid` 与 agent 工具拿到的结果里已经带
-   `display`、`lesson_no`、`position/total`、`prev/next`。
-   **未修（展示）**：`src/components/layout/AIChatPanel.tsx`、`src/lib/videoApi.ts`、
-   `backend/app/agents/chat_agent.py`（引用卡片组装 `references` 的地方）
-   目前**都没有读 `meta`** —— 用户界面上还看不到「第几节 / 上一节」。
-   下一个接手的人要做的不是「再加字段」，而是「把已有字段渲染出来」。
+1. **`meta` 的展示层：接口与后端组装已带字段，前端卡片当前由开关关闭不渲染**
+   **已修（接口）**：`schemas.py::HybridSearchHit` 加了 `meta` / `meta_score`
+   （`schemas.py:590-591`），`GET /api/search/hybrid` 与 agent 工具拿到的结果里已经带
+   `display`、`lesson_no`、`position/total`、`prev/next`；`chat_agent` 组装
+   `references` 时也把 `hit.meta` 带进了卡片结构（`chat_agent.py:645`）。
+   **当前不渲染（2026-11-16 起）**：回答下方的「相关片段」卡片由功能开关
+   `FEATURES.chatVideoReferences` 关闭（`src/config/features.ts:21`，默认 `false`；
+   渲染门禁在 `AIChatPanel.tsx:863,888`）。后端仍照常生成 `references`，`ReferenceBlock` /
+   `dedupeReferences` 与后端组装代码全部保留，把开关改回 `true` 并重新构建前端即恢复。
+   开关关闭期间，用户界面上看不到「第几节 / 上一节」；下一个接手的人要做的不是「再加字段」，
+   而是「打开开关 + 把已有字段在卡片上渲染出来」。视频库搜索页是否读取 `meta` 未核实。
 2. **同一视频可能出现两条**（一条来自 meta 通道、一条来自向量通道）。
    现有 `dedupe_overlapping(max_per_video=2)` 允许 2 条，本次未改
    （team 已确认：同视频 2 条可接受）。
@@ -494,14 +511,21 @@ top-5 命中率。只有当 summary 带来的提升显著高于「路径」时�
 
 ## 9. 验证方式（可复现）
 
+> 容器名由 compose 项目名 `p2-siteyeb` 生成，backend 容器为 `p2-siteyeb-backend-1`。
+> 端口（P2，2026-11-16 换号后，`docker-compose.yml:75,107,135,407-408`）：
+> Web `80` + `12302`（同一 nginx）；API `127.0.0.1:12402`（只绑回环，对外仍走 `http://localhost/api`）；
+> dev `12322`；PG `127.0.0.1:12502`；Redis `127.0.0.1:12602`；监控段未分配。
+> 旧号段 `11102` / `11112` / `11122` / `11132` / `11142` / `11162` 已作废（2026-11-16 整体换号），勿再引用。
+> 下面的脚本在容器内执行（`docker exec`），不经过宿主端口。
+
 ```bash
 # 容器内跑（新进程即可看到复制进去的代码）
-docker cp backend/app/services/retrieval_meta.py siteyeb-backend:/app/app/services/
-docker cp backend/app/services/lexical.py        siteyeb-backend:/app/app/services/
-docker cp backend/app/services/hybrid_search.py  siteyeb-backend:/app/app/services/
-docker cp backend/app/schemas.py                 siteyeb-backend:/app/app/schemas.py
+docker cp backend/app/services/retrieval_meta.py p2-siteyeb-backend-1:/app/app/services/
+docker cp backend/app/services/lexical.py        p2-siteyeb-backend-1:/app/app/services/
+docker cp backend/app/services/hybrid_search.py  p2-siteyeb-backend-1:/app/app/services/
+docker cp backend/app/schemas.py                 p2-siteyeb-backend-1:/app/app/schemas.py
 
-docker exec -e PYTHONPATH=/app siteyeb-backend python -c "
+docker exec -e PYTHONPATH=/app p2-siteyeb-backend-1 python -c "
 from app.services.hybrid_search import hybrid_search
 for q in ['黑马前端 jQuery 第五章','什么是 GC 算法','jQuery 动画 获取元素位置']:
     r = hybrid_search(q, top_k=5, use_rerank=False)

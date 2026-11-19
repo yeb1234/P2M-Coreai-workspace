@@ -10,6 +10,7 @@ interface UseVideoPlaybackInput {
   setIsMuted: Dispatch<SetStateAction<boolean>>;
   videoContainerRef: RefObject<HTMLDivElement | null>;
   setIsFullscreen: Dispatch<SetStateAction<boolean>>;
+  onPlaybackError?: (message: string) => void;
 }
 
 export function useVideoPlayback({
@@ -21,16 +22,25 @@ export function useVideoPlayback({
   setIsMuted,
   videoContainerRef,
   setIsFullscreen,
+  onPlaybackError,
 }: UseVideoPlaybackInput) {
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     if (v.paused || v.ended) {
-      v.play().catch(() => {});
+      void v.play().catch((error: unknown) => {
+        const name = error instanceof DOMException ? error.name : '';
+        const message = name === 'NotAllowedError'
+          ? '播放被浏览器拦截，请再点一次播放按钮。'
+          : name === 'AbortError'
+            ? '播放已中断，请再点一次。'
+            : '播放启动失败，请稍后重试。';
+        onPlaybackError?.(message);
+      });
     } else {
       v.pause();
     }
-  }, [videoRef]);
+  }, [videoRef, onPlaybackError]);
 
   const seekBy = useCallback((seconds: number) => {
     const v = videoRef.current;
@@ -88,13 +98,44 @@ export function useVideoPlayback({
 
   const toggleFullscreen = useCallback(() => {
     const el = videoContainerRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
+    const video = videoRef.current as (HTMLVideoElement & {
+      webkitEnterFullscreen?: () => void;
+    }) | null;
+    if (!el && !video) return;
+
+    if (document.fullscreenElement) {
       document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      return;
     }
-  }, [setIsFullscreen, videoContainerRef]);
+
+    // 标准 Fullscreen API：桌面 Chromium / Android Chrome 走这条。
+    if (el?.requestFullscreen) {
+      el.requestFullscreen()
+        .then(() => setIsFullscreen(true))
+        .catch(() => {
+          // iOS Safari 对普通容器不支持，退到 video 元素的原生全屏。
+          if (video?.webkitEnterFullscreen) {
+            try {
+              setIsFullscreen(true);
+              video.webkitEnterFullscreen();
+            } catch {
+              setIsFullscreen(false);
+            }
+          }
+        });
+      return;
+    }
+
+    // iPhone Safari 没有容器级 requestFullscreen，只能让 video 自己进原生播放器。
+    if (video?.webkitEnterFullscreen) {
+      try {
+        setIsFullscreen(true);
+        video.webkitEnterFullscreen();
+      } catch {
+        setIsFullscreen(false);
+      }
+    }
+  }, [setIsFullscreen, videoContainerRef, videoRef]);
 
   return {
     togglePlay,

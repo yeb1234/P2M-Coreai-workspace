@@ -2,47 +2,39 @@ import React from 'react';
 import { AlertCircle, ListTodo } from 'lucide-react';
 import { useScheduleStore, useUIStore } from '../../../stores';
 import { PRIORITY_COLORS } from '../../../types';
-import { toLocalDateString } from '../../../lib/date';
-import { datePart, hasScheduleTime } from '../../../lib/scheduleTime';
+import { selectTodoProjection } from '../../../lib/projections/todo';
 import { SummaryEmpty } from './SummaryEmpty';
 
+/**
+ * 待办卡片 = 待办页（TodoList）同一份投影的渲染。
+ * 数字和列表都来自 selectTodoProjection，卡片这边不再自己过滤/排序。
+ */
 export const TodoSummary: React.FC = () => {
   const items = useScheduleStore((s) => s.items);
+  // 拖拽顺序也参与排序，卡片和待办页看到的是同一条"第一条"
+  const itemOrder = useScheduleStore((s) => s.itemOrder);
   const { setActiveView } = useUIStore();
-  const allTodos = Object.values(items).filter((item) => item.type === 'todo' && !item.deletedAt);
-  const pending = allTodos.filter((t) => t.status === 'pending').length;
-  const inProgress = allTodos.filter((t) => t.status === 'in_progress').length;
-  const completed = allTodos.filter((t) => t.status === 'completed').length;
-  const total = allTodos.length;
-  const today = toLocalDateString(new Date());
-  const overdue = allTodos.filter(
-    (t) => hasScheduleTime(t) && datePart(t.dueAt) < today && t.status !== 'completed'
-  ).length;
 
-  const urgentTodos = allTodos
-    .filter((t) => t.status !== 'completed')
-    .sort((a, b) => {
-      const priorityOrder = { high: 0, medium: 1, low: 2, green: 3 };
-      return (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
-    });
+  // 不 memo：投影是几十条量级的纯计算，memorize 反而容易漏依赖变成陈旧值
+  const projection = selectTodoProjection(items, undefined, itemOrder);
+  const { counts, priorityQueue, overdue, completionRate, total } = projection;
 
-  const displayTodos = urgentTodos.slice(0, 3);
-  const hasMore = urgentTodos.length > 3;
-  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const displayTodos = priorityQueue.slice(0, 3);
+  const hasMore = priorityQueue.length > 3;
 
   return (
     <div className="flex flex-1 flex-col gap-2">
-      <div className="auto-grid-compact text-center">
+      <div className="auto-grid-compact todo-summary-stats text-center">
         <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5">
-          <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{pending}</p>
+          <p className="text-xl font-bold tabular-nums text-[var(--accent)]">{counts.pending}</p>
           <p className="text-xs font-medium text-[var(--text-muted)]">待处理</p>
         </div>
         <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5">
-          <p className="text-xl font-bold tabular-nums text-[var(--info)]">{inProgress}</p>
+          <p className="text-xl font-bold tabular-nums text-[var(--info)]">{counts.inProgress}</p>
           <p className="text-xs font-medium text-[var(--text-muted)]">进行中</p>
         </div>
         <div className="rounded-lg bg-[var(--bg-base)] px-2 py-1.5">
-          <p className="text-xl font-bold tabular-nums text-[var(--success)]">{completed}</p>
+          <p className="text-xl font-bold tabular-nums text-[var(--success)]">{counts.completed}</p>
           <p className="text-xs font-medium text-[var(--text-muted)]">已完成</p>
         </div>
       </div>
@@ -85,12 +77,12 @@ export const TodoSummary: React.FC = () => {
               }}
             >
               <span className={`truncate ${isLast ? 'text-[var(--text-muted)]' : 'text-[var(--text-primary)]'} font-medium`}>
-                {isLast ? `...还有 ${urgentTodos.length - 2} 项` : todo.title}
+                {isLast ? `...还有 ${priorityQueue.length - 2} 项` : todo.title}
               </span>
             </div>
           );
         })}
-        {urgentTodos.length === 0 && (
+        {priorityQueue.length === 0 && (
           <SummaryEmpty
             icon={<ListTodo size={16} />}
             title="暂无待办"
@@ -100,10 +92,10 @@ export const TodoSummary: React.FC = () => {
         )}
       </div>
 
-      {overdue > 0 && (
+      {overdue.length > 0 && (
         <div className="flex items-center gap-2 text-[var(--danger)] text-xs bg-[var(--danger-bg)] rounded-lg p-2 font-medium">
           <AlertCircle size={14} />
-          <span>{overdue} 项已过期</span>
+          <span>{overdue.length} 项已过期</span>
         </div>
       )}
     </div>

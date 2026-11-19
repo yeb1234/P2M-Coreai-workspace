@@ -25,13 +25,14 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import desc
 
-from app.agents.chat_agent import AgentContext, stream_chat
+from app.agents.chat_agent import AgentContext, BASE_PROMPT, stream_chat
 from app.auth import get_current_user, require_admin
 from app.database import SessionLocal
 from app.models import ChatMessage, ChatSession, User
@@ -53,7 +54,13 @@ from app.services.llm import (
     llm_health,
 )
 from app.services.llm_client import OpenAICompatibleClient
-from app.services.memory import append_message, decode_references, ensure_session, maybe_compress
+from app.services.memory import (
+    append_message,
+    backfill_session_title,
+    decode_references,
+    ensure_session,
+    maybe_compress,
+)
 from app.services.quota import chat_quota_for, quota_exceeded_detail
 from app.services.rate_limit import chat_limiter
 
@@ -66,6 +73,77 @@ router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 MASKED_SECRET = "__MASKED__"
 
 
+@router.get("/capabilities")
+def get_capabilities(_admin: User = Depends(require_admin)):
+    """只读管理面：列出已注册工具与能力包，方便排查「模型到底能调什么」。"""
+    from app.agents.skills import SKILLS
+    from app.agents.tool_registry import DEFAULT_REGISTRY
+
+    def describe_tool(name: str) -> str:
+        handler = DEFAULT_REGISTRY.get(name)
+        return ((handler.description if handler else "") or "").strip()[:400]
+
+    return {
+        "base_prompt": BASE_PROMPT,
+        "tools": [
+            {
+                "name": spec.name,
+                "version": spec.version,
+                "description": describe_tool(spec.name),
+                "scopes": list(spec.scopes),
+                "timeout_s": spec.timeout_s,
+                "max_calls_per_turn": spec.max_calls_per_turn,
+                "max_retries": spec.max_retries,
+                "requires_login": spec.requires_login,
+                "read_only": spec.read_only,
+                "enabled": spec.enabled,
+                "breaker_failures": spec.breaker_failures,
+                "breaker_cooldown_s": spec.breaker_cooldown_s,
+                "tags": list(spec.tags),
+            }
+            for spec in DEFAULT_REGISTRY.specs()
+        ],
+        "skills": [
+            {
+                "name": skill.name,
+                "version": skill.version,
+                "description": skill.description,
+                "intents": list(skill.intents),
+                "tools": list(skill.tools),
+                "max_total_tool_calls": skill.max_total_tool_calls,
+                "enabled": skill.enabled,
+            }
+            for skill in SKILLS
+        ],
+    }
+
+
+@router.get("/tool-metrics")
+def get_tool_metrics(_admin: User = Depends(require_admin)):
+    """只读指标面：延迟分位、超时率、重试成功率、预算/熔断拒绝。"""
+    from app.agents.tool_metrics import BREAKER, METRICS
+    from app.agents.tool_registry import DEFAULT_REGISTRY
+
+    tools = []
+    for spec in DEFAULT_REGISTRY.specs():
+        tools.append(
+            {
+                "name": spec.name,
+                "enabled": spec.enabled,
+                "metrics": METRICS.snapshot(spec.name),
+                "breaker": BREAKER.status(
+                    spec.name,
+                    spec.breaker_failures,
+                    spec.breaker_cooldown_s,
+                ),
+            }
+        )
+    return {
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "tools": tools,
+    }
+
+
 def _load_session_for_user(db, session_id: str, user: User) -> ChatSession:
     session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
     if not session:
@@ -74,12 +152,13 @@ def _load_session_for_user(db, session_id: str, user: User) -> ChatSession:
     #
     # 注意 user_id 为 NULL 的情况：迁移前的历史会话没有归属，原来这里直接放行，
     # 等于**任何登录用户都能读 87 个老会话的 162 条消息**。
-    # 现在收紧为「无主会话只有 admin 可读」，并且数据侧已经把老会话归给了最早的 admin。
+    # 现在收紧为「无主会话只有 admin 可读」；有主会话只允许本人读，
+    # admin 是运维角色，不是内容绕过角色。
     is_admin = (user.role or "") == "admin"
     if session.user_id is None:
         if not is_admin:
             raise HTTPException(status_code=404, detail="会话不存在")
-    elif session.user_id != user.id and not is_admin:
+    elif session.user_id != user.id:
         raise HTTPException(status_code=404, detail="会话不存在")
     return session
 
@@ -106,6 +185,10 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
         )
         session_id = session.id
         append_message(db, session_id, "user", payload.message)
+    except Exception:
+        # 会话建立/用户消息落库失败时还没调用模型，退额度。
+        quota.refund(user.id)
+        raise
     finally:
         db.close()
 
@@ -114,6 +197,7 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
         user_id=user.id,
         video_id=payload.video_id,
         page_context=payload.page_context,
+        note_context=payload.page_note.model_dump() if payload.page_note else None,
         system_prompt_extra=payload.system_prompt,
         intent=payload.intent,
     )
@@ -122,6 +206,8 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
         result = run_chat(ctx, payload.message)
     except Exception as exc:  # noqa: BLE001
         # run_chat 内部已按兜底方案试过两套模型，走到这里说明都没救。
+        # 没生成回答就退当天额度，别让服务端错误算到用户头上。
+        quota.refund(user.id)
         # 别让全局兜底处理器把它变成「服务内部错误，请附带 request_id 反馈」。
         if classify_llm_error(exc) == ERR_UNKNOWN:
             logger.exception("同步对话失败")
@@ -153,18 +239,24 @@ def assistant_chat(payload: AssistantChatCreate, user: User = Depends(get_curren
 
 @router.post("/chat/stream")
 async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depends(get_current_user)):
-    """SSE 流式对话。事件：token / tool_start / tool_end / done / error
+    """SSE 流式对话。事件：token / tool_start / tool_end / interrupt / done / error
 
-    每个事件是一行 `data: {json}`，done 事件里带 run_id 与工具轨迹。
+    每个事件是一行 `data: {json}`。普通请求结束后 done 带 run_id 与工具轨迹；
+    命中 HITL 时先发 interrupt，前端用同一个 run_id 调 /chat/stream 的 resume 续跑。
     """
-    allowed, remaining = chat_limiter.hit(str(user.id))
-    if not allowed:
-        raise HTTPException(status_code=429, detail="提问太频繁，缓一下再问")
+    is_resume = payload.resume is not None
+    if not is_resume:
+        allowed, remaining = chat_limiter.hit(str(user.id))
+        if not allowed:
+            raise HTTPException(status_code=429, detail="提问太频繁，缓一下再问")
 
-    quota = chat_quota_for(user.role)
-    ok, used, limit = quota.consume(user.id)
-    if not ok:
-        raise HTTPException(status_code=429, detail=quota_exceeded_detail(used, limit, "对话"))
+        quota = chat_quota_for(user.role)
+        ok, used, limit = quota.consume(user.id)
+        if not ok:
+            raise HTTPException(status_code=429, detail=quota_exceeded_detail(used, limit, "对话"))
+    else:
+        # resume 是同一轮请求的继续，不重复限流、不重复扣当天额度。
+        quota = None
 
     db = SessionLocal()
     try:
@@ -172,7 +264,13 @@ async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depen
             db, payload.session_id, video_id=payload.video_id, user_id=user.id
         )
         session_id = session.id
-        append_message(db, session_id, "user", payload.message)
+        if not is_resume:
+            append_message(db, session_id, "user", payload.message)
+    except Exception:
+        # 还没开始流式生成就失败（会话无法建立/用户消息写不进去），退额度。
+        if quota is not None:
+            quota.refund(user.id)
+        raise
     finally:
         db.close()
 
@@ -181,6 +279,7 @@ async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depen
         user_id=user.id,
         video_id=payload.video_id,
         page_context=payload.page_context,
+        note_context=payload.page_note.model_dump() if payload.page_note else None,
         system_prompt_extra=payload.system_prompt,
         intent=payload.intent,
     )
@@ -191,16 +290,44 @@ async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depen
         # 不存的话，用户从历史列表打开旧会话只剩纯文字 —— 正文链接和
         # 相关推荐框全丢（它们原本只在前端组件 state 里）。
         rich: dict = {}
+        quota_refunded = False
+        interrupted = False
+        interrupt_question = ""
+
+        def refund_quota_once() -> None:
+            nonlocal quota_refunded
+            if quota is not None and not quota_refunded:
+                quota.refund(user.id)
+                quota_refunded = True
+
         try:
-            async for event in stream_chat(ctx, payload.message):
-                if event.get("type") == "token":
+            resume = payload.resume.model_dump() if payload.resume else None
+            async for event in stream_chat(
+                ctx,
+                payload.message,
+                resume=resume,
+                run_id=payload.resume.run_id if payload.resume else None,
+                original_message=payload.resume.original_message if payload.resume else None,
+            ):
+                event_type = event.get("type")
+                if event_type == "token":
                     collected.append(event.get("text", ""))
-                elif event.get("type") == "done":
+                elif event_type == "interrupt":
+                    interrupted = True
+                    interrupt_question = str(event.get("question") or payload.message)[:240]
+                elif event_type == "done":
                     rich = {
                         "references": event.get("references") or [],
                         "mentioned_videos": event.get("mentioned_videos") or [],
+                        "actions": event.get("actions") or [],
                     }
+                elif event_type == "error":
+                    # 模型/工具彻底失败：没有可用回答，退还当天额度。
+                    refund_quota_once()
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception:
+            refund_quota_once()
+            raise
         finally:
             answer = "".join(collected).strip()
             if answer:
@@ -210,11 +337,26 @@ async def assistant_chat_stream(payload: AssistantChatCreate, user: User = Depen
                         db2, session_id, "assistant", answer,
                         references=rich.get("references"),
                         mentioned_videos=rich.get("mentioned_videos"),
+                        actions=rich.get("actions"),
                         intent=payload.intent,
                     )
                     maybe_compress(db2, session_id)
                 except Exception:
                     logger.exception("保存助手消息失败")
+                finally:
+                    db2.close()
+            elif interrupted:
+                # 中断时把问题本身也存进历史：用户从历史打开会话时，
+                # 至少能看到「上一轮停在哪个确认点」，而不是一条空回答。
+                db2 = SessionLocal()
+                try:
+                    append_message(
+                        db2, session_id, "assistant",
+                        f"等待你的选择：{interrupt_question[:120]}",
+                        intent=payload.intent,
+                    )
+                except Exception:
+                    logger.exception("保存 HITL 中断消息失败")
                 finally:
                     db2.close()
 
@@ -239,7 +381,7 @@ def list_sessions(
     try:
         rows = (
             db.query(ChatSession)
-            .filter(ChatSession.user_id == user.id)
+            .filter(ChatSession.user_id == user.id, ChatSession.message_count > 0)
             .order_by(desc(ChatSession.updated_at))
             .limit(limit)
             .all()
@@ -247,7 +389,7 @@ def list_sessions(
         return [
             {
                 "id": row.id,
-                "title": row.title,
+                "title": backfill_session_title(db, row),
                 "scope": row.scope,
                 "video_id": row.video_id,
                 "message_count": row.message_count,

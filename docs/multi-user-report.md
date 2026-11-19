@@ -1,5 +1,7 @@
 # 多用户系统诊断报告
 
+> 状态：历史诊断报告（2026-11-16 03:00–04:10 留档，当日校对）。表内数据量、会话/消息数为该时点快照；隔离矩阵与越权结论已按当前代码复核。
+
 时间：2026-11-16 03:00 – 04:10
 范围：数据隔离、权限模型、越权检查、配额
 
@@ -38,9 +40,9 @@
 
 | 表 | 内容 | 是否合理 |
 |---|---|---|
-| `videos` / `categories` | 视频库 2.8 万条 | ✓ 知识库本来就该共享 |
-| `subtitle_segments` | 359 万字幕 | ✓ |
-| `content_chunks` | 6 万语义块 + 向量 | ✓ |
+| `videos` / `categories` | 视频库 2.8 万条（报告时点快照；2026-11-16 基线 14,327 条视频） | ✓ 知识库本来就该共享 |
+| `subtitle_segments` | 359 万字幕（时点快照；基线 3,593,723 条） | ✓ |
+| `content_chunks` | 6 万语义块 + 向量（时点快照；基线 60,259 块） | ✓ |
 | `notes` | AI 生成的学习笔记 | ✓ 但有前提，见第四节 |
 | `app_settings` | 全局配置 | ✓ 只有 admin 能改 |
 
@@ -69,7 +71,8 @@
 脚本在 `backend/scripts/test_multi_user.py`，可在容器内跑：
 
 ```bash
-docker exec siteyeb-backend python scripts/test_multi_user.py http://127.0.0.1:8000
+# 容器名由 compose 生成，以 docker ps 为准，形如 p2-siteyeb-backend-1
+docker exec p2-siteyeb-backend-1 python scripts/test_multi_user.py http://127.0.0.1:8000
 ```
 
 **为什么脚本里用 `127.0.0.1:8000` 而不是 `localhost`**：容器内 `localhost` 指向容器自己，而服务监听在 8000。踩过一次。
@@ -156,6 +159,8 @@ AI 转写视频 → 自动生成 note(source='ai') → 所有人看到同一份 
 
 **我倾向做**，因为「个人学习系统」里，用户的笔记必然私有。但这是产品决策，等你确认。
 
+> 复核（2026-11-16）：该决策随后已落地——`notes` 表已有 `scope`（`shared` / `private`）与可空 `user_id`（`backend/app/models.py:176-178`），见 `release-3.0.0-beta.md` 第 2 节。前端手写笔记另走 `notesStore` + 云端快照同步。
+
 ---
 
 ## 七、顺带发现的三个小问题
@@ -172,15 +177,14 @@ AI 转写视频 → 自动生成 note(source='ai') → 所有人看到同一份 
 
 不知道历史会话属于谁，只能归给最早的 admin。如果那些会话其实是别人的，归属就错了。但比起「所有人都能读」，归给 admin 更安全。
 
-**3. 注册接口是开放的（但有开关，只是默认开）**
+**3. 注册接口默认已关闭（可显式开放）**
 
-代码里 `allow_registration` 默认是 `False`，但 compose 里写的是
-`${ALLOW_REGISTRATION:-true}` —— **默认值被覆盖成了 true**，所以现在能随便注册。
+代码里 `allow_registration` 默认是 `False`，compose 已改为
+`${ALLOW_REGISTRATION:-false}`，`.env.example` 同步为 `false`。未在 `.env`
+显式写 `true` 时，`POST /api/auth/register` 默认不可用。
 
-本身有 IP 级限流，本机演示没问题。但**公网部署必须在 `.env` 里显式写 false**，
-改由管理员在「设置 → 用户管理」里开账号。
-
-已在 `.env.example` 和 compose 注释里标出来了。
+需要临时开放注册时，在 `.env` 写 `ALLOW_REGISTRATION=true` 并重启 backend；
+公网部署保持 `false`，由管理员在「设置 → 用户管理」里开账号。
 
 ---
 
@@ -188,11 +192,11 @@ AI 转写视频 → 自动生成 note(source='ai') → 所有人看到同一份 
 
 按优先级：
 
-| 优先级 | 事 | 理由 |
-|---|---|---|
-| 1 | 定笔记的归属模型（第六节） | 影响数据结构和前端，越晚改成本越高 |
-| 2 | 注册入口加开关（可关闭） | 公网部署前必须 |
-| 3 | 给 `admin` 用户名那个账号改名或提权 | 避免运维误判 |
-| 4 | 把隔离测试接进 CI | 现在只能手动跑 |
+| 优先级 | 事 | 理由 | 复核状态（2026-11-16） |
+|---|---|---|---|
+| 1 | 定笔记的归属模型（第六节） | 影响数据结构和前端，越晚改成本越高 | ✅ 已落地（scope shared/private + user_id，见上） |
+| 2 | 注册入口加开关（可关闭） | 公网部署前必须 | ✅ 已落地：代码默认 `allow_registration=False`，compose 默认 `${ALLOW_REGISTRATION:-false}`，`.env.example` 同步 false；需开放时显式设 true |
+| 3 | 给 `admin` 用户名那个账号改名或提权 | 避免运维误判 | ⬜ 未复核（属数据层账号命名，需查库确认） |
+| 4 | 把隔离测试接进 CI | 现在只能手动跑 | ⬜ 仍是手动脚本 `backend/scripts/test_multi_user.py`，未接 CI |
 
 第 1 项需要你决策，其余我可以直接做。

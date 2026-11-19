@@ -12,7 +12,10 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
+import threading
+import time
+from collections import OrderedDict, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -23,7 +26,7 @@ from app.database import engine, settings
 from app.models import Category, Video
 from app.tables import CONTENT_CHUNKS
 from app.services import retrieval_meta
-from app.services.embeddings import EmbeddingError, get_embedding_client
+from app.services.embeddings import get_embedding_client
 from app.services.lexical import lexical_search, meta_search
 from app.services.llm import build_chat_model
 from app.services.vector_store import VectorStoreError, search as vector_search
@@ -31,6 +34,53 @@ from app.services.vector_store import VectorStoreError, search as vector_search
 logger = logging.getLogger(__name__)
 
 RRF_K = 60
+
+# 检索三路（词法 / 元数据 / query embedding）互不依赖，放到同一个固定线程池。
+# 固定 worker 数而不是按请求新建：多用户并发时线程不会无限膨胀。
+_RETRIEVAL_EXECUTOR = ThreadPoolExecutor(max_workers=3, thread_name_prefix="retrieval")
+
+# query embedding 缓存。
+# 只缓存「查询向量」，不缓存整页检索结果：
+# - 查询向量只取决于模型/维度/文本，新增视频不会让它失效；
+# - 进程内 LRU 有界，不把 1024 维向量塞进 noeviction 的 Redis。
+_QUERY_EMBED_CACHE_MAX = 256
+_QUERY_EMBED_CACHE_TTL_S = 3600.0
+_QUERY_EMBED_CACHE: OrderedDict[str, tuple[float, list[float]]] = OrderedDict()
+_QUERY_EMBED_CACHE_LOCK = threading.Lock()
+
+
+def _timed_call(fn):
+    """执行一个检索子任务，返回 (value, elapsed_ms, error)。"""
+    started = time.perf_counter()
+    try:
+        return fn(), round((time.perf_counter() - started) * 1000, 1), None
+    except Exception as exc:  # noqa: BLE001
+        return None, round((time.perf_counter() - started) * 1000, 1), exc
+
+
+def _query_embedding_cached(query: str) -> tuple[np.ndarray, str]:
+    """查询向量缓存；命中时跳过 LM Studio。"""
+    client = get_embedding_client()
+    key = f"{client.model}|{client.dim}|{query.strip().lower()[:512]}"
+    now = time.monotonic()
+
+    with _QUERY_EMBED_CACHE_LOCK:
+        item = _QUERY_EMBED_CACHE.get(key)
+        if item is not None:
+            created_at, vector = item
+            if now - created_at <= _QUERY_EMBED_CACHE_TTL_S:
+                _QUERY_EMBED_CACHE.move_to_end(key)
+                return np.asarray(vector, dtype=np.float32), "hit"
+            _QUERY_EMBED_CACHE.pop(key, None)
+
+    vector = client.embed([query])[0]
+    vector = np.asarray(vector, dtype=np.float32)
+    with _QUERY_EMBED_CACHE_LOCK:
+        _QUERY_EMBED_CACHE[key] = (now, vector.tolist())
+        _QUERY_EMBED_CACHE.move_to_end(key)
+        while len(_QUERY_EMBED_CACHE) > _QUERY_EMBED_CACHE_MAX:
+            _QUERY_EMBED_CACHE.popitem(last=False)
+    return vector, "miss"
 
 
 @dataclass
@@ -370,51 +420,79 @@ def hybrid_search(
     except Exception:
         logger.warning("查询改写失败，使用原始 query", exc_info=True)
 
-    import time
-
-    timings: dict[str, float] = {}
+    timings: dict[str, float | str] = {}
     degraded: list[str] = []
 
-    started = time.perf_counter()
-    lexical_rows = lexical_search(
-        query, limit=candidate_k, category_ids=category_ids, video_ids=video_ids
+    # 三路并行：词法和元数据不依赖 embedding，没理由排队等它。
+    # 只有 vector_search 依赖 query_vector，放在 embedding 完成后。
+    lexical_future = _RETRIEVAL_EXECUTOR.submit(
+        _timed_call,
+        lambda: lexical_search(
+            query, limit=candidate_k, category_ids=category_ids, video_ids=video_ids
+        ),
     )
-    timings["lexical_ms"] = round((time.perf_counter() - started) * 1000, 1)
 
     # 元数据通道：课程名 / 章名 / 课时名。
     # 它解决的是「查某类课程」——这类查询的答案只存在于路径里，字幕正文
     # 里没有「这是第五章 jQuery」这种话。每个视频最多贡献一条候选，
     # 所以不会挤占内容召回的名额。失败/关闭时返回空，不影响另外两路。
-    meta_rows: list[dict] = []
-    started = time.perf_counter()
+    meta_future = None
     if retrieval_meta.CHANNEL_ENABLED:
-        try:
-            meta_rows = meta_search(
+        meta_future = _RETRIEVAL_EXECUTOR.submit(
+            _timed_call,
+            lambda: meta_search(
                 query, limit=candidate_k, category_ids=category_ids, video_ids=video_ids
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("元数据通道异常，跳过: %s", exc)
+            ),
+        )
+
+    embed_future = _RETRIEVAL_EXECUTOR.submit(
+        _timed_call, lambda: _query_embedding_cached(query)
+    )
+
+    lexical_rows, lexical_ms, lexical_error = lexical_future.result()
+    timings["lexical_ms"] = lexical_ms
+    if lexical_error is not None:
+        logger.warning("词法检索异常，跳过: %s", lexical_error)
+        lexical_rows = []
+        degraded.append("lexical")
+    lexical_rows = lexical_rows or []
+
+    meta_rows: list[dict] = []
+    if meta_future is not None:
+        meta_rows, meta_ms, meta_error = meta_future.result()
+        timings["meta_ms"] = meta_ms
+        if meta_error is not None:
+            logger.warning("元数据通道异常，跳过: %s", meta_error)
             meta_rows = []
-    timings["meta_ms"] = round((time.perf_counter() - started) * 1000, 1)
+        meta_rows = meta_rows or []
+    else:
+        timings["meta_ms"] = 0.0
+
+    query_vector = None
+    embed_result, embed_ms, embed_error = embed_future.result()
+    timings["embed_ms"] = embed_ms
+    if embed_error is not None:
+        logger.warning("语义检索不可用，降级为纯词法: %s", embed_error)
+        degraded.append("vector")
+    else:
+        query_vector, embed_cache = embed_result
+        timings["embed_cache"] = embed_cache
 
     vector_rows: list = []
-    started = time.perf_counter()
-    try:
-        client = get_embedding_client()
-        query_vector = np.asarray(client.embed([query])[0], dtype=np.float32)
-        timings["embed_ms"] = round((time.perf_counter() - started) * 1000, 1)
+    if query_vector is not None:
         started = time.perf_counter()
-        vector_rows = vector_search(
-            query_vector,
-            top_k=candidate_k,
-            category_ids=category_ids,
-            video_ids=video_ids,
-        )
-        timings["vector_ms"] = round((time.perf_counter() - started) * 1000, 1)
-    except (EmbeddingError, VectorStoreError) as exc:
-        logger.warning("语义检索不可用，降级为纯词法: %s", exc)
-        degraded.append("vector")
-        timings["embed_ms"] = round((time.perf_counter() - started) * 1000, 1)
+        try:
+            vector_rows = vector_search(
+                query_vector,
+                top_k=candidate_k,
+                category_ids=category_ids,
+                video_ids=video_ids,
+            )
+            timings["vector_ms"] = round((time.perf_counter() - started) * 1000, 1)
+        except VectorStoreError as exc:
+            logger.warning("语义检索不可用，降级为纯词法: %s", exc)
+            degraded.append("vector")
+            timings["vector_ms"] = round((time.perf_counter() - started) * 1000, 1)
 
     # 组装候选池
     pool: dict[int, Hit] = {}

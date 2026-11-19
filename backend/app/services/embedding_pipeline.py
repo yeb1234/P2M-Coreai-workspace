@@ -48,6 +48,8 @@ from sqlalchemy import func
 from app.database import SessionLocal
 from app.models import SubtitleSegment, Video
 from app.services.chunker import split_into_chunks
+from app.services.subtitle_cleaner import clean_segments
+from app.services.vector_version import VECTOR_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +70,8 @@ def _vector_literal(vec: list[float]) -> str:
     return "[" + ",".join(f"{x:.5f}" for x in vec) + "]"
 
 
-def _chunk_state(video_id: int) -> tuple[int, int, datetime | None]:
-    """返回 (块数, 缺向量的块数, 最早块的创建时间)。"""
+def _chunk_state(video_id: int) -> tuple[int, int, datetime | None, int]:
+    """返回 (块数, 缺向量的块数, 最早块的创建时间, 非当前版本的块数)。"""
     from sqlalchemy import text
 
     from app.database import engine
@@ -77,14 +79,17 @@ def _chunk_state(video_id: int) -> tuple[int, int, datetime | None]:
     with engine.connect() as conn:
         row = conn.execute(
             text(
-                "SELECT count(*), count(*) FILTER (WHERE embedding IS NULL), min(created_at) "
+                "SELECT count(*), "
+                "count(*) FILTER (WHERE embedding IS NULL), "
+                "min(created_at), "
+                "count(*) FILTER (WHERE vector_version <> :version) "
                 "FROM content_chunks WHERE video_id = :vid"
             ),
-            {"vid": video_id},
+            {"vid": video_id, "version": VECTOR_VERSION},
         ).first()
     if not row:
-        return 0, 0, None
-    return int(row[0] or 0), int(row[1] or 0), row[2]
+        return 0, 0, None, 0
+    return int(row[0] or 0), int(row[1] or 0), row[2], int(row[3] or 0)
 
 
 def _latest_subtitle_at(db, video_id: int) -> datetime | None:
@@ -95,7 +100,35 @@ def _latest_subtitle_at(db, video_id: int) -> datetime | None:
     )
 
 
-def _build_chunks(video_id: int) -> int:
+def _archive_old_chunks(video_id: int, reason: str) -> int:
+    """把该视频非当前版本的旧块写进 history，再允许删除。
+
+    只在版本不一致时调用；同一版本强刷不归档，避免 history 被重复重建撑大。
+    `archived_at=now()` 在同一事务内稳定，回滚脚本按它取同一批快照。
+    """
+    from sqlalchemy import text
+
+    from app.database import engine
+
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                INSERT INTO content_chunks_history
+                    (original_id, video_id, chunk_index, start_sec, end_sec, text,
+                     char_count, segment_count, embedding, vector_version, archived_at, reason)
+                SELECT id, video_id, chunk_index, start_sec, end_sec, text,
+                       char_count, segment_count, embedding, vector_version, now(), :reason
+                FROM content_chunks
+                WHERE video_id = :vid AND vector_version <> :version
+                """
+            ),
+            {"vid": video_id, "version": VECTOR_VERSION, "reason": reason},
+        )
+    return int(result.rowcount or 0)
+
+
+def _build_chunks(video_id: int, *, archive_old: bool = False) -> int:
     """删掉旧块、按当前字幕重建。向量留空，由 _embed_pending 补。
 
     删+插而不是原地更新：分块边界会随字幕内容变化整体移动，
@@ -107,6 +140,8 @@ def _build_chunks(video_id: int) -> int:
     # 不让调用方传 session 进来，是为了杜绝「顺手把网络请求夹在事务中间」。
     db = SessionLocal()
     try:
+        if archive_old:
+            _archive_old_chunks(video_id, reason=f"before {VECTOR_VERSION}")
         rows = (
             db.query(SubtitleSegment.start_sec, SubtitleSegment.end_sec, SubtitleSegment.text)
             .filter(SubtitleSegment.video_id == video_id)
@@ -114,6 +149,9 @@ def _build_chunks(video_id: int) -> int:
             .all()
         )
         segments = [(r.start_sec, r.end_sec, r.text) for r in rows]
+        # 只清洗进入向量库的文本：原始字幕和 VTT 不动，保留回看与时间轴。
+        # 向量使用更保守的 vector_safe：不删相邻重复词，不删句末口头反问。
+        segments = clean_segments(segments, mode="vector_safe")
         chunks = split_into_chunks(segments)
 
         db.execute(
@@ -123,8 +161,8 @@ def _build_chunks(video_id: int) -> int:
             db.execute(
                 text(
                     "INSERT INTO content_chunks "
-                    "(video_id, chunk_index, start_sec, end_sec, text, char_count, segment_count) "
-                    "VALUES (:vid, :idx, :s, :e, :t, :c, :n)"
+                    "(video_id, chunk_index, start_sec, end_sec, text, char_count, segment_count, vector_version) "
+                    "VALUES (:vid, :idx, :s, :e, :t, :c, :n, :v)"
                 ),
                 [
                     {
@@ -135,6 +173,7 @@ def _build_chunks(video_id: int) -> int:
                         "t": c["text"],
                         "c": c["char_count"],
                         "n": c["segment_count"],
+                        "v": VECTOR_VERSION,
                     }
                     for index, c in enumerate(chunks)
                 ],
@@ -186,10 +225,11 @@ def _embed_pending(video_id: int, *, batch_size: int = EMBED_BATCH_SIZE) -> int:
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    f"UPDATE content_chunks AS c SET embedding = v.emb "
+                    f"UPDATE content_chunks AS c "
+                    f"SET embedding = v.emb, vector_version = :version "
                     f"FROM (VALUES {values}) AS v(id, emb) WHERE c.id = v.id"
                 ),
-                params,
+                {**params, "version": VECTOR_VERSION},
             )
         total += len(rows)
 
@@ -223,14 +263,15 @@ def index_video(video_id: int, *, force: bool = False) -> dict:
         # 没字幕就没得切。不要打标记 —— 将来转写完了还能被扫到。
         return {"video_id": video_id, "status": "skipped", "reason": "没有字幕"}
 
-    chunk_count, missing, min_created = _chunk_state(video_id)
+    chunk_count, missing, min_created, version_mismatch = _chunk_state(video_id)
 
     # 块是否基于当前这版字幕
     chunks_current = chunk_count > 0 and min_created is not None and min_created >= latest_sub
-    # 块和向量是否都齐了
+    # 块和向量是否都齐了，且文本块属于当前向量版本
     up_to_date = (
         chunks_current
         and missing == 0
+        and version_mismatch == 0
         and indexed_at is not None
         and indexed_at >= latest_sub
     )
@@ -238,9 +279,9 @@ def index_video(video_id: int, *, force: bool = False) -> dict:
         return {"video_id": video_id, "status": "skipped", "reason": "已是最新"}
 
     rebuilt = 0
-    if force or not chunks_current:
-        rebuilt = _build_chunks(video_id)
-        chunk_count, _, _ = _chunk_state(video_id)
+    if force or not chunks_current or version_mismatch > 0:
+        rebuilt = _build_chunks(video_id, archive_old=version_mismatch > 0)
+        chunk_count, _, _, _ = _chunk_state(video_id)
         if chunk_count == 0:
             # 字幕太短，切不出块。打标记避免每轮扫描都重新投递。
             _mark_indexed(video_id)
@@ -250,7 +291,7 @@ def index_video(video_id: int, *, force: bool = False) -> dict:
     embedded = _embed_pending(video_id)
 
     # ── ③ 只有全部补齐才打标记（短事务）──
-    _, still_missing, _ = _chunk_state(video_id)
+    _, still_missing, _, _ = _chunk_state(video_id)
     if still_missing == 0:
         _mark_indexed(video_id)
 
@@ -319,6 +360,17 @@ def scan_missing(limit: int = SCAN_BATCH) -> dict:
             {"lim": limit},
         ).fetchall()
 
+        # 版本存量只统计、不自动入队。当前还有大量 1.0.0 旧块，
+        # 如果这里直接按版本投递，会把整个库都塞进重建队列；版本迁移
+        # 必须由显式运维命令触发，不能让一次普通巡检变成全量重嵌。
+        version_stale = conn.execute(
+            text(
+                "SELECT count(*) FROM content_chunks "
+                "WHERE vector_version <> :version"
+            ),
+            {"version": VECTOR_VERSION},
+        ).scalar() or 0
+
     video_ids = [r[0] for r in never] + [r[0] for r in stale]
     queued = 0
     deduped = 0
@@ -353,6 +405,8 @@ def scan_missing(limit: int = SCAN_BATCH) -> dict:
         "failed": failed,
         "never_indexed": len(never),
         "stale": len(stale),
+        "vector_version": VECTOR_VERSION,
+        "version_stale_chunks": int(version_stale),
     }
 
 
@@ -372,9 +426,16 @@ def status() -> dict:
                   (SELECT count(*) FROM videos WHERE chunk_indexed_at IS NULL
                      AND EXISTS (SELECT 1 FROM subtitle_segments s WHERE s.video_id = videos.id)) AS pending,
                   (SELECT count(*) FROM content_chunks) AS chunks,
-                  (SELECT count(*) FROM content_chunks WHERE embedding IS NULL) AS missing_vectors
+                  (SELECT count(*) FROM content_chunks WHERE embedding IS NULL) AS missing_vectors,
+                  (SELECT count(*) FROM content_chunks
+                     WHERE vector_version = :version) AS current_version_chunks,
+                  (SELECT count(*) FROM content_chunks
+                     WHERE vector_version <> :version) AS stale_version_chunks,
+                  (SELECT count(*) FROM content_chunks
+                     WHERE embedding IS NULL AND vector_version = :version) AS missing_current_vectors
                 """
-            )
+            ),
+            {"version": VECTOR_VERSION},
         ).first()
     total_chunks = int(row[3] or 0)
     return {
@@ -385,6 +446,13 @@ def status() -> dict:
         "chunks_missing_vectors": int(row[4] or 0),
         "vector_coverage": (
             round(1 - int(row[4] or 0) / total_chunks, 4) if total_chunks else 0.0
+        ),
+        "vector_version": VECTOR_VERSION,
+        "chunks_current_version": int(row[5] or 0),
+        "chunks_stale_version": int(row[6] or 0),
+        "chunks_missing_current_vectors": int(row[7] or 0),
+        "version_coverage": (
+            round(int(row[5] or 0) / total_chunks, 6) if total_chunks else 0.0
         ),
     }
 

@@ -12,9 +12,9 @@ export interface VideoAiCompletion {
   label: string;
 }
 
-export function getVideoAiCompletion(video: Pick<VideoItem, 'subtitle_url' | 'summary' | 'ai_status'>, latestJob?: Pick<AiJobListItem, 'status'> | null): VideoAiCompletion {
-  const hasSubtitles = Boolean(video.subtitle_url);
-  const hasSummary = Boolean(video.summary?.trim());
+export function getVideoAiCompletion(video: Pick<VideoItem, 'subtitle_url' | 'summary' | 'ai_status' | 'has_subtitles' | 'has_summary'>, latestJob?: Pick<AiJobListItem, 'status'> | null): VideoAiCompletion {
+  const hasSubtitles = video.has_subtitles ?? Boolean(video.subtitle_url);
+  const hasSummary = video.has_summary ?? Boolean(video.summary?.trim());
   const active = latestJob?.status === 'queued' || latestJob?.status === 'running' || video.ai_status === 'queued' || video.ai_status === 'running';
   const failed = latestJob?.status === 'failed' || video.ai_status === 'failed';
   const complete = hasSubtitles && hasSummary;

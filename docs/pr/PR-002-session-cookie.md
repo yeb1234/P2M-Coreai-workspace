@@ -1,5 +1,7 @@
 # PR-002 会话搬进 httpOnly Cookie
 
+> 状态：历史参考（截至 2026-11-15，最后校对 2026-11-16）。与当前实现差异：Cookie 名 `p2m_session`、httpOnly + SameSite=Lax、12h（`Max-Age=43200`）、CSRF 中间件等机制现行有效；容器名由 compose 生成；验证命令走 `http://localhost/api` 入口仍可执行。
+
 - **分支**：`feat/session-cookie`
 - **合并提交**：`fb5f573`
 - **影响面**：认证传输、前端存储、CSRF、多用户切换、部署

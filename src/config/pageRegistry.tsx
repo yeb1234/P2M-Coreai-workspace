@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ListTodo, Calendar, StickyNote, Timer, PlayCircle, BarChart3,
   BookOpen, Code2, Target, Layers, Bookmark, Heart, GitCompare, ShoppingCart,
   Trophy, Coins, MessageSquare, Compass, Bot, Package, Workflow, Settings,
-  AlarmClock, Captions, Route, Activity,
+  AlarmClock, Captions, Route, Activity, FileText,
 } from 'lucide-react';
 import type { ActiveView } from '../stores/uiStore';
 
@@ -19,6 +19,7 @@ const TodoPage = lazyPage(() => import('../components/todo/TodoPage'), 'TodoPage
 const CalendarPage = lazyPage(() => import('../components/calendar/CalendarPage'), 'CalendarPage');
 const Calendar2Page = lazyPage(() => import('../components/calendar2/Calendar2Page'), 'Calendar2Page');
 const NotesPage = lazyPage(() => import('../components/notes/NotesPage'), 'NotesPage');
+const MarkdownNotesPage = lazyPage(() => import('../components/mdnotes/MarkdownNotesPage'), 'MarkdownNotesPage');
 const PomodoroPage = lazyPage(() => import('../components/pomodoro/PomodoroPage'), 'PomodoroPage');
 const TimeCenterPage = lazyPage(() => import('../components/timecenter/TimeCenterPage2'), 'TimeCenterPage2');
 const VideoPage = lazyPage(() => import('../components/video/VideoPage'), 'VideoPage');
@@ -61,6 +62,7 @@ const PAGE_LOADERS: Record<ActiveView, () => Promise<unknown>> = {
   calendar: () => import('../components/calendar/CalendarPage'),
   calendar2: () => import('../components/calendar2/Calendar2Page'),
   notes: () => import('../components/notes/NotesPage'),
+  mdnotes: () => import('../components/mdnotes/MarkdownNotesPage'),
   pomodoro: () => import('../components/pomodoro/PomodoroPage'),
   timecenter: () => import('../components/timecenter/TimeCenterPage2'),
   video: () => import('../components/video/VideoPage'),
@@ -114,11 +116,13 @@ export const PAGES: PageEntry[] = [
   { id: 'calendar', path: 'calendar', component: CalendarPage, label: '日历看板', icon: <Calendar size={20} />, color: 'text-[#7c3aed]' },
   // calendar2 = 周历（周视图，拖动安排待办和事件）
   { id: 'calendar2', path: 'calendar2', component: Calendar2Page, label: '周历', icon: <Calendar size={20} />, color: 'text-[var(--info)]' },
-  { id: 'notes', path: 'notes', component: NotesPage, label: '笔记', icon: <StickyNote size={20} />, color: 'text-[var(--warn)]' },
+  { id: 'notes', path: 'notes', component: NotesPage, label: '便签', icon: <StickyNote size={20} />, color: 'text-[var(--warn)]' },
+  { id: 'mdnotes', path: 'mdnotes', component: MarkdownNotesPage, label: '笔记', icon: <FileText size={20} />, color: 'text-[#2563eb]' },
   { id: 'pomodoro', path: 'pomodoro', component: PomodoroPage, label: '番茄钟', icon: <Timer size={20} />, color: 'text-[var(--accent)]' },
   { id: 'timecenter', path: 'timecenter', component: TimeCenterPage, label: '时间中心', icon: <AlarmClock size={20} />, color: 'text-[var(--accent)]' },
   { id: 'video', path: 'video', component: VideoPage, label: 'IT视频站', icon: <PlayCircle size={20} />, color: 'text-[#ec4899]' },
   { id: 'learning', path: 'learning', component: LearningPathPage, label: '学习路径', icon: <Route size={20} />, color: 'text-[var(--success)]' },
+  { id: 'bookmarks', path: 'bookmarks', component: BookmarksPage, label: '书签收藏', icon: <Bookmark size={20} />, color: 'text-[#06b6d4]' },
   { id: 'journey', path: 'journey', component: JourneyPage, label: '学习轨迹', icon: <Activity size={20} />, color: 'text-[var(--accent)]' },
   { id: 'transcriber', path: 'transcriber', component: TranscriberPage, label: '字幕转录王', icon: <Captions size={20} />, color: 'text-[#06b6d4]' },
   { id: 'health', path: 'health', component: HealthPage, label: '健康助手', icon: <Heart size={20} />, color: 'text-[#ec4899]', dev: true },
@@ -130,10 +134,9 @@ export const PAGES: PageEntry[] = [
   { id: 'snippets', path: 'snippets', component: SnippetsPage, label: '代码片段', icon: <Code2 size={20} />, color: 'text-[#8b5cf6]', dev: true },
   { id: 'habits', path: 'habits', component: HabitsPage, label: '习惯追踪', icon: <Target size={20} />, color: 'text-[var(--success)]', dev: true },
   { id: 'flashcards', path: 'flashcards', component: FlashcardsPage, label: '闪卡记忆', icon: <Layers size={20} />, color: 'text-[var(--warn)]', dev: true },
-  { id: 'bookmarks', path: 'bookmarks', component: BookmarksPage, label: '书签收藏', icon: <Bookmark size={20} />, color: 'text-[#06b6d4]', dev: true },
   { id: 'tokens', path: 'tokens', component: TokensPage, label: 'Token 用量', icon: <Coins size={20} />, color: 'text-[var(--accent)]', dev: true },
   { id: 'leetcode', path: 'leetcode', component: LeetcodePage, label: 'LeetCode', icon: <Code2 size={20} />, color: 'text-[var(--warn)]', dev: true },
-  { id: 'interview', path: 'interview', component: InterviewPage, label: '面试题库', icon: <MessageSquare size={20} />, color: 'text-[#ec4899]', dev: true },
+  { id: 'interview', path: 'interview', component: InterviewPage, label: '面试 Agent', icon: <MessageSquare size={20} />, color: 'text-[#0f766e]' },
   { id: 'codenav', path: 'codenav', component: CodeNavPage, label: '编程导航', icon: <Compass size={20} />, color: 'text-[var(--info)]', dev: true },
   { id: 'aiagent', path: 'aiagent', component: AIAgentPage, label: '灵境小助手', icon: <Bot size={20} />, color: 'text-[#8b5cf6]' },
   { id: 'openclaw', path: 'openclaw', component: OpenClawPage, label: 'OpenClaw', icon: <Package size={20} />, color: 'text-[var(--danger)]', dev: true },

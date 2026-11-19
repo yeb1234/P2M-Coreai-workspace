@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_optional_user, require_admin
 from app.database import get_db
-from app.models import AiJob, Category, Note, SubtitleSegment, User, Video, WatchHistory
+from app.models import AiJob, Category, Note, SubtitleSegment, User, UserVideoFavorite, Video, WatchHistory
+from app.services.profile import invalidate_profile_cache
 from app.utils.files import resolve_media_path
 from app.schemas import (
     AiJobCreate,
@@ -28,6 +29,8 @@ from app.schemas import (
 )
 from app.services.admin_ai_queue import _is_queue_paused, enqueue_ai_jobs
 from app.services.ai_jobs import create_ai_job_from_payload
+from app.services.quota import quota_exceeded_detail, search_quota_for
+from app.services.rate_limit import search_limiter
 from app.services.sprite import get_or_generate_sprite, get_sprite_meta_path, get_sprite_path, has_sprite
 from app.services.subtitle_writer import update_vtt_segment_text
 from app.services.video_serialization import serialize_video
@@ -115,6 +118,26 @@ def latest_watch_map(
     return {history.video_id: history for history in histories}
 
 
+def favorite_map(
+    db: Session, video_ids: list[int], user_id: int | None
+) -> dict[int, UserVideoFavorite]:
+    """每个视频「当前用户」的收藏；匿名返回空，代表没有个人收藏。
+
+    不能再用 `Video.is_favorite`：那是共享库字段，A 的收藏会变成 B 的收藏。
+    """
+    if not video_ids or user_id is None:
+        return {}
+    rows = (
+        db.query(UserVideoFavorite)
+        .filter(
+            UserVideoFavorite.user_id == user_id,
+            UserVideoFavorite.video_id.in_(video_ids),
+        )
+        .all()
+    )
+    return {row.video_id: row for row in rows}
+
+
 def fts_segment_rows(db: Session, query_text: str, limit: int):
     try:
         return db.execute(
@@ -138,9 +161,11 @@ def fts_segment_rows(db: Session, query_text: str, limit: int):
 
 @router.get("/search/segments", response_model=list[SegmentSearchResult])
 def search_segments(
+    request: Request,
     q: str = Query(..., min_length=1),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
 ):
     """按字幕内容搜索视频片段。
 
@@ -161,10 +186,36 @@ def search_segments(
     from app.utils.paths import display_folder_path
     from app.utils.textclean import clean_promo_text
 
+    # 和 /api/search/hybrid 同一套成本边界：匿名只能走无 rerank 的检索，
+    # 登录用户启用 rerank 时才受搜索配额/限流约束。
+    identity = f"user:{user.id}" if user is not None else f"ip:{request.client.host if request.client else 'anonymous'}"
+    allowed, _ = search_limiter.hit(identity)
+    if not allowed:
+        raise HTTPException(status_code=429, detail="搜索太频繁，缓一下再试")
+
+    effective_rerank = user is not None
+    quota = None
+    if effective_rerank:
+        quota = search_quota_for(user.role)
+        ok, used, limit = quota.consume(user.id)
+        if not ok:
+            raise HTTPException(
+                status_code=429,
+                detail=quota_exceeded_detail(used, limit, "搜索"),
+            )
+
     try:
-        result = hybrid_search(q.strip(), top_k=limit, candidate_k=30, use_rerank=True)
+        result = hybrid_search(
+            q.strip(),
+            top_k=limit,
+            candidate_k=30,
+            use_rerank=effective_rerank,
+        )
         hits = result.get("hits") or []
     except Exception:
+        # 没走到 rerank 就不该扣搜索额度；检索失败也一样。
+        if quota is not None:
+            quota.refund(user.id)
         logger.exception("片段搜索失败，回退到 FTS")
         hits = []
 
@@ -246,6 +297,7 @@ def get_videos(
         .all()
     )
     watch_map = latest_watch_map(db, [item.id for item in selected], _uid(user))
+    favorite_by_video = favorite_map(db, [item.id for item in selected], _uid(user))
     job_map = active_job_map(db, [item.id for item in selected])
     category_ids = {item.category_id for item in selected if item.category_id}
     category_map = {c.id: c.path for c in db.query(Category).filter(Category.id.in_(category_ids)).all()} if category_ids else {}
@@ -258,6 +310,7 @@ def get_videos(
                 category_map.get(item.category_id),
                 include_segments=False,
                 include_details=False,
+                favorite=favorite_by_video.get(item.id),
             )
             for item in selected
         ],
@@ -295,7 +348,16 @@ def get_continue_video(
     if video.category_id:
         category = db.query(Category).filter(Category.id == video.category_id).first()
         category_path = category.path if category else None
-    return serialize_video(video, history, job_map.get(video.id), category_path, include_segments=False, include_details=False)
+    favorite = favorite_map(db, [video.id], user.id).get(video.id)
+    return serialize_video(
+        video,
+        history,
+        job_map.get(video.id),
+        category_path,
+        include_segments=False,
+        include_details=False,
+        favorite=favorite,
+    )
 
 
 @router.get("/history/recent", response_model=list[VideoOut])
@@ -329,6 +391,7 @@ def get_recent_history(
 
     video_ids = [history.video_id for history in histories]
     videos = {video.id: video for video in db.query(Video).filter(Video.id.in_(video_ids)).all()}
+    favorite_by_video = favorite_map(db, video_ids, user.id)
     job_map = active_job_map(db, video_ids)
     category_ids = {video.category_id for video in videos.values() if video.category_id}
     categories = {c.id: c.path for c in db.query(Category).filter(Category.id.in_(category_ids)).all()} if category_ids else {}
@@ -337,7 +400,15 @@ def get_recent_history(
         video = videos.get(history.video_id)
         if not video:
             continue
-        result.append(serialize_video(video, history, job_map.get(video.id), categories.get(video.category_id), include_segments=False, include_details=False))
+        result.append(serialize_video(
+            video,
+            history,
+            job_map.get(video.id),
+            categories.get(video.category_id),
+            include_segments=False,
+            include_details=False,
+            favorite=favorite_by_video.get(video.id),
+        ))
     return result
 
 
@@ -358,11 +429,20 @@ def get_recent_videos(
 
     video_ids = [video.id for video in videos]
     watch_map = latest_watch_map(db, video_ids, _uid(user))
+    favorite_by_video = favorite_map(db, video_ids, _uid(user))
     job_map = active_job_map(db, video_ids)
     category_ids = {video.category_id for video in videos if video.category_id}
     categories = {c.id: c.path for c in db.query(Category).filter(Category.id.in_(category_ids)).all()} if category_ids else {}
     return [
-        serialize_video(video, watch_map.get(video.id), job_map.get(video.id), categories.get(video.category_id), include_segments=False, include_details=False)
+        serialize_video(
+            video,
+            watch_map.get(video.id),
+            job_map.get(video.id),
+            categories.get(video.category_id),
+            include_segments=False,
+            include_details=False,
+            favorite=favorite_by_video.get(video.id),
+        )
         for video in videos
     ]
 
@@ -382,7 +462,14 @@ def get_video(
     if video.category_id:
         category = db.query(Category).filter(Category.id == video.category_id).first()
         category_path = category.path if category else None
-    return serialize_video(video, watch_map.get(video.id), job_map.get(video.id), category_path)
+    favorite = favorite_map(db, [video.id], _uid(user)).get(video.id)
+    return serialize_video(
+        video,
+        watch_map.get(video.id),
+        job_map.get(video.id),
+        category_path,
+        favorite=favorite,
+    )
 
 
 def iter_file_range(path: Path, start: int, end: int, chunk_size: int = 1024 * 1024):
@@ -511,9 +598,9 @@ def save_watch_history(
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    if not video.duration and payload.duration:
-        video.duration = payload.duration
-
+    # duration 是共享视频元数据，只能由导入/管理流程写。
+    # 原来这里会在 duration 为空时接受成员上报，等于任何登录用户
+    # 都能改全库的时长，进而影响完成率和推荐。
     completed = bool(payload.duration and payload.progress / payload.duration >= 0.9)
     # 必须带 user_id：否则「2 分钟内合并同一条记录」会把别人的进度当成自己的覆盖掉
     latest = (
@@ -523,6 +610,10 @@ def save_watch_history(
         .first()
     )
     now = datetime.now()
+    previous_completed = bool(latest.completed) if latest else None
+    created_new = latest is None or latest.watched_at is None or (
+        now - latest.watched_at > timedelta(minutes=2)
+    )
     if latest and latest.watched_at and now - latest.watched_at <= timedelta(minutes=2):
         latest.progress = payload.progress
         latest.duration = payload.duration
@@ -540,6 +631,11 @@ def save_watch_history(
             )
         )
     db.commit()
+    # 进度通常十几秒就上报一次。每报一次都删画像缓存会让 5 分钟 TTL 失效，
+    # 只在「新建进度记录」或「完成状态发生变化」时失效；中间的累计时长
+    # 最多陈旧一个 TTL，对聊天/路径规划足够。
+    if created_new or previous_completed != completed:
+        invalidate_profile_cache(user.id)
     return {"status": "ok", "completed": completed}
 
 
@@ -566,25 +662,48 @@ def set_video_favorite(
     video_id: int,
     payload: VideoFavoriteIn,
     db: Session = Depends(get_db),
-    # 收藏作用于共享视频库，成员登录后即可标记
-    _user=Depends(get_current_user),
+    # 收藏是当前用户的个人状态，不再改共享 videos.is_favorite
+    user: User = Depends(get_current_user),
 ):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    video.is_favorite = payload.is_favorite
-    video.favorited_at = datetime.now() if payload.is_favorite else None
+    favorite = (
+        db.query(UserVideoFavorite)
+        .filter(
+            UserVideoFavorite.user_id == user.id,
+            UserVideoFavorite.video_id == video.id,
+        )
+        .first()
+    )
+    if payload.is_favorite:
+        if favorite is None:
+            favorite = UserVideoFavorite(
+                user_id=user.id,
+                video_id=video.id,
+                favorited_at=datetime.now(),
+            )
+            db.add(favorite)
+        # 已收藏时保留第一次收藏时间，重复点不刷新 favorited_at
+    elif favorite is not None:
+        db.delete(favorite)
+        favorite = None
     db.commit()
-    db.refresh(video)
 
-    watch_map = latest_watch_map(db, [video.id], _user.id)
+    watch_map = latest_watch_map(db, [video.id], user.id)
     job_map = active_job_map(db, [video.id])
     category_path = None
     if video.category_id:
         category = db.query(Category).filter(Category.id == video.category_id).first()
         category_path = category.path if category else None
-    return serialize_video(video, watch_map.get(video.id), job_map.get(video.id), category_path)
+    return serialize_video(
+        video,
+        watch_map.get(video.id),
+        job_map.get(video.id),
+        category_path,
+        favorite=favorite,
+    )
 
 
 @router.get("/{video_id}/playlist")
@@ -613,6 +732,7 @@ def get_playlist(
         query = query.filter(Video.id == video.id)
     videos = query.all()
     watch_map = latest_watch_map(db, [item.id for item in videos], _uid(user))
+    favorite_by_video = favorite_map(db, [item.id for item in videos], _uid(user))
 
     items = []
     current_index = 0
@@ -620,6 +740,7 @@ def get_playlist(
     category_map = {c.id: c.path for c in db.query(Category).filter(Category.id.in_(category_ids)).all()} if category_ids else {}
     for index, item in enumerate(videos):
         last_watch = watch_map.get(item.id)
+        favorite = favorite_by_video.get(item.id)
         if item.id == video_id:
             current_index = index
         items.append(
@@ -630,8 +751,8 @@ def get_playlist(
                 "category_path": category_map.get(item.category_id),
                 "watch_progress": last_watch.progress if last_watch else None,
                 "completed": bool(last_watch.completed) if last_watch else False,
-                "is_favorite": bool(item.is_favorite),
-                "favorited_at": item.favorited_at,
+                "is_favorite": bool(favorite),
+                "favorited_at": favorite.favorited_at if favorite else None,
                 "subtitle_url": to_output_url(item.subtitle_path),
             }
         )

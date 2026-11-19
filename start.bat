@@ -122,7 +122,7 @@ goto menu
 echo.
 echo Following backend log. Ctrl+C to stop following.
 echo.
-docker logs -f --tail 60 siteyeb-backend
+docker logs -f --tail 60 p2-siteyeb-backend-1
 goto menu
 
 :stop_all
@@ -140,7 +140,7 @@ echo   waiting for backend to become healthy...
 set "READY=0"
 for /l %%i in (1,1,30) do (
     if "!READY!"=="0" (
-        for /f "delims=" %%s in ('docker inspect -f "{{.State.Health.Status}}" siteyeb-backend 2^>nul') do (
+        for /f "delims=" %%s in ('docker inspect -f "{{.State.Health.Status}}" p2-siteyeb-backend-1 2^>nul') do (
             if "%%s"=="healthy" set "READY=1"
         )
         if "!READY!"=="0" (

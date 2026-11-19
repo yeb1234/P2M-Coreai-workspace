@@ -250,7 +250,10 @@ def reset_sequences(pg_conn) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sqlite", default="C:/SiteYeb/learning_os.db")
+    parser.add_argument(
+        "--sqlite",
+        default=str(Path(__file__).resolve().parents[2] / ".migration" / "learning_os.db"),
+    )
     parser.add_argument("--pg-dsn", default="")
     parser.add_argument("--force", action="store_true", help="清空目标表后重灌")
     parser.add_argument("--only", default="", help="逗号分隔的表名")

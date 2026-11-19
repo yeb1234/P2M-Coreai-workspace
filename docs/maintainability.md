@@ -1,5 +1,7 @@
 # 在屎山上持续开发的工作法
 
+> 状态：部分现行（最后校对 2026-11-16）。第 2、5、6、9、10 节的工作方法仍然成立；第 1、8 节里引用的历史故障实例已逐条复核，已修复的标注「已修」，未修的保留为技术债。
+
 > `lessons.md` 讲的是「哪些 bug 不报错、怎么识别」。
 > 这份讲的是另一件事：**怎么让「改动」这个动作本身不失控。**
 >
@@ -17,8 +19,8 @@
 
 | 形态 | 这次的实例 | 报错吗 |
 |---|---|---|
-| 同一份数据两个存储 | 待办同时在 `schedule_items` 表和 IndexedDB `p2m-todo-storage` | 不报 |
-| 同一份规则两处写 | `models.py` 里 11 张表有 `user_id` 外键，`delete_user` 手抄了 8 张 | 不报（删到有数据的用户才 500） |
+| 同一份数据两个存储 | 待办同时在 `schedule_items` 表和 IndexedDB `p2m-todo-storage`（**该双轨后来已收敛到 `scheduleStore`/服务端表，`useTodoStore` 已删除；旧键只留在本地清理清单里**） | 不报 |
+| 同一份规则两处写 | `models.py` 里 11 张表有 `user_id` 外键，`delete_user` 手抄了 8 张（**漏表问题已修，见 1.2**） | 不报（删到有数据的用户才 500） |
 | 同一份配置两处读 | `PATH_MAP` 存在、`resolve_media_path()` 存在，但 `generate_thumbnail` 没调它 | 不报（日志里只有 FileNotFound） |
 
 **每多一个副本，就多一个会静默不同步的地方，而且没有任何地方会报错。**
@@ -38,6 +40,10 @@
 周历/统计/隐私   useTodoStore     → IndexedDB p2m-todo-storage
 时间中心         useTodoStore     → IndexedDB p2m-todo-storage
 ```
+
+> 现状（2026-11-16）：`useTodoStore` 已删除，待办/周历/统计统一走 `scheduleStore` → `schedule_items` 表；
+> `p2m-todo-storage` 只是浏览器里可能残留的旧键，列在 `src/components/settings/types.ts` 的 `STORAGE_KEYS`
+> 清理清单中，不再有代码写入。
 
 **用户看到了什么**
 
@@ -77,6 +83,9 @@ width: `${(todo.pomodoroCount / totalPomodoros) * 100}%`
 
 **用户关联待办做完了整个番茄周期，待办里还是 0/4。**
 
+> **已修**：`pomodoroStore` 完成关联番茄后会把待办的 `pomodoroCount` 加 1
+> （`src/stores/pomodoroStore.ts:395-404`）。这个「字段有了没人写」的坑本身仍是检查清单项。
+
 **删用户 → 11 张表**
 
 ```python
@@ -85,6 +94,9 @@ width: `${(todo.pomodoroCount / totalPomodoros) * 100}%`
 ```
 
 **只要用户有这三张表里任一数据，删除就撞外键、接口 500。**
+
+> **已修**：`delete_user` 现在按依赖顺序清 14 个模型，含 `CalendarEvent` / `MemoryItem` / `Note`
+> （`backend/app/routers/admin.py:488-515`）。清单仍是手抄，规则 3 说的「下次加表还会错」依然成立。
 
 **为什么难查**：读取路径完全正常，代码读起来也没毛病。**「谁负责写」这件事没有任何地方声明**。
 
@@ -120,6 +132,10 @@ thumbnail_worker._run_one:
 **为什么难查**：从应用日志看不出任何异常——没有报错，就是不动。
 必须去 `pg_stat_activity` 看 `state='idle in transaction'` 才找得到。
 
+> **已修**：7 处涉及 ffmpeg/网络/文件 IO 的路径都改成了「短事务读 → 无事务做活 → 短事务写」三段式，
+> 迁移 DDL 加了 `SET LOCAL lock_timeout = '20s'`；`/health` 保留 `transactions` 段做监控
+> （`backend/app/main.py` 的 `/health`）。长事务本身仍是排查时的第一嫌疑。
+
 **排查命令**
 
 ```sql
@@ -141,12 +157,12 @@ WHERE datname='p2u...' AND state <> 'idle';
 
 框架的默认值是为 demo 设计的，不是为你的生产设计的。
 
-| 默认值 | 我们这儿实际发生了什么 |
-|---|---|
-| RQ `job_timeout = 180s` | 转写一小时的课程视频，3 分钟就被强杀 —— 三处 `enqueue` 全都没传这个参数 |
-| Vite `emptyOutDir`（被手改成 `false`） | 每次构建只增不删，累积 839 个文件、71MB 镜像，而首页只引用 17 个 js |
-| `<audio preload="auto">` | 首屏把 15 个环境音全下载了，1147KB，占首屏传输量的 **98%** |
-| `threading.Thread(...).start()` 每请求一个 | 两个请求同时到达会重复处理同一批视频，同一 id 被两个线程同时写文件 + commit |
+| 默认值 | 我们这儿实际发生了什么 | 现状（2026-11-16） |
+|---|---|---|
+| RQ `job_timeout = 180s` | 转写一小时的课程视频，3 分钟就被强杀 —— 三处 `enqueue` 全都没传这个参数 | **已修**：`rq_client.py:37` `compute_job_timeout` 按时长算超时，不再吃 RQ 默认 180s |
+| Vite `emptyOutDir`（被手改成 `false`） | 每次构建只增不删，累积 839 个文件、71MB 镜像，而首页只引用 17 个 js | **已修**：`vite.config.ts:26` `emptyOutDir: true` |
+| `<audio preload="auto">` | 首屏把 15 个环境音全下载了，1147KB，占首屏传输量的 **98%** | **已修**：环境音由开关控制，关闭时不预加载（`globalAmbientSoundController.test.ts`） |
+| `threading.Thread(...).start()` 每请求一个 | 两个请求同时到达会重复处理同一批视频，同一 id 被两个线程同时写文件 + commit | 历史实例；当前启动扫描在 `lifespan` 里起守护线程，重复处理风险未单独复核 |
 
 **共同点**：都不是「写错了」，是**没写**。默认值在数据量小、任务短、只有一个人的时候完全没问题。
 
@@ -172,7 +188,7 @@ Q3  我要改的这段代码，是「读者」还是「写者」？
 
 ```bash
 # Q1：页面在读哪个 store
-grep -n "useScheduleStore\|useTodoStore\|useState" src/components/todo/TodoList.tsx | head
+grep -n "useScheduleStore\|useState" src/components/todo/TodoList.tsx | head
 
 # Q2：谁在写这个 key
 grep -rn "p2m-todo-storage" src/ backend/ | grep -v node_modules
@@ -197,7 +213,7 @@ sed -n '120,150p' src/stores/scheduleStore.ts
 
 **对的**：日历视图从 `scheduleStore` 实时派生（`calendarDerivedData`），不往 `calendar_events` 写待办副本。
 
-**错的**：`todoCalendarSyncPlan` —— 老方案是「把待办写成日历事件，带 `todo:due` 标记」。这玩意儿最后只有测试在引用，业务代码一次都没调过，成了死代码。
+**错的**：`todoCalendarSyncPlan` —— 老方案是「把待办写成日历事件，带 `todo:due` 标记」。这玩意儿最后只有测试在引用，业务代码一次都没调过，成了死代码。该文件现已删除，截至 2026-11-16 `src/` 下 0 处引用。
 
 **判据**：如果 A 能由 B 算出来，就不要存 A。存了就得管同步，管同步就有同步失败。
 
@@ -221,11 +237,11 @@ user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
 
 ### 规则 4：所有常驻进程必须在编排里
 
-`worker.py` 逻辑写得很完整（建表 → 恢复中断任务 → 补推 → 清僵尸 → 阻塞消费），**但 `docker-compose.yml` 里没有 worker 服务**。
+`worker.py` 逻辑写得很完整（建表 → 恢复中断任务 → 补推 → 清僵尸 → 阻塞消费）。
 
-它靠手工在宿主机跑。Redis 里还留着 `ai-worker-103` 的注册记录和心跳——说明当时确实活着。
-
-机器一重启，worker 就没了。队列里的任务没人消费，前端一直转圈，用户只能自己去开一个终端。
+> **已修**：`docker-compose.yml` 现在有独立 `worker` 服务，复用 backend 镜像、只换启动命令，
+> `restart: unless-stopped`，并关掉了继承来的 HTTP healthcheck（worker 不提供 HTTP）。
+> 内嵌 worker 受 `AI_WORKER_EMBEDDED` 控制，compose 部署时为 `false`，避免两个 worker 抢队列。
 
 **判据**：`docker compose ps` 里看不到的常驻进程，全是定时炸弹。
 
@@ -361,11 +377,15 @@ bash scripts/diagnose.sh
 但重启解决不了锁等待（持锁的是别的连接），只会让问题看起来像「进程不稳定」。
 这里要的是「看得见」，不是「自动重启」。
 
-docker 会把探针输出存下来，所以即使不 curl 也能看：
+docker 会把探针输出存下来，所以即使不 curl 也能看（容器名由 compose 生成，形如 `p2-siteyeb-backend-1`，以 `docker ps` 为准）：
 
 ```bash
-docker inspect -f '{{json .State.Health.Log}}' siteyeb-backend | tail -c 500
+docker inspect -f '{{json .State.Health.Log}}' p2-siteyeb-backend-1 | tail -c 500
 ```
+
+> 已核对：`start.bat` / `start.sh` / `scripts/diagnose.sh` / `backup.sh` / `restore.sh` / `preflight.sh`
+> 已统一按 compose 实际生成的 `p2-siteyeb-<service>-1` 取容器，并保留 `*_CONTAINER` 环境变量覆盖；
+> 文档命令一律按 compose 生成名写。
 
 ---
 
@@ -389,6 +409,9 @@ docker inspect -f '{{json .State.Health.Log}}' siteyeb-backend | tail -c 500
 
 第 8 条不是洁癖：这一轮发现 `GET /api/ai-jobs` **完全不登录就能列出所有转写任务**（含视频标题、失败原因、模型配置），`GET /api/ai-jobs/{id}` 匿名可查。都是单用户时代留下的。
 
+> **已修**：任务列表与批量入口现在是 `require_admin`（`backend/app/routers/ai_jobs.py:60,160`），
+> 单任务读取走 `get_current_user`（`ai_jobs.py:272`）。「加端点默认加鉴权」这条规则仍然适用。
+
 **单用户时代不设防的端点，多用户之后全是后门。**
 
 ---
@@ -401,10 +424,10 @@ docker inspect -f '{{json .State.Health.Log}}' siteyeb-backend | tail -c 500
 |---|---|---|
 | `p2m-todo-storage` 旧数据还留在用户浏览器里 | 无害，但排查时会误导（这次的坑） | 加一次性清理，或明确写进文档 |
 | 时间中心只显示 `reminderAt` 非空的待办 | 设计如此（它是「时间中心」），但没文档 | 补一句注释，别再当 bug 查 |
-| `sprite` 代码矛盾：`file_scanner` 有 `generate_missing_sprites()`，`models.py` 没有 `sprite` 字段 | 功能半途废弃或改名 | 查清后要么补字段要么删函数 |
+| `sprite` 代码矛盾：`file_scanner` 有 `generate_missing_sprites()`，`models.py` 没有 `sprite` 字段（雪碧图按文件系统判断有无，不落库） | 功能半途废弃或改名 | 查清后要么补字段要么删函数 |
 | ~~旧检索表 `segment_embeddings` 覆盖率 38%~~ **已删除** | 表 3.5GB / 71 万行，检索早已不走它 | 已删表 + 删掉碎片检索路径 + 删 `retrieval_source` 开关。删前后 4 个查询结果完全一致 |
 | `dist/sounds` 47MB（`cafe.ogg` 单个 20M，`wind.ogg` 529kbps） | 镜像体积，不影响首屏 | 重编码 64kbps 单声道，有音质取舍 |
-| worker 并发 = 1，任务失败不重试 | 队列堆 20 个视频要等很久；网络抖动导致的失败永久失败 | 要区分「可重试」和「不可重试」，别盲目加 |
+| worker 并发 = 1；AI 转写任务失败不自动重试 | 队列堆 20 个视频要等很久；网络抖动导致的失败永久失败 | 通用 `background_tasks` 已有 3 次重试上限（`MAX_ATTEMPTS=3`）；转写任务仍不重试，要区分「可重试」和「不可重试」，别盲目加 |
 | `sync_db_queue_to_rq` 没测过 Redis 挂掉的场景 | 未知 | 断 Redis 试一次 |
 | 测试账号清理靠手写 SQL，且要按依赖顺序 | 每次清理都可能撞外键 | 做成脚本，或复用 `delete_user` |
 | 其余 13 个主题的对比度已修，但没逐个截图验证 | 数值达标，观感未验 | 抽样看 2-3 个 |

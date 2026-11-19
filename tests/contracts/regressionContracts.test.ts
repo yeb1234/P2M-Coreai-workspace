@@ -131,7 +131,7 @@ describe('regression contracts', () => {
   it('keeps AI job polling adaptive to page visibility', () => {
     const aiJobCenter = readRepoFile('src/hooks/useAiJobCenter.ts');
 
-    expect(aiJobCenter).toContain('document.visibilityState === \'visible\' ? 3000 : 10000');
+    expect(aiJobCenter).toContain("document.visibilityState === 'visible' ? 5000 : 20000");
     expect(aiJobCenter).toContain('document.addEventListener(\'visibilitychange\'');
     expect(aiJobCenter).toContain('window.setTimeout(tick');
     expect(aiJobCenter).not.toContain('window.setInterval');

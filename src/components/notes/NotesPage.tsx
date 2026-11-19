@@ -4,6 +4,8 @@ import { CollapsibleToolPanel, EmptyState, PageTitle } from '../shared';
 import { useNotesStore, useUIStore } from '../../stores';
 import type { Note, NoteColor, NoteInsertPosition } from '../../stores/notesStore';
 import { getNoteTags, NOTE_COLOR_OPTIONS } from '../../stores/notesStore';
+import { splitNotesByPinned } from '../../lib/projections/notes';
+import { apiFetch } from '../../lib/videoApi';
 import { playInteractionSound } from '../../lib/sounds';
 
 const COLOR_DOT = Object.fromEntries(NOTE_COLOR_OPTIONS.map((item) => [item.value, item.dot])) as Record<NoteColor, string>;
@@ -45,6 +47,8 @@ export const NotesPage: React.FC = () => {
   const [collapsedTrash, setCollapsedTrash] = useState(false);
   const [collapsedFilters, setCollapsedFilters] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [aiNoteLoading, setAiNoteLoading] = useState(false);
+  const [aiNoteError, setAiNoteError] = useState('');
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [insertPosition, setInsertPosition] = useState<NoteInsertPosition>('after');
@@ -86,8 +90,9 @@ export const NotesPage: React.FC = () => {
     });
   }, [activeColor, activeTag, notes, search]);
 
-  const pinned = useMemo(() => filtered.filter((note) => note.pinned), [filtered]);
-  const unpinned = useMemo(() => filtered.filter((note) => !note.pinned), [filtered]);
+  // 置顶/非置顶的分组口径和工作台卡片共用（lib/projections/notes），
+  // 免得便签页和工作台卡片各排一套顺序
+  const { pinned, unpinned } = useMemo(() => splitNotesByPinned(filtered), [filtered]);
 
   const startEdit = useCallback((note: Note) => {
     setActiveNoteId(note.id);
@@ -96,7 +101,7 @@ export const NotesPage: React.FC = () => {
 
   const startNew = useCallback(() => {
     const id = addNote({
-      title: '新笔记',
+      title: '新便签',
       content: '',
       color: activeColor === 'all' ? 'sticky-yellow' : activeColor,
       tag: activeTag === 'all' ? '' : activeTag,
@@ -106,21 +111,40 @@ export const NotesPage: React.FC = () => {
     playInteractionSound('success');
   }, [activeColor, activeTag, addNote, startEdit]);
 
-  const createTodayAiNote = useCallback(() => {
-    const id = upsertTodayAiNote();
-    const note = useNotesStore.getState().notes.find((item) => item.id === id);
-    if (note) {
-      setActiveTag('all');
-      setActiveColor('all');
-      startEdit(note);
-      playInteractionSound('success');
+  const createTodayAiNote = useCallback(async () => {
+    if (aiNoteLoading) return;
+    setAiNoteLoading(true);
+    setAiNoteError('');
+    try {
+      const todayKey = new Date().toDateString();
+      const localNotes = notes
+        .filter((note) => note.tag !== 'AI日报' && new Date(note.updatedAt).toDateString() === todayKey)
+        .slice(0, 10)
+        .map((note) => note.title);
+      const result = await apiFetch<{ title: string; content: string }>('/api/notes/ai-daily', {
+        method: 'POST',
+        body: JSON.stringify({ local_notes: localNotes }),
+        timeoutMs: 75000,
+      });
+      const id = upsertTodayAiNote({ title: result.title, content: result.content });
+      const note = useNotesStore.getState().notes.find((item) => item.id === id);
+      if (note) {
+        setActiveTag('all');
+        setActiveColor('all');
+        startEdit(note);
+        playInteractionSound('success');
+      }
+    } catch (error) {
+      setAiNoteError(error instanceof Error ? error.message : '生成失败，稍后再试');
+    } finally {
+      setAiNoteLoading(false);
     }
-  }, [startEdit, upsertTodayAiNote]);
+  }, [aiNoteLoading, notes, startEdit, upsertTodayAiNote]);
 
   const saveEdit = useCallback(() => {
     if (!edit.id) return;
     updateNote(edit.id, {
-      title: edit.title.trim() || '未命名笔记',
+      title: edit.title.trim() || '未命名便签',
       content: edit.content,
       color: edit.color,
       tag: edit.tag,
@@ -263,7 +287,7 @@ export const NotesPage: React.FC = () => {
                 onClick={saveEdit}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--success)] text-white shadow-sm transition-colors hover:bg-[#15803d]"
                 title="保存"
-                aria-label="保存笔记"
+                aria-label="保存便签"
               >
                 <Save size={14} strokeWidth={2.2} />
               </button>
@@ -325,7 +349,7 @@ export const NotesPage: React.FC = () => {
           <Trash2 size={12} />
         </button>
         <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2 pl-4 pr-12">{note.title}</h3>
-        <p className={`text-xs text-[#374151] leading-relaxed whitespace-pre-wrap ${isHovered ? '' : 'line-clamp-4'}`}>{note.content || '空笔记'}</p>
+        <p className={`text-xs text-[#374151] leading-relaxed whitespace-pre-wrap ${isHovered ? '' : 'line-clamp-4'}`}>{note.content || '空便签'}</p>
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-[var(--border-medium)]/20">
           <div className="flex min-w-0 flex-wrap gap-1">
             {getNoteTags(note).slice(0, 3).map((tag) => (
@@ -365,7 +389,7 @@ export const NotesPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <StickyNote size={16} className="text-[var(--warn)]" />
-            <h2 className="text-sm font-bold text-[var(--text-primary)]">笔记</h2>
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">便签</h2>
             <span className="text-xs text-[var(--text-muted)]">({notes.length})</span>
           </div>
           <div className="flex items-center gap-0.5">
@@ -377,11 +401,15 @@ export const NotesPage: React.FC = () => {
               <Trash2 size={14} />
               {trashedNotes.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[var(--danger)] text-white text-xs rounded-full flex items-center justify-center">{trashedNotes.length}</span>}
             </button>
-            <button onClick={startNew} className="p-1.5 rounded-lg text-[var(--warn)] bg-[#fffbeb]" title="新建笔记">
+            <button onClick={createTodayAiNote} disabled={aiNoteLoading} className="p-1.5 rounded-lg text-[#7c3aed] bg-[#f5f3ff] disabled:opacity-60" title="AI 今日便签">
+              <StickyNote size={14} className={aiNoteLoading ? 'animate-pulse' : undefined} />
+            </button>
+            <button onClick={startNew} className="p-1.5 rounded-lg text-[var(--warn)] bg-[#fffbeb]" title="新建便签">
               <Plus size={14} />
             </button>
           </div>
         </div>
+        {aiNoteError && <p className="mt-1 text-xs text-[var(--danger)]">{aiNoteError}</p>}
       </div>
 
       {/* Mobile filters - shown directly */}
@@ -436,8 +464,8 @@ export const NotesPage: React.FC = () => {
       {/* Desktop header */}
       <div className="hidden md:block">
         <PageTitle
-          title="笔记"
-          subtitle={`${notes.length} 条笔记，${trashedNotes.length} 条在垃圾箱；拖动卡片手柄调整顺序`}
+          title="便签"
+          subtitle={`${notes.length} 条便签，${trashedNotes.length} 条在垃圾箱；拖动卡片手柄调整顺序`}
           icon={<StickyNote size={22} />}
           action={
             <div className="flex items-center gap-2">
@@ -453,18 +481,21 @@ export const NotesPage: React.FC = () => {
                   </span>
                 )}
               </button>
+              {aiNoteError && (
+                <span className="max-w-[220px] text-xs text-[var(--danger)]">{aiNoteError}</span>
+              )}
               <button
                 onClick={createTodayAiNote}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#7c3aed] bg-[#f5f3ff] border border-[#ddd6fe] rounded-lg hover:bg-[#ede9fe] transition-colors"
-                title="施工中：先生成或更新一条置顶的今日 AI 笔记"
+                disabled={aiNoteLoading}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#7c3aed] bg-[#f5f3ff] border border-[#ddd6fe] rounded-lg hover:bg-[#ede9fe] transition-colors disabled:opacity-60"
+                title="汇总今天的学习记录，生成一条置顶的 AI 便签"
               >
-                <StickyNote size={16} />
-                AI 今日笔记
-                <span className="text-xs font-normal text-[#8b5cf6]">施工中</span>
+                <StickyNote size={16} className={aiNoteLoading ? 'animate-pulse' : undefined} />
+                {aiNoteLoading ? '生成中…' : 'AI 今日便签'}
               </button>
               <button onClick={startNew} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[var(--warn)] rounded-lg hover:bg-[#d97706] transition-colors">
                 <Plus size={16} />
-                新建笔记
+                新建便签
               </button>
             </div>
           }
@@ -617,7 +648,7 @@ export const NotesPage: React.FC = () => {
       )}
 
       <section>
-        {pinned.length > 0 && <h3 className="text-xs font-medium text-[var(--text-muted)] mb-2">全部笔记</h3>}
+        {pinned.length > 0 && <h3 className="text-xs font-medium text-[var(--text-muted)] mb-2">全部便签</h3>}
         {unpinned.length > 0 ? (
           <div className="auto-grid-wide">
             {unpinned.map(renderCard)}
@@ -625,8 +656,8 @@ export const NotesPage: React.FC = () => {
         ) : filtered.length === 0 && (
           <EmptyState
             icon={<StickyNote size={24} className="text-[var(--text-muted)]" />}
-            title={search ? '没有找到匹配的笔记' : '还没有笔记'}
-            description="可以新建一条笔记，或调整标签、颜色筛选条件。"
+            title={search ? '没有找到匹配的便签' : '还没有便签'}
+            description="可以新建一条便签，或调整标签、颜色筛选条件。"
           />
         )}
       </section>

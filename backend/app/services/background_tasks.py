@@ -58,7 +58,7 @@ import logging
 from datetime import datetime
 from typing import Any, Callable
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
 from app.database import SessionLocal
 from app.models import BackgroundTask
@@ -321,17 +321,112 @@ def requeue_stale_tasks() -> dict[str, int]:
     return {"recovered_running": recovered_running, "requeued": requeued}
 
 
+def reconcile_background_tasks(limit: int = 200) -> dict[str, int]:
+    """运行期校对：把 DB 里 queued/running、但 RQ 已经没有活着的 job 补投。
+
+    和 requeue_stale_tasks 的区别：
+      - 那个只在 worker 启动时跑，且会把所有 running 都当成崩溃；
+      - 这个按 RQ 的 JobStatus 判断，STARTED/QUEUED 的真实任务绝对不碰，
+        只补「DB 说在跑、Redis 里已经没了」的孤儿任务。
+
+    典型场景就是 vector-worker 被 OOM/重启杀掉后，background_tasks
+    留在 queued，但 rq:queue:background 里已经没有对应 job。之前只有
+    重启才会恢复，所以能卡一整天。
+    """
+    from rq.job import JobStatus
+
+    from app.services.rq_client import background_queue
+
+    now = datetime.now()
+    queue = background_queue()
+    db = SessionLocal()
+    checked = 0
+    requeued = 0
+    alive = 0
+    failed = 0
+    try:
+        candidates = (
+            db.query(BackgroundTask)
+            .filter(BackgroundTask.status.in_(("queued", "running")))
+            .order_by(BackgroundTask.created_at.asc())
+            .limit(limit)
+            .all()
+        )
+        for task in candidates:
+            checked += 1
+            # 刚创建的任务留给正常 enqueue 流程；60 秒后还没进 RQ 才补。
+            # running 不等待：DB 已经说在跑，RQ 却没有 STARTED，基本就是
+            # 上一个执行进程已经死了。
+            if (
+                task.status == "queued"
+                and task.created_at is not None
+                and (now - task.created_at).total_seconds() < 60
+            ):
+                continue
+
+            job_id = f"bg-{task.id}"
+            try:
+                job = queue.fetch_job(job_id)
+                status = job.get_status() if job is not None else None
+                if status in (JobStatus.QUEUED, JobStatus.STARTED):
+                    alive += 1
+                    continue
+
+                # failed/stopped/finished 的旧 job 会占着同一个 job_id，
+                # 必须先删掉，否则 enqueue 会以为它还在。
+                if job is not None:
+                    try:
+                        job.delete()
+                    except Exception:
+                        logger.warning("清理旧 background job 失败 job=%s", job_id)
+
+                if task.status == "running":
+                    task.status = "queued"
+                    task.started_at = None
+                    task.finished_at = None
+                    task.error = None
+
+                queue.enqueue(
+                    "app.services.background_tasks.run_background_task",
+                    args=(task.id,),
+                    job_id=job_id,
+                    job_timeout=TASK_TIMEOUT_SECONDS,
+                )
+                db.commit()
+                requeued += 1
+            except Exception:  # noqa: BLE001
+                failed += 1
+                db.rollback()
+                logger.exception("补投 background 任务失败 task=%s", task.id)
+    finally:
+        db.close()
+
+    if requeued:
+        logger.info(
+            "background 任务校对：检查 %d，补投 %d，仍在跑 %d，失败 %d",
+            checked, requeued, alive, failed,
+        )
+    return {
+        "checked": checked,
+        "requeued": requeued,
+        "alive": alive,
+        "failed": failed,
+    }
+
+
 def task_stats() -> dict[str, int]:
-    """按状态统计任务数量，给管理接口用。"""
+    """按状态统计任务数量，给管理接口用。
+
+    用 GROUP BY 让数据库只回传「状态 + 数量」，不再把 1.8 万行
+    (status, id) 全部拉到 Python 里逐个累加。
+    """
     db = SessionLocal()
     try:
         rows = (
-            db.query(BackgroundTask.status, BackgroundTask.id)
+            db.query(BackgroundTask.status, func.count(BackgroundTask.id))
+            .group_by(BackgroundTask.status)
             .all()
         )
-        counts: dict[str, int] = {}
-        for status, _ in rows:
-            counts[status] = counts.get(status, 0) + 1
-        return counts
+        return {str(status or "unknown"): int(count) for status, count in rows}
     finally:
         db.close()

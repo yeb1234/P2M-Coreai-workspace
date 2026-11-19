@@ -22,16 +22,13 @@ const hasIndexedDb = typeof indexedDB !== 'undefined';
 const db = hasIndexedDb ? new P2MDexie() : null;
 const memoryKv = new Map<string, string>();
 
-export function setCurrentUser(username: string | null) {
-  // 只写一个本地标记。原来还有个内存变量 currentUser 和配套的
-  // getCurrentUser / restoreUser，但认证早已改成服务端 Cookie 会话，
-  // 那套本地账号体系整体废弃（2026-11 清理时删掉）。
-  // 这个 key 目前**没有读取方**，留着是为了不打断 authStore 的 7 处调用；
-  // 真要清干净，得连那些调用一起删。
-  if (username) {
-    localStorage.setItem('p2m-current-user', username);
-  } else {
+export function setCurrentUser(_username: string | null) {
+  // 旧的本地账号体系已废弃；这个标记没有读取方，而且会把上一个账号的
+  // 显示名留在浏览器里跨账号可见。统一清掉，不再写。
+  try {
     localStorage.removeItem('p2m-current-user');
+  } catch {
+    /* 隐私模式忽略 */
   }
 }
 

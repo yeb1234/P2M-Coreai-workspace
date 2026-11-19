@@ -59,13 +59,60 @@ STOPWORDS = {
     "怎么", "什么", "如何", "为什么", "哪些", "这个", "那个", "可以", "是否",
 }
 
+# 子串命中的「同前缀不同词」黑名单：token -> 必须排除的更长词。
+#
+# 为什么需要：词法通道是 `ILIKE '%java%'`，而字幕是 ASR 产物，
+# 说话人讲 JavaScript 时写 javascript，讲 Java 时也常常粘连成
+# javaapi / javasdk / java版。实测（2026-11，14,327 视频）：
+#   content_chunks 含 java 的块 534 个，其中 214 个只是 javascript
+#   标题+路径 ILIKE '%java%' 命中 1,119 个视频，绝大多数是 JS 课
+# 结果「学 Java」会被 JS/Vue/Node 课程灌满，真正的 Java 内容（SpringBoot
+# 那 22 个视频、面试题的 4 个视频）反而被压到后面。
+# 这里只做高置信度排除，不做词边界（\m java \M 在 ASR 文本里只剩 3 个视频，
+# 会把 javaapi / java sdk 这类粘连写法一起误杀）。
+_TOKEN_EXCLUDE: dict[str, tuple[str, ...]] = {
+    "java": ("javascript", "java script", "javascrtipt"),
+}
 
-def extract_tokens(query: str, max_code_tokens: int = 6) -> list[str]:
+
+def _exclude_patterns(token: str) -> list[str] | None:
+    """返回该 token 需要排除的 ILIKE 模式；没有黑名单则返回 None。"""
+    longer = _TOKEN_EXCLUDE.get(token.lower())
+    return [f"%{item}%" for item in longer] if longer else None
+
+
+# 上位概念展开：用户说「学 Java」，库里那门课的标题写的是 SpringBoot。
+#
+# 实测：22 个 SpringBoot 单元测试视频（第5章 8 个 / 第6章 14 个）是真 Java
+# 技术栈内容，但标题、分类名里都没有 "java" 三个字，按 token 字面永远召不回。
+# 这里只做「同义扩展召回」——把展开词作为额外的 ILIKE 分支并进候选池，
+# 排序仍交给向量 / rerank，不会把无关内容顶到前面。
+_TOKEN_EXPAND: dict[str, tuple[str, ...]] = {
+    "java": ("springboot", "spring boot", "junit", "jvm", "maven"),
+}
+
+
+# 拉丁 token 进入正文词法检索的最短长度。
+#
+# 为什么不是 2：query 改写会把「依赖注入」补成 dependency injection DI，
+# DI 这种两字符 token 生成 ILIKE '%di%'，在 6 万块上命中 6,000+ 行，
+# 执行计划会从 GIN 位图扫描退化成逐视频 nested loop。
+# 实测同一 query 从 29ms 变成约 700ms。正文召回交给更长的 token 和 CJK 词，
+# 元数据通道（标题/路径）仍保留 2 字符能力，见 retrieval_meta.meta_terms。
+MIN_LATIN_TOKEN_LEN = 3
+
+
+def extract_tokens(
+    query: str,
+    max_code_tokens: int = 6,
+    *,
+    min_latin_len: int = MIN_LATIN_TOKEN_LEN,
+) -> list[str]:
     """抽技术术语，用于 ILIKE 精确匹配。"""
     tokens: list[str] = []
     for match in CODE_TOKEN_RE.findall(query):
         lowered = match.lower()
-        if len(lowered) >= 2 and lowered not in STOPWORDS:
+        if len(lowered) >= min_latin_len and lowered not in STOPWORDS:
             tokens.append(lowered)
         if len(tokens) >= max_code_tokens:
             break
@@ -157,8 +204,20 @@ def lexical_search(
         clauses = []
         for index, token in enumerate(code_tokens):
             key = f"tok{index}"
-            clauses.append(f"s.text ILIKE :{key}")
             params[key] = f"%{token}%"
+            excluded = _exclude_patterns(token)
+            if excluded:
+                # java 不能被 javascript 顶替：先命中再排除更长的同类词
+                ex_key = f"tokex{index}"
+                params[ex_key] = excluded
+                clauses.append(f"(s.text ILIKE :{key} AND NOT (s.text ILIKE ANY(:{ex_key})))")
+            else:
+                clauses.append(f"s.text ILIKE :{key}")
+            # 同义扩展：学 Java 时把 SpringBoot / JUnit 那些块的召回一起打开
+            for extra in _TOKEN_EXPAND.get(token, ()):
+                exp_key = f"tokexp{index}_{len(clauses)}"
+                params[exp_key] = f"%{extra}%"
+                clauses.append(f"s.text ILIKE :{exp_key}")
         token_conditions = " OR (" + " OR ".join(clauses) + ")"
 
     # 块模式下永远不用相似度匹配。
@@ -299,9 +358,19 @@ def _document_frequency(terms: list[str]) -> dict[str, int]:
     for index, term in enumerate(missing):
         key = f"df{index}"
         params[key] = f"%{term}%"
-        columns.append(
-            f"count(*) FILTER (WHERE title ILIKE :{key} OR filepath ILIKE :{key}) AS {key}"
-        )
+        excluded = _exclude_patterns(term)
+        if excluded:
+            # df 必须和命中条件同口径：java 若按子串统计是 1,119（几乎全是
+            # JavaScript 课），会被 META_MAX_DF 判成泛词直接丢掉整条通道。
+            ex_key = f"dfx{index}"
+            params[ex_key] = excluded
+            cond = (
+                f"(title ILIKE :{key} AND NOT (title ILIKE ANY(:{ex_key})))"
+                f" OR (filepath ILIKE :{key} AND NOT (filepath ILIKE ANY(:{ex_key})))"
+            )
+        else:
+            cond = f"title ILIKE :{key} OR filepath ILIKE :{key}"
+        columns.append(f"count(*) FILTER (WHERE {cond}) AS {key}")
 
     sql = "SELECT " + ", ".join(columns) + " FROM videos"
     try:
@@ -369,6 +438,12 @@ def meta_search(
     if not terms:
         return []
 
+    # 同义扩展要一并进元数据通道：问「学 Java」时，标题写 SpringBoot 的
+    # 那门课（22 个视频）只能靠这一步才被召回。
+    for term in list(terms):
+        terms.extend(_TOKEN_EXPAND.get(term.lower(), ()))
+    terms = list(dict.fromkeys(terms))
+
     df = _document_frequency(terms)
     kept = [term for term in terms if 0 < df.get(term, 0) <= max_df]
     if not kept:
@@ -396,19 +471,34 @@ def meta_search(
         key = f"m{index}"
         params[key] = f"%{term}%"
         weight = weights[term]
+        excluded = _exclude_patterns(term)
+        ex_key = f"mx{index}"
+        if excluded:
+            params[ex_key] = excluded
+
+            def _col_cond(column: str, _k: str = key, _x: str = ex_key) -> str:
+                # 元数据通道同样要防 javascript 顶替 java：
+                # 否则「学 Java」命中的全是 JS 课程的路径，RRF 里一路排前。
+                return f"({column} ILIKE :{_k} AND NOT ({column} ILIKE ANY(:{_x})))"
+
+        else:
+
+            def _col_cond(column: str, _k: str = key) -> str:
+                return f"{column} ILIKE :{_k}"
+
         # 命中位置的权重只做「同分时的先后」，不做主导：
         # 先比命中几个词（覆盖率），再看命中的是标题还是路径。
         # 早期版本给路径 0.5，结果「路径同时命中 jQuery + 第五章」的视频
         # （0.85 分）反而输给「只有标题里有 jQuery」的视频（1.0 分）——
         # 这正是要靠路径救回来的那类查询。
         score_cases.append(
-            f"CASE WHEN v.title ILIKE :{key} THEN {weight}"
-            f" WHEN v.filename ILIKE :{key} THEN {round(weight * 0.95, 3)}"
-            f" WHEN v.filepath ILIKE :{key} THEN {round(weight * 0.85, 3)}"
+            f"CASE WHEN {_col_cond('v.title')} THEN {weight}"
+            f" WHEN {_col_cond('v.filename')} THEN {round(weight * 0.95, 3)}"
+            f" WHEN {_col_cond('v.filepath')} THEN {round(weight * 0.85, 3)}"
             f" ELSE 0 END"
         )
-        like_conditions.append(f"v.title ILIKE :{key} OR v.filepath ILIKE :{key}")
-        text_conditions.append(f"s2.text ILIKE :{key}")
+        like_conditions.append(f"{_col_cond('v.title')} OR {_col_cond('v.filepath')}")
+        text_conditions.append(_col_cond("s2.text"))
 
     filters: list[str] = []
     if category_ids:

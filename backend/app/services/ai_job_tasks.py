@@ -8,6 +8,7 @@ faster-whisper.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime
 
 from app.database import SessionLocal
@@ -66,9 +67,57 @@ def run_ai_job_task(job_id: str) -> None:
             logger.warning("Job %s not found in DB, skipping", job_id)
             return
 
+        # 兜底路由：台式机 worker 只消费 ai_jobs，如果历史配置或旧队列
+        # 把 summary_only 任务误投进来，不在这里跑 LLM，也不改 DB 状态；
+        # 保持 queued，交给 audio-prep 的池刷新按 summary_only 重新投到
+        # summary_jobs。否则台式机会和笔记本重复做同一批总结。
+        queues_mode = (os.getenv("WORKER_QUEUES") or "").strip().lower().replace(" ", "")
+        if job.summary_only and queues_mode == "ai_jobs":
+            logger.warning(
+                "summary_only job=%s landed in ai_jobs; leave queued for summary_jobs reload",
+                job_id,
+            )
+            return
+
         video = db.query(Video).filter(Video.id == job.video_id).first()
         if not video:
             _mark_failed(db, job, "Video not found")
+            return
+
+        # 「只补总结」不能重新抽音频跑 Whisper：库里已有字幕的视频，
+        # 直接拿 transcription/transcript_segments 做总结。
+        # 这条分支在 source 文件不存在时也能走通 —— 数据库里已有字幕，
+        # 不该因为源视频被移走就丢掉总结能力。
+        existing_text = (video.transcription or "").strip()
+        existing_segments = load_segments(video.transcript_segments)
+        if not existing_text and existing_segments:
+            existing_text = "\n".join(
+                (segment.get("text") or "").strip() for segment in existing_segments
+            ).strip()
+
+        if job.summary_only and existing_text and existing_segments:
+            paths = _build_job_paths(video, job)
+            summary = video.summary if (video.summary and video.summary.strip()) else None
+            summary_error = None
+            if job.do_summary and not summary:
+                summary, summary_error = _step_summarize(
+                    db, job, video, existing_text
+                )
+                if not (summary and summary.strip()):
+                    # 以前这里继续写文件并把 job 标成 completed，监控看到
+                    # “Processing complete”，但 videos.summary 是空的，
+                    # 全库完成度永远上不去。总结没产出就是失败，不能伪成功。
+                    _mark_failed(
+                        db,
+                        job,
+                        summary_error or "总结为空，未写入视频总结",
+                        stage="summarizing",
+                    )
+                    return
+            _step_write_outputs(
+                db, job, video, paths, existing_text, existing_segments, summary, summary_error
+            )
+            _finalize_job(db, job, video, paths, existing_text, existing_segments, summary, summary_error)
             return
 
         paths = _build_job_paths(video, job)
@@ -90,6 +139,14 @@ def run_ai_job_task(job_id: str) -> None:
                 summary, summary_error = _step_summarize(
                     db, job, video, video.transcription or ""
                 )
+                if not (summary and summary.strip()):
+                    _mark_failed(
+                        db,
+                        job,
+                        summary_error or "总结为空，未写入视频总结",
+                        stage="summarizing",
+                    )
+                    return
                 if summary:
                     video.summary = summary
                     # markdown 里也补上总结段，保持笔记文件与库一致

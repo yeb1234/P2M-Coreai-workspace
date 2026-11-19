@@ -50,8 +50,40 @@ CONTENT_CHUNKS = Table(
     # 维度由 settings.embedding_dim 决定，这里不写死 —— 类型只用于结果转换，
     # 真正的 halfvec(N) 在 content_chunks_ddl() 里按运行时配置拼。
     Column("embedding", HALFVEC(), nullable=True),
+    # 向量版本（三段式）。存量没有版本字段的行默认视为 1.0.0 legacy；
+    # 新管线显式写入当前 VECTOR_VERSION，不依赖数据库默认值。
+    Column("vector_version", Text, nullable=False, server_default="1.0.0"),
     Column("created_at", DateTime, server_default=func.now()),
 )
+
+
+def content_chunks_history_ddl(dim: int) -> list[str]:
+    """版本切换前的旧块归档表，用于可回滚。
+
+    只保存被新版本替换掉的旧块，不参与检索；不建 HNSW，避免白占内存。
+    `archived_at` 在同一事务内是稳定的，回滚按它取同一批快照。
+    """
+    return [
+        f"""
+        CREATE TABLE IF NOT EXISTS content_chunks_history (
+            id             BIGSERIAL PRIMARY KEY,
+            original_id    BIGINT,
+            video_id       INTEGER NOT NULL,
+            chunk_index    INTEGER NOT NULL,
+            start_sec      DOUBLE PRECISION NOT NULL,
+            end_sec        DOUBLE PRECISION NOT NULL,
+            text           TEXT NOT NULL,
+            char_count     INTEGER NOT NULL,
+            segment_count  INTEGER NOT NULL,
+            embedding      halfvec({dim}),
+            vector_version TEXT NOT NULL,
+            archived_at    TIMESTAMP NOT NULL DEFAULT now(),
+            reason         TEXT
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_content_chunks_history_video_version "
+        "ON content_chunks_history (video_id, vector_version, archived_at)",
+    ]
 
 
 def content_chunks_ddl(dim: int) -> list[str]:
@@ -69,11 +101,15 @@ def content_chunks_ddl(dim: int) -> list[str]:
             segment_count INTEGER NOT NULL DEFAULT 1,
             -- 向量先留空，由回填脚本填。放同一张表省一次 JOIN
             embedding     halfvec({dim}),
+            -- 旧版本存量默认 1.0.0；新管线显式写当前版本
+            vector_version TEXT NOT NULL DEFAULT '1.0.0',
             created_at    TIMESTAMP DEFAULT now()
         )
         """,
         "CREATE INDEX IF NOT EXISTS ix_content_chunks_video "
         "ON content_chunks (video_id, chunk_index)",
+        "CREATE INDEX IF NOT EXISTS ix_content_chunks_vector_version "
+        "ON content_chunks (vector_version)",
         "CREATE INDEX IF NOT EXISTS ix_content_chunks_embedding "
         "ON content_chunks USING hnsw (embedding halfvec_cosine_ops)",
         # 词法检索要用 trigram，和 subtitle_segments 保持一致

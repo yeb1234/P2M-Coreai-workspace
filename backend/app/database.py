@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,7 +23,32 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 ROOT_DIR = Path(__file__).resolve().parents[2]
 logger = logging.getLogger(__name__)
 
-DEFAULT_CORS_ORIGINS = "http://localhost:5002,http://localhost:5173,http://localhost"
+# 多个进程（backend + worker + worker2）启动时都会走到 schema 自举。
+# 这不是「幂等就可以并发」的场景：Alembic 和 create_all 都会拿 DDL 锁，
+# 两个进程同时改同一张表会死锁。用 PostgreSQL 会话级 advisory lock
+# 把整个自举串行化；锁随连接关闭自动释放，不依赖 redis 或文件锁。
+_SCHEMA_LOCK_KEY = 0x5032534348454D41  # "P2SCHEMA"
+_SCHEMA_LOCK_TIMEOUT_SECONDS = int(os.getenv("SCHEMA_LOCK_TIMEOUT_SECONDS", "180"))
+
+
+def _resolve_project_path(value: str) -> str:
+    """把配置里的相对路径固定到项目根，而不是进程当前目录。
+
+    Docker 里传的是 /videos 这类绝对容器路径，原样返回；
+    裸跑后端时允许 VIDEO_FOLDER=./video-library，无论从哪个目录启动
+    都会落到项目根下的 video-library，不再依赖 shell 的 CWD。
+    """
+    if not value:
+        return value
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return str(path)
+    return str(ROOT_DIR / path)
+
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost,http://localhost:12302,http://localhost:12322,"
+    "http://127.0.0.1,http://127.0.0.1:12302,http://127.0.0.1:12322"
+)
 
 
 class Settings(BaseSettings):
@@ -34,7 +60,7 @@ class Settings(BaseSettings):
     db_echo: bool = False
 
     # ---------------- 路径 ----------------
-    video_folder: str = str(ROOT_DIR / "videos")
+    video_folder: str = str(ROOT_DIR / "video-library")
     # ---- 日志 ----
     log_level: str = "INFO"
     # 为空则只走 stdout（交给 docker 采集）；设了目录就额外写一份 JSONL 到磁盘。
@@ -48,11 +74,15 @@ class Settings(BaseSettings):
     log_backup_count: int = 5
 
     work_dir: str = ""
+    # 音频缓存单独放 SSD：CPU 抽出的 16k WAV 写这里，
+    # GPU worker 只读这里，避免和 /videos 所在的 HDD 抢 I/O。
+    # 为空时回退到 work_dir，保持旧部署兼容。
+    audio_cache_dir: str = ""
     output_dir: str = ""
     thumbnail_dir: str = ""
     sprite_dir: str = ""
     # 宿主机路径 -> 容器内路径的映射，多个用 ; 分隔，最长前缀优先。
-    # 例：D:/ITJC/thumbnails=/data/thumbnails;D:/ITJC=/videos
+    # 例：./video-library/thumbnails=/data/thumbnails;./video-library=/videos
     # 数据库里的 filepath 是容器化之前写入的 Windows 绝对路径，需要这层转换
     path_map: str = ""
 
@@ -157,6 +187,9 @@ class Settings(BaseSettings):
     # ---- 多用户每日配额（防单账号跑光外部 LLM 额度）----
     quota_chat_daily: int = 200
     quota_plan_daily: int = 20
+    # 搜索 rerank 和每日 AI 笔记同样是 LLM 成本入口，不能只限 chat/plan。
+    quota_search_daily: int = 100
+    quota_ai_daily: int = 10
     # 管理员倍率：要能压测和排查，但也不是无限
     quota_admin_multiplier: int = 5
 
@@ -176,7 +209,7 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         items = [part.strip() for part in (self.cors_origins or "").split(",") if part.strip()]
-        return items or ["http://localhost:5002"]
+        return items or DEFAULT_CORS_ORIGINS.split(",")
 
     @property
     def admin_username_set(self) -> set[str]:
@@ -189,15 +222,27 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# 路径统一先归一化，再从 video_folder 派生缺省产物目录。
+# 这样 .env 里写 ./video-library 也能在任意启动目录下稳定落到项目根。
+settings.video_folder = _resolve_project_path(settings.video_folder) or str(ROOT_DIR / "video-library")
+
 # 兼容既有代码里 settings.work_dir / output_dir / thumbnail_dir / sprite_dir 的读取
 if not settings.work_dir:
     settings.work_dir = str(Path(settings.video_folder) / "work")
+else:
+    settings.work_dir = _resolve_project_path(settings.work_dir)
 if not settings.output_dir:
     settings.output_dir = str(Path(settings.video_folder) / "output")
+else:
+    settings.output_dir = _resolve_project_path(settings.output_dir)
 if not settings.thumbnail_dir:
     settings.thumbnail_dir = str(Path(settings.video_folder) / "thumbnails")
+else:
+    settings.thumbnail_dir = _resolve_project_path(settings.thumbnail_dir)
 if not settings.sprite_dir:
     settings.sprite_dir = str(Path(settings.video_folder) / "sprites")
+else:
+    settings.sprite_dir = _resolve_project_path(settings.sprite_dir)
 
 for folder in (
     settings.video_folder,
@@ -405,6 +450,10 @@ def _run_alembic_migrations() -> None:
 
     backend_dir = Path(__file__).resolve().parent.parent
     cfg = Config(str(backend_dir / "alembic.ini"))
+    # 应用进程已经由 setup_from_settings 配好日志；env.py 里的 fileConfig
+    # 会把 root handler 清空，此后所有业务日志静默丢失。用这个标记让 env.py
+    # 跳过日志重配 —— 迁移只负责改结构，不该动日志系统。
+    cfg.attributes["skip_logging_config"] = True
     cfg.set_main_option("script_location", str(backend_dir / "alembic"))
     # ConfigParser 会把 % 当插值符，密码里含 % 会炸
     cfg.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
@@ -430,6 +479,44 @@ def _run_alembic_migrations() -> None:
         logger.exception("alembic 迁移失败，继续启动但结构可能不是最新")
 
 
+def _acquire_schema_lock(conn) -> None:
+    """等待 PostgreSQL advisory lock。
+
+    用 try_advisory_lock 轮询而不是直接 pg_advisory_lock：
+    - 可以打日志说明「在等谁」，不会看起来像进程卡死；
+    - 超时后抛错，避免一个有问题的迁移把整个启动流程永久挂住。
+    """
+    deadline = time.monotonic() + _SCHEMA_LOCK_TIMEOUT_SECONDS
+    waited = False
+    while True:
+        acquired = conn.execute(
+            text("SELECT pg_try_advisory_lock(:key)"),
+            {"key": _SCHEMA_LOCK_KEY},
+        ).scalar()
+        if acquired:
+            if waited:
+                logger.info("schema 自举锁已获取，继续初始化")
+            return
+        if not waited:
+            logger.info("另一个进程正在初始化 schema，等待 advisory lock...")
+            waited = True
+        if time.monotonic() >= deadline:
+            raise TimeoutError(
+                f"等待 schema advisory lock 超时（{_SCHEMA_LOCK_TIMEOUT_SECONDS}s）"
+            )
+        time.sleep(1)
+
+
+def _release_schema_lock(conn) -> None:
+    try:
+        conn.execute(
+            text("SELECT pg_advisory_unlock(:key)"),
+            {"key": _SCHEMA_LOCK_KEY},
+        )
+    except Exception:
+        logger.warning("释放 schema advisory lock 失败，连接关闭时会自动释放", exc_info=True)
+
+
 def ensure_runtime_schema() -> None:
     """建表与索引（幂等）。
 
@@ -447,13 +534,23 @@ def ensure_runtime_schema() -> None:
     SQLite 只跑最小结构（Alembic 的 DDL 有 PG 专有语法，跑不了）。
     """
     if settings.is_postgres:
-        _run_alembic_migrations()
+        # 注意锁连接只负责持锁，迁移仍然走各自的 engine；
+        # 锁是会话级的，必须在同一个连接上 unlock。
+        with engine.connect() as lock_conn:
+            _acquire_schema_lock(lock_conn)
+            try:
+                # create_all 也纳入锁：worker 和 backend 以前各自先 create_all，
+                # 再进 ensure，DDL 仍可能在锁外并发。
+                Base.metadata.create_all(bind=engine)
+                _run_alembic_migrations()
+                from app.migrations import upgrade_postgres
 
-        from app.migrations import upgrade_postgres
-
-        upgrade_postgres(engine)
+                upgrade_postgres(engine)
+            finally:
+                _release_schema_lock(lock_conn)
         return
 
     from app.migrations import upgrade_sqlite_legacy
 
+    Base.metadata.create_all(bind=engine)
     upgrade_sqlite_legacy(engine)

@@ -15,9 +15,9 @@ from sqlalchemy import func
 from app.core.csrf import CSRFGuardMiddleware
 from app.core.errors import register_exception_handlers
 from app.core.observability import RequestContextMiddleware, setup_from_settings
-from app.database import Base, SessionLocal, engine, ensure_runtime_schema, settings
+from app.database import SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
-from app.routers import admin, ai_jobs, assistant, auth, calendar_events, categories, learning, memory_admin, notes, schedule_items, search, user_data, videos, watch_events
+from app.routers import admin, agent_actions, ai_jobs, assistant, auth, calendar_events, categories, interview, learning, mcp, memory_admin, notes, schedule_items, search, user_data, videos, watch_events
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
 
@@ -161,7 +161,6 @@ def _warmup_retrieval() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    Base.metadata.create_all(bind=engine)
     ensure_runtime_schema()
     start_file_watcher()
     threading.Thread(target=run_startup_scan, name="startup-video-scan", daemon=True).start()
@@ -199,11 +198,32 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="P2 Learning OS API",
-    version="3.0.0",
+    version="6.0.0",
     lifespan=lifespan,
     docs_url="/api/docs" if settings.enable_docs else None,
     openapi_url="/api/openapi.json" if settings.enable_docs else None,
 )
+
+
+@app.middleware("http")
+async def client_type_middleware(request: Request, call_next):
+    """识别桌面客户端，仅用于 UI 分流，绝不参与鉴权。
+
+    浏览器默认 web；桌面壳带 X-Client-Type: desktop-exe。
+    即使有人在浏览器里伪造这个 header，也只能拿到桌面精简视图，
+    后端权限仍按登录用户/角色判断，不会因此开放任何 IPC 或特权接口。
+    """
+    raw = (request.headers.get("X-Client-Type") or "web").strip().lower()
+    request.state.client_type = "desktop-exe" if raw == "desktop-exe" else "web"
+    return await call_next(request)
+
+
+@app.get("/api/client-info")
+async def client_info(request: Request):
+    """给桌面/网页自测用：确认 header 是否被识别。"""
+    client_type = getattr(request.state, "client_type", "web")
+    return {"client_type": client_type, "ui_mode": client_type}
+
 
 # 显式来源：allow_origins=["*"] 与 allow_credentials=True 是无效组合，
 # 浏览器会直接拒绝，而且等于关闭了同源保护。
@@ -213,7 +233,7 @@ app.add_middleware(
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Client-Type"],
     expose_headers=["X-Sprite-Meta", "X-Request-ID"],
 )
 # CSRF 在 CORS 之内：Cookie 会话的写请求必须来源可信
@@ -235,7 +255,10 @@ app.include_router(memory_admin.router)
 app.include_router(learning.router)
 app.include_router(watch_events.router)
 app.include_router(notes.router)
+app.include_router(agent_actions.router)
 app.include_router(calendar_events.router)
+app.include_router(mcp.router)
+app.include_router(interview.router)
 app.include_router(admin.router)
 
 app.mount("/output", StaticFiles(directory=settings.output_dir), name="output")
@@ -277,7 +300,7 @@ def health():
     docker 会把健康探针的输出存进 `.State.Health.Log`，所以把这个指标
     放进 /health 之后，出问题可以一条命令看到：
 
-        docker inspect -f '{{json .State.Health.Log}}' siteyeb-backend
+        docker inspect -f '{{json .State.Health.Log}}' p2-siteyeb-backend-1
 
     ## 注意：warn 不回 503
 

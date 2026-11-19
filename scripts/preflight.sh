@@ -62,9 +62,9 @@ esac
 echo
 echo "== 网络暴露 =="
 
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q siteyeb-pg; then
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q p2-siteyeb-postgres-1; then
   DANGER="$(docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null \
-    | grep -E 'siteyeb-pg|siteyeb-redis' \
+    | grep -E 'p2-siteyeb-postgres-1|p2-siteyeb-redis-1' \
     | grep -E '0\.0\.0\.0:(5432|6379)' || true)"
   if [ -n "$DANGER" ]; then
     fail "数据库/Redis 暴露在 0.0.0.0：$(echo "$DANGER" | tr '\n' ' ')"
@@ -72,7 +72,7 @@ if docker ps --format '{{.Names}}' 2>/dev/null | grep -q siteyeb-pg; then
     pass "5432/6379 未暴露到公网"
   fi
 else
-  warn "未检测到 siteyeb-pg 容器，跳过端口检查"
+  warn "未检测到 p2-siteyeb-postgres-1 容器，跳过端口检查"
 fi
 
 echo

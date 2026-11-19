@@ -1,5 +1,7 @@
 # PR 记录
 
+> 状态：历史参考（截至 2026-11-15 合并批次，最后校对 2026-11-16）。与当前实现差异：容器名已改由 compose 生成（`p2-siteyeb-<服务>-1`，无 `container_name`）；PG/Redis 宿主端口 2026-11-16 换号（`127.0.0.1:12502` / `127.0.0.1:12602`）；各记录内的验证命令除注明外，走 `http://localhost/api` 入口仍有效。
+
 这个目录用「一个改动 = 一份记录」的方式，把每次功能迭代沉淀成可复盘的 PR 描述。
 
 代码是单人开发的，但流程按协作项目做：**分支 → 自测 → PR 描述 → 合并 → 打标签**。
@@ -14,7 +16,7 @@
 | [PR-001](PR-001-security-hardening.md) | 多用户鉴权与网关加固 | `feat/security-hardening` | `5a82093` | 已合并 |
 | [PR-002](PR-002-session-cookie.md) | 会话搬进 httpOnly Cookie | `feat/session-cookie` | `fb5f573` | 已合并 |
 | [PR-003](PR-003-storage-governance.md) | 存储治理（统计信息 + Redis 上限） | `fix/storage-governance` | `157a42c` | 已合并 |
-| [PR-004](PR-004-learning-path-tab.md) | 学习路径 TAB 与 Agent 上下文 | `feat/learning-path` | `5a82093` | 已合并 |
+| [PR-004](PR-004-learning-path.md) | 学习路径 TAB 与 Agent 上下文 | `feat/learning-path` | `5a82093` | 已合并 |
 
 > PR-001 与 PR-004 在同一次提交里落地（学习路径的鉴权和数据隔离本来就是安全改造的一部分）。
 > 这是个反例：**改动耦合太紧，PR 就失去了独立评审的价值**。后面的 PR-002/003 拆开了。

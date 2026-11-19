@@ -103,6 +103,7 @@ export function VideoPlayerControls({
 }: VideoPlayerControlsProps) {
   return (
     <div
+      data-player-control="controls"
       className={`absolute inset-x-0 bottom-0 z-20 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       onClick={onStopControlClick}
       onDoubleClick={onStopControlClick}
@@ -213,7 +214,14 @@ export function VideoPlayerControls({
               <PictureInPicture2 size={16} />
             </button>
           )}
-          <button onClick={() => { onToggleFullscreen(); playInteractionSound('tap'); }} className={`${isMobile ? 'p-1.5' : 'p-1.5'} text-white/80 hover:text-white transition-colors`} title={isFullscreen ? '退出全屏 (F)' : '全屏 (F)'}>
+          <button
+            type="button"
+            onClick={() => { onToggleFullscreen(); playInteractionSound('tap'); }}
+            aria-label={isFullscreen ? '退出全屏' : '进入全屏'}
+            aria-pressed={isFullscreen}
+            className={`${isMobile ? 'flex h-10 w-9 items-center justify-center' : 'p-1.5'} text-white/80 hover:text-white transition-colors`}
+            title={isFullscreen ? '退出全屏 (F)' : '全屏 (F)'}
+          >
             {isFullscreen ? <Minimize size={isMobile ? 14 : 16} /> : <Maximize size={isMobile ? 14 : 16} />}
           </button>
         </div>

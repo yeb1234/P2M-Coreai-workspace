@@ -64,7 +64,7 @@ export const PomodoroStats: React.FC = () => {
 
       {hasAnySessions && (
         <div className="min-w-0 overflow-x-auto pb-1 pr-1">
-          <div className="min-w-[300px] pr-2">
+          <div className="min-w-0 pr-2">
           <div className="flex items-center gap-2 text-[var(--text-secondary)] mb-3">
             <TrendingUp size={14} />
             <span className="text-xs font-medium">本周趋势</span>
@@ -141,3 +141,4 @@ export const PomodoroStats: React.FC = () => {
     </div>
   );
 };
+

@@ -14,6 +14,8 @@ from app.services.rq_client import is_job_cancelled
 logger = logging.getLogger(__name__)
 
 _MODEL_CACHE = {}
+_BATCH_PIPELINE_CACHE = {}
+_BATCH_SIZE = max(1, int(os.getenv("WHISPER_BATCH_SIZE", "8") or 8))
 _THREAD_ENV_KEYS = (
     "OMP_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",
@@ -263,6 +265,34 @@ def get_whisper_model(model_size: str, cpu_threads: Optional[int] = None, comput
     return _MODEL_CACHE[key]
 
 
+def get_batched_pipeline(model_size: str, cpu_threads: Optional[int] = None, compute_type: Optional[str] = None, device_type: Optional[str] = None):
+    """Return a cached BatchedInferencePipeline for the same loaded model.
+
+    faster-whisper >= 1.1 supports feeding multiple audio windows to the GPU
+    in one call. The pipeline holds a reference to the WhisperModel, so it
+    shares the model cache instead of loading a second copy.
+    """
+    model = get_whisper_model(
+        model_size,
+        cpu_threads=cpu_threads,
+        compute_type=compute_type,
+        device_type=device_type,
+    )
+    key = (
+        _resolve_faster_whisper_model(model_size),
+        _validate_compute_type(_resolve_device(device_type), compute_type or settings.whisper_compute_type)[0],
+        _resolve_cpu_threads(cpu_threads),
+        _resolve_device(device_type),
+    )
+    pipeline = _BATCH_PIPELINE_CACHE.get(key)
+    if pipeline is None:
+        from faster_whisper import BatchedInferencePipeline
+
+        pipeline = BatchedInferencePipeline(model=model)
+        _BATCH_PIPELINE_CACHE[key] = pipeline
+    return pipeline
+
+
 def _parse_whisper_cpp_json(json_path: Path) -> dict:
     data = json.loads(json_path.read_text(encoding="utf-8"))
     source_segments = data.get("transcription") or data.get("segments") or []
@@ -409,9 +439,7 @@ def transcribe_wav(
     if job_id is not None and is_job_cancelled(job_id):
         raise RuntimeError("Job cancelled")
 
-    model = get_whisper_model(model_size, cpu_threads=cpu_threads, compute_type=compute_type, device_type=device_type)
-    segments, _info = model.transcribe(
-        str(wav_path),
+    transcribe_kwargs = dict(
         language=language or None,
         vad_filter=settings.whisper_vad_filter if vad_filter is None else vad_filter,
         beam_size=beam_size or settings.whisper_beam_size,
@@ -419,6 +447,31 @@ def transcribe_wav(
         temperature=settings.whisper_temperature if temperature is None else temperature,
         condition_on_previous_text=False,
     )
+
+    # faster-whisper >= 1.1 supports batched inference: multiple audio windows
+    # are decoded and sent to the GPU together, which fills the idle gaps
+    # between short serial transcriptions. Batch size is configurable via
+    # WHISPER_BATCH_SIZE; 1 keeps the old single-pass path.
+    if _BATCH_SIZE > 1:
+        try:
+            pipeline = get_batched_pipeline(
+                model_size,
+                cpu_threads=cpu_threads,
+                compute_type=compute_type,
+                device_type=device_type,
+            )
+            segments, _info = pipeline.transcribe(
+                str(wav_path),
+                batch_size=_BATCH_SIZE,
+                **transcribe_kwargs,
+            )
+        except Exception as exc:
+            logger.warning("[whisper] batched inference unavailable (%s), falling back to single-pass", exc)
+            model = get_whisper_model(model_size, cpu_threads=cpu_threads, compute_type=compute_type, device_type=device_type)
+            segments, _info = model.transcribe(str(wav_path), **transcribe_kwargs)
+    else:
+        model = get_whisper_model(model_size, cpu_threads=cpu_threads, compute_type=compute_type, device_type=device_type)
+        segments, _info = model.transcribe(str(wav_path), **transcribe_kwargs)
 
     parts: list[str] = []
     timestamped_segments: list[dict] = []

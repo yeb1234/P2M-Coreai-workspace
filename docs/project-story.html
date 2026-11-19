@@ -593,9 +593,15 @@
     这份文档不讲「用了什么技术」，只讲<em>为什么这么选、哪里踩过坑、面试怎么讲</em>。
   </p>
 
+  <div class="note">
+    <span class="ico">※</span>
+    <div><strong>状态：现行复盘页（最后校对 2026-11-16）。</strong>
+    当前基线：PostgreSQL 17 + pgvector、3.0 线；文中历史阶段的规模、耗时与代码行数为当时快照，已在对应位置注明。</div>
+  </div>
+
   <div class="kpi-grid">
     <div class="kpi"><div class="v">14,327</div><div class="l">视频 / 359 万条字幕片段</div></div>
-    <div class="kpi"><div class="v">4 万行</div><div class="l">前后端代码（59 + 203 文件）</div></div>
+    <div class="kpi"><div class="v">4 万行</div><div class="l">前后端代码（59 + 203 文件，11/15 快照）</div></div>
     <div class="kpi"><div class="v">15GB → 1.77GB</div><div class="l">数据库体积</div></div>
     <div class="kpi"><div class="v">26s → 25ms</div><div class="l">向量检索耗时</div></div>
     <div class="kpi"><div class="v">0 → 18/18</div><div class="l">中文检索命中率</div></div>
@@ -662,7 +668,7 @@
 <!-- ============ 02 ============ -->
 <section id="arch">
   <div class="sec-head"><span class="sec-num">02</span><h2>架构长什么样</h2></div>
-  <p class="sec-desc">四个容器，三条数据流。先看整体，再拆每条流。</p>
+  <p class="sec-desc">五个服务（PG / Redis / 后端 / worker / nginx 前端），三条数据流。先看整体，再拆每条流。</p>
 
   <figure class="figure">
     <svg viewBox="0 0 860 520" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
@@ -699,12 +705,12 @@
       <text x="52" y="234" font-size="12" font-weight="650" fill="#1c1c1a">检索层</text>
       <text x="52" y="254" font-size="11.5" fill="#4a4a46">词法：pg_trgm</text>
       <text x="52" y="272" font-size="11.5" fill="#4a4a46">语义：pgvector HNSW</text>
-      <text x="52" y="290" font-size="11.5" fill="#4a4a46">融合：加权 RRF + LLM 重排</text>
+      <text x="52" y="290" font-size="11.5" fill="#4a4a46">融合：加权 RRF + cross-encoder 重排</text>
 
       <rect x="240" y="214" width="185" height="98" rx="6" fill="#faf9f7" stroke="#e4e1da"/>
       <text x="252" y="234" font-size="12" font-weight="650" fill="#1c1c1a">Agent 层</text>
       <text x="252" y="254" font-size="11.5" fill="#4a4a46">LangGraph ReAct</text>
-      <text x="252" y="272" font-size="11.5" fill="#4a4a46">8 个工具 · 工具轨迹审计</text>
+      <text x="252" y="272" font-size="11.5" fill="#4a4a46">9 个工具 · 工具轨迹审计</text>
       <text x="252" y="290" font-size="11.5" fill="#4a4a46">规划图：5 节点状态机</text>
 
       <rect x="440" y="214" width="185" height="98" rx="6" fill="#faf9f7" stroke="#e4e1da"/>
@@ -775,8 +781,8 @@
   <pre><code>POST /api/search/hybrid?q=事件循环是什么
   ├─ 词法路：pg_trgm 三元组匹配（8~30ms）
   ├─ 语义路：bge-m3 嵌入 → pgvector HNSW 近邻（6~25ms）
-  ├─ RRF 融合：按名次加权，词法 0.8 / 语义 1.2
-  └─ LLM 重排：候选 20 条 → 精选 6 条（0.6~2.8s，可关）</code></pre>
+  ├─ RRF 融合：按名次加权，词法 0.8 / 语义 1.2 / 元数据 1.5
+  └─ cross-encoder 重排：RRF 前 20 条 → 阈值 0.10 过滤（可关；API 失败退回 LLM listwise）</code></pre>
   <p>
     为什么必须有两条路？<strong>它们失败的场景正好互补</strong>：
     词法擅长精确术语（<code>useEffect</code>、版本号），但整句相似度会被长文本稀释；
@@ -951,7 +957,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
         <div class="v">
           关键判断是：<strong>业务库本身也是问题，不只是向量</strong>。
           上 Milvus 只解决一半，SQLite 的 15GB、单写锁、备份难还在。
-          而 pgvector 0.8 的 HNSW 索引对 186 万条 1024 维向量完全够用 —— 实测单次查询 6~25ms。
+          而 pgvector 的 HNSW 索引对这个量级的 1024 维向量完全够用 —— 实测单次查询 6~25ms。
           Milvus 的优势（千万级以上、多租户、分布式）在这个量级用不上，却要额外维护 etcd + MinIO 三件套。
         </div>
       </div>
@@ -1010,7 +1016,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
       <div class="kv">
         <div class="k">结果</div>
         <div class="v">
-          8 个工具、SSE 流式、工具轨迹审计全部落地；
+          9 个工具、SSE 流式、工具轨迹审计全部落地；
           规划图 5 节点带条件边，实测产出 7 步路径、每步绑定真实视频。
         </div>
       </div>
@@ -1047,7 +1053,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
       </div>
       <div class="kv">
         <div class="k">决定</div>
-        <div class="v"><strong>C</strong>，并且加一层可选的 LLM 重排。</div>
+        <div class="v"><strong>C</strong>，并且加一层可选的 cross-encoder 重排（API 失败时退回 LLM listwise）。</div>
       </div>
       <div class="kv">
         <div class="k">依据</div>
@@ -1057,7 +1063,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
           整句三元组相似度被长文本稀释；<br>
           · 纯语义：问「函数返回另一个函数」（不含「闭包」二字）能正确召回闭包内容，这是词法做不到的。<br>
           融合用 RRF（Reciprocal Rank Fusion）：不看绝对分数，只看各自排名，
-          <code>score = Σ w/(k + rank)</code>，词法权重 0.8 / 语义 1.2。
+          <code>score = Σ w/(k + rank)</code>，词法权重 0.8 / 语义 1.2 / 元数据 1.5。
         </div>
       </div>
       <div class="kv">
@@ -1182,7 +1188,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
       <div class="kv">
         <div class="k">决定</div>
         <div class="v">
-          四个服务全容器化（PG + Redis + 后端 + nginx 前端），
+          五个服务全容器化（PG + Redis + 后端 + worker + nginx 前端），
           但 <strong>保留本地 venv 开发模式</strong>。
         </div>
       </div>
@@ -1592,7 +1598,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
   <p class="sec-desc">全部是实测数字，不是估算。面试时被追问「有数据吗」，就靠这一页。</p>
 
   <h3>检索质量</h3>
-  <p>向量规模：28,747 条 / 45 个视频（覆盖 Python、前端、AI、数据库、网络、设计模式）。</p>
+  <p>向量规模（截至 2026-11-16）：<code>content_chunks</code> 60,259 条 / 8,785 个有字幕视频，向量覆盖 100%；评测集为 6 个已知答案查询（覆盖 Python、前端、AI、数据库、网络、设计模式）。</p>
   <div class="table-wrap">
     <table>
       <thead><tr><th>查询</th><th>Top-3 命中</th><th>相关度</th></tr></thead>
@@ -1612,7 +1618,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
   <div class="grid-2">
     <div class="stat-box">
       <div><span class="before">26,750ms</span><span class="arrow">→</span><span class="after">6–25ms</span></div>
-      <div class="what">向量检索（319 万条）</div>
+      <div class="what">向量检索（6.0 万条 chunk；耗时为调优当时实测）</div>
     </div>
     <div class="stat-box">
       <div><span class="before">0 命中</span><span class="arrow">→</span><span class="after">3–32ms 全命中</span></div>
@@ -1643,11 +1649,11 @@ fcd1e58  chore           换行符规则固化</code></pre>
       <tbody>
         <tr><td>业务数据迁移</td><td class="num">359 万条 / 53.8 秒</td><td>COPY 协议，6.7 万行/秒</td></tr>
         <tr><td>数据库体积</td><td class="num good">15GB → 1.77GB</td><td>清掉 14GB 废向量</td></tr>
-        <tr><td>向量存储</td><td class="num">halfvec 半精度</td><td>比 float32 省一半，7.6GB → 3.8GB</td></tr>
-        <tr><td>后端代码</td><td class="num">10,902 行 / 59 文件</td><td>FastAPI 单体 + worker</td></tr>
-        <tr><td>前端代码</td><td class="num">29,451 行 / 203 文件</td><td>React 19 + TS</td></tr>
+        <tr><td>向量存储</td><td class="num">halfvec 半精度</td><td>比 float32 省一半（存储 / 内存）</td></tr>
+        <tr><td>后端代码</td><td class="num">10,902 行 / 59 文件</td><td>FastAPI 单体 + worker（11/15 快照）</td></tr>
+        <tr><td>前端代码</td><td class="num">29,451 行 / 203 文件</td><td>React 19 + TS（11/15 快照）</td></tr>
         <tr><td>镜像体积</td><td class="num">1.66GB / 191MB</td><td>后端 / 前端</td></tr>
-        <tr><td>启动到可用</td><td class="num">约 60 秒</td><td>四容器，含 healthcheck 等待</td></tr>
+        <tr><td>启动到可用</td><td class="num">约 60 秒</td><td>五服务，含 healthcheck 等待</td></tr>
       </tbody>
     </table>
   </div>
@@ -1726,7 +1732,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
     </table>
   </div>
   <p>自动提取走异步（不阻塞回答），落库前有二次校验：<b>LLM 只是提议，代码是闸门</b>。</p>
-  <p>实测：输入「我每周六要带孩子完全学不了；我习惯早上六点起来学，晚上效率低」，20 秒后自动多出两条，类型判断正确（preference / constraint），来源标 <code>inferred</code> 区别于手动的 <code>manual</code>。</p>
+  <p>实测：输入「我每周六要带孩子完全学不了；我习惯早上六点起来学，晚上效率低」，后台异步抽取完成后（LLM 超时 40s）自动多出两条，类型判断正确（preference / constraint），来源标 <code>inferred</code> 区别于手动的 <code>manual</code>。</p>
 
   <h3>这一批的教训</h3>
   <p><b>「配置写了」和「配置生效了」是两件事。</b>中间有四道关卡都可能断：配置有没有传进进程、传进去的能不能执行、依赖库能不能被找到、拿不到时是报错还是静默降级。</p>
@@ -1747,7 +1753,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
         因为这个项目真正的瓶颈不止向量。当时 SQLite 已经 15GB，单写锁让转写任务和前端查询互相卡，
         备份还得停服务。如果只上 Milvus，向量问题解决一半，业务库的问题原封不动。
         pgvector 让业务数据和向量待在同一个库里，一个容器、一份备份、一次事务。
-        量级上也够：186 万条 1024 维，HNSW 实测 6~25ms。Milvus 的优势在千万级以上和分布式，
+        量级上也够：当前六万多条 chunk、1024 维，HNSW 实测 6~25ms。Milvus 的优势在千万级以上和分布式，
         这个量级用不上，却要多维护 etcd 和 MinIO 三件套。
       </div>
       <p>
@@ -1768,7 +1774,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
         RRF 只用名次不用分数：<code>score = Σ w/(k + rank)</code>，k 取 60。
         名次是天然可比的，而且对异常分数不敏感 —— 某一路给出一个离谱的高分也不会污染结果。
       </div>
-      <p><strong>追问「权重怎么定的」：</strong>词法 0.8、语义 1.2。依据是抽检：
+      <p><strong>追问「权重怎么定的」：</strong>词法 0.8、语义 1.2、元数据 1.5。依据是抽检：
       语义在跨表述召回上更可靠（问「函数返回另一个函数」能找到闭包），
       词法容易被短碎片干扰，所以给语义更高权重。</p>
     </div>
@@ -1781,13 +1787,13 @@ fcd1e58  chore           换行符规则固化</code></pre>
       <div class="say">
         分两段。<strong>离线</strong>：视频 → ffmpeg 抽音轨 → Whisper 转写 → 切成 3~5 秒的片段落库 →
         bge-m3 批量嵌入（batch 256，约 84 条/秒）→ 写入 pgvector 的 halfvec 列 → 建 HNSW 索引。<br>
-        <strong>在线</strong>：用户提问 → 同时跑词法和语义两路召回各 30 条 → RRF 融合 →
-        取前 20 条给 LLM 做 listwise 重排 → 精选 6 条 → 连同问题、画像、记忆、会话摘要一起组 prompt →
-        LLM 生成回答 → SSE 逐 token 推给前端 → 回答里带《视频名》和 mm:ss。
+        <strong>在线</strong>：用户提问 → 同时跑词法、语义、元数据三路召回各 30 条 → RRF 融合取前 20 条 →
+        cross-encoder 重排 + 阈值 0.10 过滤（API 失败退回 LLM listwise）→ 参考片段最多 5 张 → 连同问题、画像、记忆、会话摘要一起组 prompt →
+        LLM 生成回答 → SSE 逐 token 推给前端 → 回答里带《视频名》和 mm:ss。参考卡片当前由前端开关 <code>FEATURES.chatVideoReferences</code> 控制，2026-11-16 默认关闭、不渲染。
       </div>
       <p>
         <strong>容易被忽略的一环：</strong>重排是「锦上添花但不能拖死主流程」的，
-        所以设了 8 秒硬超时，超时直接退回 RRF 原序。检索的可用性不能依赖一个可能变慢的外部服务。
+        兜底的 LLM listwise 设了 8 秒硬超时，超时直接退回 RRF 原序。检索的可用性不能依赖一个可能变慢的外部服务。
       </p>
     </div>
   </div>
@@ -1883,15 +1889,15 @@ fcd1e58  chore           换行符规则固化</code></pre>
   </div>
 
   <div class="qa">
-    <div class="qa-q"><span class="mark">Q9</span><span>16GB 内存的单机，怎么扛住 186 万条向量？</span></div>
+    <div class="qa-q"><span class="mark">Q9</span><span>16GB 内存的单机，怎么扛住几万条向量？</span></div>
     <div class="qa-a">
       <div class="say">
         三个手段叠起来：<br>
-        ① <strong>半精度存储</strong>：<code>halfvec(1024)</code> 而不是 <code>vector(1024)</code>，7.6GB → 3.8GB；<br>
+        ① <strong>半精度存储</strong>：<code>halfvec(1024)</code> 而不是 <code>vector(1024)</code>，存储和内存比 float32 省一半；<br>
         ② <strong>HNSW 而不是暴力扫</strong>：不加载全量向量，靠图索引近似近邻，
         查询只碰一小部分节点；<br>
         ③ <strong>入库前过滤</strong>：只对 ≥8 字的片段建索引，
-        359 万降到 186 万 —— 短片段多是 ASR 碎片，进索引只会污染召回。
+        短片段多是 ASR 碎片，进索引只会污染召回。
       </div>
       <p>
         <strong>顺带一提：</strong>最初试过 hnswlib，Windows 上编译失败（缺 MSVC）。
@@ -1995,8 +2001,8 @@ fcd1e58  chore           换行符规则固化</code></pre>
         这是当前最影响体验的短板。<br>
         ② <strong>字幕质量</strong>。ASR 错误是检索效果的天花板。
         计划对高价值课程跑一轮 LLM 校对，把「申考贝」这类碎片修掉。<br>
-        ③ <strong>全量向量化</strong>。现在只覆盖了 1.5%，全量约 186 万条、需 6 小时。
-        技术上没难度，是排期问题。
+        ③ <strong>字幕校对与埋点补全</strong>。向量已全量覆盖（60,259 条 chunk，截至 2026-11-16）；
+        剩下的是把高价值课程的 ASR 错误修掉、把学习行为埋点补齐。
       </div>
       <p>
         <strong>还有一个我想做但没做的：</strong>把「学习路径的完成情况」回流到推荐里 ——
@@ -2086,7 +2092,7 @@ fcd1e58  chore           换行符规则固化</code></pre>
         <tr><td class="num">3–5 min</td><td>两轮迭代的差别</td><td>「能跑」和「正确」之间那段（<a href="#story">第 03 节</a>）</td></tr>
         <tr><td class="num">5–7 min</td><td>两三个关键取舍</td><td>选 pgvector 而不是 Milvus、混合检索为什么 RRF</td></tr>
         <tr><td class="num">7–9 min</td><td>一个深挖的坑</td><td>选「319 万条废向量」或「中文检索零命中」讲透</td></tr>
-        <tr><td class="num">9–10 min</td><td>局限和下一步</td><td>埋点缺失、字幕质量、覆盖率 1.5%</td></tr>
+        <tr><td class="num">9–10 min</td><td>局限和下一步</td><td>埋点缺失、字幕质量、学习路径回流推荐</td></tr>
       </tbody>
     </table>
   </div>
@@ -2510,14 +2516,14 @@ fcd1e58  chore           换行符规则固化</code></pre>
         <tr><td><code>app/services/vector_store.py</code></td><td>pgvector 读写</td><td>COPY 批量写入、iterative_scan</td></tr>
         <tr><td><code>app/services/embeddings.py</code></td><td>向量化客户端</td><td>批量 256、指数退避、维度校验</td></tr>
         <tr><td><code>app/agents/chat_agent.py</code></td><td>对话 Agent</td><td>上下文装配顺序、工具轨迹提取</td></tr>
-        <tr><td><code>app/agents/tools.py</code></td><td>8 个工具</td><td>返回压缩后的纯文本而非 JSON</td></tr>
+        <tr><td><code>app/agents/tools.py</code></td><td>9 个工具</td><td>返回压缩后的纯文本而非 JSON</td></tr>
         <tr><td><code>app/agents/plan_agent.py</code></td><td>规划状态机</td><td>条件边、重排阈值、真实视频回填</td></tr>
         <tr><td><code>app/services/memory.py</code></td><td>记忆系统</td><td>会话压缩、三层记忆分工</td></tr>
         <tr><td><code>app/services/profile.py</code></td><td>学习画像</td><td>事件流聚合、上界钳制</td></tr>
         <tr><td><code>app/migrations.py</code></td><td>Schema 演进</td><td>HNSW / GIN 索引定义</td></tr>
         <tr><td><code>app/core/observability.py</code></td><td>可观测性</td><td>request_id 贯穿、JSON 日志</td></tr>
-        <tr><td><code>scripts/migrate_sqlite_to_pg.py</code></td><td>数据迁移</td><td>COPY 协议、源库只读</td></tr>
-        <tr><td><code>scripts/backfill_embeddings.py</code></td><td>向量回填</td><td>断点续跑、游标分页</td></tr>
+        <tr><td><code>backend/scripts/migrate_sqlite_to_pg.py</code></td><td>数据迁移</td><td>COPY 协议、源库只读</td></tr>
+        <tr><td><code>backend/scripts/backfill_chunk_embeddings.py</code></td><td>向量回填</td><td>断点续跑、游标分页</td></tr>
       </tbody>
     </table>
   </div>
@@ -2529,11 +2535,11 @@ docker compose -f docker-compose.pg.yml --env-file .env up -d
 # 起全栈（部署）
 docker compose up -d --build
 
-# 后端（注意别用 8000，Docker 占用）
+# 后端（容器内监听 8000；宿主回环发布 12402，对外走 nginx /api；venv 本地直连端口按需自定）
 cd backend && .venv311/Scripts/python -m uvicorn app.main:app --port 8100 --reload
 
-# 前端
-VITE_API_BASE_URL=http://127.0.0.1:8100 npm run dev
+# 前端（Vite dev 12322，/api 代理到 127.0.0.1:12302，无需配 VITE_API_BASE_URL）
+npm run dev
 
 # 健康检查
 curl localhost/health          # 库版本、pgvector 版本、向量条数
@@ -2542,9 +2548,9 @@ curl localhost/ready           # 含模型探活
 # 检索试跑
 curl "localhost/api/search/hybrid?q=闭包是什么&top_k=3&rerank=false"
 
-# 迁移与回填
-python scripts/migrate_sqlite_to_pg.py --dry-run
-python scripts/backfill_embeddings.py --all --batch-size 256
+# 迁移与回填（在 backend 目录下执行）
+cd backend && python scripts/migrate_sqlite_to_pg.py --dry-run
+cd backend && python scripts/backfill_chunk_embeddings.py --batch-size 128
 
 # 前端全量类型检查（别信增量缓存）
 ./node_modules/.bin/tsc -b --force</code></pre>
@@ -2558,13 +2564,13 @@ python scripts/backfill_embeddings.py --all --batch-size 256
         <tr><td><strong>RAG</strong></td><td>先检索相关资料，再让模型基于资料回答</td><td>整个系统的核心范式</td></tr>
         <tr><td><strong>嵌入 / embedding</strong></td><td>把文本变成一串数字，意思相近的数字也相近</td><td>bge-m3，1024 维</td></tr>
         <tr><td><strong>向量检索 / ANN</strong></td><td>在向量空间里找最近的邻居，不逐条比对</td><td>pgvector HNSW</td></tr>
-        <tr><td><strong>HNSW</strong></td><td>分层可导航小世界图，近似最近邻的一种索引</td><td>m=16, ef_construction=64</td></tr>
-        <tr><td><strong>halfvec</strong></td><td>半精度向量（float16），省一半空间</td><td>7.6GB → 3.8GB</td></tr>
+        <tr><td><strong>HNSW</strong></td><td>分层可导航小世界图，近似最近邻的一种索引</td><td>pgvector HNSW，索引参数走默认值（m=16, ef_construction=64）</td></tr>
+        <tr><td><strong>halfvec</strong></td><td>半精度向量（float16），省一半空间</td><td>pgvector halfvec，HNSW 索引</td></tr>
         <tr><td><strong>pg_trgm</strong></td><td>三元组模糊匹配，把字符串切成三字滑窗</td><td>中文词法检索，替代 FTS5</td></tr>
-        <tr><td><strong>RRF</strong></td><td>按名次而不是分数融合多路结果</td><td>词法 0.8 / 语义 1.2</td></tr>
-        <tr><td><strong>重排 / rerank</strong></td><td>对初筛结果再排一次序，精度更高但更慢</td><td>LLM listwise，8 秒超时</td></tr>
+        <tr><td><strong>RRF</strong></td><td>按名次而不是分数融合多路结果</td><td>词法 0.8 / 语义 1.2 / 元数据 1.5</td></tr>
+        <tr><td><strong>重排 / rerank</strong></td><td>对初筛结果再排一次序，精度更高但更慢</td><td>cross-encoder 优先；LLM listwise 兜底（8s 超时）</td></tr>
         <tr><td><strong>ReAct</strong></td><td>模型边推理边调工具的循环范式</td><td>LangGraph create_react_agent</td></tr>
-        <tr><td><strong>工具调用</strong></td><td>模型输出结构化请求，由程序执行后把结果喂回</td><td>8 个工具</td></tr>
+        <tr><td><strong>工具调用</strong></td><td>模型输出结构化请求，由程序执行后把结果喂回</td><td>9 个工具</td></tr>
         <tr><td><strong>SSE</strong></td><td>服务器单向持续推送，基于普通 HTTP</td><td>流式对话</td></tr>
         <tr><td><strong>COPY 协议</strong></td><td>PostgreSQL 的批量导入通道，比 INSERT 快一个量级</td><td>359 万条 53.8 秒</td></tr>
       </tbody>

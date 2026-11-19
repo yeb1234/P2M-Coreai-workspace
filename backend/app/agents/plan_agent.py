@@ -26,7 +26,7 @@ from app.database import SessionLocal
 from app.models import LearningGoal, LearningPath, LearningPathStep, Video
 from app.services.hybrid_search import hybrid_search
 from app.services.llm import build_chat_model
-from app.services.profile import profile_summary_text, recompute_profile
+from app.services.profile import get_profile_data, profile_summary_text
 from app.utils.files import unique_suffix
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ def node_analyze(state: PlanState) -> PlanState:
     """把目标翻译成能力清单，并对照用户现状标注已有/缺失。"""
     db = SessionLocal()
     try:
-        profile = recompute_profile(db, None)
+        profile = get_profile_data(db, None)
         profile_text = profile_summary_text(profile)
     finally:
         db.close()
@@ -275,7 +275,11 @@ def node_persist(state: PlanState) -> PlanState:
 
     db = SessionLocal()
     try:
-        owner_id = int(state.get("user_id") or 0) or None
+        owner_id = int(state.get("user_id") or 0)
+        if owner_id <= 0:
+            # 空的 owner_id 不写库：否则会生成一条“无主路径”，
+            # 后续谁登录都可能读到。调用方必须在进入图之前注入用户。
+            return {"error": "缺少用户归属，拒绝写入空归属路径"}
         goal = (
             db.query(LearningGoal)
             .filter(

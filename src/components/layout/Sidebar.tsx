@@ -8,18 +8,19 @@ import { useDragResize } from '../../hooks/useDragResize';
 // 侧边栏分组。24 项平铺认知负担太重，按使用场景分三组。
 // 分组只影响「标题插在哪」，不影响用户拖拽出来的实际顺序 ——
 // 判断依据是「当前项和上一项是否同组」，同组就不重复插标题。
+// 排序规则：已完成并验收的项目入口往本组前部放，不按建设时间追加到末尾。
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
   {
     label: '日常',
-    ids: ['dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'pomodoro', 'timecenter'],
+    ids: ['dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'mdnotes', 'pomodoro', 'timecenter'],
   },
   {
     label: '学习',
-    ids: ['learning', 'journey', 'video', 'transcriber', 'flashcards', 'leetcode', 'interview', 'reader', 'snippets'],
+    ids: ['bookmarks', 'learning', 'journey', 'video', 'transcriber', 'flashcards', 'leetcode', 'interview', 'reader', 'snippets'],
   },
   {
     label: '工具',
-    ids: ['health', 'compare', 'shop', 'esports', 'stats', 'habits', 'bookmarks', 'tokens', 'codenav', 'aiagent', 'openclaw', 'hermes', 'settings'],
+    ids: ['health', 'compare', 'shop', 'esports', 'stats', 'habits', 'tokens', 'codenav', 'aiagent', 'openclaw', 'hermes', 'settings'],
   },
 ];
 
@@ -195,9 +196,9 @@ export const Sidebar: React.FC = () => {
               {showGroupHeader && (
                 <div className="flex items-center gap-1.5 px-2.5 pb-1 pt-2.5 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
                   <span>{group}</span>
-                  {/* 「工具」这一组 13 项里有 11 项还是静态占位（另外两项是
-                      灵境小助手和数据中心，已从 dev 标记里摘掉）。
-                      在组标题上标一次，比在 11 个菜单项上各挂一个标签清楚。 */}
+                  {/* 「工具」这一组里还有多项静态占位（灵境小助手和数据中心
+                      已经有真实功能，不在其中）。在组标题上标一次，比在
+                      每个菜单项上各挂一个标签清楚。 */}
                   {group === '工具' && (
                     <span className="flex items-center gap-1 normal-case tracking-normal">
                       <Construction size={11} className="text-[var(--warn)]" aria-hidden="true" />

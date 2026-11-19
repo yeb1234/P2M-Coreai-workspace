@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -23,6 +24,63 @@ from app.models import ChatMessage, ChatSession, MemoryItem
 from app.utils.files import unique_suffix
 
 logger = logging.getLogger(__name__)
+
+# 会话标题只在「第一条用户消息」时生成，不额外调模型。
+# 旧会话默认标题是「学习对话」，列表里全一样，靠这个常量识别并懒回填。
+GENERIC_SESSION_TITLES = {"", "学习对话", "新对话", "未命名对话", "Learning Assistant"}
+SESSION_TITLE_MAX_CHARS = 28
+
+
+def derive_session_title(content: str, *, limit: int = SESSION_TITLE_MAX_CHARS) -> str:
+    """从用户第一句话提取一个可读标题。
+
+    不做模型标题生成：首条消息已经够用，而且列表是高频打开的，
+    多一次 LLM 调用只会让历史和首轮对话都变慢。
+    """
+    text = re.sub(r"```.*?```", " ", content or "", flags=re.S)
+    text = re.sub(r"[*_#>`~]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return ""
+    first_sentence = re.split(r"[。！？!?\n]", text, maxsplit=1)[0].strip()
+    title = first_sentence or text
+    if len(title) > limit:
+        title = title[:limit].rstrip() + "…"
+    return title
+
+
+def is_generic_session_title(title: str | None) -> bool:
+    return (title or "").strip() in GENERIC_SESSION_TITLES
+
+
+def first_user_message_text(db: Session, session_id: str) -> str:
+    row = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session_id, ChatMessage.role == "user")
+        .order_by(ChatMessage.created_at.asc())
+        .first()
+    )
+    return row.content if row else ""
+
+
+def backfill_session_title(db: Session, session: ChatSession) -> str:
+    """旧会话标题还是「学习对话」时，用第一条用户消息补一个标题。
+
+    标题回填不是一次真实对话，不能改动 updated_at，否则历史排序会整体错位。
+    """
+    if not is_generic_session_title(session.title):
+        return session.title
+    title = derive_session_title(first_user_message_text(db, session.id))
+    if title:
+        # 显式带上原 updated_at，绕开 onupdate=datetime.now
+        db.query(ChatSession).filter(ChatSession.id == session.id).update(
+            {ChatSession.title: title, ChatSession.updated_at: session.updated_at},
+            synchronize_session=False,
+        )
+        db.commit()
+        db.refresh(session)
+    return session.title
+
 
 COMPRESS_THRESHOLD = 24  # 超过这么多条就压缩
 KEEP_RECENT = 10  # 压缩后保留的原文条数
@@ -36,7 +94,7 @@ class ConversationContext:
     total_messages: int = 0
 
 def ensure_session(db: Session, session_id: str | None, *, video_id: int | None = None,
-                   user_id: int | None = None, title: str = "学习对话") -> ChatSession:
+                   user_id: int | None = None, title: str = "新对话") -> ChatSession:
     """拿到（或新建）一个会话。
 
     **必须校验归属**。session_id 由 unique_suffix() 生成，会出现在响应里，
@@ -52,9 +110,11 @@ def ensure_session(db: Session, session_id: str | None, *, video_id: int | None 
     if session_id:
         session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
         if session and user_id is not None and session.user_id == user_id:
+            backfill_session_title(db, session)
             return session
         if session and session.user_id is None and user_id is None:
             # 匿名共享会话（老数据 / 单用户模式）：双方都没有归属时可沿用
+            backfill_session_title(db, session)
             return session
         if session:
             # 归属不符或已过期：记一笔，便于发现有人在试别人的 id
@@ -79,23 +139,22 @@ def encode_references(
     references: list[dict] | None = None,
     mentioned_videos: list[dict] | None = None,
     intent: str | None = None,
+    actions: list[dict] | None = None,
 ) -> str | None:
     """把一条助手消息的富内容打包进 references_json。
 
     历史上这个字段只存 references 的裸数组。现在要额外保存
-    mentioned_videos（正文里《视频标题》→ video_id 的映射）和
-    intent（这条回答用的模板 id），否则从历史列表加载旧会话时
-    只剩纯文字 —— 链接和推荐框全丢。
-
-    用 envelope 而不是加数据库列：只有一个消费者（get_session_messages），
-    不必跑 migration。读取端 decode_references() 同时兼容旧的裸数组。
+    mentioned_videos（正文里《视频标题》→ video_id 的映射）、
+    intent（这条回答用的模板 id）和 actions（本轮真正落库的笔记/日程/Todo
+    回执），否则从历史列表加载旧会话时只剩纯文字，用户也看不到执行记录。
     """
     payload = {
         "references": references or [],
         "mentioned_videos": mentioned_videos or [],
         "intent": intent,
+        "actions": actions or [],
     }
-    if not references and not mentioned_videos and not intent:
+    if not references and not mentioned_videos and not intent and not actions:
         return None
     return json.dumps(payload, ensure_ascii=False)
 
@@ -106,7 +165,7 @@ def decode_references(raw: str | None) -> dict:
       2. [...] 裸数组     → 旧格式，只有 references
       3. {...} envelope  → 新格式
     """
-    empty = {"references": [], "mentioned_videos": [], "intent": None}
+    empty = {"references": [], "mentioned_videos": [], "intent": None, "actions": []}
     if not raw:
         return empty
     try:
@@ -120,6 +179,7 @@ def decode_references(raw: str | None) -> dict:
             "references": data.get("references") or [],
             "mentioned_videos": data.get("mentioned_videos") or [],
             "intent": data.get("intent"),
+            "actions": data.get("actions") or [],
         }
     return empty
 
@@ -133,6 +193,7 @@ def append_message(
     references: list[dict] | None = None,
     mentioned_videos: list[dict] | None = None,
     intent: str | None = None,
+    actions: list[dict] | None = None,
     tool_calls: list[dict] | None = None,
     model: str | None = None,
     tokens_in: int | None = None,
@@ -144,7 +205,7 @@ def append_message(
         session_id=session_id,
         role=role,
         content=content,
-        references_json=encode_references(references, mentioned_videos, intent),
+        references_json=encode_references(references, mentioned_videos, intent, actions),
         tool_calls_json=json.dumps(tool_calls, ensure_ascii=False) if tool_calls else None,
         model=model,
         tokens_in=tokens_in,
@@ -154,8 +215,13 @@ def append_message(
     db.add(message)
     session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
     if session:
+        was_empty = (session.message_count or 0) == 0
         session.message_count = (session.message_count or 0) + 1
         session.updated_at = datetime.now()
+        if role == "user" and was_empty and is_generic_session_title(session.title):
+            title = derive_session_title(content)
+            if title:
+                session.title = title
     db.commit()
     db.refresh(message)
     return message

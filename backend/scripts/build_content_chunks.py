@@ -45,6 +45,8 @@ from sqlalchemy import text  # noqa: E402
 
 from app.database import engine, settings  # noqa: E402
 from app.services.chunker import split_into_chunks  # noqa: E402,F401  （分块逻辑在服务层）
+from app.services.subtitle_cleaner import clean_segments  # noqa: E402
+from app.services.vector_version import VECTOR_VERSION  # noqa: E402
 
 def ensure_table(conn) -> None:
     """建表 + 索引。DDL 来自 app.tables，和 migrations 用同一份。
@@ -52,13 +54,22 @@ def ensure_table(conn) -> None:
     之前这里自己写了一份 DDL，而 migrations 里没有 ——
     结果新部署（没跑过这个脚本）时默认检索源 chunks 查的是不存在的表。
     """
-    from app.tables import content_chunks_ddl
+    from app.tables import content_chunks_ddl, content_chunks_history_ddl
 
     dim = int(settings.embedding_dim or 1024)
     conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
     for statement in content_chunks_ddl(dim):
         conn.execute(text(statement))
+    for statement in content_chunks_history_ddl(dim):
+        conn.execute(text(statement))
+    # 旧库的 content_chunks 可能没有版本列；手工建块脚本也必须幂等补列。
+    conn.execute(
+        text(
+            "ALTER TABLE content_chunks ADD COLUMN IF NOT EXISTS "
+            "vector_version TEXT NOT NULL DEFAULT '1.0.0'"
+        )
+    )
 
 
 def main() -> int:
@@ -110,6 +121,9 @@ def main() -> int:
                 {"vid": video.id},
             ).fetchall()
             segments = [(r.start_sec, r.end_sec, r.text) for r in rows]
+            # 脚本和后台索引管线必须走同一套清洗/版本，否则手工重建
+            # 会静默把未清洗文本写回向量库，版本号也会说错。
+            segments = clean_segments(segments, mode="vector_safe")
             chunks = split_into_chunks(segments)
 
             total_segments += len(segments)
@@ -125,8 +139,8 @@ def main() -> int:
                     conn.execute(
                         text(
                             "INSERT INTO content_chunks "
-                            "(video_id, chunk_index, start_sec, end_sec, text, char_count, segment_count) "
-                            "VALUES (:vid, :idx, :s, :e, :t, :c, :n)"
+                            "(video_id, chunk_index, start_sec, end_sec, text, char_count, segment_count, vector_version) "
+                            "VALUES (:vid, :idx, :s, :e, :t, :c, :n, :v)"
                         ),
                         {
                             "vid": video.id,
@@ -136,6 +150,7 @@ def main() -> int:
                             "t": chunk["text"],
                             "c": chunk["char_count"],
                             "n": chunk["segment_count"],
+                            "v": VECTOR_VERSION,
                         },
                     )
                 conn.commit()

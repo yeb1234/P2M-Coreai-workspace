@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 
 from app.database import SessionLocal
 from app.models import AiJob, Video
@@ -31,6 +31,7 @@ from app.services.rq_client import (
     get_redis_connection,
     is_job_cancelled,
     send_kill_to_worker,
+    summary_jobs_queue,
 )
 
 _PAUSE_KEY = "ai_queue:paused"
@@ -56,15 +57,47 @@ def _is_queue_paused() -> bool:
     return bool(get_redis_connection().exists(_PAUSE_KEY))
 
 
+def ai_job_status_counts(db=None) -> dict[str, int]:
+    """一次 GROUP BY 拿全部状态计数，替代 4 条独立 count(*)。
+
+    ai_jobs 的 seq_scan 曾到 5 万次；管理面每次刷新 4 条 count
+    是主要放大源之一。传入 db 时复用调用方 session，不额外开关连接。
+    返回固定键位，未知状态也保留，调用方不必处理 KeyError。
+    """
+    own_session = db is None
+    if own_session:
+        db = SessionLocal()
+    try:
+        rows = (
+            db.query(AiJob.status, func.count(AiJob.id))
+            .group_by(AiJob.status)
+            .all()
+        )
+        counts = {
+            "running": 0,
+            "queued": 0,
+            "failed": 0,
+            "completed": 0,
+            "cancelled": 0,
+        }
+        for status, count in rows:
+            counts[str(status or "unknown")] = int(count)
+        return counts
+    finally:
+        if own_session:
+            db.close()
+
+
 def ai_queue_state() -> dict:
     db = SessionLocal()
     try:
+        counts = ai_job_status_counts(db)
         return {
             "paused": _is_queue_paused(),
-            "running": db.query(AiJob).filter(AiJob.status == "running").count(),
-            "queued": db.query(AiJob).filter(AiJob.status == "queued").count(),
-            "failed": db.query(AiJob).filter(AiJob.status == "failed").count(),
-            "completed": db.query(AiJob).filter(AiJob.status == "completed").count(),
+            "running": counts.get("running", 0),
+            "queued": counts.get("queued", 0),
+            "failed": counts.get("failed", 0),
+            "completed": counts.get("completed", 0),
         }
     finally:
         db.close()
@@ -335,24 +368,28 @@ def enqueue_ai_jobs(job_ids: list[str], at_front: bool = False) -> None:
     if not job_ids:
         return
     queue = ai_jobs_queue()
-    # 一次查出这批任务对应视频的时长，避免逐条 query
+    summary_queue = summary_jobs_queue()
+    # 一次查出这批任务对应视频的时长和 summary_only 标记，避免逐条 query
     timeout_by_job: dict[str, int] = {}
+    summary_job_ids: set[str] = set()
     db = SessionLocal()
     try:
         rows = (
-            db.query(AiJob.id, Video.duration)
+            db.query(AiJob.id, AiJob.summary_only, Video.duration)
             .join(Video, Video.id == AiJob.video_id)
             .filter(AiJob.id.in_(job_ids))
             .all()
         )
-        timeout_by_job = {jid: compute_job_timeout(dur) for jid, dur in rows}
+        timeout_by_job = {jid: compute_job_timeout(dur) for jid, _summary_only, dur in rows}
+        summary_job_ids = {jid for jid, summary_only, _dur in rows if summary_only}
     except Exception:
         pass
     finally:
         db.close()
 
     for job_id in job_ids:
-        queue.enqueue(
+        target = summary_queue if job_id in summary_job_ids else queue
+        target.enqueue(
             "app.services.ai_job_tasks.run_ai_job_task",
             args=(job_id,),
             job_id=job_id,
@@ -500,73 +537,122 @@ def sync_db_queue_to_rq() -> int:
 
     Called on startup, resume, and after recover so that jobs created
     while Redis was temporarily unavailable still get executed.
+
+    这里必须分批提交：历史上一次性把 6000+ 条 queued 任务装进一个
+    Session，最后只 commit 一次；worker 启动恢复和正在转写的 worker
+    同时更新 videos 时，PostgreSQL 会直接判 deadlock。分批后每批
+    提交一次，锁持有时间从「整个回填」降到「200 条左右」。
     """
     import logging
+    import os
 
     logger = logging.getLogger(__name__)
     db = SessionLocal()
     try:
-        queued_jobs = db.query(AiJob).filter(AiJob.status == "queued").order_by(AiJob.created_at.asc()).all()
-        if not queued_jobs:
+        # 先只取主键，避免把 6000+ 个 ORM 对象和关系全部加载进内存。
+        queued_ids = [
+            row[0]
+            for row in db.query(AiJob.id)
+            .filter(AiJob.status == "queued")
+            .order_by(AiJob.created_at.asc())
+            .all()
+        ]
+        total = len(queued_ids)
+        if not total:
             return 0
+
         queue = ai_jobs_queue()
+        summary_queue = summary_jobs_queue()
         enqueued = 0
         skipped = 0
-        for job in queued_jobs:
-            try:
-                # 如果视频已经有完整转录结果，直接标记完成，不入队
-                video = db.query(Video).filter(Video.id == job.video_id).first()
-                if video and _video_has_transcription_outputs(video):
-                    job.status = "completed"
-                    job.stage = "completed"
-                    job.message = "Skipped — video already has transcription"
-                    job.transcript = video.transcription
-                    job.transcript_segments = video.transcript_segments
-                    job.summary = video.summary
-                    job.markdown_path = video.markdown_path
-                    job.subtitle_path = video.subtitle_path
-                    video.ai_status = "completed"
-                    video.ai_stage = "completed"
-                    video.ai_error = None
-                    skipped += 1
-                    continue
+        batch_size = max(1, int(os.getenv("AI_STARTUP_SYNC_BATCH", "200")))
+        for start in range(0, total, batch_size):
+            batch_ids = queued_ids[start : start + batch_size]
+            # 重新按状态过滤：这一批可能在查询之后已经被别的 worker 接手。
+            jobs = (
+                db.query(AiJob)
+                .filter(AiJob.id.in_(batch_ids), AiJob.status == "queued")
+                .order_by(AiJob.created_at.asc())
+                .all()
+            )
+            for job in jobs:
+                try:
+                    # 任务必须按能力路由：summary_only 只能进 summary_jobs，
+                    # 否则台式机的转写 worker 会去跑总结，和笔记本重复消费。
+                    target_queue = summary_queue if job.summary_only else queue
+                    video = db.query(Video).filter(Video.id == job.video_id).first()
+                    # 只有转写任务才能用“视频已有转录”来跳过；总结任务
+                    # 即使有转录也必须检查 summary 是否已经写入，不能误判完成。
+                    if job.summary_only:
+                        if video and (video.summary or "").strip():
+                            job.status = "completed"
+                            job.stage = "completed"
+                            job.message = "Skipped — video already has summary"
+                            job.summary = video.summary
+                            skipped += 1
+                            continue
+                    elif video and _video_has_transcription_outputs(video):
+                        job.status = "completed"
+                        job.stage = "completed"
+                        job.message = "Skipped — video already has transcription"
+                        job.transcript = video.transcription
+                        job.transcript_segments = video.transcript_segments
+                        job.summary = video.summary
+                        job.markdown_path = video.markdown_path
+                        job.subtitle_path = video.subtitle_path
+                        video.ai_status = "completed"
+                        video.ai_stage = "completed"
+                        video.ai_error = None
+                        skipped += 1
+                        continue
 
-                rq_job = queue.fetch_job(job.id)
-                # fetch_job 会从 failed/finished registry 里也找到同名 job，
-                # 光判断 is None 不够：worker 被强杀后，RQ 把任务标成
-                # abandoned→failed，而 DB 侧还停在 queued。于是这里看到
-                # 「job 已存在」就跳过，DB 永远 queued，前端一直显示
-                # 「处理中」，用户反复重试都没用。
-                #
-                # 只有 RQ 里确实还活着（queued / started）才算已入队。
-                # 其它状态一律清掉旧记录重新投递。
-                from rq.job import JobStatus
+                    rq_job = target_queue.fetch_job(job.id)
+                    # fetch_job 会从 failed/finished registry 里也找到同名 job，
+                    # 光判断 is None 不够：worker 被强杀后，RQ 把任务标成
+                    # abandoned→failed，而 DB 侧还停在 queued。于是这里看到
+                    # 「job 已存在」就跳过，DB 永远 queued，前端一直显示
+                    # 「处理中」，用户反复重试都没用。
+                    #
+                    # 只有 RQ 里确实还活着（queued / started）才算已入队。
+                    # 其它状态一律清掉旧记录重新投递。
+                    from rq.job import JobStatus
 
-                alive = rq_job is not None and rq_job.get_status() in (
-                    JobStatus.QUEUED,
-                    JobStatus.STARTED,
-                )
-                if rq_job is not None and not alive:
-                    try:
-                        rq_job.delete()
-                    except Exception:
-                        pass
-                if not alive:
-                    queue.enqueue(
-                        "app.services.ai_job_tasks.run_ai_job_task",
-                        args=(job.id,),
-                        job_id=job.id,
-                        job_timeout=_job_timeout_seconds(db, job),
-                        result_ttl=AI_JOB_RESULT_TTL_SECONDS,
+                    alive = rq_job is not None and rq_job.get_status() in (
+                        JobStatus.QUEUED,
+                        JobStatus.STARTED,
                     )
-                    enqueued += 1
-            except Exception:
-                logger.exception("Failed to enqueue job %s to RQ", job.id)
-        db.commit()
+                    if rq_job is not None and not alive:
+                        try:
+                            rq_job.delete()
+                        except Exception:
+                            pass
+                    if not alive:
+                        target_queue.enqueue(
+                            "app.services.ai_job_tasks.run_ai_job_task",
+                            args=(job.id,),
+                            job_id=job.id,
+                            job_timeout=_job_timeout_seconds(db, job),
+                            result_ttl=AI_JOB_RESULT_TTL_SECONDS,
+                        )
+                        enqueued += 1
+                except Exception:
+                    logger.exception("Failed to enqueue job %s to RQ", job.id)
+            # 每批独立 commit：既释放行锁，也让已完成的跳过结果及时落库。
+            db.commit()
+            logger.info(
+                "sync_db_queue_to_rq: batch %d-%d/%d committed "
+                "(enqueued=%d skipped=%d)",
+                start + 1,
+                min(start + len(batch_ids), total),
+                total,
+                enqueued,
+                skipped,
+            )
+
         logger.info(
             "sync_db_queue_to_rq: pushed %d/%d queued jobs to RQ, skipped %d already-done",
             enqueued,
-            len(queued_jobs),
+            total,
             skipped,
         )
         return enqueued
@@ -595,6 +681,7 @@ def reconcile_stuck_ai_jobs(db, limit: int = 20) -> int:
 
     try:
         queue = ai_jobs_queue()
+        summary_queue = summary_jobs_queue()
         # queued 和 running 都要扫。
         #
         # 原来只扫 queued，漏了一类真实故障：worker 重启后 RQ 会把旧的
@@ -615,7 +702,8 @@ def reconcile_stuck_ai_jobs(db, limit: int = 20) -> int:
         recovered = 0
         for job in stuck:
             try:
-                rq_job = queue.fetch_job(job.id)
+                target_queue = summary_queue if job.summary_only else queue
+                rq_job = target_queue.fetch_job(job.id)
                 alive = rq_job is not None and rq_job.get_status() in (
                     JobStatus.QUEUED,
                     JobStatus.STARTED,
@@ -627,7 +715,7 @@ def reconcile_stuck_ai_jobs(db, limit: int = 20) -> int:
                         rq_job.delete()
                     except Exception:
                         pass
-                queue.enqueue(
+                target_queue.enqueue(
                     "app.services.ai_job_tasks.run_ai_job_task",
                     args=(job.id,),
                     job_id=job.id,

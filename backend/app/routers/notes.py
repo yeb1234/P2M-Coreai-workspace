@@ -10,8 +10,9 @@
 
 import logging
 from pathlib import Path
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -19,17 +20,40 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db, settings
 from app.models import Note, User
+from app.services.quota import ai_daily_quota_for, quota_exceeded_detail
+from app.services.rate_limit import ai_daily_limiter
 
 logger = logging.getLogger(__name__)
 from app.schemas import NoteOut, NoteUpdate
+from app.services.daily_digest import generate_daily_note
+from app.services.note_ai import NoteAIError, extract_note_actions, polish_note, summarize_note
+from app.services.note_library import save_private_note
+from app.services.user_data_cleanup import delete_private_note_files
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
 
 class NoteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
-    content: str = ""
+    content: str = Field(default="", max_length=60_000)
     video_id: int | None = None
+
+
+class DailyNoteIn(BaseModel):
+    # 前端便签存在浏览器里，服务端看不到；由前端把今天更新过的标题带上来
+    local_notes: list[str] = Field(default_factory=list)
+
+
+class NoteAiIn(BaseModel):
+    """笔记 AI 请求。
+
+    正文来自浏览器 IndexedDB，服务端不保存、不反查；只处理后返回结果。
+    """
+
+    action: Literal["summary", "polish", "actions"]
+    title: str = Field(default="", max_length=240)
+    markdown: str = Field(default="", max_length=60_000)
+    instruction: str = Field(default="", max_length=300)
 
 
 def _load_visible(note_id: int, user: User, db: Session) -> Note:
@@ -71,6 +95,78 @@ def _purge_public_private_note(note_id: int, user_id: int | None, *, keep: Path)
         logger.warning("清理公开目录私有笔记失败 note_id=%s path=%s", note_id, legacy, exc_info=True)
 
 
+@router.post("/ai-daily")
+def ai_daily_note(
+    payload: DailyNoteIn,
+    request: Request,
+    user: User = Depends(get_current_user),
+):
+    """生成「今日 AI 便签」：汇总当天真实学习行为 + 明天建议。
+
+    只统计当前登录用户自己的数据；便签在浏览器端，标题由前端带上来。
+    LLM 不可用时服务内部会退回模板，前端拿到的仍然是可读内容。
+    """
+    # 这个接口会调用外部/本地 LLM；前端按钮可能被连点，先限流再扣每日额度。
+    allowed, _ = ai_daily_limiter.hit(f"user:{user.id}")
+    if not allowed:
+        raise HTTPException(status_code=429, detail="日报生成太频繁，缓一分钟再试")
+
+    quota = ai_daily_quota_for(user.role)
+    ok, used, limit = quota.consume(user.id)
+    if not ok:
+        raise HTTPException(
+            status_code=429,
+            detail=quota_exceeded_detail(used, limit, "AI 日报"),
+        )
+
+    try:
+        return generate_daily_note(user.id, payload.local_notes)
+    except Exception:
+        # 日报失败（LLM/数据聚合异常）不应让用户白扣当天额度。
+        quota.refund(user.id)
+        raise
+
+
+@router.post("/ai")
+def note_ai(
+    payload: NoteAiIn,
+    user: User = Depends(get_current_user),
+):
+    """对当前笔记做总结 / 润色 / 待办日历抽取。
+
+    这是无状态接口：正文由前端带上来，不回写 IndexedDB。
+    动作抽取只返回建议，创建待办/日历由前端确认后走现有接口。
+    """
+    allowed, _ = ai_daily_limiter.hit(f"user:{user.id}:note-ai")
+    if not allowed:
+        raise HTTPException(status_code=429, detail="AI 操作太频繁，缓一分钟再试")
+
+    quota = ai_daily_quota_for(user.role)
+    ok, used, limit = quota.consume(user.id)
+    if not ok:
+        raise HTTPException(
+            status_code=429,
+            detail=quota_exceeded_detail(used, limit, "AI 笔记"),
+        )
+
+    try:
+        if payload.action == "summary":
+            result = summarize_note(payload.title, payload.markdown)
+            return {"action": "summary", "result": result, "provider": result["provider"], "model": result["model"]}
+        if payload.action == "polish":
+            result = polish_note(payload.title, payload.markdown, payload.instruction)
+            return {"action": "polish", "result": result, "provider": result["provider"], "model": result["model"]}
+        result = extract_note_actions(payload.title, payload.markdown)
+        return {"action": "actions", "result": result, "provider": result["provider"], "model": result["model"]}
+    except NoteAIError as exc:
+        quota.refund(user.id)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        quota.refund(user.id)
+        logger.exception("笔记 AI 处理失败 action=%s", payload.action)
+        raise HTTPException(status_code=502, detail="AI 服务暂时不可用，请稍后重试") from exc
+
+
 @router.get("", response_model=list[NoteOut])
 def list_notes(
     scope: str | None = None,
@@ -95,22 +191,16 @@ def list_notes(
 @router.post("", response_model=NoteOut)
 def create_note(
     payload: NoteCreate,
-    db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """新建自己的笔记。永远 private —— 共享笔记只由 AI 转写流程产生。"""
-    note = Note(
-        title=payload.title.strip(),
-        content=payload.content,
-        video_id=payload.video_id,
+    return save_private_note(
         user_id=user.id,
-        scope="private",
+        title=payload.title,
+        content=payload.content,
         source="manual",
+        video_id=payload.video_id,
     )
-    db.add(note)
-    db.commit()
-    db.refresh(note)
-    return note
 
 
 @router.put("/{note_id}", response_model=NoteOut)
@@ -165,6 +255,10 @@ def delete_note(
     if note.scope == "shared":
         # 共享笔记不删 —— 删了视频就少一段笔记；想改内容走 PUT
         raise HTTPException(status_code=403, detail="共享笔记不能删除，只能编辑")
+    note_user_id = note.user_id
     db.delete(note)
     db.commit()
+    # DB 删除成功后再清文件：反过来先删文件，DB 事务失败就丢内容了。
+    # 路径由 note_id/user_id 重新计算，不信任 DB 里可能被写坏的 markdown_path。
+    delete_private_note_files(note_id, note_user_id)
     return {"ok": True, "id": note_id}

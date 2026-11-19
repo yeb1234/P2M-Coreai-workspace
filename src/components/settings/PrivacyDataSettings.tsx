@@ -44,7 +44,7 @@ export function PrivacySettings() {
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--danger)]" />
           <div>
             <SettingsSectionTitle danger>清除所有数据</SettingsSectionTitle>
-            <SettingsHint>将删除所有待办、笔记、日历、番茄记录等数据。此操作不可撤销。</SettingsHint>
+            <SettingsHint>将删除所有待办、便签、日历、番茄记录等数据。此操作不可撤销。</SettingsHint>
           </div>
         </div>
         <SettingsButton variant="danger" onClick={() => setShowWipeConfirm(true)} className="px-3 py-1.5 text-xs">
@@ -56,7 +56,7 @@ export function PrivacySettings() {
         onClose={() => setShowWipeConfirm(false)}
         onConfirm={handleWipeAll}
         title="清除所有数据"
-        message="确定要删除所有数据吗？这将清除所有待办、笔记、日历事件、番茄记录等，且无法恢复。"
+        message="确定要删除所有数据吗？这将清除所有待办、便签、日历事件、番茄记录等，且无法恢复。"
         confirmText="确认清除"
       />
     </div>
@@ -146,7 +146,7 @@ export function DataSettings() {
 
   const stats: Record<string, number> = {
     待办: Object.values(todos).length,
-    笔记: notes.length,
+    便签: notes.length,
     日历事件: Object.keys(events).length,
     番茄记录: Object.keys(sessions).length,
   };

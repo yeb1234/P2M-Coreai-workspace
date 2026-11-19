@@ -63,7 +63,7 @@ export const CalendarToolbar: React.FC = () => {
           </button>
         </div>
 
-        <h2 className="min-w-0 flex-1 text-base font-semibold text-[var(--text-primary)] md:text-lg">
+        <h2 className="calendar-toolbar-title min-w-0 flex-1 text-base font-semibold text-[var(--text-primary)] md:text-lg">
           {titleText}
         </h2>
       </div>

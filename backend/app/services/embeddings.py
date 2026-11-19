@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 
@@ -31,6 +32,9 @@ class EmbeddingClient:
     timeout_s: int = 0
     max_retries: int = 3
     _session: requests.Session = field(default_factory=requests.Session, repr=False)
+    # requests.Session 不是严格线程安全；backend 现在会并行跑检索三路，
+    # embedding 调用必须串行化，避免同一 session 被多个线程同时 POST。
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def __post_init__(self) -> None:
         self.base_url = (self.base_url or settings.embedding_base_url).rstrip("/")
@@ -54,7 +58,11 @@ class EmbeddingClient:
         """
         if not texts:
             return []
+        # 单 GPU 上 embedding 请求本来就应该排队；锁同时保护共享 Session。
+        with self._lock:
+            return self._embed_many(texts)
 
+    def _embed_many(self, texts: list[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
         for start in range(0, len(texts), self.batch_size):
             chunk = texts[start : start + self.batch_size]

@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal, Plus, History } from 'lucide-react';
+import { AlertCircle, Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal, Plus, History, Check, HelpCircle, ArrowRight, Undo2, FileText, CalendarDays, ListTodo } from 'lucide-react';
 import { useAIStore } from '../../stores';
+import type { ChatHitl, ChatAction } from '../../stores/aiStore';
 import { authFetch } from '../../lib/authApi';
 import { openVideoAt } from '../../lib/videoNavigation';
 import {
+  fetchAgentActions,
   fetchAssistantRuntimeSettings,
   streamAssistantChat,
+  undoAgentAction,
   type AssistantRuntimeSettingsDto,
 } from '../../lib/videoApi';
 import { useDragResize } from '../../hooks/useDragResize';
@@ -17,7 +20,9 @@ import {
   detectIntent,
 } from '../../lib/aiPromptDefaults';
 import { playInteractionSound } from '../../lib/sounds';
+import { renderMarkdown } from '../../lib/markdown';
 import { useAssistantPageContext } from '../../hooks/useAssistantPageContext';
+import { canShowChatVideoReferences } from '../../config/features';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const ASSISTANT_SETTINGS_CHANGED_EVENT = 'p2m:assistant-settings-changed';
@@ -65,7 +70,109 @@ const TOOL_LABELS: Record<string, string> = {
   get_learning_goal: '读取学习目标',
   recommend_next_videos: '推荐下一步',
   search_notes: '检索笔记',
+  save_note: '保存到笔记库',
+  summarize_and_save_note: '总结并保存笔记',
+  create_calendar_event: '安排日历',
+  create_todo: '创建 Todo',
+  ask_user: '等待你的选择',
 };
+
+const HITL_LABELS: Record<string, string> = {
+  clarify: '先确认你的意图',
+  supplement: '还差一点信息',
+  confirm: '执行前确认',
+};
+
+function HitlCard({
+  hitl,
+  disabled,
+  onChoose,
+}: {
+  hitl: ChatHitl;
+  disabled: boolean;
+  onChoose: (selected: string, text: string, label: string) => void;
+}) {
+  const [custom, setCustom] = useState('');
+  const [showCustom, setShowCustom] = useState(false);
+  const pending = hitl.status === 'pending';
+  const selectedText = hitl.customText
+    ? `其它：${hitl.customText}`
+    : hitl.selectedLabel || hitl.selected || '';
+
+  return (
+    <div className="mt-2.5 rounded-[var(--r-2)] border border-[var(--accent)]/40 bg-[var(--bg-card)] p-2.5 shadow-sm">
+      <p className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-[var(--accent)]">
+        <HelpCircle size={11} />
+        {HITL_LABELS[hitl.kind] || '需要你确认'}
+      </p>
+      <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]">{hitl.question}</p>
+      {hitl.context && (
+        <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">{hitl.context}</p>
+      )}
+
+      {pending ? (
+        <div className="mt-2 space-y-1.5">
+          {hitl.options.map((option, index) => (
+            <button
+              key={`${option.id}-${index}`}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChoose(option.id, '', option.label)}
+              className="group flex w-full items-center gap-2 rounded-[var(--r-1)] border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2.5 py-2 text-left text-xs leading-4 text-[var(--text-primary)] transition-colors hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-elevated))] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[10px] font-semibold text-[var(--accent)]">
+                {option.id}
+              </span>
+              <span className="min-w-0 flex-1">{option.label}</span>
+              <ArrowRight size={11} className="shrink-0 text-[var(--text-muted)] transition-colors group-hover:text-[var(--accent)]" />
+            </button>
+          ))}
+
+          {hitl.allowCustom && !showCustom && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setShowCustom(true)}
+              className="text-[11px] text-[var(--text-muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--accent)] disabled:opacity-50"
+            >
+              其它（自己填写）
+            </button>
+          )}
+          {hitl.allowCustom && showCustom && (
+            <div className="flex gap-1.5">
+              <input
+                value={custom}
+                onChange={(event) => setCustom(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && custom.trim() && !disabled) {
+                    event.preventDefault();
+                    onChoose('custom', custom.trim(), '其它');
+                  }
+                }}
+                autoFocus
+                placeholder="写下你的选择或补充…"
+                className="min-w-0 flex-1 rounded-[var(--r-1)] border border-[var(--border-light)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+              />
+              <button
+                type="button"
+                disabled={disabled || !custom.trim()}
+                onClick={() => onChoose('custom', custom.trim(), '其它')}
+                className="shrink-0 rounded-[var(--r-1)] bg-[var(--accent)] px-2.5 py-1.5 text-[11px] font-medium text-white disabled:opacity-40"
+              >
+                提交
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="mt-2 flex items-center gap-1 text-[11px] text-[var(--success)]">
+          <Check size={11} />
+          已选择{selectedText ? `：${selectedText}` : ''}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function shortProviderModel(provider: 'local' | 'external', modelName: string) {
   const label = provider === 'local' ? '本地' : '外部';
@@ -109,40 +216,30 @@ function formatTimestamp(seconds: number) {
  *
  * 没命中的书名号原样输出 —— 模型有时会写「《某某理论》」这种不是视频的引用。
  */
-function renderWithVideoLinks(text: string, links: MentionedVideo[]): React.ReactNode {
-  if (!links.length) return text;
+/** 助手回答按 Markdown 渲染；有视频映射时把《标题》换成可点链接。 */
+function renderAssistantMarkdown(
+  text: string,
+  links: MentionedVideo[],
+  references: ReferenceItem[] = [],
+): string {
+  const html = renderMarkdown(text);
+  if (!links.length) return html;
   const map = new Map(links.map((item) => [item.text, item.video_id]));
-  const pattern = /《[^》]{2,120}》/g;
-  const nodes: React.ReactNode[] = [];
-  let cursor = 0;
-  let match: RegExpExecArray | null = pattern.exec(text);
-  while (match !== null) {
-    const raw = match[0];
-    const videoId = map.get(raw);
-    if (match.index > cursor) nodes.push(text.slice(cursor, match.index));
-    if (videoId) {
-      nodes.push(
-        <button
-          key={`${videoId}-${match.index}`}
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            openVideoAt(videoId);
-          }}
-          title="打开这个视频"
-          className="text-[var(--accent)] underline decoration-dotted underline-offset-2 hover:decoration-solid"
-        >
-          {raw}
-        </button>
-      );
-    } else {
-      nodes.push(raw);
+  // 同一视频在回答里可能只提到一次；用该视频首条相关片段的起始秒作为跳转定位。
+  // 老消息没有 references 时保持原行为，只跳视频不定位。
+  const startSecByVideo = new Map<number, number>();
+  for (const item of references) {
+    if (item.start_sec > 0 && !startSecByVideo.has(item.video_id)) {
+      startSecByVideo.set(item.video_id, item.start_sec);
     }
-    cursor = match.index + raw.length;
-    match = pattern.exec(text);
   }
-  if (cursor < text.length) nodes.push(text.slice(cursor));
-  return nodes;
+  return html.replace(/《[^》]{2,120}》/g, (raw) => {
+    const videoId = map.get(raw);
+    if (!videoId) return raw;
+    const startSec = startSecByVideo.get(videoId);
+    const startAttr = startSec ? ` data-start-sec="${startSec}"` : '';
+    return `<a href="#video-${videoId}" data-video-id="${videoId}"${startAttr} class="ai-video-link">${raw}</a>`;
+  });
 }
 
 /**
@@ -180,10 +277,14 @@ function dedupeReferences(items: ReferenceItem[] | undefined): ReferenceItem[] {
     .slice(0, 5);
 }
 
-const ReferenceCard: React.FC<{ item: ReferenceItem }> = ({ item }) => (
+const ReferenceCard: React.FC<{
+  item: ReferenceItem;
+  onOpenVideo: (videoId: number, startSec?: number) => void;
+}> = ({ item, onOpenVideo }) => (
   <button
     type="button"
-    onClick={() => openVideoAt(item.video_id, item.start_sec)}
+    onClick={() => onOpenVideo(item.video_id, item.start_sec)}
+    aria-label={`打开视频：${item.video_title || `视频 ${item.video_id}`}，从 ${formatTimestamp(item.start_sec)} 开始`}
     className="flex w-full items-start gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] px-2.5 py-2 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-bg)]"
   >
     <PlayCircle size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
@@ -214,10 +315,17 @@ const ReferenceCard: React.FC<{ item: ReferenceItem }> = ({ item }) => (
       </p>
       <p className="text-xs text-[var(--text-muted)] line-clamp-2">{item.text}</p>
     </div>
+    <span className="ml-auto mt-0.5 shrink-0 text-[10px] font-medium text-[var(--accent)]">
+      去视频
+    </span>
   </button>
 );
 
-const ReferenceBlock: React.FC<{ items: ReferenceItem[]; label?: string }> = ({ items, label }) => {
+const ReferenceBlock: React.FC<{
+  items: ReferenceItem[];
+  label?: string;
+  onOpenVideo: (videoId: number, startSec?: number) => void;
+}> = ({ items, label, onOpenVideo }) => {
   if (!items.length) return null;
   return (
     <div className="mt-1.5 space-y-1.5">
@@ -225,17 +333,81 @@ const ReferenceBlock: React.FC<{ items: ReferenceItem[]; label?: string }> = ({ 
         {label ?? '相关片段（点击跳转）'}
       </p>
       {items.map((item) => (
-        <ReferenceCard key={`${item.video_id}-${item.start_sec}`} item={item} />
+        <ReferenceCard key={`${item.video_id}-${item.start_sec}`} item={item} onOpenVideo={onOpenVideo} />
       ))}
     </div>
   );
 };
 
-export const AIChatPanel: React.FC = () => {
+const ACTION_META: Record<string, { label: string; icon: React.ReactNode }> = {
+  note: { label: '笔记', icon: <FileText size={13} /> },
+  calendar: { label: '日历', icon: <CalendarDays size={13} /> },
+  todo: { label: 'Todo', icon: <ListTodo size={13} /> },
+};
+
+const ActionReceipts: React.FC<{
+  actions?: ChatAction[];
+  onUndo: (action: ChatAction) => void;
+  undoingId: string | null;
+}> = ({ actions, onUndo, undoingId }) => {
+  if (!actions?.length) return null;
+  return (
+    <div className="mt-2 space-y-1.5" aria-label="本轮执行记录">
+      {actions.map((action) => {
+        const meta = ACTION_META[action.action_type] || ACTION_META.note;
+        const undone = action.status === 'undone';
+        const failed = action.status === 'failed';
+        return (
+          <div
+            key={action.id}
+            className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 ${
+              failed
+                ? 'border-[var(--danger)]/30 bg-[var(--danger-bg)]'
+                : undone
+                  ? 'border-[var(--border-light)] bg-[var(--bg-secondary)] opacity-70'
+                  : 'border-[var(--border-light)] bg-[var(--bg-card)]'
+            }`}
+          >
+            <span className="mt-0.5 text-[var(--accent)]">{meta.icon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-medium text-[var(--text-primary)]">
+                  {failed ? '执行失败' : undone ? '已撤回' : `已写入${meta.label}`}
+                </span>
+                <span className="text-[10px] text-[var(--text-muted)]">· {action.title}</span>
+              </div>
+              {action.summary && (
+                <p className="mt-0.5 line-clamp-2 text-[10px] text-[var(--text-muted)]">
+                  {action.summary}
+                </p>
+              )}
+            </div>
+            {action.status === 'applied' && action.can_undo !== false && (
+              <button
+                type="button"
+                onClick={() => onUndo(action)}
+                disabled={undoingId === action.id}
+                className="flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-light)] px-1.5 py-1 text-[10px] text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                aria-label={`撤回：${action.title}`}
+              >
+                {undoingId === action.id ? <Loader2 size={11} className="animate-spin" /> : <Undo2 size={11} />}
+                撤回
+              </button>
+            )}
+            {undone && <Check size={12} className="mt-1 shrink-0 text-[var(--text-muted)]" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const {
     chatOpen, setChatOpen, model, systemPrompt, setSystemPrompt,
     promptTemplates, activeTemplateId, updateTemplate,
     chatWidth, setChatWidth, messages, addMessage, updateMessage, setMessages, clearMessages, sessionId, setSessionId,
+    pendingPrompt, consumePendingPrompt,
   } = useAIStore();
   const { width: liveChatWidth, startResize } = useDragResize({
     initialWidth: chatWidth,
@@ -248,6 +420,7 @@ export const AIChatPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [toolHint, setToolHint] = useState('');
+  const [undoingActionId, setUndoingActionId] = useState<string | null>(null);
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   // 本轮没检索到片段时，保留上一轮的引用但标记出来 —— 直接清空的话
   // 用户会以为「推荐的东西没了」，而留着不标记又会让人误当成这轮的依据。
@@ -266,6 +439,8 @@ export const AIChatPanel: React.FC = () => {
   interface SessionMeta {
     id: string;
     title: string | null;
+    scope?: string;
+    video_id?: number | null;
     message_count: number;
     updated_at: string | null;
   }
@@ -298,6 +473,32 @@ export const AIChatPanel: React.FC = () => {
     if (next) void loadSessions();
   };
 
+  const handleUndoAction = async (messageId: string, action: ChatAction) => {
+    if (undoingActionId) return;
+    setUndoingActionId(action.id);
+    setError('');
+    try {
+      const result = await undoAgentAction(action.id);
+      const updatedAction: ChatAction = result.action
+        ? {
+            ...action,
+            status: result.action.status,
+            can_undo: false,
+            undone_at: result.action.undone_at ?? action.undone_at,
+          }
+        : { ...action, status: 'undone', can_undo: false };
+      const existing = messages.find((m) => m.id === messageId)?.actions ?? [];
+      updateMessage(messageId, {
+        actions: existing.map((item) => (item.id === action.id ? updatedAction : item)),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '撤回失败，请稍后重试');
+    } finally {
+      setUndoingActionId(null);
+    }
+  };
+
+
   const openSession = async (id: string) => {
     const res = await authFetch(`/api/assistant/sessions/${encodeURIComponent(id)}/messages?limit=50`);
     if (!res.ok) return;
@@ -310,12 +511,12 @@ export const AIChatPanel: React.FC = () => {
         /** 后端 references_json envelope 里带回来的富内容 */
         mentioned_videos?: MentionedVideo[];
         intent?: string | null;
+        actions?: ChatAction[];
         created_at?: string | null;
       }>;
     };
     setSessionId(id);
-    setMessages(
-      data.messages.map((m) => ({
+    const mapped = data.messages.map((m) => ({
         id: m.id || makeId(),
         role: m.role,
         content: m.content,
@@ -324,8 +525,35 @@ export const AIChatPanel: React.FC = () => {
         // 现在随消息一起还原，历史会话和当前会话显示一致。
         mentioned_videos: m.mentioned_videos ?? [],
         intent: m.intent ?? undefined,
-      }))
-    );
+        actions: m.actions ?? [],
+      }));
+    setMessages(mapped);
+    // 消息里的 actions 是写入当时的快照；撤回状态以动作表为准。
+    // 重开历史时对一次状态，否则已撤回的记录仍会显示「撤回」按钮。
+    void fetchAgentActions(100)
+      .then((latest) => {
+        const byId = new Map(latest.items.map((item) => [item.id, item]));
+        const reconciled = mapped.map((message) =>
+          message.actions?.length
+            ? {
+                ...message,
+                actions: message.actions.map((action) => {
+                  const current = byId.get(action.id);
+                  return current
+                    ? {
+                        ...action,
+                        status: current.status,
+                        can_undo: current.can_undo ?? current.status === 'applied',
+                        undone_at: current.undone_at ?? action.undone_at,
+                      }
+                    : action;
+                }),
+              }
+            : message
+        );
+        setMessages(reconciled);
+      })
+      .catch(() => undefined);
     setReferences([]);
     // 意图标签取最近一条 assistant 消息的，和历史消息对得上
     const lastWithIntent = [...data.messages].reverse().find((m) => m.intent);
@@ -367,9 +595,44 @@ export const AIChatPanel: React.FC = () => {
     const def = DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === effectiveTemplateId);
     if (def) setDraftTemplate(def.content);
   };
-  const [, setPageContext] = useAssistantPageContext(chatOpen);
+  const [pageContext, setPageContext] = useAssistantPageContext(chatOpen);
   const [runtimeModelLabel, setRuntimeModelLabel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * 回答里的视频引用：先跳到视频，再收起手机上的整屏 AI。
+   * 桌面端侧栏可以一直开着，保持原来的行为。
+   */
+  const openAssistantVideo = React.useCallback(
+    (videoId: number, startSec?: number) => {
+      openVideoAt(videoId, startSec);
+      if (mobile) setChatOpen(false);
+    },
+    [mobile, setChatOpen]
+  );
+
+  /**
+   * 正文链接的点击必须尽早处理。
+   * 消息正文是 dangerouslySetInnerHTML，点击序列中 AIChatPanel 发生重渲染，
+   * mousedown 到 mouseup 之间原 anchor 会从 DOM 里被替换掉，浏览器不再合成
+   * click；所以这里在 pointerdown 就完成跳转。
+   * 键盘 Enter/Space 仍走 onClick 兜底。
+   */
+  const lastVideoActivationRef = useRef<{ videoId: number; at: number } | null>(null);
+  const activateVideoLink = React.useCallback((event: React.SyntheticEvent<HTMLElement>) => {
+    const target = (event.target as HTMLElement | null)?.closest?.('a[data-video-id]') as HTMLAnchorElement | null;
+    const videoId = Number(target?.dataset.videoId);
+    if (!videoId) return;
+    event.preventDefault();
+    const now = Date.now();
+    const last = lastVideoActivationRef.current;
+    if (last && last.videoId === videoId && now - last.at < 500) return;
+    lastVideoActivationRef.current = { videoId, at: now };
+    const startSec = Number(target?.dataset.startSec);
+    openAssistantVideo(videoId, Number.isFinite(startSec) && startSec > 0 ? startSec : undefined);
+  }, [openAssistantVideo]);
+
   const abortRef = useRef<AbortController | null>(null);
   const bufferRef = useRef('');
   const rafRef = useRef<number | null>(null);
@@ -377,6 +640,15 @@ export const AIChatPanel: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
+
+  // 题目详情等入口通过 pendingPrompt 预填问题；面板已经开着时也要生效。
+  useEffect(() => {
+    if (!chatOpen || !pendingPrompt) return;
+    setInput(pendingPrompt);
+    setLiveIntent(detectIntent(pendingPrompt, pageContext?.kind));
+    consumePendingPrompt();
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }, [chatOpen, pendingPrompt, consumePendingPrompt, pageContext?.kind]);
 
   useEffect(() => () => {
     abortRef.current?.abort();
@@ -466,6 +738,7 @@ export const AIChatPanel: React.FC = () => {
     abortRef.current = controller;
     const usedTools: string[] = [];
     let streamError = '';
+    let interrupted = false;
 
     /* 静默看门狗：流式请求本身没有超时，模型卡住时前端会永远转「正在思考」。
        用户截图里就卡在这个状态，只能手动关面板。
@@ -487,7 +760,7 @@ export const AIChatPanel: React.FC = () => {
 
       // 按用户这次的问题自动选意图模板。认不出来就退回手动选的模板 ——
       // 宁可不认，也不要认错（认错会让 AI 用完全错误的策略回答）。
-      const detected = detectIntent(text);
+      const detected = detectIntent(text, context.kind);
       setLastIntent(detected);
       const effectiveTemplate = detected
         ? promptTemplates.find((t) => t.id === detected) ?? activeTemplate
@@ -500,6 +773,7 @@ export const AIChatPanel: React.FC = () => {
       await streamAssistantChat(text, {
         sessionId,
         pageContext: context.promptContext,
+        pageNote: context.notePayload,
         systemPrompt: requestSystemPrompt,
         // 把识别出的意图一起存库，历史会话加载后才能还原「当时用的策略」
         intent: detected,
@@ -517,6 +791,30 @@ export const AIChatPanel: React.FC = () => {
             case 'tool_end':
               setToolHint('');
               break;
+            case 'interrupt':
+              interrupted = true;
+              setToolHint('');
+              if (event.session_id && event.session_id !== sessionId) {
+                setSessionId(event.session_id);
+              }
+              updateMessage(assistantId, {
+                streaming: false,
+                steps: usedTools,
+                intent: event.intent ?? detected ?? undefined,
+                hitl: {
+                  runId: event.run_id,
+                  interruptId: event.interrupt_id,
+                  kind: event.kind,
+                  question: event.question,
+                  options: event.options || [],
+                  allowCustom: event.allow_custom !== false,
+                  context: event.context,
+                  intent: event.intent ?? detected ?? null,
+                  originalMessage: event.original_message,
+                  status: 'pending',
+                },
+              });
+              break;
             case 'done':
               setToolHint('');
               if (event.session_id && event.session_id !== sessionId) {
@@ -529,6 +827,10 @@ export const AIChatPanel: React.FC = () => {
               if (event.references?.length) {
                 setReferences(event.references);
                 updateMessage(assistantId, { references: event.references });
+              }
+              if (event.actions?.length) {
+                // 执行回执跟着这条回答走：保存了什么、在哪、能不能撤回
+                updateMessage(assistantId, { actions: event.actions as ChatAction[] });
               }
               if (event.degraded_from) {
                 // 主通道挂了、是备用救回来的。不提示的话用户只会觉得
@@ -553,7 +855,7 @@ export const AIChatPanel: React.FC = () => {
       const finalText = bufferRef.current.trim();
       if (finalText) playInteractionSound('success');
       patchMessage(assistantId, {
-        content: finalText || streamError || '（没有返回内容，请重试）',
+        content: interrupted ? finalText : (finalText || streamError || '（没有返回内容，请重试）'),
         streaming: false,
         steps: usedTools,
       });
@@ -591,16 +893,192 @@ export const AIChatPanel: React.FC = () => {
     }
   };
 
+  /**
+   * HITL 续跑：不重新写一条用户问题，只把 A/B/C 选择作为 resume 交给同一个
+   * LangGraph thread。后端用 Command(resume=...) 从 checkpoint 继续，
+   * 模型看到的是工具返回结果，不会把原问题再问一遍。
+   */
+  const resumeFromHitl = async (
+    assistantId: string,
+    hitl: ChatHitl,
+    selected: string,
+    text: string,
+    label: string,
+  ) => {
+    if (loading || hitl.status !== 'pending') return;
+    setError('');
+    setToolHint('');
+
+    const choiceText = selected === 'custom' ? `其它：${text}` : `${selected}. ${label}`;
+    updateMessage(assistantId, {
+      hitl: {
+        ...hitl,
+        status: 'answered',
+        selected,
+        selectedLabel: label,
+        customText: text || undefined,
+      },
+      streaming: false,
+    });
+    addMessage({ id: makeId(), role: 'user', content: choiceText });
+
+    const nextAssistantId = makeId();
+    bufferRef.current = '';
+    addMessage({ id: nextAssistantId, role: 'assistant', content: '', streaming: true });
+    setLoading(true);
+    playInteractionSound('start');
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const usedTools: string[] = [];
+    let streamError = '';
+    let interrupted = false;
+
+    const watchdog = { timer: null as number | null, fired: false };
+    const rearmWatchdog = () => {
+      if (watchdog.timer) window.clearTimeout(watchdog.timer);
+      watchdog.timer = window.setTimeout(() => {
+        watchdog.fired = true;
+        controller.abort();
+      }, 90_000);
+    };
+    rearmWatchdog();
+
+    try {
+      const context = getAssistantPageContext();
+      setPageContext(context);
+      await streamAssistantChat(text || label || '继续', {
+        sessionId,
+        pageContext: context.promptContext,
+        pageNote: context.notePayload,
+        intent: hitl.intent ?? undefined,
+        resume: {
+          runId: hitl.runId,
+          interruptId: hitl.interruptId,
+          selected,
+          text,
+          originalMessage: hitl.originalMessage || hitl.question,
+        },
+        onEvent: (event) => {
+          rearmWatchdog();
+          switch (event.type) {
+            case 'token':
+              bufferRef.current += event.text;
+              scheduleFlush(nextAssistantId);
+              break;
+            case 'tool_start':
+              usedTools.push(event.tool);
+              setToolHint(TOOL_LABELS[event.tool] ?? event.tool);
+              break;
+            case 'tool_end':
+              setToolHint('');
+              break;
+            case 'interrupt':
+              interrupted = true;
+              setToolHint('');
+              if (event.session_id && event.session_id !== sessionId) {
+                setSessionId(event.session_id);
+              }
+              updateMessage(nextAssistantId, {
+                streaming: false,
+                steps: usedTools,
+                intent: event.intent ?? hitl.intent ?? undefined,
+                hitl: {
+                  runId: event.run_id,
+                  interruptId: event.interrupt_id,
+                  kind: event.kind,
+                  question: event.question,
+                  options: event.options || [],
+                  allowCustom: event.allow_custom !== false,
+                  context: event.context,
+                  intent: event.intent ?? hitl.intent ?? null,
+                  originalMessage: event.original_message,
+                  status: 'pending',
+                },
+              });
+              break;
+            case 'done':
+              setToolHint('');
+              if (event.session_id && event.session_id !== sessionId) {
+                setSessionId(event.session_id);
+              }
+              if (event.mentioned_videos?.length) {
+                updateMessage(nextAssistantId, { mentioned_videos: event.mentioned_videos });
+              }
+              if (event.references?.length) {
+                setReferences(event.references);
+                updateMessage(nextAssistantId, { references: event.references });
+              }
+              if (event.actions?.length) {
+                updateMessage(nextAssistantId, { actions: event.actions as ChatAction[] });
+              }
+              if (event.degraded_from) {
+                updateMessage(nextAssistantId, { degraded_from: event.degraded_from });
+              }
+              if (hitl.intent) {
+                updateMessage(nextAssistantId, { intent: hitl.intent });
+              }
+              break;
+            case 'error':
+              streamError = event.message;
+              setError(event.message);
+              break;
+            default:
+              break;
+          }
+        },
+        signal: controller.signal,
+      });
+
+      const finalText = bufferRef.current.trim();
+      if (finalText) playInteractionSound('success');
+      patchMessage(nextAssistantId, {
+        content: interrupted ? finalText : (finalText || streamError || '（没有返回内容，请重试）'),
+        streaming: false,
+        steps: usedTools,
+      });
+      if (finalText) setError('');
+    } catch (err) {
+      const aborted = err instanceof DOMException && err.name === 'AbortError';
+      const message = watchdog.fired
+        ? '模型 90 秒没有返回任何内容，已自动停止'
+        : aborted
+          ? '已停止生成'
+          : err instanceof Error
+            ? err.message
+            : '对话请求失败';
+      if (!aborted) {
+        setError(
+          /Failed to fetch|NetworkError/i.test(message)
+            ? '连不上后端，请确认服务是否已启动'
+            : message
+        );
+        playInteractionSound('error');
+      }
+      patchMessage(nextAssistantId, {
+        content: bufferRef.current.trim() || (aborted ? '已停止生成。' : '请求失败，请检查后端与模型服务。'),
+        streaming: false,
+      });
+    } finally {
+      if (watchdog.timer) window.clearTimeout(watchdog.timer);
+      abortRef.current = null;
+      setLoading(false);
+      setToolHint('');
+    }
+  };
+
   return (
     <aside
-      className="relative shrink-0 border-l border-[var(--border-light)] bg-[var(--bg-card)] flex flex-col"
-      style={{ width: `${liveChatWidth}px` }}
+      className={`ai-panel relative shrink-0 border-l border-[var(--border-light)] bg-[var(--bg-card)] flex flex-col ${
+        mobile ? 'ai-panel-mobile' : ''
+      }`}
+      style={mobile ? undefined : { width: `${liveChatWidth}px` }}
     >
       <button
         type="button"
         onMouseDown={(e) => { e.preventDefault(); startResize(e.clientX); }}
         onTouchStart={(e) => { e.preventDefault(); startResize(e.touches[0].clientX); }}
-        className="absolute -left-3 top-0 z-10 flex h-full w-3 cursor-col-resize items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)]"
+        className="ai-panel-resize absolute -left-3 top-0 z-10 flex h-full w-3 cursor-col-resize items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)]"
         title="拖动调整灵境小助手宽度"
       >
         <span className="h-full w-px bg-[var(--border-light)]" />
@@ -647,13 +1125,15 @@ export const AIChatPanel: React.FC = () => {
           }}
           className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]"
           title="清空对话（同时开启新会话）"
+          aria-label="清空对话"
         >
           <Trash2 size={14} />
         </button>
         <button
           onClick={() => setChatOpen(false)}
-          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+          className="ai-panel-close p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
           title="关闭灵境小助手"
+          aria-label="关闭灵境小助手"
         >
           <X size={15} />
         </button>
@@ -688,13 +1168,32 @@ export const AIChatPanel: React.FC = () => {
                     item.id === sessionId ? 'bg-[var(--accent-bg)]' : ''
                   }`}
                 >
-                  <p className="truncate text-xs font-medium text-[var(--text-primary)]">
-                    {item.title || '未命名对话'}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-                    {item.message_count} 条
+                  <div className="flex items-start justify-between gap-2">
+                    <p
+                      className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-primary)]"
+                      title={item.title || '未命名对话'}
+                    >
+                      {item.title || '未命名对话'}
+                    </p>
+                    {item.scope === 'video' && (
+                      <span className="shrink-0 rounded-full bg-[var(--accent-bg)] px-1.5 py-0.5 text-[10px] text-[var(--accent)]">
+                        视频
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+                    <span className="font-mono text-[var(--text-secondary)]">
+                      #{item.id.slice(-6)}
+                    </span>
+                    <span>·</span>
+                    <span>{item.message_count} 条</span>
                     {item.updated_at
-                      ? ` · ${new Date(item.updated_at).toLocaleDateString('zh-CN')}`
+                      ? ` · ${new Date(item.updated_at).toLocaleString('zh-CN', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}`
                       : ''}
                   </p>
                 </button>
@@ -826,19 +1325,58 @@ export const AIChatPanel: React.FC = () => {
         {messages.map((message) => (
           <div key={message.id} className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div
-              className={`max-w-[88%] rounded-xl px-3 py-2 text-xs leading-6 whitespace-pre-wrap ${
+              className={`max-w-[88%] rounded-xl px-3 py-2 text-xs leading-6 ${
                 message.role === 'user'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-light)]'
+                  ? 'bg-[var(--accent)] text-white whitespace-pre-wrap'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-light)] whitespace-normal'
               }`}
             >
               {message.content
                 ? (message.role === 'assistant'
-                    ? renderWithVideoLinks(message.content, message.mentioned_videos ?? [])
+                    ? (
+                      <div
+                        className="ai-md"
+                        onPointerDown={(event) => {
+                          if (event.pointerType !== 'mouse' || event.button !== 0) return;
+                          activateVideoLink(event);
+                        }}
+                        onClick={activateVideoLink}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return;
+                          const target = (event.target as HTMLElement | null)?.closest?.('a[data-video-id]');
+                          if (!target) return;
+                          event.preventDefault();
+                          activateVideoLink(event);
+                        }}
+                        dangerouslySetInnerHTML={{
+                          __html: renderAssistantMarkdown(
+                            message.content,
+                            message.mentioned_videos ?? [],
+                            message.references ?? [],
+                          ),
+                        }}
+                      />
+                    )
                     : message.content)
                 : (message.streaming ? '…' : '')}
               {message.streaming && message.content && (
                 <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-[var(--accent)] align-middle" />
+              )}
+              {message.role === 'assistant' && message.hitl && (
+                <HitlCard
+                  hitl={message.hitl}
+                  disabled={loading}
+                  onChoose={(selected, text, label) => {
+                    void resumeFromHitl(message.id, message.hitl!, selected, text, label);
+                  }}
+                />
+              )}
+              {message.role === 'assistant' && (
+                <ActionReceipts
+                  actions={message.actions}
+                  onUndo={(action) => void handleUndoAction(message.id, action)}
+                  undoingId={undoingActionId}
+                />
               )}
               {message.role === 'assistant' && message.steps && message.steps.length > 0 && (
                 <p className="mt-1.5 flex items-center gap-1 text-xs text-[var(--text-muted)]">
@@ -856,10 +1394,18 @@ export const AIChatPanel: React.FC = () => {
                 </p>
               )}
             </div>
-            {/* 相关片段挂在这条回答下面，而不是整个对话的最底部 */}
-            {message.role === 'assistant' && !message.streaming && (
+            {/* 相关片段挂在这条回答下面，而不是整个对话的最底部。
+                2026-11-17：只对「问题解答」渲染 —— 该意图的正文来自通用知识，
+                底部视频卡片作为继续学习的延伸入口；其他意图继续保持清爽。 */}
+            {canShowChatVideoReferences(message.intent) &&
+              message.role === 'assistant' &&
+              !message.streaming && (
               <div className="w-full max-w-[88%]">
-                <ReferenceBlock items={dedupeReferences(message.references)} />
+                <ReferenceBlock
+                  items={dedupeReferences(message.references)}
+                  label="想进一步了解？相关视频片段"
+                  onOpenVideo={openAssistantVideo}
+                />
               </div>
             )}
           </div>
@@ -880,10 +1426,17 @@ export const AIChatPanel: React.FC = () => {
         <div ref={messagesEndRef} />
         {/* 流式过程中的临时引用。
             消息生成完会把 references 写回 message，之后由每条回答自己渲染；
-            这里只负责「回答还在流、但检索已经先回来了」这段空窗期。 */}
-        {loading && dedupeReferences(references).length > 0 && (
+            这里只负责「回答还在流、但检索已经先回来了」这段空窗期。
+            同样只对「问题解答」开放，避免其他意图闪出卡片。 */}
+        {canShowChatVideoReferences(lastIntent) &&
+          loading &&
+          dedupeReferences(references).length > 0 && (
           <div className="w-full">
-            <ReferenceBlock items={dedupeReferences(references)} label="检索到的片段（回答生成中）" />
+            <ReferenceBlock
+              items={dedupeReferences(references)}
+              label="想进一步了解？相关视频片段（检索中）"
+              onOpenVideo={openAssistantVideo}
+            />
           </div>
         )}
       </div>
@@ -891,11 +1444,12 @@ export const AIChatPanel: React.FC = () => {
       <div className="p-3 border-t border-[var(--border-light)]">
         <div className="flex gap-2">
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => {
               const next = e.target.value;
               setInput(next);
-              setLiveIntent(detectIntent(next));
+              setLiveIntent(detectIntent(next, pageContext?.kind));
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {

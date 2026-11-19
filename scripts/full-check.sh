@@ -5,7 +5,7 @@ warn(){ echo "  WARN  $1"; W=$((W+1)); }
 code(){ curl -s -o /dev/null -w '%{http_code}' -m 20 "$@" 2>/dev/null; }
 
 echo "=== 1. 容器 ==="
-for c in siteyeb-pg siteyeb-redis siteyeb-backend siteyeb-frontend; do
+for c in p2-siteyeb-postgres-1 p2-siteyeb-redis-1 p2-siteyeb-backend-1 p2-siteyeb-frontend-1; do
   st=$(docker inspect -f '{{.State.Health.Status}}' $c 2>/dev/null || echo unknown)
   [ "$st" = "healthy" ] && pass "$c healthy" || fail "$c 状态 $st"
 done
@@ -32,20 +32,20 @@ done
 echo "$H" | grep -qi "^Server:.*nginx/" && warn "暴露版本号" || pass "未暴露版本号"
 
 echo "=== 5. 数据库结构 ==="
-q=$(docker exec siteyeb-pg psql -U p2user -d p2learning -t -c "SELECT count(*) FROM information_schema.columns WHERE table_name='users' AND column_name IN ('role','token_version','is_active');" 2>/dev/null | tr -d ' ')
+q=$(docker exec p2-siteyeb-postgres-1 psql -U p2user -d p2learning -t -c "SELECT count(*) FROM information_schema.columns WHERE table_name='users' AND column_name IN ('role','token_version','is_active');" 2>/dev/null | tr -d ' ')
 [ "$q" = "3" ] && pass "users 安全字段齐全" || fail "users 字段缺失($q/3)"
-q=$(docker exec siteyeb-pg psql -U p2user -d p2learning -t -c "SELECT count(*) FROM information_schema.columns WHERE table_name='watch_history' AND column_name='user_id';" 2>/dev/null | tr -d ' ')
+q=$(docker exec p2-siteyeb-postgres-1 psql -U p2user -d p2learning -t -c "SELECT count(*) FROM information_schema.columns WHERE table_name='watch_history' AND column_name='user_id';" 2>/dev/null | tr -d ' ')
 [ "$q" = "1" ] && pass "watch_history.user_id 存在" || fail "watch_history 缺 user_id"
-q=$(docker exec siteyeb-pg psql -U p2user -d p2learning -t -c "SELECT count(*) FROM content_chunks;" 2>/dev/null | tr -d ' ')
+q=$(docker exec p2-siteyeb-postgres-1 psql -U p2user -d p2learning -t -c "SELECT count(*) FROM content_chunks;" 2>/dev/null | tr -d ' ')
 [ "$q" -gt 50000 ] && pass "语义块已建 ($q)" || fail "语义块数量异常($q)"
-q=$(docker exec siteyeb-pg psql -U p2user -d p2learning -t -c "SELECT count(*) FROM subtitle_segments WHERE last_analyze IS NULL;" 2>/dev/null | tr -d ' ')
-q2=$(docker exec siteyeb-pg psql -U p2user -d p2learning -t -c "SELECT n_live_tup FROM pg_stat_user_tables WHERE relname='subtitle_segments';" 2>/dev/null | tr -d ' ')
+q=$(docker exec p2-siteyeb-postgres-1 psql -U p2user -d p2learning -t -c "SELECT count(*) FROM subtitle_segments WHERE last_analyze IS NULL;" 2>/dev/null | tr -d ' ')
+q2=$(docker exec p2-siteyeb-postgres-1 psql -U p2user -d p2learning -t -c "SELECT n_live_tup FROM pg_stat_user_tables WHERE relname='subtitle_segments';" 2>/dev/null | tr -d ' ')
 [ "$q2" -gt 3000000 ] && pass "统计信息新鲜 ($q2)" || fail "统计信息过期 ($q2)"
 
 echo "=== 6. Redis ==="
-mm=$(docker exec siteyeb-redis redis-cli CONFIG GET maxmemory 2>/dev/null | tail -1 | tr -d '\r ')
+mm=$(docker exec p2-siteyeb-redis-1 redis-cli CONFIG GET maxmemory 2>/dev/null | tail -1 | tr -d '\r ')
 [ "$mm" = "268435456" ] && pass "maxmemory 256MB" || fail "maxmemory=$mm"
-rc=$(docker exec siteyeb-redis redis-cli ping 2>/dev/null | tr -d '\r')
+rc=$(docker exec p2-siteyeb-redis-1 redis-cli ping 2>/dev/null | tr -d '\r')
 [ "$rc" = "PONG" ] && pass "Redis 可连通" || fail "Redis $rc"
 
 echo "=== 7. 检索链路 ==="

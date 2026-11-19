@@ -238,8 +238,8 @@ function ProfileSettings() {
             <p className="text-sm font-medium text-[var(--text-primary)]">编辑回车行为</p>
             <SettingsHint>
               {noteEnterBehavior === 'enter_save'
-                ? 'Enter 保存笔记/待办，Alt+Enter 在正文里换行。'
-                : 'Enter 在正文里换行，Alt+Enter 保存笔记/待办。'}
+                ? 'Enter 保存便签/待办，Alt+Enter 在正文里换行。'
+                : 'Enter 在正文里换行，Alt+Enter 保存便签/待办。'}
             </SettingsHint>
           </div>
           <ToggleSwitch

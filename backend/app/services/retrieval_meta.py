@@ -266,7 +266,7 @@ def meta_terms(query: str, *, max_terms: int = 6) -> list[str]:
         if term not in terms:
             terms.append(term)
 
-    for token in extract_tokens(query, max_code_tokens=max_terms):
+    for token in extract_tokens(query, max_code_tokens=max_terms, min_latin_len=2):
         if token not in terms:
             terms.append(token)
 

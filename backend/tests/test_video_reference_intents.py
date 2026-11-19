@@ -9,12 +9,43 @@
 """
 
 from app.agents.chat_agent import _needs_video_references as need
+from app.agents.chat_agent import _tools_for_intent
 
 
 def test_course_intent_always_needs_references():
     # 用户明确要课程推荐，无论怎么问都给
     assert need("course-recommend", "有没有适合AI产品开发的课程") is True
     assert need("course-recommend", "推荐几个讲 FastAPI 的视频") is True
+
+
+def test_question_answer_needs_references_for_followup_videos():
+    # 正文来自通用知识，但相关片段作为回答后的延伸入口，始终准备
+    assert need("question-answer", "Python的装饰器是什么") is True
+    assert need("question-answer", "这个函数是什么原理") is True
+    assert need("question-answer", "FastAPI 怎么用") is True
+
+
+def test_question_answer_disables_retrieval_tools():
+    # 不能只加前端意图：模型如果还能调 search_videos，回答会继续被视频库带跑
+    assert _tools_for_intent("question-answer") == []
+    assert _tools_for_intent("course-recommend")
+
+
+def test_interview_question_only_recommends_video_when_asked():
+    # 普通题目讲解只讲题；点「推荐相关视频」或用户明确要视频时才挂卡片
+    assert need("interview-question", "这题怎么答") is False
+    assert need("interview-question", "展开讲讲评分点") is False
+    assert need("interview-question", "推荐相关视频") is True
+    assert need("interview-question", "有没有讲这道题的课程") is True
+
+
+def test_interview_question_has_bank_tools():
+    names = {tool.name for tool in _tools_for_intent("interview-question")}
+    assert "get_interview_question" in names
+    assert "search_interview_questions" in names
+    assert "search_interview_knowledge" in names
+    assert "search_videos" in names
+    assert "get_video_summary" in names
 
 
 def test_knowledge_qa_only_when_asking_for_video():

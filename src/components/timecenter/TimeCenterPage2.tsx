@@ -8,6 +8,7 @@ import { playNotificationSound } from '../../lib/sounds';
 import { toLocalDateString } from '../../lib/date';
 import { generateId } from '../../lib/id';
 import { useClockNow } from '../../hooks/useClockNow';
+import { userScopedStorage } from '../../lib/userScopedStorage';
 
 /* ------------------------------------------------------------------ */
 /*  Widget system                                                      */
@@ -386,7 +387,7 @@ export const TimeCenterPage2: React.FC = () => {
   const validWidgetIds = new Set<WidgetId>(['hero-clock', 'world-clocks', 'stopwatch', 'active-countdown', 'quick-presets']);
   const [layout, setLayout] = useState<WidgetLayout[]>(() => {
     try {
-      const raw = localStorage.getItem('p2m-timecenter-layout');
+      const raw = userScopedStorage.getItem('p2m-timecenter-layout');
       if (raw) {
         const parsed = JSON.parse(raw) as WidgetLayout[];
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -463,7 +464,7 @@ export const TimeCenterPage2: React.FC = () => {
         if (item.id === idB) return { ...item, position: a.position };
         return item;
       });
-      localStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
+      userScopedStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -474,7 +475,7 @@ export const TimeCenterPage2: React.FC = () => {
       if (!item) return prev;
       const nextSize: WidgetSize = item.size === 'small' ? 'large' : 'small';
       const next = prev.map((i) => (i.id === id ? { ...i, size: nextSize } : i));
-      localStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
+      userScopedStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -482,7 +483,7 @@ export const TimeCenterPage2: React.FC = () => {
   const toggleWidgetEnabled = useCallback((id: string) => {
     setLayout((prev) => {
       const next = prev.map((i) => (i.id === id ? { ...i, enabled: !i.enabled } : i));
-      localStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
+      userScopedStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -490,7 +491,7 @@ export const TimeCenterPage2: React.FC = () => {
   const setAllWidgetSize = useCallback((size: WidgetSize) => {
     setLayout((prev) => {
       const next = prev.map((i) => (i.enabled ? { ...i, size } : i));
-      localStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
+      userScopedStorage.setItem('p2m-timecenter-layout', JSON.stringify(next));
       return next;
     });
   }, []);

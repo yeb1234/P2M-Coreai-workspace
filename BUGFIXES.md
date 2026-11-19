@@ -1,5 +1,7 @@
 # BUGFIXES
 
+> 状态：现行（最后校对 2026-11-16）
+
 > **用途**：记录修过的缺陷，按等级 + 时间倒序。每条都要能对应到一次提交。
 >
 > **维护约定**：修完 bug 当天追加一条，写清「现象 / 根因 / 修法」，
@@ -124,6 +126,14 @@
 
 - **[P1] 有字幕无总结时补不上** —— 视频已有字幕，总结却一直是空的，点重试也没用。
   修法：恢复逻辑区分「缺字幕」与「缺总结」，缺总结单独补生成。`b94d3be`
+
+- **[P1] 卡在 running 的僵尸任务无人接管** —— 上一条 `reconcile_stuck_ai_jobs` 只扫 `queued`，
+  漏了一类真实故障：worker 重启时 `requeue_interrupted_ai_jobs` 先把 DB 的 running 改成 queued，
+  但 RQ 把旧 started job 标 abandoned→failed 是**延迟发生**的；若发生在之后，DB 停在 running，
+  而自愈函数只扫 queued，永远没人管，前端一直显示「正在转写」（日志可见 `AbandonedJobError`）。
+  修法：扫描范围扩到 `queued` + `running`，判定仍以 RQ 真实状态为准（started 视为活跃不动，
+  找不到 / failed 才重投）；重投后 job 自身状态一并复位成 queued（原来只复位 video，
+  job 停在 running 会导致显示不一致）。`a357a8c`
 
 - **[P1] 任务取消 / 续写 / 重启恢复三处失效** ——
   - 单个取消：`running` 直接返回 `running_not_cancellable`，用户点取消没反应。
@@ -299,6 +309,25 @@
   修法：新增 `thumbnail_attempts` / `thumbnail_failed_at`，3 次后放弃，
   成功时清零；给两个手动出口（单个重试 / 全部已放弃清零）；
   线程池和后台任务两条失败路径都记账（只算一处会让手动重试绕过计数）。`c16231b`
+
+- **[P2] 上一轮的检索片段跟着新问题跑** —— 同一会话接着问新问题，检索还没回来的
+  那几秒，界面挂的还是上一轮的片段（标「检索到的片段（回答生成中）」）。
+  根因：流式临时片段区块读的是 `references` state，它只在 done 时写入、从不清空。
+  修法：`sendMessage` 开头 `setReferences([])`；按消息归属渲染的部分不受影响
+  （每条历史消息自己带 references）。`9a13650`
+
+- **[P2] 同一条片段在列表里出现两次** —— 标题完全相同的重复视频（早期扫描路径
+  变化留下的）`video_id` 不同、内容是同一个，`dedupeReferences` 只按 `video_id`
+  去重，于是同一片段列两条。
+  修法：两层去重 —— 先按 `video_id` 留最高分，再按「标题 + 起始秒」去一次。`9a13650`
+
+- **[P2] 运行中转写的取消按钮被前端遗留禁用** —— 后端取消链路早已支持：转写循环
+  每处理一个字幕段就检查 cancel flag，faster-whisper 的 segments 是生成器，可在
+  步骤边界中断；但前端 `VideoAiJobCenter` 里 running 任务的 X 按钮仍是
+  「运行中不可停止」禁用态（后端不支持时代留下的）。
+  修法：放开按钮，提示改为「停止这个任务（当前步骤结束后退出，通常几秒内）」，
+  并补 `cancelling` 状态显示（转圈 + 禁用，避免重复点）。实测运行中取消 5 秒内
+  `transcribing → cancelled`，video 回 idle。`a357a8c`
 
 - **[P2] 401 连锁清理，用户被踢回登录页并刷一堆报错** ——
   登录后并发重载 8 个 store，cookie 失效时 8 个请求同时 401，

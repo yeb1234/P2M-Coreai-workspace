@@ -1,5 +1,7 @@
 # 3.0.0-beta
 
+> 状态：历史发布记录（3.0.0-beta 时点留档，2026-11-16 校对）。文中验证数字、表行数、块数均为该时点快照；破坏性变更与升级步骤仍适用。
+
 > 这是一个**大版本**。数据库结构、检索链路、部署方式都变了，
 > 升级前请先读「破坏性变更」和「升级步骤」。
 
@@ -101,9 +103,11 @@
 「不给已有表补索引」这次真的踩到了：`models.Note` 声明了 `scope`/`user_id`
 的 `index=True`，新库有索引、老库没有，同一份代码两种行为。
 
-- baseline `ed9ec716c9b0`：21 表 + 49 索引 + `content_chunks` + 6 个手工索引
-- `f2f5d8064921`：补 notes 两个索引
+- baseline `ed9ec716c9b0`（2026-11-16 13:56，`down_revision=None`）：21 表 + 49 索引 + `content_chunks` + 6 个手工索引
+- `f2f5d8064921`（notes_indexes_parity，13:58）：补 notes 两个索引
 - 老库过渡：检测「有表但无 `alembic_version`」→ stamp baseline → upgrade head
+
+> 现行状态：Alembic 只覆盖上述 2 个 revision；旧机制 `migrations.py`（`create_all` + `ALTER IF NOT EXISTS`）与 `database.py` 的 `ensure_runtime_schema` 仍然并存，**没有全部迁到 Alembic**。
 
 ### 7. 死代码清理
 
@@ -119,8 +123,10 @@
 ### 8. 部署
 
 - `start.bat` / `start.sh` 重写为 Docker 编排（旧的跑本机 uvicorn + npm run dev，
-  但 pgvector / Redis / ffmpeg 只有容器里有）
-- 「不用 AI 助手」= `postgres + redis + backend + frontend`，worker 不起
+  但 pgvector / Redis / ffmpeg 只有容器里有）。待确认：这两个脚本及 `diagnose.sh` /
+  `backup.sh` / `restore.sh` / `preflight.sh` 内的容器名仍是旧名 `siteyeb-*`，
+  与 compose 生成的 `p2-siteyeb-<service>-1` 不一致，能否直接跑需逐条核对
+- 「不用 AI 助手」= `postgres + redis + backend + frontend`，worker 不起（beta 时点编排取舍；现行 compose 已把 worker 拆成独立服务，见 `maintainability.md` 规则 4 复核）
 - 修 nginx 缓存后端旧 IP 导致整站 502：改用 `resolver` + 变量形式 `proxy_pass`
 
 ---
@@ -141,8 +147,8 @@
 ## 升级步骤
 
 ```bash
-# 1. 备份数据库（必须）
-docker exec siteyeb-pg pg_dump -U p2user p2learning > backup-2.9x.sql
+# 1. 备份数据库（必须；容器名由 compose 生成，以 docker ps 为准，形如 p2-siteyeb-postgres-1）
+docker exec p2-siteyeb-postgres-1 pg_dump -U p2user p2learning > backup-2.9x.sql
 
 # 2. 拉代码、重建镜像
 git pull

@@ -1,5 +1,7 @@
 # 颜色系统重构 + 主题收敛
 
+> 状态：历史 PR 记录（分支 `refactor/design-system` 时期）。2026-11-16 复核：颜色变量化方案仍为现行；遗留项状态见文末更新。
+
 ## 背景
 
 上一版加了「学术纸感」主题，但切过去只有底色变了，彩色块（待办统计的橙/蓝/绿、番茄钟色块）纹丝不动 —— 项目里有 **416 处硬编码颜色**，CSS 变量主题管不到。
@@ -48,7 +50,7 @@
 - 移除「导入主题」按钮和隐藏 input
 - 移除 `importRef` / `importStatus` / `parseThemeVarsText` 引用
 
-**保留** 16 个预设和导出功能（导出给用户备份用，不影响加载）。
+**保留** 预设主题和导出功能（导出给用户备份用，不影响加载）。PR 时期为 16 个；现行 `THEME_PRESETS`（`src/lib/themes.ts`）为 14 个。
 
 ## 验证
 
@@ -79,4 +81,4 @@ docker compose up -d --build
 
 **分类色没变量化**。如果以后要「一键换掉所有彩色」，需要给每个分类色也建语义变量（`--tag-purple` 之类）。现在不做，因为分类色的语义是「区分模块」，不是「跟随主题」。
 
-**`todoStore` 还在**。周历/统计已经改用 `scheduleStore`，但 store 文件没删。确认全项目无引用后可连 `p2m-todo-storage` 一起清理。
+**`todoStore` 遗留（2026-11-16 复核：已清理）**：周历/统计改用 `scheduleStore` 后，`useTodoStore` 与 `src/stores/todoStore.ts` 已删除；`p2m-todo-storage` 旧键仍列在 `src/components/settings/types.ts` 的 `STORAGE_KEYS` 清理清单里，等待老浏览器本地数据清掉。

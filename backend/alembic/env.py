@@ -43,7 +43,17 @@ if str(BACKEND_DIR) not in sys.path:
 
 config = context.config
 
-if config.config_file_name is not None:
+# 日志由应用自己配（见 app/core/observability.py）。
+#
+# 这里**不能无条件调 fileConfig**：它会把 root 的 handler 全部清掉，
+# 并按 disable_existing_loggers=True 关掉所有已存在的 logger。
+# 而 alembic 是**在应用进程里**跑的（app/database.py 的 ensure_runtime_schema
+# 会 command.upgrade），于是启动时那一行「日志落盘」写完之后，后面所有业务日志
+# 全部静默丢弃 —— 不报错、不抛异常，比没有日志更难查。
+#
+# 命令行单独跑 alembic 时（没有应用配日志）才用 ini 里的 logging 配置，
+# 那种场景由调用方不设 skip_logging_config 来区分。
+if config.config_file_name is not None and not config.attributes.get("skip_logging_config"):
     fileConfig(config.config_file_name)
 
 from app.database import Base, settings  # noqa: E402

@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 import type React from 'react';
 import type { MutableRefObject, RefObject } from 'react';
 import type { VideoItem } from '../../lib/videoApi';
+import { PENDING_AUTOPLAY_VIDEO_KEY, PENDING_SEEK_KEY } from '../../lib/videoNavigation';
+import { userScopedStorage } from '../../lib/userScopedStorage';
 
 function getVideoErrorLabel(code: number | undefined): string {
   if (code === 1) return '加载被中止';
@@ -27,6 +29,7 @@ interface UseVideoElementEventsOptions {
   setMediaError: (message: string) => void;
   setShowControls: (visible: boolean) => void;
   hideCurrentTextTracks: () => void;
+  onPlaybackError?: (message: string) => void;
 }
 
 export function useVideoElementEvents({
@@ -45,6 +48,7 @@ export function useVideoElementEvents({
   setMediaError,
   setShowControls,
   hideCurrentTextTracks,
+  onPlaybackError,
 }: UseVideoElementEventsOptions) {
   const videoDuration = currentVideo?.duration ?? null;
   const watchProgress = currentVideo?.watch_progress ?? null;
@@ -70,10 +74,10 @@ export function useVideoElementEvents({
     if (video.volume > 0) lastVolumeRef.current = video.volume;
 
     // 优先跳转到聊天引用里指定的时间点，其次才是上次观看进度
-    const pendingSeekRaw = localStorage.getItem('p2m_pending_seek_sec');
+    const pendingSeekRaw = userScopedStorage.getItem(PENDING_SEEK_KEY);
     let pendingSeek: number | null = null;
     if (pendingSeekRaw) {
-      localStorage.removeItem('p2m_pending_seek_sec');
+      userScopedStorage.removeItem(PENDING_SEEK_KEY);
       const parsed = Number(pendingSeekRaw);
       if (Number.isFinite(parsed) && parsed > 0) pendingSeek = parsed;
     }
@@ -88,10 +92,26 @@ export function useVideoElementEvents({
     }
 
     if (subtitleUrl) hideCurrentTextTracks();
-    if (playAfterLoadRef.current) {
+
+    // 列表点卡片、AI 引用跳转都属于用户明确的播放动作。
+    // 只在视频 id 匹配时消费标记，避免上一次失败加载留下的标记误播别的视频。
+    const pendingAutoplayRaw = userScopedStorage.getItem(PENDING_AUTOPLAY_VIDEO_KEY);
+    let pendingAutoplay = false;
+    if (pendingAutoplayRaw) {
+      userScopedStorage.removeItem(PENDING_AUTOPLAY_VIDEO_KEY);
+      pendingAutoplay = pendingAutoplayRaw === String(currentVideo.id);
+    }
+
+    if (playAfterLoadRef.current || pendingAutoplay) {
       playAfterLoadRef.current = false;
-      video.play().catch(() => {
+      void video.play().catch((error: unknown) => {
+        const name = error instanceof DOMException ? error.name : '';
         setShowControls(true);
+        onPlaybackError?.(
+          name === 'NotAllowedError'
+            ? '自动播放被拦截，请点播放按钮继续。'
+            : '视频未能自动播放，请点播放按钮重试。',
+        );
       });
     }
   }, [
@@ -111,6 +131,7 @@ export function useVideoElementEvents({
     subtitleUrl,
     videoRef,
     volume,
+    onPlaybackError,
   ]);
 
   const handleVolumeSync = useCallback((event: React.SyntheticEvent<HTMLVideoElement>) => {

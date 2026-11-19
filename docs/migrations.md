@@ -1,197 +1,92 @@
-# 数据库迁移（Alembic）
+# 数据库迁移机制
 
-引入于 2026-11-16。之前只有 `app/migrations.py` 的手写迁移。
+> 状态：事实已核实（核对基线 2026-11-16）
 
----
+## 一、两套机制并存（2026-11-16 现状，不是「已全部迁完」）
 
-## 一、为什么从"手写 ALTER"换成 Alembic
+PostgreSQL 上同时存在两套结构管理机制，启动时按顺序都跑：
 
-原来那套是 `create_all` + 一长串 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`，
-装在 `app/migrations.py` 里，每次启动跑一遍。
+| 机制 | 位置 | 管什么 | 依据 |
+|---|---|---|---|
+| **Alembic 版本链** | `backend/alembic/`（`env.py`、`versions/`） | 版本化的结构变更，有记录、可回滚；管 `Base.metadata` 下的 ORM 表 | `backend/alembic/env.py:62,123-132`；`backend/app/database.py:384-431` |
+| **运行时补齐** | `backend/app/migrations.py` 的 `upgrade_postgres(engine)` | `create_all` 补缺表、幂等补索引/列、pgvector 扩展、`content_chunks` DDL；按当前运行配置补齐 | `backend/app/migrations.py:84-210`；`backend/app/database.py:453-458` |
 
-**优点**（要保住，不能丢）：幂等，启动自动跑，不会出现"忘记执行 upgrade"。
+不要写成「结构已经全部由 Alembic 管理」或「旧迁移脚本可以删掉」。两套都在，分工见第三节。
 
-**缺点**（这次要解决的）：
+### Alembic 版本链
 
-1. **没有版本记录**。线上库到底是第几版结构，只能靠人回忆。
-2. **`create_all` 只建缺失的表，不给已有的表补索引**。
-   实际后果：`models.Note` 声明了 `scope`/`user_id` 的 `index=True`，
-   新库有索引，老库没有 —— 同一份代码两种行为，`ensure_video_note`
-   在老库上全表扫。
-3. **改类型、删列、加约束兜不住**。`IF NOT EXISTS` 只能"加"。
-4. **不可回滚**。
+| Revision | 文件 | 说明 |
+|---|---|---|
+| `ed9ec716c9b0` | `versions/2026_11_16_1356-ed9ec716c9b0_baseline.py` | baseline：首次引入 Alembic 时对空库建全部结构 |
+| `f2f5d8064921` | `versions/2026_11_16_1358-f2f5d8064921_notes_indexes_parity.py` | 补 `notes` 上模型声明了索引、老库缺的两个索引；`down_revision = ed9ec716c9b0`，对新库是无操作 |
 
-第 2 条是这次真正踩到的坑，也是引入 Alembic 的直接理由。
+baseline revision 写死在 `database.py:381`（`BASELINE_REVISION`），发布后凝固。
 
----
+### 运行时补齐（migrations.py）
 
-## 二、现在的分工
+- `upgrade_postgres`：先 `CREATE EXTENSION IF NOT EXISTS vector / pg_trgm`，再 `Base.metadata.create_all`，然后逐条 `CREATE INDEX IF NOT EXISTS` 与幂等补列，最后建 `content_chunks`（`migrations.py:89-92,110-202`）。
+- `upgrade_sqlite_legacy`：SQLite 路径的最小结构，不跑 Alembic（`migrations.py:212`；`database.py:461-463`）。
+
+## 二、启动链路
+
+容器入口等库可连后跑 `ensure_runtime_schema()`（`backend/docker-entrypoint.sh:40-41`）：
 
 ```
-app/database.ensure_runtime_schema()
-  ├─ 1. alembic upgrade head        ← 版本化的结构变更（21 张 ORM 表）
-  └─ 2. migrations.upgrade_postgres ← 兼容兜底
-         ├─ Base.metadata.create_all()    建缺失的表
-         ├─ 幂等 ALTER（加列）
-         └─ content_chunks_ddl(dim)       pgvector 表，维度要运行时拼
+ensure_runtime_schema()
+  ├─ PostgreSQL:
+  │    1. _run_alembic_migrations()   # upgrade head（老库先 stamp baseline）
+  │    2. upgrade_postgres(engine)    # create_all + 幂等补索引/列 + content_chunks DDL
+  └─ SQLite:
+       upgrade_sqlite_legacy(engine)  # 最小结构，Alembic DDL 有 PG 专有语法，跑不了
 ```
 
-**为什么第 2 步还留着**：`content_chunks` 的 `halfvec(N)` 维度来自
-`settings.embedding_dim`，而迁移文件里的 DDL 必须**写死**（迁移要能重放
-当时那一版结构，不能随配置变）。所以这张表仍由 `tables.py` 管。
+依据：`backend/app/database.py:437-463`。
 
-`content_chunks` 是 Alembic 的**盲区**：autogenerate 看不到它。
-要改这张表，改 `tables.py` 的 `content_chunks_ddl()`，**不要指望自动检测**。
-
----
-
-## 三、日常怎么用
-
-所有命令在 `backend/` 目录下执行。
-
-### 改完 models.py 之后
-
-```bash
-cd backend
-
-# 看看会生成什么（不写文件）
-alembic revision --autogenerate -m "add xxx to videos" --sql
-# 或者直接生成，然后人工检查
-alembic revision --autogenerate -m "add xxx to videos"
-```
-
-**生成后一定要打开看。** autogenerate 会漏东西，也会多东西：
-
-| 会漏 | 会多 |
-|---|---|
-| `content_chunks` 的任何变更 | 无意义的 server_default 抖动 |
-| `gin_trgm_ops` / `hnsw` 这类索引 | 重复索引（同列不同名） |
-| 数据迁移（回填、重命名） | — |
-
-检查完再：
-
-```bash
-alembic upgrade head
-```
-
-### 看当前状态
-
-```bash
-alembic current          # 现在停在哪一版
-alembic history --verbose
-alembic heads
-```
-
-### 回滚
-
-```bash
-alembic downgrade -1     # 退一版
-alembic downgrade base   # 全退（会删表，危险）
-```
-
-### 临时连别的库（比如验证 baseline）
-
-```bash
-alembic -x db_url="postgresql+psycopg://user:pass@host/db" upgrade head
-# 或
-ALEMBIC_DATABASE_URL="postgresql+psycopg://..." alembic upgrade head
-```
-
-连接地址**不写在 `alembic.ini` 里**，由 `alembic/env.py` 从
-`app.database.settings` 读 —— 避免"改了 .env 但迁移连的还是旧库"。
-
----
-
-## 四、老库是怎么过过来的
-
-线上库当时有 21 张表，但没有 `alembic_version`。直接 `upgrade head`
-会撞 `relation "agent_runs" already exists`。
-
-启动时的 `_run_alembic_migrations()` 会自动判断：
+`_run_alembic_migrations()` 对三种库状态分别处理（`database.py:387-391`）：
 
 | 库状态 | 动作 |
 |---|---|
-| 空库 | `upgrade head`，baseline 建全部表 |
-| 有表、无 `alembic_version` | 先 `stamp <baseline>`，再 `upgrade head` |
+| 空库 | `upgrade head`（baseline 建全部表） |
+| 有表、无 `alembic_version`（老部署） | 先 `stamp` 到 baseline，再 `upgrade head` |
 | 有 `alembic_version` | 直接 `upgrade head` |
 
-`stamp` 只是写一行版本记录，不动结构 —— 它的含义是
-"结构已经等于 baseline 了，别重放建表语句"。
+迁移失败不抛异常阻断启动，但会大声记日志；结构可能不是最新，需要事后排查（`database.py:433-434`）。
 
-这一步是**一次性**的。之后所有库都有版本记录了。
+## 三、为什么两套都留着
 
----
+1. **`create_all` 只补缺表**：表已存在就整张跳过，包括这张表上后加的索引和列。老库因此会和新库结构不一致，这类漂移正是引入 Alembic 要解决的。
+2. **`content_chunks` 挂在独立 `pgvector_metadata` 上**，不在 `Base.metadata` 里：halfvec 类型在 SQLite 上无法编译，挂进 Base 会让 `create_all` 直接抛 `CompileError`。它的 DDL 由 `tables.py:content_chunks_ddl()` 按运行时 `embedding_dim` 拼 `halfvec(N)`，Alembic 看不到这张表（`backend/alembic/env.py:17-25`；`backend/app/tables.py:35-82`）。
+3. **维度要能重放**：迁移文件里必须写死维度；运行时配置的维度由 `upgrade_postgres` 兜底对齐。
 
-## 五、当前迁移链
+分工一句话：**Alembic 管版本记录，`upgrade_postgres` 管「按当前配置补齐」**（`database.py:444-449`）。
 
-```
-ed9ec716c9b0  baseline
-  └─ 21 张 ORM 表 + 49 个索引
-  └─ content_chunks（手工补，autogenerate 看不到）
-  └─ 6 个业务索引（手工补，只写在旧 migrations.py 里）
-  └─ pgvector / pg_trgm 扩展
-      └─ f2f5d8064921  notes indexes parity
-           补上 notes.scope / notes.user_id 两个索引
-           （models 声明了，但老库 create_all 没补）
-```
+## 四、SQLite 口径
 
-**baseline 是凝固的**。它里面的 DDL 不会因为 `models.py` 改动而变化。
-不要 import `app.tables.content_chunks_ddl()` 到迁移里 —— 那会让历史迁移
-随应用代码漂移，回滚到旧版本时得到错误的 schema。
+- SQLite 用于本地测试 / 轻量部署；Alembic 在线上跳过时会打印原因（`alembic/env.py:96-98`）。
+- SQLite 结构由 `upgrade_sqlite_legacy` 直接建，不走版本链。
+- 新增 `content_chunks` 的列/索引时，改 `tables.py`，不要指望 autogenerate 检测到。
 
-要改结构，新建迁移。
+## 五、常用命令
 
----
-
-## 六、验证 baseline 是否真的对
-
-换过 baseline 或大改 models 后，值得跑一次：
+在 `backend/` 目录下（`alembic.ini` 在 `backend/`）：
 
 ```bash
-# 1. 建一个空库
-docker exec siteyeb-pg psql -U p2user -d postgres -c "CREATE DATABASE p2learning_check;"
-
-# 2. 在上面跑全部迁移
-cd backend
-ALEMBIC_DATABASE_URL="postgresql+psycopg://p2user:<pw>@127.0.0.1:5432/p2learning_check" \
-  alembic upgrade head
-
-# 3. 对比列和索引（应该完全一致）
-for db in p2learning p2learning_check; do
-  docker exec siteyeb-pg psql -U p2user -d $db -t -A -c \
-    "SELECT table_name||'.'||column_name||' '||data_type
-     FROM information_schema.columns WHERE table_schema='public'
-     AND table_name<>'alembic_version' ORDER BY 1" > /tmp/cols_$db.txt
-done
-diff /tmp/cols_p2learning.txt /tmp/cols_p2learning_check.txt
-
-# 4. 清理
-docker exec siteyeb-pg psql -U p2user -d postgres -c "DROP DATABASE p2learning_check;"
+alembic current          # 当前 revision
+alembic history          # 版本链
+alembic upgrade head     # 升到 head
 ```
 
-2026-11-16 首次引入时跑过：262 列、82 个索引**完全一致**。
+临时连别的库：`alembic -x db_url=postgresql+psycopg://... upgrade head`（`alembic/env.py:13-15,65-73`）。
 
----
+- 数据库地址从 `app.database.settings` 读，不写在 `alembic.ini` 里，避免 `.env` 改了还连旧库（`env.py:3-11`）。
+- 连接时设 `lock_timeout = '20s'`：DDL 拿排他锁，长事务会让迁移无限等待，20 秒跨不过去直接报错，比无声卡死好诊断（`env.py:110-121`）。
 
-## 七、几个坑
+## 六、模型对齐口径
 
-**① `alembic.ini` 必须纯 ASCII**
+- `models.py` 共 21 个 ORM 模型，挂在 `Base.metadata`（`backend/app/models.py`，`__tablename__` 计数 21）。
+- `content_chunks` 不在此映射内，见第三节。
+- 旧文档里「49 个索引」「262 列、82 个索引完全一致」等列/索引计数，是 2026-11-16 首次引入 baseline 时的实测数字，本次未对当前库复核；需要精确数字时在库内 `information_schema` 现查。
 
-Alembic 用系统 locale 编码读 ini（Windows 上是 GBK）。
-注释里写中文会直接 `UnicodeDecodeError`，而且报错位置在
-`configparser`，很难联想到"注释是中文"。说明都放在 `env.py` 里。
+## 待用户确认
 
-**② 不要在 env.py 里用 `connection.execute("SET ...")`**
-
-SQLAlchemy 2.0 的 `connection.execute()` 会**自动开启事务**，
-Alembic 的 `context.begin_transaction()` 就退化成 savepoint，
-最外层退出时整体回滚 —— 表现为 `stamp` 显示成功、
-`alembic_version` 却没建出来。
-
-用 `exec_driver_sql()` + 显式 `commit()`。
-
-**③ SQLite 会跳过迁移**
-
-`env.py` 检测到 `sqlite://` 直接返回。Alembic 的 DDL 里有 PG 专有语法
-（JSONB、`USING hnsw`、部分索引），SQLite 跑不了。
-SQLite 路径继续走 `create_all` —— 那条路只用于本地跑测试。
+- 老库 stamp baseline 是引入 Alembic 时的一次性过渡；线上是否还存在无 `alembic_version` 的老库、是否需要保留这条过渡分支，未在本次核实。

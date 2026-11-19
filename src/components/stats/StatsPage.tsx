@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { BarChart3, TrendingUp, Clock, Target, Calendar, Flame, StickyNote, ListTodo, Trophy } from 'lucide-react';
 import { PageTitle } from '../shared';
-import type { ScheduleItem } from '../../types/schedule';
 import { usePomodoroStore, useCalendarStore, useNotesStore, useScheduleStore } from '../../stores';
 import { toLocalDateString } from '../../lib/date';
+import { selectTodoProjection } from '../../lib/projections/todo';
+import { selectQuickStatsProjection } from '../../lib/projections/quickStats';
 
 const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -41,23 +42,25 @@ export const StatsPage: React.FC = () => {
   // 统计口径对齐待办页：用 scheduleStore 而不是 todoStore，
   // 否则「统计里说 5 条待办」和「待办页显示 3 条」对不上。
   const scheduleItems = useScheduleStore((s) => s.items);
-  // 这里只需要「待办条目列表」本身，不需要 key-value 结构，
-  // 所以直接用数组，避免 Object.fromEntries 把类型退化成 unknown。
-  const todoList = useMemo<ScheduleItem[]>(
-    () => Object.values(scheduleItems).filter((i) => i.type === 'todo' && !i.deletedAt),
-    [scheduleItems],
-  );
   const getTodayStats = usePomodoroStore((s) => s.getTodayStats);
   const getWeekStats = usePomodoroStore((s) => s.getWeekStats);
   const sessions = usePomodoroStore((s) => s.sessions);
   const notes = useNotesStore((s) => s.notes);
   const calendarEvents = useCalendarStore((s) => s.events);
 
-  const completedTodos = todoList.filter((t) => t.status === 'completed').length;
-  const pendingTodos = todoList.filter((t) => t.status === 'pending').length;
-  const inProgressTodos = todoList.filter((t) => t.status === 'in_progress').length;
+  // 待办基础集合（type todo 且未删除）复用待办投影，和待办页 / 概览卡片同一份口径
+  const todoProjection = selectTodoProjection(scheduleItems);
+  const todoList = todoProjection.todos;
+  const completedTodos = todoProjection.counts.completed;
+  const pendingTodos = todoProjection.counts.pending;
+  const inProgressTodos = todoProjection.counts.inProgress;
 
   const todayStats = getTodayStats();
+  // 概览卡片同一份投影：今日番茄 / 便签 / 今日事件，两边数字必须一致
+  const quick = selectQuickStatsProjection({ items: scheduleItems, todayStats, notes, calendarEvents });
+  // 徽章「日程管理」按 legacy 日历事件全量计数，不随今日口径变（徽章不动）
+  const calendarEventTotal = Object.keys(calendarEvents).length;
+
   const weekStats = getWeekStats();
   const streak = getStreakDays(sessions);
 
@@ -72,8 +75,6 @@ export const StatsPage: React.FC = () => {
   const totalWeekMinutes = last7.reduce(
     (sum, d) => sum + (weekStats.dailyBreakdown[d]?.minutes || 0), 0
   );
-
-  const eventCount = Object.keys(calendarEvents).length;
 
   // Achievement badges
   const badges: { label: string; unlocked: boolean; icon: React.ReactNode }[] = [
@@ -98,13 +99,13 @@ export const StatsPage: React.FC = () => {
       icon: <Flame size={18} />,
     },
     {
-      label: '笔记大师',
+      label: '便签大师',
       unlocked: notes.length >= 10,
       icon: <StickyNote size={18} />,
     },
     {
       label: '日程管理',
-      unlocked: eventCount >= 20,
+      unlocked: calendarEventTotal >= 20,
       icon: <Calendar size={18} />,
     },
   ];
@@ -124,7 +125,7 @@ export const StatsPage: React.FC = () => {
             <Target size={16} />
             <span className="text-xs font-medium">今日番茄</span>
           </div>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">{todayStats.totalPomodoros}</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)]">{quick.pomodoros}</p>
           <p className="text-xs text-[var(--text-muted)] mt-1">
             {todayStats.totalMinutes >= 60
               ? `${(todayStats.totalMinutes / 60).toFixed(1)}h`
@@ -170,14 +171,14 @@ export const StatsPage: React.FC = () => {
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
           <StickyNote size={16} className="text-[var(--warn)]" />
           <div>
-            <p className="text-lg font-bold text-[var(--text-primary)]">{notes.length}</p>
-            <p className="text-xs text-[var(--text-muted)]">笔记</p>
+            <p className="text-lg font-bold text-[var(--text-primary)]">{quick.notesCount}</p>
+            <p className="text-xs text-[var(--text-muted)]">便签</p>
           </div>
         </div>
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-light)] rounded-xl p-3 flex items-center gap-3">
           <Calendar size={16} className="text-[#7c3aed]" />
           <div>
-            <p className="text-lg font-bold text-[var(--text-primary)]">{eventCount}</p>
+            <p className="text-lg font-bold text-[var(--text-primary)]">{quick.eventsCount}</p>
             <p className="text-xs text-[var(--text-muted)]">日历事件</p>
           </div>
         </div>
@@ -206,7 +207,7 @@ export const StatsPage: React.FC = () => {
           <h3 className="text-sm font-medium text-[var(--text-primary)]">本周专注趋势</h3>
         </div>
         {totalWeekMinutes > 0 ? (
-          <div className="min-w-[300px] flex items-end gap-3 h-40">
+          <div className="min-w-0 flex items-end gap-3 h-40">
             {last7.map((date) => {
               const data = weekStats.dailyBreakdown[date];
               const minutes = data?.minutes || 0;
@@ -216,8 +217,8 @@ export const StatsPage: React.FC = () => {
 
               return (
                 <div key={date} className="flex-1 flex flex-col items-center gap-2">
-                  <span className="text-xs text-[var(--text-muted)]">
-                    {minutes > 0 ? `${minutes}分钟` : '-'}
+                  <span className="whitespace-nowrap text-[10px] leading-tight text-[var(--text-muted)] sm:text-xs">
+                    {minutes > 0 ? `${minutes}分` : '-'}
                   </span>
                   <div className="w-full flex items-end justify-center" style={{ height: '120px' }}>
                     <div
@@ -272,3 +273,4 @@ export const StatsPage: React.FC = () => {
     </div>
   );
 };
+

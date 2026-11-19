@@ -57,7 +57,7 @@ const STATUS_FILTERS = [
 const BATCH_MODES: Array<{ value: AiJobBatchMode; label: string; desc: string }> = [
   { value: 'unfinished', label: '继续未完成', desc: '跳过已有字幕和总结的视频，只补没完成的。' },
   { value: 'missing_subtitles', label: '只处理无字幕', desc: '只给没有字幕的视频生成字幕和总结。' },
-  { value: 'missing_summary', label: '只补总结', desc: '已有字幕但没有总结时才入队。' },
+  { value: 'missing_summary', label: '只补总结', desc: '已有字幕但没有总结时才入队，直接读现有字幕，不重跑 Whisper。' },
   { value: 'failed_only', label: '只重试失败', desc: '只把最近失败的视频重新入队。' },
   { value: 'all', label: '全部重跑', desc: '清空旧 AI 输出后重新生成。' },
 ];

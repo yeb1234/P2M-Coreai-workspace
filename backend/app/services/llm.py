@@ -21,7 +21,9 @@ Completions.create，实测抛 TypeError。
 供设置页的扫模型、连通性测试和后台任务复用。
 
 `provider_slot` + `call_with_retry`：同一个 provider 的请求做节流（本地单模型
-串行、外部保留最小间隔），429/5xx/超时会指数退避重试；401/403/404 不重试 ——
+串行、外部保留最小间隔），429/5xx/超时会指数退避重试（429 至少等 5s、听
+Retry-After、最多 30s）；401/403/404 与「余额/配额不足」不重试 ——
+前者换 key，后者换通道或充值，重试都是白等。
 key 错或路径错，重试一百次也是同一个结果，直接换 provider 才有意义。
 
 `call_with_fallback`：按调用方给的顺序依次尝试 provider，返回「是不是降级成功」，
@@ -55,6 +57,7 @@ ERR_NETWORK = "network"           # DNS 失败 / 连接被拒 / 超时
 ERR_AUTH = "auth"                 # 401 / 403，key 错或没权限
 ERR_NOT_FOUND = "not_found"       # 404，base_url 路径不对（如少了 /v1）
 ERR_RATE_LIMIT = "rate_limit"     # 429
+ERR_QUOTA = "quota"               # 402 / insufficient_quota：余额或配额用尽，重试无意义
 ERR_UPSTREAM = "upstream"         # 5xx
 ERR_BAD_RESPONSE = "bad_response"  # 200 但返回体不是 OpenAI 兼容格式
 ERR_CONFIG = "config"             # 本端就没配好（缺 base_url / key / model）
@@ -62,7 +65,35 @@ ERR_UNKNOWN = "unknown"
 
 # 重试有意义的三类：过一会儿再来可能就好了。
 # 401/403/404 不在这里 —— 换个 provider 才是正解。
+# 余额/配额不足也不在：充值前重试一百次也一样，只是白等。
 RETRYABLE_KINDS = frozenset({ERR_NETWORK, ERR_RATE_LIMIT, ERR_UPSTREAM})
+
+# 限流最多等这么久再试。上游 Retry-After 比这还长就不硬等，
+# 超过这个量级用户/任务更该换通道，而不是挂着。
+RATE_LIMIT_MAX_WAIT_S = 30.0
+
+# 这些文案代表「账户没钱/配额用尽」，不是限流。
+# 注意 OpenAI 把余额不足也塞进 HTTP 429，所以必须先看文案再看状态码。
+_QUOTA_TEXT_HINTS = (
+    "insufficient_quota",
+    "insufficient quota",
+    "exceeded your current quota",
+    "quota exhausted",
+    "quota exceeded",
+    "billing hard limit",
+    "payment required",
+    "credit balance",
+    "credit limit",
+    "out of credits",
+    "no credits",
+    "余额不足",
+    "额度不足",
+    "配额不足",
+    "配额已用尽",
+    "欠费",
+    "请充值",
+    "账户余额",
+)
 
 _STATUS_RE = re.compile(r"\bHTTP\s*(\d{3})\b", re.IGNORECASE)
 
@@ -106,6 +137,11 @@ def classify_llm_error(exc: BaseException) -> str:
 
     name = type(exc).__name__.lower()
     text = (str(exc) or "").lower()
+
+    # 余额/配额优先于状态码：OpenAI 的 insufficient_quota 走的是 HTTP 429，
+    # 若按 429 归类会白白重试好几轮，还给出「限流」这种误导提示。
+    if status == 402 or any(hint in text for hint in _QUOTA_TEXT_HINTS):
+        return ERR_QUOTA
 
     # 没拿到状态码时先判连接类：requests.ConnectionError 继承 OSError，
     # socket.gaierror 也是 OSError，用 isinstance 一把抓。
@@ -196,7 +232,14 @@ def describe_llm_error(
         return f"接口不存在（HTTP 404）：{where}返回 404，{hint}。{tail}"
 
     if kind == ERR_RATE_LIMIT:
-        return f"请求过于频繁（HTTP 429）：{where}限流了，稍等几秒到一分钟再试。"
+        return f"请求过于频繁（HTTP 429）：{where}限流了，已自动等待重试仍未恢复，稍后再试或换另一套模型。"
+
+    if kind == ERR_QUOTA:
+        status_text = f"（HTTP {status}）" if status is not None else ""
+        return (
+            f"账户额度不足{status_text}：{where}提示余额或配额已用尽，"
+            "重试不会恢复，请充值或换一个 API Key。"
+        )
 
     if kind == ERR_UPSTREAM:
         return f"上游服务出错（HTTP {status}）：{where}暂时不可用，稍后重试或换另一套模型。"
@@ -281,12 +324,30 @@ def provider_slot(provider: Provider | str):
 
 
 def _retry_after_of(exc: BaseException) -> float | None:
+    """拿上游建议的等待秒数：优先 Retry-After 头，其次是文案里的 'try again in 20s'。
+
+    429 的等待时间经常只写在响应体里（OpenAI 兼容服务尤其如此），
+    只读 header 会一直按 1/2/4 秒退避，白撞好几轮。
+    """
     headers = getattr(getattr(exc, "response", None), "headers", None) or {}
     try:
         value = headers.get("Retry-After") if hasattr(headers, "get") else None
-        return float(value) if value is not None else None
+        if value is not None:
+            return float(value)
     except (TypeError, ValueError):
-        return None
+        pass
+
+    match = re.search(
+        r"(?:try again|retry)\s+in\s+(\d+(?:\.\d+)?)\s*(?:s|sec|secs|seconds)",
+        str(exc) or "",
+        re.IGNORECASE,
+    )
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            return None
+    return None
 
 
 def _log_llm_call(
@@ -334,7 +395,9 @@ def _call_one(
 
     返回 (结果, 实际尝试次数)。异常原样抛给上层，由上层决定换不换 provider。
     - 429 / 5xx / 连接超时：1s、2s、4s… 最多 `max_attempts` 次
+    - 429 单独处理：至少等 5s，优先听 Retry-After，封顶 30s
     - 401 / 403 / 404：不重试（key 错、路径错，重试一百次也一样）
+    - 402 / insufficient_quota：不重试（没钱，等多久都不会好）
     - `budget_s`：从第一次尝试起的总时间预算，超了就不再重试（HTTP 请求
       不能被一次扫描拖到前端超时）
     """
@@ -359,9 +422,15 @@ def _call_one(
             last_exc = exc
             kind = classify_llm_error(exc)
             elapsed_ms = int((time.monotonic() - attempt_started) * 1000)
-            delay = min(base_delay_s * (2 ** (attempt - 1)), max_delay_s)
-            # 上游给了 Retry-After 就听它的（429 常带）
-            delay = _retry_after_of(exc) or delay
+            exponential = min(base_delay_s * (2 ** (attempt - 1)), max_delay_s)
+            retry_after = _retry_after_of(exc)
+            if kind == ERR_RATE_LIMIT:
+                # 限流是「等一会儿就好」的错，别用 1/2/4 秒的短退避白撞。
+                # 至少 5s，尊重上游 Retry-After，但封顶 30s。
+                delay = min(max(5.0, retry_after or 0.0, exponential), RATE_LIMIT_MAX_WAIT_S)
+            else:
+                # 上游给了 Retry-After 就听它的（429 常带），但仍受 max_delay_s 约束
+                delay = min(retry_after, max_delay_s) if retry_after else exponential
 
             retry = (
                 kind in RETRYABLE_KINDS

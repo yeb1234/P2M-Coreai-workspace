@@ -1,4 +1,5 @@
 import { clampPlaybackRate } from './videoPlayerUtils';
+import { userScopedStorage } from '../../lib/userScopedStorage';
 
 const PLAYER_SETTINGS_KEY = 'p2m-video-player-settings';
 const PLAYER_SETTINGS_MIGRATION_KEY = 'p2m-video-player-settings-auto-play-default-v1';
@@ -25,12 +26,12 @@ const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 
 export function loadPlayerSettings(): PlayerSettings {
   try {
-    const raw = localStorage.getItem(PLAYER_SETTINGS_KEY);
+    const raw = userScopedStorage.getItem(PLAYER_SETTINGS_KEY);
     if (!raw) return DEFAULT_PLAYER_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<PlayerSettings>;
-    const shouldForceAutoPlayDefault = localStorage.getItem(PLAYER_SETTINGS_MIGRATION_KEY) !== 'done';
+    const shouldForceAutoPlayDefault = userScopedStorage.getItem(PLAYER_SETTINGS_MIGRATION_KEY) !== 'done';
     if (shouldForceAutoPlayDefault) {
-      localStorage.setItem(PLAYER_SETTINGS_MIGRATION_KEY, 'done');
+      userScopedStorage.setItem(PLAYER_SETTINGS_MIGRATION_KEY, 'done');
     }
     return {
       showSubtitles: typeof parsed.showSubtitles === 'boolean' ? parsed.showSubtitles : DEFAULT_PLAYER_SETTINGS.showSubtitles,
@@ -47,5 +48,5 @@ export function loadPlayerSettings(): PlayerSettings {
 }
 
 export function savePlayerSettings(settings: PlayerSettings) {
-  localStorage.setItem(PLAYER_SETTINGS_KEY, JSON.stringify(settings));
+  userScopedStorage.setItem(PLAYER_SETTINGS_KEY, JSON.stringify(settings));
 }

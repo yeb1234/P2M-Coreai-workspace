@@ -76,13 +76,14 @@ class DailyQuota:
         return True, used, self.limit
 
     def refund(self, user_id: int, cost: int = 1) -> None:
-        """任务失败时退还配额，避免因为服务端问题扣用户的量。
+        """任务失败/未真正执行时退还配额。
 
-        **目前没有任何调用方，但不要删。**
-
-        routers/learning.py 的 consume 发生在「去重命中」「并发上限 429」
-        「生成失败」三条路径之前，这三种情况都会白扣一次额度。
-        修那个 bug 时需要这个方法，删了还得照原样写回来。
+        调用点：
+        - learning.generate_path：创建 run 后落库失败、异步生成失败、线程池拒绝；
+        - assistant：模型调用失败；
+        - search：rerank 请求失败；
+        - notes.ai-daily：日报生成异常。
+        不要直接删：没有 refund 的 consume 会让用户为服务端错误买单。
         """
         try:
             get_redis_connection().decrby(self._key(user_id), cost)
@@ -101,6 +102,16 @@ def chat_quota_for(role: str | None) -> DailyQuota:
 
 def plan_quota_for(role: str | None) -> DailyQuota:
     return DailyQuota("plan", settings.quota_plan_daily * _admin_multiplier(role))
+
+
+def search_quota_for(role: str | None) -> DailyQuota:
+    """带 rerank 的搜索按天限额；匿名请求不走这个桶。"""
+    return DailyQuota("search", settings.quota_search_daily * _admin_multiplier(role))
+
+
+def ai_daily_quota_for(role: str | None) -> DailyQuota:
+    """今日 AI 便签按天限额，避免一个用户反复点按钮烧 LLM。"""
+    return DailyQuota("ai_daily", settings.quota_ai_daily * _admin_multiplier(role))
 
 
 def quota_exceeded_detail(used: int, limit: int, what: str) -> str:

@@ -17,7 +17,7 @@ if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
   exit 1
 fi
 
-CONTAINER="${PG_CONTAINER:-siteyeb-pg}"
+CONTAINER="${PG_CONTAINER:-p2-siteyeb-postgres-1}"
 DB_USER="${POSTGRES_USER:-p2user}"
 DB_NAME="${POSTGRES_DB:-p2learning}"
 

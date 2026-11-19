@@ -261,7 +261,13 @@ def migrate(
 
     必须管理员调用：这个接口能创建账号并覆盖任意用户的 user_data，
     早期版本没有任何鉴权，等于把写入权限完全开放。
+
+    历史迁移只允许发生在空库首次初始化：库里已有任何用户时直接拒绝，
+    避免把同一份 kv_data 复制进多个账号，或覆盖已有账号的私有数据。
     """
+    if db.query(User).count() > 0:
+        raise HTTPException(status_code=403, detail="后端已有用户数据，迁移接口已关闭")
+
     migrated_users = 0
     total_kv = 0
 

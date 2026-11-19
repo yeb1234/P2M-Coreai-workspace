@@ -31,7 +31,7 @@ from app.agents.plan_agent import generate_learning_path
 from app.auth import get_current_user
 from app.database import SessionLocal
 from app.models import AgentRun, LearningGoal, LearningPath, LearningPathStep, User, Video
-from app.services.profile import profile_to_dict, recompute_profile
+from app.services.profile import get_profile_data
 from app.services.quota import plan_quota_for, quota_exceeded_detail
 from app.services.rate_limit import plan_limiter
 from app.utils.files import unique_suffix
@@ -157,8 +157,13 @@ def _load_path_for_user(db, path_id: str, user: User) -> LearningPath:
     path = db.query(LearningPath).filter(LearningPath.id == path_id).first()
     if not path:
         raise HTTPException(status_code=404, detail="路径不存在")
-    # 越权访问一律按「不存在」处理，避免通过 404/403 差异探测别人的路径 id
-    if path.user_id is not None and path.user_id != user.id and (user.role or "") != "admin":
+    # 越权访问一律按「不存在」处理，避免通过 404/403 差异探测别人的路径 id。
+    # 无主路径只允许 admin 处理迁移；admin 不是内容绕过角色，别人的路径照样 404。
+    is_admin = (user.role or "") == "admin"
+    if path.user_id is None:
+        if not is_admin:
+            raise HTTPException(status_code=404, detail="路径不存在")
+    elif path.user_id != user.id:
         raise HTTPException(status_code=404, detail="路径不存在")
     return path
 
@@ -168,7 +173,7 @@ def get_profile(user: User = Depends(get_current_user)):
     """学习画像：观看时长、完成率、投入领域、活跃时段。"""
     db = SessionLocal()
     try:
-        return profile_to_dict(recompute_profile(db, user.id))
+        return get_profile_data(db, user.id)
     finally:
         db.close()
 
@@ -258,14 +263,12 @@ def generate_path(payload: PathGenerateRequest, user: User = Depends(get_current
     if not allowed:
         raise HTTPException(status_code=429, detail="生成太频繁了，等几分钟再试")
 
-    # 规划一次要多次 LLM 调用 + 检索，是最贵的一段。去重之后仍要防整天累计
+    # 先不扣配额：去重命中和并发 429 都不应该消耗当天额度。
+    # 真正要创建 run 之前才 consume；异步失败再 refund。
     quota = plan_quota_for(user.role)
-    quota_ok, quota_used, quota_limit = quota.consume(user.id)
-    if not quota_ok:
-        raise HTTPException(status_code=429, detail=quota_exceeded_detail(quota_used, quota_limit, "路径生成"))
-
     db = SessionLocal()
     run_id = unique_suffix()
+    quota_consumed = False
     try:
         _reap_stale_runs(db)
 
@@ -294,6 +297,16 @@ def generate_path(payload: PathGenerateRequest, user: User = Depends(get_current
                 )
             _inflight += 1
 
+        quota_ok, quota_used, quota_limit = quota.consume(user.id)
+        if not quota_ok:
+            with _inflight_lock:
+                _inflight = max(0, _inflight - 1)
+            raise HTTPException(
+                status_code=429,
+                detail=quota_exceeded_detail(quota_used, quota_limit, "路径生成"),
+            )
+        quota_consumed = True
+
         try:
             db.add(
                 AgentRun(
@@ -307,7 +320,9 @@ def generate_path(payload: PathGenerateRequest, user: User = Depends(get_current
             db.commit()
         except Exception:
             with _inflight_lock:
-                _inflight -= 1
+                _inflight = max(0, _inflight - 1)
+            if quota_consumed:
+                quota.refund(user.id)
             raise
     finally:
         db.close()
@@ -316,6 +331,7 @@ def generate_path(payload: PathGenerateRequest, user: User = Depends(get_current
         global _inflight
         started = time.perf_counter()
         db2 = SessionLocal()
+        success = False
         try:
             result = generate_learning_path(
                 goal_title=payload.title,
@@ -332,6 +348,7 @@ def generate_path(payload: PathGenerateRequest, user: User = Depends(get_current
                 run.error = result.get("error")
                 run.latency_ms = round((time.perf_counter() - started) * 1000)
                 db2.commit()
+            success = bool(result.get("ok"))
         except Exception as exc:
             logger.exception("路径规划失败")
             try:
@@ -344,10 +361,30 @@ def generate_path(payload: PathGenerateRequest, user: User = Depends(get_current
                 logger.exception("回写失败状态也失败了")
         finally:
             db2.close()
+            if not success:
+                # 生成失败（模型报错/无有效路径）退还当天额度；
+                # 成功才真正消耗一次。
+                quota.refund(user.id)
             with _inflight_lock:
                 _inflight = max(0, _inflight - 1)
 
-    _executor.submit(_work)
+    try:
+        _executor.submit(_work)
+    except Exception:
+        # 线程池拒绝（极少见）：run 已落库但没人执行，回写失败并退额度。
+        with _inflight_lock:
+            _inflight = max(0, _inflight - 1)
+        quota.refund(user.id)
+        db2 = SessionLocal()
+        try:
+            run = db2.query(AgentRun).filter(AgentRun.id == run_id).first()
+            if run:
+                run.status = "failed"
+                run.error = "任务线程提交失败"
+                db2.commit()
+        finally:
+            db2.close()
+        raise
     return {"run_id": run_id, "status": "running"}
 
 
@@ -358,7 +395,13 @@ def get_run(run_id: str, user: User = Depends(get_current_user)):
         run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
         if not run:
             raise HTTPException(status_code=404, detail="任务不存在")
-        if run.user_id is not None and run.user_id != user.id and (user.role or "") != "admin":
+        # 无主 run 只允许 admin 做迁移/清理；admin 不是内容绕过角色，
+        # 别人名下的 run 仍然 404。
+        is_admin = (user.role or "") == "admin"
+        if run.user_id is None:
+            if not is_admin:
+                raise HTTPException(status_code=404, detail="任务不存在")
+        elif run.user_id != user.id:
             raise HTTPException(status_code=404, detail="任务不存在")
 
         payload = None

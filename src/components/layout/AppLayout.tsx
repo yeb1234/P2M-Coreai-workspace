@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'r
 import { Navigate, useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { DesktopNav } from './DesktopNav';
 import { AIChatPanel } from './AIChatPanel';
 import { MobileLayout } from './MobileLayout';
 import { useUIStore } from '../../stores';
@@ -11,10 +12,41 @@ import { GlobalAmbientSoundController } from '../pomodoro/GlobalAmbientSoundCont
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { TodoReminderPopup } from './TodoReminderPopup';
 import { UnderConstructionBanner } from '../shared/UnderConstruction';
+import { IS_DESKTOP_CLIENT } from '../../lib/clientContext';
 
 interface AppLayoutProps {
   storesReady?: boolean;
 }
+
+type PageDescriptor = (typeof PAGES)[number];
+
+/**
+ * 页面容器单独 memo。
+ *
+ * keep-alive 下，只要 AppLayout 因路由或 store 重渲染，所有已挂载页面都会跟着
+ * 重渲染；字幕转录王、视频站这类页面数据量很大，隐藏页重算一次就能卡住主线程。
+ * 这里按 page 和 isActive 做浅比较：切页时只让离开/进入的两页重渲染，其余隐藏页保持不动。
+ */
+const PageContent = React.memo(function PageContent({ page }: { page: PageDescriptor }) {
+  const Page = page.component;
+  return (
+    <Suspense
+      fallback={
+        <div className="py-10 text-center text-sm text-[var(--text-muted)]">
+          正在载入页面...
+        </div>
+      }
+    >
+      <Page />
+    </Suspense>
+  );
+});
+
+const PagePane: React.FC<{ page: PageDescriptor; isActive: boolean }> = ({ page, isActive }) => (
+  <div style={{ display: isActive ? undefined : 'none' }}>
+    <PageContent page={page} />
+  </div>
+);
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
   const { fontSize, compactMode } = useUIStore();
@@ -70,7 +102,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
     };
   }, [activeKey]);
 
-  if (isMobile) {
+  if (isMobile && !IS_DESKTOP_CLIENT) {
     return (
       <>
         <GlobalAmbientSoundController enabled={storesReady} />
@@ -81,14 +113,20 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
   }
 
   return (
-    <div className="flex flex-col h-screen" data-font-size={fontSize} data-compact={compactMode ? 'true' : 'false'}>
+    <div
+      className="flex flex-col h-screen"
+      data-font-size={fontSize}
+      data-compact={compactMode ? 'true' : 'false'}
+      data-client={IS_DESKTOP_CLIENT ? 'desktop-exe' : 'web'}
+    >
       <GlobalAmbientSoundController enabled={storesReady} />
       <TodoReminderPopup />
       <div className="flex-1 m-1 md:m-2 wood-texture rounded-lg p-1 md:p-2 overflow-hidden flex flex-col">
         <div className="flex-1 paper-surface flex flex-col overflow-hidden">
           <Header />
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar />
+          {IS_DESKTOP_CLIENT && <DesktopNav />}
+          <div className="app-content-row flex flex-1 overflow-hidden">
+            {!IS_DESKTOP_CLIENT && <Sidebar />}
             <main ref={mainRef} className="app-main min-w-0 flex-1 overflow-y-auto">
               {currentPage?.dev && (
                 <div className="px-3 pt-3 md:px-4">
@@ -99,21 +137,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ storesReady = true }) => {
               {mountedIds.map((id) => {
                 const page = PAGES.find((p) => p.id === id);
                 if (!page) return null;
-                const Page = page.component;
-                const isActive = id === currentPage?.id;
-                return (
-                  <div key={id} style={{ display: isActive ? undefined : 'none' }}>
-                    <Suspense
-                      fallback={
-                        <div className="py-10 text-center text-sm text-[var(--text-muted)]">
-                          正在载入页面...
-                        </div>
-                      }
-                    >
-                      <Page />
-                    </Suspense>
-                  </div>
-                );
+                return <PagePane key={id} page={page} isActive={id === currentPage?.id} />;
               })}
             </main>
             <AIChatPanel />

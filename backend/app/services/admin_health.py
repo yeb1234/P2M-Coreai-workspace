@@ -5,8 +5,8 @@ import requests
 from sqlalchemy import text
 
 from app.database import SessionLocal, engine, settings
-from app.models import AiJob, Video
-from app.services.admin_ai_queue import _is_queue_paused
+from app.models import Video
+from app.services.admin_ai_queue import _is_queue_paused, ai_job_status_counts
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 
 
@@ -126,9 +126,10 @@ def backend_health() -> dict:
 
     db = SessionLocal()
     try:
-        queued = db.query(AiJob).filter(AiJob.status == "queued").count()
-        running = db.query(AiJob).filter(AiJob.status == "running").count()
-        failed = db.query(AiJob).filter(AiJob.status == "failed").count()
+        job_counts = ai_job_status_counts(db)
+        queued = job_counts.get("queued", 0)
+        running = job_counts.get("running", 0)
+        failed = job_counts.get("failed", 0)
         videos = db.query(Video).count()
         checks.append(health_item(
             "AI 队列",

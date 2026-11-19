@@ -292,6 +292,9 @@ export const Calendar2Page: React.FC = () => {
   const showDesktopPanel = pageWidth >= DESKTOP_PANEL_BREAKPOINT;
   const visibleDayCount = useMemo(() => {
     if (!pageWidth) return 7;
+    // 手机竖屏只放 3 天：4 列在 390px 下每天要 112px，
+    // 加上左侧时间轴会被容器裁掉半列，右侧日期根本看不到。
+    if (pageWidth < 480) return 3;
     if (pageWidth < 870) return 4;
     if (pageWidth < 1080) return 5;
     if (pageWidth < 1280) return 6;
@@ -305,6 +308,7 @@ export const Calendar2Page: React.FC = () => {
     if (!widthSource) return DEFAULT_DAY_WIDTH;
     const available = Math.max(0, widthSource - LEFT_GUTTER - 1);
     const preferred = Math.floor(available / visibleDayCount);
+    if (visibleDayCount === 3) return clamp(preferred, 72, 140);
     if (visibleDayCount === 4) return clamp(preferred, 112, 180);
     if (visibleDayCount === 5) return clamp(preferred, 104, 200);
     if (visibleDayCount === 6) return clamp(preferred, 96, 220);
@@ -361,7 +365,7 @@ export const Calendar2Page: React.FC = () => {
   const laidOutEvents = useMemo(() => layoutWeekEvents(events), [events]);
 
   const monthTitle = `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月`;
-  const compactDayLabel = `${DAYS[visibleDayOffset]}-${DAYS[visibleDayOffset + visibleDayCount - 1]}`;
+  const compactDayLabel = `${DAYS[visibleDayOffset].replace('周', '')}–${DAYS[visibleDayOffset + visibleDayCount - 1].replace('周', '')}`;
   const nextCompactOffset = visibleDayOffset >= maxCompactOffset ? 0 : Math.min(maxCompactOffset, visibleDayOffset + 1);
 
   const startSelection = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -512,7 +516,7 @@ export const Calendar2Page: React.FC = () => {
     } catch {
       setDraft(null);
     }
-  }, [dayWidth, items, updateItem, visibleDayCount, visibleDayOffset, weekDateStrings]);
+  }, [dayWidth, items, maxTodoMinutes, updateItem, visibleDayCount, visibleDayOffset, weekDateStrings]);
 
   const handleEventContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>, item: WeekEvent) => {
     event.preventDefault();
@@ -656,7 +660,7 @@ export const Calendar2Page: React.FC = () => {
                   <span>GMT+08</span>
                 )}
                 {visibleDayCount < 7 && (
-                  <button type="button" onClick={() => setCompactDayOffset(nextCompactOffset)} className="mt-2 block rounded-lg border border-[var(--border-light)] px-1.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]" title="切换显示前半周/后半周">
+                  <button type="button" onClick={() => setCompactDayOffset(nextCompactOffset)} className="calendar2-compact-range mt-2 block rounded-lg border border-[var(--border-light)] px-1.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]" title="切换显示前半周/后半周">
                     {compactDayLabel}
                   </button>
                 )}
@@ -715,7 +719,7 @@ export const Calendar2Page: React.FC = () => {
           >
             {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, index) => START_HOUR + index).map((hour) => (
               <React.Fragment key={hour}>
-                <div className="absolute left-0 w-[64px] border-r border-[var(--border-medium)] pr-2 text-right text-xs text-[var(--text-muted)]" style={{ top: minutesToTop(hour * 60) - 8 }}>
+                <div className="absolute left-0 w-[64px] border-r border-[var(--border-medium)] pr-2 text-right text-xs text-[var(--text-muted)]" style={{ top: Math.max(0, minutesToTop(hour * 60) - 8) }}>
                   {formatHourLabel(hour)}
                 </div>
                 <div className="absolute left-[64px] right-0 border-t border-[var(--border-medium)]" style={{ top: minutesToTop(hour * 60) }} />

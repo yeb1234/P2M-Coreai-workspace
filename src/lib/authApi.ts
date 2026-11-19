@@ -9,6 +9,7 @@ import { API_BASE, resolveApiPath } from './apiBase';
  */
 export const SESSION_USER_KEY = 'p2m-auth-user-id';
 const LEGACY_TOKEN_KEY = 'p2m-auth-token';
+const LEGACY_SECRET_KEYS = ['p2m-remember', 'p2m-password'];
 
 // 同源部署用 same-origin；跨域（VITE_API_BASE_URL 指向别的域名）必须 include
 const CREDENTIAL_MODE: RequestCredentials = API_BASE ? 'include' : 'same-origin';
@@ -38,6 +39,7 @@ export function markSession(userId: number): void {
     // 升级前把令牌存在 localStorage 的，必须清掉：
     // 不改的话旧令牌还留在 JS 可读的地方，等于换了个位置继续暴露
     localStorage.removeItem(LEGACY_TOKEN_KEY);
+    LEGACY_SECRET_KEYS.forEach((key) => localStorage.removeItem(key));
   } catch {
     /* 隐私模式写不进去，退化为不分区 */
   }
@@ -47,6 +49,7 @@ export function clearSession(): void {
   try {
     localStorage.removeItem(SESSION_USER_KEY);
     localStorage.removeItem(LEGACY_TOKEN_KEY);
+    LEGACY_SECRET_KEYS.forEach((key) => localStorage.removeItem(key));
   } catch {
     /* ignore */
   }
@@ -73,8 +76,13 @@ export async function authFetch(path: string, init?: RequestInit): Promise<Respo
   });
   if (res.status === 401 && !authExpiredHandled) {
     authExpiredHandled = true;
+    // 先带上旧用户 id 发事件：authStore 需要在会话标记被删掉之前，
+    // 把旧账号遗留的裸 key 归到旧账号，而不是留给下一个登录的人。
+    const expiredUserId = getSessionUserId();
+    window.dispatchEvent(new CustomEvent('p2m:auth-expired', {
+      detail: { userId: expiredUserId },
+    }));
     clearSession();
-    window.dispatchEvent(new CustomEvent('p2m:auth-expired'));
   }
   return res;
 }

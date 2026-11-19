@@ -46,6 +46,8 @@ services:
       # 配额：防止单个账号把外部 LLM 额度跑光
       QUOTA_CHAT_DAILY: ${QUOTA_CHAT_DAILY:-200}
       QUOTA_PLAN_DAILY: ${QUOTA_PLAN_DAILY:-20}
+      QUOTA_SEARCH_DAILY: ${QUOTA_SEARCH_DAILY:-100}
+      QUOTA_AI_DAILY: ${QUOTA_AI_DAILY:-10}
       QUOTA_ADMIN_MULTIPLIER: ${QUOTA_ADMIN_MULTIPLIER:-5}
     # 云上容器内不需要访问宿主机服务，去掉这条可以减少一个攻击面
     extra_hosts: !reset []
@@ -64,7 +66,6 @@ services:
   # 不用它时把 profile 去掉即可（默认不启动）。
   embedding:
     image: ${EMBEDDING_IMAGE:-ghcr.io/ggerganov/llama.cpp:server}
-    container_name: siteyeb-embedding
     restart: unless-stopped
     profiles: ["embedding"]
     command:

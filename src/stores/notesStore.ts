@@ -27,7 +27,7 @@ interface NotesState {
   notes: Note[];
   trash: Record<string, TrashedNote>;
   addNote: (data: Partial<Note> & { title: string }) => string;
-  upsertTodayAiNote: () => string;
+  upsertTodayAiNote: (payload?: { title?: string; content?: string }) => string;
   updateNote: (id: string, updates: Partial<Note>) => void;
   reorderNotes: (fromId: string, toId: string, position?: NoteInsertPosition) => void;
   deleteNote: (id: string) => void;
@@ -80,7 +80,7 @@ export function getNoteTags(note: Pick<Note, 'title' | 'content' | 'tag'>): stri
 const SEED_NOTES: Note[] = [
   {
     id: 'note-1',
-    title: 'React 性能优化笔记',
+    title: 'React 性能优化便签',
     content: 'useMemo 缓存计算结果，useCallback 缓存函数引用。真正需要优化时，再结合 React.memo 和虚拟列表。',
     color: 'sticky-yellow',
     pinned: true,
@@ -110,6 +110,28 @@ const SEED_NOTES: Note[] = [
   },
 ];
 
+/**
+ * 旧种子和旧日报里写的是「笔记」。现在这个页面叫「便签」，已经持久化到
+ * IndexedDB 的旧文案不会因为 seed 改名而自动更新；这里只精确迁移种子和
+ * 系统生成的 AI 日报，不碰用户自己写的标题/正文。
+ */
+function migrateLegacyStickyLabels(notes: Note[]): Note[] {
+  return notes.map((note) => {
+    let title = note.title;
+    let content = note.content;
+    if (note.id === 'note-1' && title === 'React 性能优化笔记') {
+      title = 'React 性能优化便签';
+    }
+    if (note.tag === 'AI日报') {
+      title = title.replace(/^今日 AI 笔记 - /, '今日 AI 便签 - ');
+      content = content.replace(/^# 今日 AI 笔记(?=\n|$)/m, '# 今日 AI 便签');
+    }
+    return title === note.title && content === note.content
+      ? note
+      : { ...note, title, content };
+  });
+}
+
 export const useNotesStore = create<NotesState>()(
   persist(
     (set, get) => ({
@@ -133,34 +155,26 @@ export const useNotesStore = create<NotesState>()(
         return id;
       },
 
-      upsertTodayAiNote: () => {
+      upsertTodayAiNote: (payload) => {
         const ts = now();
         const today = new Date().toLocaleDateString('zh-CN');
-        const title = `今日 AI 笔记 - ${today}`;
-        const content = [
-          '# 今日 AI 笔记',
+        const title = payload?.title || `今日 AI 便签 - ${today}`;
+        const content = payload?.content || [
+          '# 今日 AI 便签',
           '',
-          '> 施工中：这里以后会一键汇总今日待办、视频学习、日历和灵境小助手对话内容。',
+          '> 还没有生成内容。点「AI 今日便签」会汇总今天的视频学习、待办、学习路径和提问。',
           '',
           '## 今日摘要',
-          '- 暂未接入自动生成。',
-          '',
-          '## 待整理',
-          '- 可以先手动补充今天的重点。',
+          '- 暂未生成。',
         ].join('\n');
         let noteId = '';
         set((state) => {
           const existing = state.notes.find((note) => note.tag === 'AI日报' && note.title === title);
-          if (existing) {
-            noteId = existing.id;
-            return {
-              notes: [
-                { ...existing, content, color: 'sticky-purple' as NoteColor, pinned: true, updatedAt: ts },
-                ...state.notes.filter((note) => note.id !== existing.id),
-              ],
-            };
-          }
-          noteId = generateId();
+          noteId = existing?.id || generateId();
+          // 历史日报取消置顶：置顶区只保留最新一篇，否则一周下来顶上全是日报
+          const rest = state.notes
+            .filter((note) => note.id !== noteId)
+            .map((note) => (note.tag === 'AI日报' && note.pinned ? { ...note, pinned: false } : note));
           const note: Note = {
             id: noteId,
             title,
@@ -168,10 +182,10 @@ export const useNotesStore = create<NotesState>()(
             color: 'sticky-purple',
             pinned: true,
             tag: 'AI日报',
-            createdAt: ts,
+            createdAt: existing?.createdAt || ts,
             updatedAt: ts,
           };
-          return { notes: [note, ...state.notes] };
+          return { notes: [note, ...rest] };
         });
         return noteId;
       },
@@ -291,12 +305,22 @@ export const useNotesStore = create<NotesState>()(
       name: 'p2m-notes-storage',
       storage: createJSONStorage(() => idbStorage),
       partialize: (state) => ({ notes: state.notes, trash: state.trash }),
+      merge: (persisted, current) => {
+        const persistedState = persisted as Partial<
+          Pick<NotesState, 'notes' | 'trash'>
+        > | undefined;
+        return {
+          ...current,
+          notes: migrateLegacyStickyLabels(persistedState?.notes ?? current.notes),
+          trash: persistedState?.trash ?? current.trash,
+        };
+      },
     }
   )
 );
 
 /**
- * 笔记云端同步的接线。
+ * 便签云端同步的接线。
  *
  * 由 App 在「已登录」之后调用一次：
  *   - 先把云端快照拉下来（如果本地还是初始种子数据，用云端覆盖）
@@ -304,7 +328,7 @@ export const useNotesStore = create<NotesState>()(
  *
  * 为什么要判断「本地是种子数据」：
  * 新设备打开时本地只有 SEED_NOTES 那几条示例，如果直接推上去，
- * 会把云端的真实笔记冲掉。
+ * 会把云端的真实便签冲掉。
  */
 let syncInitialized = false;
 

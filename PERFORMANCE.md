@@ -1,5 +1,7 @@
 # PERFORMANCE
 
+> 状态：现行（最后校对 2026-11-16）；库内数据口径截至 2026-11-16。
+
 > **用途**：记录有量化结果或结构性收益的性能改动，以及这个项目值得长期盯的指标。
 >
 > **维护约定**：做完性能优化当天追加一条，必须写「改了什么 / 优化前 / 优化后 / 依据」。
@@ -27,10 +29,10 @@
     （ASR 把 GC 听成 JC，正文写的是「什么是JC算法」，只匹配正文必然漏）。
 - **优化后**：三个典型查询 top-1 全部修正 ——
   jQuery 第五章 →《05-Jquery对象》；jQuery 动画 →《02-获取位置》rerank 0.987；
-  GC 算法 →《3、什么是GC算法》rerank 0.821。**零重建索引**，复用已有 60,307 块向量。
+  GC 算法 →《3、什么是GC算法》rerank 0.821。**零重建索引**，复用已有语义块向量。
 - **成本**：每次检索 +100~200ms。
-  - 测量条件：全库 14,327 个视频 / 60,307 个语义块 / 8,785 个已索引视频，
-    单机 `siteyeb-pg` + 本机 LM Studio 的 bge-m3，串行执行，未做并发压测。
+  - 测量条件：全库 14,327 个视频 / 60,259 个语义块 / 8,785 个已索引视频（截至 2026-11-16），
+    单机 `p2-siteyeb-postgres-1` + 本机 LM Studio 的 bge-m3，串行执行，未做并发压测。
   - 其中 df（文档频率）统计在词已缓存时消失：进程内缓存、写入后 10 分钟过期、
     上限 512 条；命中缓存时该次 77~90ms（df 部分为 0），
     进程重启或缓存过期后首次遇到该词 +70~95ms/批（该次合计 170~300ms）。
@@ -42,6 +44,8 @@
 - **依据**：`b519494`；设计稿 `docs/retrieval-metadata-design.md`。
 - **边界**：接口已返回 `meta`（课程 / 章 / 第 N 节 / 上下节），
   但前端与对话引用卡片尚未消费 —— 用户界面还看不到这些线索。
+  注：对话引用卡片 2026-11-16 起由 `FEATURES.chatVideoReferences` 开关关闭（默认 `false`），
+  代码保留、后端仍生成 references；改回 `true` 重建前端即恢复。
 
 #### 口语化查询改写（规则层）
 
@@ -230,8 +234,9 @@
     `embedding_model`、`llm`、`transactions`；返回 503 表示检索链路不齐。
 - **为什么单独盯事务**：长事务不报错、不超时、不打日志，只会让 `ALTER TABLE` /
   `CREATE INDEX` 无声排队 —— 曾经把迁移卡了 12 分 30 秒，整站 502。
-- **容器 unhealthy 时**：`docker inspect -f '{{range .State.Health.Log}}...' siteyeb-backend`
-  能看到探针最后一次输出（应用日志可能一个字都没有）。
+- **容器 unhealthy 时**：`docker inspect -f '{{range .State.Health.Log}}...' p2-siteyeb-backend-1`
+  能看到探针最后一次输出（应用日志可能一个字都没有）。容器名由 compose 生成，
+  可用 `docker compose ps` 核对实际名字。
 - **一键诊断**：`bash scripts/diagnose.sh`（只读）。四段：容器状态、探针最后输出、
   PG 长事务/锁等待、Redis worker 注册。
 
@@ -322,8 +327,9 @@ bash scripts/logq.sh path /api/notes       # 按路径筛
 
 - **全项目检查**：`bash scripts/full-check.sh`（容器健康、公共接口、鉴权边界、
   安全头、数据库结构、Redis 配置、检索链路、前端资源；输出 PASS/WARN/FAIL 计数）。
-- **多用户隔离**：`python backend/scripts/test_multi_user.py`（容器内跑；
-  注意用 `127.0.0.1:8000` 而不是 `localhost`）。
+- **多用户隔离**：`python backend/scripts/test_multi_user.py`（宿主机跑；
+  默认打 `http://localhost`（80 nginx 入口），可传第一个参数指别的环境。
+  backend 容器内 8000 映射到宿主回环 `127.0.0.1:12402`；脚本不要写 `127.0.0.1:8000`）。
 - **修复项针对性验证**：`backend/scripts/verify_fixes.py`（验证「修之前会错、修之后对」，
   不是只看接口 200）。
 
@@ -334,7 +340,7 @@ bash scripts/logq.sh path /api/notes       # 按路径筛
 记录在此是为了让下一个改检索的人不用重新测一遍。以下问题**本轮未修**，
 不属于本版收益，不要当成已解决的优化项引用。
 
-- **不足 3 字符的关键词绕过 pg_trgm 索引，退化为全表扫描**（60,307 行）。
+- **不足 3 字符的关键词绕过 pg_trgm 索引，退化为全表扫描**（60,259 行，截至 2026-11-16）。
   - 触发条件：查询里出现不足 3 个字符的关键词（`算法`、`闭包`、`gc`）。
     `vue`（3 字符）、`组件通信`（4 字符）、`jQuery` 都能走 GIN 索引，不慢。
   - 实测（EXPLAIN，同一张表、同样用 `ILIKE '%词%'`）：`算法`（2 字符）

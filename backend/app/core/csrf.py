@@ -33,15 +33,27 @@ logger = logging.getLogger(__name__)
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
+def _hostname(value: str) -> str:
+    """取主机名，丢掉端口。
+
+    为什么丢端口：Cookie 的 SameSite 判定按主机名算，端口不参与。
+    CSRF 白名单若按 host:port 严格比，同一台机器的 80 和 12302 会被当成两个站点，
+    换端口后登录直接 403（2026-11-16 实测：127.0.0.1:12302 被拦，localhost:12302 放行），
+    局域网用 IP 访问也全挂。对齐 SameSite 语义才是正确口径。
+    """
+    try:
+        parsed = urlparse(value if "//" in value else f"//{value}")
+        return (parsed.hostname or "").lower()
+    except ValueError:
+        return ""
+
+
 def _origin_hosts() -> set[str]:
     hosts: set[str] = set()
     for item in settings.cors_origin_list:
-        try:
-            parsed = urlparse(item)
-            if parsed.netloc:
-                hosts.add(parsed.netloc.lower())
-        except ValueError:
-            continue
+        host = _hostname(item)
+        if host:
+            hosts.add(host)
     return hosts
 
 
@@ -60,12 +72,12 @@ class CSRFGuardMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            source_host = urlparse(source).netloc.lower()
+            source_host = _hostname(source)
         except ValueError:
             source_host = ""
 
         allowed = _origin_hosts()
-        request_host = (request.headers.get("host") or "").lower()
+        request_host = _hostname(request.headers.get("host") or "")
         if request_host:
             allowed.add(request_host)
 

@@ -20,7 +20,7 @@
 	}
 
 	# 反代到前端容器；nginx 里已经把 /api 转到 backend 了，这里不需要重复配置
-	reverse_proxy host.docker.internal:{$WEB_PORT:8080} {
+	reverse_proxy host.docker.internal:{$WEB_PORT:12302} {
 		# 流式对话：Caddy 默认不缓冲响应，这里显式声明，避免以后换配置时被改坏
 		flush_interval -1
 		transport http {

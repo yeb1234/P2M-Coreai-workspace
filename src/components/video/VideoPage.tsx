@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { PlayCircle, ArrowLeft } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { useVideoStore } from '../../stores/videoStore';
@@ -28,6 +29,7 @@ import { useIsMobile, useWindowWidth } from '../../hooks/useMediaQuery';
 
 function VideoPlayerView() {
   const { currentVideo, currentSegments, jobStatus, jobStage, jobError, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId } = useVideoStore();
+  const location = useLocation();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   // 播放行为埋点：心跳每 15 秒上报一次，用于算真实观看时长与学习画像
@@ -42,6 +44,7 @@ function VideoPlayerView() {
   const [videoDuration, setVideoDuration] = useState(0);
   const { width: playlistPanelWidth, startResize: startPlaylistResize } = usePlaylistResize(300);
   const [mediaError, setMediaError] = useState('');
+  const [playbackHint, setPlaybackHint] = useState('');
   const isMobile = useIsMobile();
   const windowWidth = useWindowWidth();
   const {
@@ -78,6 +81,10 @@ function VideoPlayerView() {
     setIsMuted,
     videoContainerRef,
     setIsFullscreen,
+    onPlaybackError: (message) => {
+      setPlaybackHint(message);
+      setShowControls(true);
+    },
   });
   const {
     showControls,
@@ -88,6 +95,16 @@ function VideoPlayerView() {
     setShowSubtitleMenu,
     resetHideTimer,
   } = useVideoControlChrome(isPlaying);
+
+  // keep-alive 会保留视频页 DOM；切到工作台等其它路由时必须主动暂停，
+  // 否则 video 会在 display:none 的页面里继续解码，拖慢整个应用。
+  useEffect(() => {
+    if (location.pathname === '/video') return;
+    const video = videoRef.current;
+    if (video && !video.paused) video.pause();
+    setIsPlaying(false);
+    setShowControls(true);
+  }, [location.pathname, setShowControls]);
   const {
     playlist,
     playlistScope,
@@ -161,7 +178,17 @@ function VideoPlayerView() {
     setMediaError,
     setShowControls,
     hideCurrentTextTracks,
+    onPlaybackError: (message) => {
+      setPlaybackHint(message);
+      setShowControls(true);
+    },
   });
+
+  useEffect(() => {
+    if (!playbackHint) return;
+    const timer = window.setTimeout(() => setPlaybackHint(''), 4500);
+    return () => window.clearTimeout(timer);
+  }, [playbackHint]);
 
   // Load video details if missing
   useEffect(() => {
@@ -227,6 +254,23 @@ function VideoPlayerView() {
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
+
+  // iOS Safari 走 video 元素的原生全屏，不发 fullscreenchange，
+  // 需要监听 webkit 专有事件才能让图标/文案正确切换。
+  useEffect(() => {
+    const video = videoRef.current as (HTMLVideoElement & {
+      webkitEnterFullscreen?: () => void;
+    }) | null;
+    if (!video) return;
+    const onBegin = () => setIsFullscreen(true);
+    const onEnd = () => setIsFullscreen(false);
+    video.addEventListener('webkitbeginfullscreen', onBegin);
+    video.addEventListener('webkitendfullscreen', onEnd);
+    return () => {
+      video.removeEventListener('webkitbeginfullscreen', onBegin);
+      video.removeEventListener('webkitendfullscreen', onEnd);
+    };
+  }, [videoKey]);
 
   const handleTimeUpdate = useCallback(() => {
     if (!currentVideo) return;
@@ -314,6 +358,17 @@ function VideoPlayerView() {
             className="aspect-video bg-black md:rounded-xl rounded-lg overflow-hidden relative select-none"
             onMouseMove={resetHideTimer}
             onMouseLeave={() => { if (isPlaying) setShowControls(false); }}
+            onClick={(event) => {
+              if (touchHandledRef.current || event.detail > 1) return;
+              const target = event.target as HTMLElement;
+              if (target.closest('[data-player-control]')) return;
+              togglePlay();
+            }}
+            onDoubleClick={(event) => {
+              const target = event.target as HTMLElement;
+              if (target.closest('[data-player-control]')) return;
+              toggleFullscreen();
+            }}
             style={{ cursor: showControls ? 'default' : 'none' }}
           >
             <video
@@ -331,13 +386,16 @@ function VideoPlayerView() {
               onEnded={handleEnded}
               onLoadedMetadata={videoElementEvents.handleLoadedMetadata}
               onVolumeChange={videoElementEvents.handleVolumeSync}
-              onClick={() => { if (!touchHandledRef.current) togglePlay(); }}
-              onDoubleClick={() => { if (!isMobile) toggleFullscreen(); }}
             />
 
             <MediaErrorOverlay message={mediaError} />
+            {playbackHint && (
+              <div className="absolute left-3 top-3 z-20 max-w-[calc(100%-1.5rem)] rounded-lg bg-black/75 px-3 py-2 text-xs text-white shadow-lg pointer-events-none">
+                {playbackHint}
+              </div>
+            )}
             <SubtitleOverlay visible={showSubtitles} text={activeSubtitleText} opacity={subtitleOpacity} size={subtitleSize} onDoubleClick={handleSubtitleDoubleClick} />
-            <PausedOverlay isPlaying={isPlaying} />
+            <PausedOverlay isPlaying={isPlaying} onPlay={togglePlay} />
 
             <VideoPlayerControls
               showControls={showControls}
@@ -415,7 +473,7 @@ function VideoPlayerView() {
           onCorrectSubtitles={() => triggerCorrection(currentVideo.id)}
           onToggleAutoPlay={() => setAutoPlay(!autoPlay)}
           onToggleScope={togglePlaylistScope}
-          onSelectItem={(item) => { void selectPlaylistItem(item); }}
+          onSelectItem={(item) => { void selectPlaylistItem(item, true); }}
           footer={!isMobile ? <VideoAiJobCenter {...aiJobCenterProps} /> : undefined}
         />
       </div>

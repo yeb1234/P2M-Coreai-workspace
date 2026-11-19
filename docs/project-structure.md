@@ -1,5 +1,7 @@
 # 项目结构规整方案
 
+> 状态：部分现行（最后校对 2026-11-16）。第一节「现状」目录树与计数已按当前代码核对；第二至五节是重构提案，截至 2026-11-16 均未执行，仅作可行性留档。
+
 > **结论（2026-11-16 决定）：不做。**
 >
 > 这是个人项目、早期阶段，目录乱一点的代价远小于重构的风险：
@@ -25,26 +27,57 @@
 ## 一、现状
 
 ```
-backend/app/
-├── agents/          chat_agent / plan_agent / tools          ← agent 逻辑在这，合理
-├── core/            errors / observability                    ← 合理
-├── routers/         各 API 模块                                ← 合理
-├── services/        39 个 .py 全部平铺 ← 主要问题
-├── utils/           通用工具                                  ← 合理
-├── models.py        所有 ORM 模型（单文件）
-├── schemas.py       所有 Pydantic 模型（单文件）
-├── database.py      配置 + 引擎
-└── worker.py        RQ worker 入口
+backend/
+├── alembic/          版本化迁移：env.py + versions/（2 个 revision）。
+│                     与旧机制 migrations.py（create_all + ALTER IF NOT EXISTS）
+│                     及 database.py 的 ensure_runtime_schema 并存，未全部迁到 alembic
+├── app/
+│   ├── agents/      chat_agent / plan_agent / tools          ← agent 逻辑在这，合理
+│   ├── core/        csrf / errors / observability            ← 合理
+│   ├── routers/     14 个 API 模块（口径：main.py 里 include_router 计数）
+│   ├── services/    39 个已跟踪 .py 全部平铺 ← 主要问题（口径：services/ 下非 __init__ 计数；
+│                     另有未提交的 daily_digest.py 属进行中工作流，未计入）
+│   ├── utils/       files / paths / serialization / textclean
+│   ├── models.py    21 个 ORM 模型（单文件，口径：models.py 里 __tablename__ 计数）
+│   ├── schemas.py   所有 Pydantic 模型（单文件）
+│   ├── tables.py    content_chunks 等向量表 DDL 的唯一来源
+│   ├── migrations.py 旧机制：create_all + ALTER IF NOT EXISTS（含 SQLite 回滚分支）
+│   ├── database.py  配置 + 引擎 + ensure_runtime_schema
+│   ├── auth.py      密码哈希 / 令牌 / 鉴权依赖
+│   ├── main.py      FastAPI 入口 + 中间件 + 路由注册
+│   └── worker.py    RQ SimpleWorker（ai_jobs + background 两个队列）
+├── scripts/         一次性运维/回填脚本（verify_fixes.py、test_multi_user.py 等）
+├── tests/           后端测试 5 个 .py（非 pytest 套件，混用 unittest 与裸 test_* 函数）
+└── static/
 
 prompts/
-└── clientPrompts.ts 前端提示词（意图模板、系统提示词）
+├── clientPrompts.ts  前端提示词（意图模板、系统提示词、意图识别正则）
+└── runtime_prompts.py 运行时可改的提示词（Python 文件放在前端 prompts 目录）
 
-src/                 前端（Vite + React）
-tests/               前端契约测试
-backend/tests/       后端 pytest（只有 3 个文件）
-docs/                设计文档（已有 20+ 篇）
-scripts/             运维/验证脚本
+src/                  前端（Vite 8 + React 19 + TS 6，HashRouter）
+├── components/      页面/模块目录（32 个一级子目录，口径：src/components/ 下一级目录计数）
+├── config/          pageRegistry.tsx（29 个注册页面）/ features.ts（功能开关）
+├── hooks/          12 个 use* hook（index.ts 只 re-export useCrossModuleSync）；
+│                    另有 13 个 use* hook 内聚在 src/components/video/ 下
+├── lib/             API 客户端、工具函数；projections/ 为工作台投影派生（进行中）
+├── plugins/         工作台插件 5 个（registry.ts + registerAllPlugins）
+├── stores/          12 个 zustand store（口径：stores/ 下非 index 计数）
+├── types/           类型定义
+├── assets/          静态资源
+└── __tests__/       前端单元测试 28 个文件（口径：src/__tests__ 下 *.test.ts(x)）
+
+tests/                前端测试：contracts/（契约回归）+ e2e/（Playwright 规格）
+docs/                 设计文档（37 篇 .md）
+scripts/              运维/验证脚本（.sh / .cjs / .mjs）
 ```
+
+> 进行中说明：`src/lib/projections/`、`src/hooks/useDashboardProjectionRefresh.ts`、
+> `src/plugins/` 属另一条正在做的「工作台首页插件 + 投影同步」工作流（截至 2026-11-16
+> 尚未提交）。目录已存在，但功能状态为进行中，不按稳定 API 描述。
+
+> 功能开关（2026-11-16）：`features.ts` 里 `FEATURES.chatVideoReferences = false`，
+> 「相关片段」卡片默认不渲染；`ReferenceBlock`、`dedupeReferences` 与后端 references
+> 生成均保留，改回 `true` 重建前端即恢复。后端仍生成、前端不展示。
 
 ### 四个具体问题
 
@@ -78,9 +111,9 @@ scripts/             运维/验证脚本
 现在这些魔数各写各的：
 
 ```
-hybrid_search.py   top_k=6 / candidate_k=15 或 30 / vector_score >= 0.5 / RRF k
+hybrid_search.py   top_k / candidate_k=30 / 三路权重 lexical 0.8·vector 1.2·meta 1.5 / RRF_K=60 / rerank_top_n=20
 lexical.py         limit / max_df / min_specific_df
-retrieval_meta.py  META_LEVELS=3 / 各种阈值
+retrieval_meta.py  META_LEVELS=3 / 各种阈值；rerank_min_score=0.02（database.py:93）
 embedding_pipeline.py  SCAN_BATCH / SCAN_INTERVAL_SECONDS
 rq_client.py       AI_JOB_TIMEOUT_SECONDS / 三个倍率
 database.py        whisper_cpu_threads 等
@@ -166,7 +199,7 @@ META_CHANNEL_LIMIT = 30
 这样 `from app.services.hybrid_search import hybrid_search` 依然能用。
 等所有 import 都改成新路径后，再删 re-export。
 
-这一步必须单独一个 commit，且改完跑完整回归（前端 222 + 后端 verify_fixes + 检索实测）。
+这一步必须单独一个 commit，且改完跑完整回归（前端 vitest：`src/__tests__` 28 个文件 + `tests/contracts` 1 个；后端 `backend/scripts/verify_fixes.py`；检索实测）。
 
 ### 第 4 步：测试与产物分离（低风险）
 
@@ -181,7 +214,7 @@ META_CHANNEL_LIMIT = 30
 | 文件 | 评什么 | 数据来源 |
 |---|---|---|
 | `retrieval_cases.json` | 检索：给定 query，期望 top5 含某个 video_id | 从真实失败案例攒（如「什么是GC算法」→ 必须命中「3、什么是GC算法」） |
-| `intent_cases.json` | 意图识别：query → 期望意图 | 现有 `chatIntent.test.ts` 的 19 条可以搬过来 |
+| `intent_cases.json` | 意图识别：query → 期望意图 | 现有 `chatIntent.test.ts` 的 18 条 case 可以搬过来 |
 | `prompt_regression.md` | 提示词改动的对照记录 | 每次改提示词记「改了什么 / 为什么 / 哪条 case 变好变差」 |
 
 评测跑法建议做成一个脚本 `scripts/eval_retrieval.py`，输出命中率和回归项。

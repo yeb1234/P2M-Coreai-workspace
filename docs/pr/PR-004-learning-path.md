@@ -1,5 +1,7 @@
 # PR-004 学习路径 TAB 与 Agent 上下文
 
+> 状态：历史参考（截至 2026-11-15，最后校对 2026-11-16）。与当前实现差异：`/api/learning/paths/active`、`/api/learning/paths/generate`、`/api/assistant/chat/stream` 端点与 `get_my_learning_path` 工具、`p2m:play-video` 事件现行有效；「E2E 11 项全过」为提交当时快照。
+
 - **分支**：`feat/learning-path`
 - **合并提交**：`5a82093`（与 PR-001 同批，见下方复盘）
 - **影响面**：前端导航、LangGraph 规划、对话 Agent、任务队列

@@ -65,3 +65,7 @@ register_limiter = RateLimiter("register_ip", limit=5, window_sec=3600)
 plan_limiter = RateLimiter("plan_user", limit=6, window_sec=600)
 # 对话：同一用户 1 分钟 20 轮
 chat_limiter = RateLimiter("chat_user", limit=20, window_sec=60)
+# 搜索：带 rerank 的混合检索也是 LLM 成本入口；匿名按 IP 限流
+search_limiter = RateLimiter("search", limit=30, window_sec=60)
+# 每日 AI 笔记生成：前端按钮可能被连点，先挡瞬时速率，再挡每日额度
+ai_daily_limiter = RateLimiter("ai_daily", limit=3, window_sec=60)

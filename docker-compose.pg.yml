@@ -6,10 +6,13 @@
 # 调优面向 16GB 内存的单机：shared_buffers 2GB，建 HNSW 索引时
 # maintenance_work_mem 2GB，random_page_cost 1.1 表示 SSD。
 
+# 项目名与主 compose 一致：两个文件交替用时，容器/网络/卷不会各成一套。
+name: p2-siteyeb
+
 services:
   postgres:
     image: docker.m.daocloud.io/pgvector/pgvector:pg17
-    container_name: siteyeb-pg
+    # 不写 container_name：交给 compose 生成 p2-siteyeb-postgres-1
     restart: unless-stopped
     # 见 docker-compose.yml 同名服务的注释：默认 64MB 的 /dev/shm 不够 PG 并行查询用
     shm_size: 1gb
@@ -44,7 +47,7 @@ services:
       - log_min_duration_statement=500
     ports:
       # 只绑回环，避免数据库端口对公网开放
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-12502}:5432"
     volumes:
       - siteyeb-pgdata:/var/lib/postgresql/data
     healthcheck:

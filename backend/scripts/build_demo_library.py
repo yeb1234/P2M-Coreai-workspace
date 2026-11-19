@@ -26,6 +26,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 def _local_database_url() -> str | None:
     """宿主机跑时把容器内主机名换成本地回环，否则 DNS 解析会卡几十秒。"""
@@ -73,8 +75,11 @@ def to_host_path(raw: str) -> Path:
     之前 50 个里 34 个报「源不存在」就是这个原因，不是文件丢了。
     """
     if raw.startswith("/videos/"):
-        base = os.environ.get("VIDEO_HOST_PATH", "D:/ITJC")
-        return Path(base) / raw[len("/videos/"):].replace("/", os.sep)
+        configured = os.environ.get("VIDEO_HOST_PATH", "").strip()
+        base = Path(configured) if configured else PROJECT_ROOT / "video-library"
+        if not base.is_absolute():
+            base = PROJECT_ROOT / base
+        return base / raw[len("/videos/"):].replace("/", os.sep)
     return Path(raw)
 
 

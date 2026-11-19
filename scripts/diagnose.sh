@@ -23,16 +23,17 @@ fi
 PG_USER="${PG_USER:-p2user}"
 PG_DB="${PG_DB:-p2learning}"
 
-BE=siteyeb-backend
-PG=siteyeb-pg
-RD=siteyeb-redis
-WK=siteyeb-worker
+BE="${BACKEND_CONTAINER:-p2-siteyeb-backend-1}"
+PG="${PG_CONTAINER:-p2-siteyeb-postgres-1}"
+RD="${REDIS_CONTAINER:-p2-siteyeb-redis-1}"
+WK="${WORKER_CONTAINER:-p2-siteyeb-worker-1}"
+FE="${FRONTEND_CONTAINER:-p2-siteyeb-frontend-1}"
 
 hr() { printf '\n\033[1m%s\033[0m\n' "── $1 ──"; }
 run() { "$@" 2>&1; }
 
 hr "1. 容器状态"
-run docker ps -a --filter "name=siteyeb" --format 'table {{.Names}}\t{{.Status}}'
+run docker ps -a --filter "name=p2-siteyeb" --format 'table {{.Names}}\t{{.Status}}'
 
 hr "2. 健康探针的最后输出"
 # docker 会把探针输出存下来 —— 这是容器 unhealthy 时唯一还活着的诊断信息。
@@ -89,7 +90,7 @@ fi
 hr "6. nginx 最近的错误"
 # 502 的真凭据在这里：connect() failed (111: Connection refused) 说明后端没在监听，
 # 而不是「接口报错」。上一节看不到这种信息。
-ng_err=$(docker logs --tail 200 siteyeb-frontend 2>&1 | grep -iE "\[error\]|failed|upstream" | tail -6)
+ng_err=$(docker logs --tail 200 "$FE" 2>&1 | grep -iE "\[error\]|failed|upstream" | tail -6)
 if [ -n "$ng_err" ]; then
     echo "$ng_err"
 else

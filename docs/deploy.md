@@ -1,210 +1,123 @@
 # 部署与上线
 
+> 状态：事实已核实（核对基线 2026-11-16）
+
 这份文档解决一个问题：**从「本机能跑」到「可以给别人用」，中间还差什么。**
+容器组成、端口、卷的口径见 `docs/docker.md`；本文只讲上线前的准备、探针、备份和排障入口。
 
----
+## 一、准备
 
-## 三种部署形态
+1. 装好 Docker Engine 与 Compose 插件；仓库克隆到服务器。
+2. 复制 `.env.example` 为 `.env`，至少改这几项：
+   - `JWT_SECRET`：随机串，长度 ≥ 32，不能用示例值（`.env.example:70`）。
+   - `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB`：库账号口令。
+   - 公网部署：`ALLOW_REGISTRATION=false`（`.env.example:78`）、`COOKIE_SECURE=true`（`.env.example:89`）。
+   - 本机 embedding 服务：`EMBEDDING_BASE_URL_DOCKER` 默认 `http://host.docker.internal:1234/v1`（`.env.example:100`；`docker-compose.yml:164`）。
+3. 媒体库放在 `./data/` 与 `VIDEO_HOST_PATH` 对应目录，路径口径见 `docs/docker.md` 第三节。
 
-先想清楚给谁用，形态不同，要求差很多。
-
-| 形态 | 适用场景 | 需要什么 | 安全要求 |
-|---|---|---|---|
-| **A. 本机/内网** | 自己用、家里或工位局域网 | 一条 `docker compose up -d` | 基本够用，别忘了关注册 |
-| **B. 公网 + 域名** | 给面试官、给朋友试用 | 一台 VPS + 一个域名 | **必须 HTTPS** |
-| **C. 内网穿透** | 不想买 VPS，临时演示 | Cloudflare Tunnel / frp | 至少开 Tunnel 侧鉴权 |
-
-**不要做的**：把 80 端口直接映射到公网就开始用。密码和会话令牌都是明文过网，
-等于每次登录都在广播凭据。
-
----
-
-## A. 本机 / 内网
+## 二、构建与启动
 
 ```bash
-cp .env.example .env
-# 必填：POSTGRES_PASSWORD、JWT_SECRET、EXTERNAL_LLM_API_KEY
-python -c "import secrets; print(secrets.token_urlsafe(48))"   # 生成 JWT_SECRET
 docker compose up -d --build
 ```
 
-打开 `http://localhost`，注册第一个账号 —— **它会自动成为管理员**（系统里没有管理员时，
-首个注册者提权，这是为了升级兼容；`ADMIN_USERNAMES` 白名单优先）。
+起 5 个服务：`postgres`、`redis`、`backend`、`worker`、`frontend`（`docker-compose.yml:28,85,116,260,386`）。backend 容器入口先等库可连，再跑 `ensure_runtime_schema()`，最后才 exec uvicorn（`backend/docker-entrypoint.sh:10-56`）。库表结构的两套机制见 `docs/migrations.md`。
 
-建完自己的账号后：
-
-```bash
-# .env
-ALLOW_REGISTRATION=false     # 关掉公开注册
-JWT_EXPIRE_HOURS=12
-```
-
-重启生效：`docker compose up -d backend`。
-
-后续加人走「设置 → 用户管理 → 新建账号」，或 `POST /api/auth/create-user`。
-
----
-
-## B. 公网 + 域名（面试演示用这个）
-
-### 1. 前置条件
-
-- 一台能跑 Docker 的机器（2C4G 起，向量回填会吃满 CPU）
-- 一个域名，A 记录指向这台机器
-- 80 / 443 端口可从公网访问（安全组/防火墙放行）
-
-### 2. 起服务
+web-only（不带 AI worker）：
 
 ```bash
-# .env 里补两行
-DOMAIN=learn.your-domain.com
-COOKIE_SECURE=true          # HTTPS 必须开，否则 Cookie 安全属性不生效
-
-docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+docker compose up -d postgres redis backend frontend
 ```
 
-Caddy 会自动申请 Let's Encrypt 证书，**不需要手工跑 certbot**。
-首次申请需要 80 端口能被访问（HTTP-01 挑战）。
+## 三、访问入口
 
-### 3. 为什么用 Caddy 而不是 nginx + certbot
+- 本机/局域网：`http://localhost:12302`，同时也映射了裸 80（`docker-compose.yml:407-408`）。
+- API 走 nginx 同源代理 `/api`。backend 回环口 `127.0.0.1:12402` 只绑本机，供宿主调试；对外服务不经过这个口（`docker-compose.yml:132-135`）。容器内网地址是 `backend:8000`（`nginx.conf:100`）。
+- nginx 用 resolver + 变量形式的 `proxy_pass`，backend 重建换 IP 后不需要重启 frontend（`nginx.conf:87-100`）。
 
-证书申请、续期、HTTP→HTTPS 跳转、HTTP/2、HTTP/3 全是默认行为，配置只有三行。
-nginx 方案要写 webroot、配 cron、处理续期失败、自己加 HSTS，出错面大得多。
+## 四、探针
 
-现有的 nginx 容器仍然保留（负责 SPA 托管和 API 反代），Caddy 只在最外层做 TLS 终止：
+| 探针 | 检查内容 | 依据 |
+|---|---|---|
+| `GET /health` | 进程存活、数据库连通、长事务健康度；degraded 仍返回 200（不触发编排重启） | `backend/app/main.py:266-321`；compose backend healthcheck `docker-compose.yml:235-236` |
+| `GET /ready` | database、vectors 覆盖率、transactions、embedding_model、llm；任一关键项失败返回 503 | `backend/app/main.py:324-357` |
+| `GET /api/admin/health` | 管理面详细指标 | 鉴权后访问 |
 
-```
-用户 → Caddy(443, TLS) → nginx(前端+API 反代) → backend
-```
-
-### 4. 证书持久化
-
-证书存在命名卷 `siteyeb-caddy-data` 里。**不要删这个卷** ——
-Let's Encrypt 对同一域名有申请频率限制（每周 5 次），反复重建会触发限流。
-
----
-
-## 多用户管理
-
-管理员在「设置 → 用户管理」里可以：
-
-| 操作 | 效果 |
-|---|---|
-| 新建账号 | 直接可用，无需邮箱验证 |
-| 设为管理员 / 降为成员 | 立即生效（权限判断读数据库，不是读令牌） |
-| 停用 | **该用户已登录的所有设备立即掉线**（token_version +1） |
-| 重置密码 | 同上，旧密码和旧会话同时失效 |
-| 删除账号 | 连同其学习记录、路径、笔记一起删除；视频库和字幕不受影响 |
-
-三条防呆规则（后端强制，不是只靠前端）：
-
-1. 不能停用、降级、删除自己
-2. 系统始终保留至少一个启用的管理员
-3. 越权访问别人的资源返回 **404 而不是 403** —— 403 会暴露「这个 id 存在」
-
-### 数据隔离边界
-
-| 数据 | 隔离方式 |
-|---|---|
-| 学习记录、画像、路径、对话历史 | 数据库按 `user_id` 过滤 |
-| 笔记、待办、番茄钟 | 前端存储按 `user_id` 分区（`u{id}:{key}`），后端 `user_data` 已按用户鉴权 |
-| 视频库、字幕、向量索引 | **共享资源**，所有登录用户可见。这是产品选择：小团队共享一个视频库 |
-| 管理配置、任务队列 | 仅管理员 |
-
----
-
-## 备份
+容器 unhealthy 时，应用日志可能一个字都没有；先看探针最后一次输出：
 
 ```bash
-./scripts/backup.sh                 # 备份到 backups/，保留 7 天
-KEEP_DAYS=30 ./scripts/backup.sh    # 自定义保留期
+docker inspect -f '{{range .State.Health.Log}} exit={{.ExitCode}} {{printf "%.260s" .Output}}{{"\n"}}{{end}}' backend
 ```
 
-备份走 `pg_dump -Fc`（自定义格式，可选择性恢复单表），完成后会校验文件头。
-
-定时任务（Linux）：
+## 五、HTTPS（可选叠加层）
 
 ```bash
-crontab -e
-0 3 * * * cd /path/to/project && ./scripts/backup.sh >> backups/backup.log 2>&1
+DOMAIN=learn.example.com docker compose \
+  -f docker-compose.yml -f docker-compose.https.yml up -d --build
 ```
 
-**体积注意**：含向量表时约 500MB+，因为 `segment_embeddings` 存了 300 万条 1024 维半精度向量。
-如果只想备份业务数据，可以加 `--exclude-table=segment_embeddings`，但恢复后需要重跑回填。
+- 叠加层里 frontend 只绑回环 `127.0.0.1:12302`，对外 80/443（含 443/udp HTTP/3）由 `caddy` 服务承担（`docker-compose.https.yml:15-25`）。
+- Caddy 自动申请并续期 Let's Encrypt 证书；证书持久化在 `siteyeb-caddy-data` / `siteyeb-caddy-config` 两个卷（`docker-compose.https.yml:28-29,44-47`），否则重启后重新申请容易触发限流。
+- 前提：域名 A 记录指向本机，80/443 公网可达。
+- `Caddyfile:23` 反代到 `host.docker.internal:{$WEB_PORT:12302}`，兜底值已与 compose 默认 `12302` 对齐；叠加 HTTPS 时无需再显式设 `WEB_PORT`。
+
+## 六、备份与恢复
+
+脚本在 `scripts/` 下，只读/破坏性口径都写在脚本头注释里。
+
+### 备份
+
+```bash
+./scripts/backup.sh                # 输出到 backups/
+KEEP_DAYS=30 ./scripts/backup.sh   # 保留 30 天，默认 7 天
+```
+
+- 用 `pg_dump -Fc` 自定义格式，先 dump 进容器再 `docker cp` 出来（`scripts/backup.sh:35-36`），避免 Windows 下 shell 重定向改写二进制流。
+- 写完校验文件头必须是 `PGDMP`（`scripts/backup.sh:47-52`）。
+- 向量存在 `content_chunks.embedding`（`halfvec`，维度默认 1024，`backend/app/database.py:80`；DDL 见 `backend/app/tables.py:57-82`）。旧文档提过的 `segment_embeddings` 表已删除，不要在备份说明里再引用。
+- 库之外还要备份绑定挂载的媒体/产物目录和 `./logs/`，挂载口径见 `docs/docker.md` 第三节。
 
 ### 恢复
 
 ```bash
-./scripts/restore.sh backups/p2learning-20261115-031500.dump
+./scripts/restore.sh backups/p2learning-20261116-031500.dump
+./scripts/restore.sh backups/xxx.dump --yes
 ```
 
-脚本会先自动做一次当前状态的备份（回滚点），再执行恢复，并要求输入 `yes` 确认。
+- `--clean --if-exists --no-owner --single-transaction`；恢复前先断开其它连接，否则 DROP 被会话锁住（`scripts/restore.sh:47-53`）。
+- 脚本会先跑一次 `backup.sh` 留回滚点（`scripts/restore.sh:36-40`）；恢复完建议 `docker compose restart backend`。
 
----
+### 定时任务（Linux 示例）
 
-## 上线自检
+```cron
+0 3 * * * cd /path/to/project && ./scripts/backup.sh >> backups/backup.log 2>&1
+```
+
+## 七、上线前自检
 
 ```bash
-./scripts/preflight.sh                       # 检查本机
-./scripts/preflight.sh https://your-domain   # 检查线上
+./scripts/preflight.sh [http://localhost]
 ```
 
-检查 16 项，输出 PASS / WARN / FAIL：
+只读检查，不改状态；覆盖 JWT_SECRET、注册开关、Cookie Secure、端口暴露、接口 401/200 边界、安全响应头、近 48 小时备份等共 16 项（`scripts/preflight.sh:26-132`）。结果分 PASS / WARN / FAIL：FAIL 必须解决，WARN 要么解决要么能解释清楚；有 FAIL 不建议对外发布。
 
-```
-== 配置 ==
-  PASS  JWT_SECRET 长度 64，非默认值
-  WARN  注册仍开放：公网会被灌号
-  PASS  HTTPS 部署且 COOKIE_SECURE=true
-== 网络暴露 ==
-  PASS  5432/6379 未暴露到公网
-== 接口边界 ==
-  PASS  未登录访问 /api/admin/health -> 401
-  ...
-== 结果 ==
-  通过 14 / 警告 2 / 失败 0
-```
+## 八、排障入口
 
-有 FAIL 就别发布。WARN 要么解决，要么能解释清楚为什么可以接受。
+- 整站异常先跑：`bash scripts/diagnose.sh`，八段依次是容器状态、探针最后输出、PG 长事务/锁等待、队列注册与积压、后端最近错误、nginx 最近错误、worker 日志、应用日志文件（`scripts/diagnose.sh:34-109`）。
+- 按 request_id 查历史日志：`bash scripts/logq.sh req <id>`，用法见 `docs/logging.md`。
+- 分层定位 502：
+  1. `docker compose ps` 看 frontend / backend 是否 healthy；
+  2. backend 不健康 → 看 diagnose 第 3 段锁等待；
+  3. backend 健康但仍 502 → 看 diagnose 第 6 段 nginx 错误；
+  4. 转写一直排队 → 看 diagnose 第 4 段 worker 注册数。
 
----
+## 九、数据基线（2026-11-16 口径）
 
-## 故障排查
+以下为本次核对基线，不是上线承诺值；实际数字以 `/api/stats` 与管理接口为准：
 
-**登录成功但立刻被踢回登录页**
-`COOKIE_SECURE=true` 但用 http 访问 —— 浏览器不会保存 Secure Cookie。
-要么上 HTTPS，要么改回 `false`。
+- 视频 14,327；语义块 60,259；字幕片段 3,593,723；有字幕视频 8,785。
 
-**改完 JWT_SECRET 后所有人都要重新登录**
-正常。令牌是用旧密钥签的，验不过。一次性代价。
+## 配置核对结论
 
-**证书申请失败**
-80 端口被占用或域名没解析到本机。先 `curl -I http://your-domain` 确认能到。
-Let's Encrypt 有频率限制，调试时可以先设 `ACME_EMAIL` 为真实邮箱并等 1 小时。
-
-**容器 healthy 但页面白屏**
-看 `docker logs siteyeb-frontend`。前端构建期 `VITE_API_BASE_URL` 留空才走同源反代；
-设了值而值与实际域名不一致会导致所有 API 404。
-
-**想清空所有数据重来**
-```bash
-docker compose down            # 停容器，保留数据
-docker compose down -v         # 连数据卷一起删，不可恢复
-```
-
----
-
-## 面试时可以怎么讲这一段
-
-如果被问「你这个能上线吗」，有说服力的答法不是「能」，而是**讲清楚边界**：
-
-> 单机到小团队规模可以直接跑。我做了三层：
-> 传输层用 Caddy 自动证书，会话令牌放 httpOnly Cookie 而不是 localStorage；
-> 应用层做了 RBAC、CSRF 双保险、登录限流和账号级数据隔离；
-> 运维层有 pg_dump 定时备份和一份 16 项的上线自检脚本。
->
-> 但我也清楚它现在**不适合**多租户 SaaS：没有组织/团队概念，视频库是全局共享的，
-> 计费、审计日志、跨区域都没做。要做成 SaaS，数据模型得先加 tenant_id，
-> 那是重构不是迭代。
-
-**主动说「不适合什么」，比声称「什么都能做」可信得多。**
+- `Caddyfile:23` 兜底反代端口已改为 12302，与 compose `WEB_PORT` 默认一致。
+- `scripts/backup.sh:16`、`scripts/restore.sh:20`、`scripts/preflight.sh` 已改用 compose 生成名 `p2-siteyeb-postgres-1` / `p2-siteyeb-redis-1`，仍可用 `PG_CONTAINER` 覆盖；`start.bat` / `start.sh` / `diagnose.sh` 同步改为 `p2-siteyeb-backend-1`。

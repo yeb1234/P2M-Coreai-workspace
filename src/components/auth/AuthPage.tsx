@@ -11,6 +11,17 @@ const REMEMBER_KEY = 'p2m-remember-username';
 
 function loadRememberedUsername(): string {
   try {
+    // 旧版本把 { username, password } 明文存在 p2m-remember 里；
+    // 发现即清除，绝不让它继续留在共享浏览器中。
+    localStorage.removeItem('p2m-remember');
+    localStorage.removeItem('p2m-password');
+    localStorage.removeItem('p2m-auth-token');
+
+    const legacyLastUsername = localStorage.getItem('p2m-last-username');
+    if (legacyLastUsername && !localStorage.getItem(REMEMBER_KEY)) {
+      localStorage.setItem(REMEMBER_KEY, legacyLastUsername);
+      localStorage.removeItem('p2m-last-username');
+    }
     return localStorage.getItem(REMEMBER_KEY) || '';
   } catch {
     return '';
@@ -127,7 +138,7 @@ export const AuthPage: React.FC = () => {
                   onChange={(e) => setRemember(e.target.checked)}
                   className="w-3.5 h-3.5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]/20"
                 />
-                <span className="text-xs text-[var(--text-secondary)]">记住密码</span>
+                <span className="text-xs text-[var(--text-secondary)]">记住账号</span>
               </label>
             )}
 

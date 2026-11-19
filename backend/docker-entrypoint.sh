@@ -38,7 +38,12 @@ else:
 PY
 
 echo "[entrypoint] 初始化 schema（幂等）..."
-python -c "from app.database import ensure_runtime_schema; ensure_runtime_schema()"
+# schema 检查是尽力而为：多个 worker 同时启动时，ALTER TABLE 可能和正在跑
+# 查询的 worker 撞锁（DeadlockDetected / LockNotAvailable）。原先进程直接退出，
+# 容器就会无限重启；这里改成记录后继续启动，迁移本身仍会在上面尝试。
+if ! python -c "from app.database import ensure_runtime_schema; ensure_runtime_schema()"; then
+    echo "[entrypoint] 运行时 schema 检查失败，继续启动（稍后由 backend / 下次重启补齐）"
+fi
 
 # 首次从 SQLite 迁移时打开（源库需挂载到 /data/source 并只读）
 if [ "${MIGRATE_SQLITE:-false}" = "true" ]; then

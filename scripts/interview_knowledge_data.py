@@ -1,0 +1,714 @@
+"""面试知识库专题数据。由 build_interview_knowledge.py 写入 knowledge.json。"""
+
+from __future__ import annotations
+
+ARTICLES: list[dict] = [
+    {
+        "id": "kb-deepseek-evolution",
+        "category": "DeepSeek",
+        "title": "DeepSeek V3 → V3.2 → V4 → V4.1-Flash：一条按瓶颈演进的路线",
+        "subtitle": "不要背名词，按“每一代解决什么瓶颈”串起来",
+        "readingMinutes": 12,
+        "tags": ["DeepSeek", "MoE", "MLA", "DSA", "CSA", "CED"],
+        "summary": "V3 解决 MoE 训练效率，V3.2 解决长上下文注意力成本，V4 解决百万上下文，V4.1-Flash 解决 Agent input-heavy 的 prefill 与 KV 存储。附常见错误说法纠正。",
+        "body": """
+## 先给结论
+
+| 版本 | 参数/激活 | 上下文 | 核心变化 | 一句话 |
+| --- | --- | --- | --- | --- |
+| V3 | 671B / 37B | 128K | MLA + DeepSeekMoE + MTP + auxiliary-loss-free | 把 MoE 训练和推理成本打下来 |
+| V3.1 | 671B / 37B | 128K | 思考/非思考混合 | 一个模型两种模式 |
+| V3.2 | 671B / 37B | 128K | V3 + DSA（唯一架构改动） | 长上下文注意力从 O(L²) 降到 O(Lk) |
+| V4-Pro | 1.6T / 49B | 1M | CSA + HCA、mHC、Muon | 百万上下文，FLOPs 27%、KV 10% vs V3.2 |
+| V4-Flash | 284B / 13B | 1M | 同 V4 | 小一号的百万上下文 |
+| V4.1-Flash | 552B 主干 + 196B Engram | 1M | CED + pure CSA2 + FP4 KV + DSpark | Agent input-heavy 专用，KV 890 B/token |
+
+> 记忆抓手：**V3 省训练，V3.2 省注意力，V4 省长上下文，V4.1-Flash 省 prefill 和 KV。**
+
+## V3：四个关键设计
+
+1. **MLA（Multi-head Latent Attention）**：K/V 先压成低秩 latent，推理只缓存 latent，KV cache 大幅下降。
+2. **DeepSeekMoE**：fine-grained routed experts + shared experts，每 token 只激活部分专家。
+3. **Auxiliary-loss-free 负载均衡**：用路由 bias 调整代替传统 aux loss，减少对语言建模性能的伤害。
+4. **MTP（Multi-Token Prediction）**：训练时预测多个未来 token；推理可配合投机解码。
+
+数字：14.8T tokens，2.788M H800 GPU hours，训练稳定、无不可恢复 loss spike。
+
+## V3.2：DSA 是唯一架构改动
+
+相对 V3.1-Terminus，V3.2 只加 **DeepSeek Sparse Attention（DSA）**，通过继续训练注入：
+
+- **Lightning Indexer**：轻量多头，算 query 对历史 token 的相关性分数，ReLU + FP8。
+- **Fine-grained Top-K**：每个 query 只保留 Top-k（默认 2048）个 KV 做注意力。
+
+复杂度：核心注意力 O(L²) → O(Lk)；indexer 本身仍 O(L²)，但便宜得多。
+
+训练两阶段：
+1. **Dense warm-up**：2.1B tokens、1000 步，冻结主模型只训 indexer，让它模仿 dense attention。
+2. **Sparse training**：943.7B tokens、15000 步，打开 top-k，全模型适配；indexer 输入 detach。
+
+配套：RL 后训练算力超过预训练 10%；Agentic 任务合成管线；V3.2-Speciale 是高算力推理变体。
+
+## V4：百万上下文的混合注意力
+
+V4 保留 DeepSeekMoE + MTP，新增：
+
+- **CSA + HCA 混合注意力**：CSA 沿序列压缩 KV 并接 DSA 稀疏注意力；HCA 用更大压缩率但保持 dense 注意力。
+- **mHC**：残差映射约束到双随机矩阵流形（Birkhoff 多面体），提升深层信号传播稳定性。
+- **Muon 优化器**：更快收敛、更稳。
+- **三种推理模式**：Non-think / Think High / Think Max。
+
+效率：1M 上下文下 V4-Pro 单 token FLOPs 约为 V3.2 的 27%，KV cache 约为 10%；预训练 32T tokens。
+
+## V4.1-Flash：为 Agent 的“读多写少”重做结构
+
+- **CED（Causal Encoder-Decoder）**：40 层，前 20 层 encoder、后 20 层 decoder；decoder 的 global KV 由 encoder 最终隐状态投影生成。
+- **非对称激活**：prefill 8B，decode 16B；长输入 prefill 计算量接近减半。
+- **pure CSA2**：跨层复用 global KV、indexer K、Top-K indices；三种模式 Full / Reindex / Reuse。
+- **FP4 global KV**：890 bytes/token，约为 V4-Flash 的 1/4。
+- **SWA Bounded Replay**：persistent KV 降到约 1/8；过期后重算最近 128 token 近似恢复。
+- **Engram 196B**：2/3/4-gram 多哈希查表，条件记忆，不增加每 token 激活计算。
+- **DSpark**：半自回归草稿 + 置信度调度验证。
+- **SinglePass mHC**：Mega-mHC kernel，激活访存约减半。
+
+## 常见错误说法（面试直接纠正）
+
+1. **“V4.1-Flash 是 CSA2 + HCA 混合”** — 错。V4 是 CSA+HCA；V4.1-Flash 是 **pure CSA2**。
+2. **“V4.1-Flash 1M 下 FLOPs 是 V3.2 的 27%”** — 这是 V4-Pro 的数字。V4.1-Flash 是 decode FLOPs 随上下文几乎恒定，4K→1M 只增约 1/4。
+3. **“V4.1-Flash 是 285B”** — 技术报告写 552B 主干 + 196B Engram；284B/285B 是 V4-Flash 的口径。
+4. **“V4.1 Pro 已经发布”** — 截至 2026-10-31 没有；V4 Pro 继续提供，V4.1-Flash 在 2026-10-17 升级到 1017。
+
+## 面试口述（30 秒版）
+
+DeepSeek 这条线是按瓶颈演进的：V3 用 MLA + DeepSeekMoE + MTP 把 MoE 的训练推理成本打下来；V3.2 用 DSA 的 lightning indexer + top-k 2048 把长上下文注意力从平方降到线性；V4 用 CSA/HCA 混合注意力和 mHC 把上下文做到 1M；V4.1-Flash 则针对 Agent 的 input-heavy 负载，用 CED 把 40 层拆成 20 层 encoder + 20 层 decoder，prefill 只激活 8B、decode 16B，再用 pure CSA2 + FP4 KV + SWA Bounded Replay 把 KV 压到 890 字节每 token。它不是单纯堆参数，而是把“读”和“写”的成本拆开算。
+        """,
+        "sources": [
+            {"title": "DeepSeek-V4.1-Flash 技术报告（arXiv 2609.19969）", "url": "https://arxiv.org/abs/2609.19969"},
+            {"title": "DeepSeek V4.1 Flash 官方发布页", "url": "https://www.deepseek.com/news/deepseek-v4-1-flash/"},
+            {"title": "DeepSeek-V4 技术报告（arXiv 2606.19348）", "url": "https://arxiv.org/html/2606.19348"},
+            {"title": "DeepSeek V4 中文模型卡", "url": "https://fe-static.deepseek.com/chat/transparency/deepseek-V4-model-card-CN_3c2bd9.pdf"},
+            {"title": "DeepSeek-V3.2 技术报告（arXiv 2512.02556）", "url": "https://arxiv.org/pdf/2512.02556v1"},
+            {"title": "DeepSeek-V3.2 中文模型卡", "url": "https://fe-static.deepseek.com/chat/transparency/deepseek-v3.2-model-card-0414-CN.pdf"},
+            {"title": "DeepSeek-V3 技术报告（arXiv 2412.19437）", "url": "https://arxiv.org/pdf/2412.19437"},
+            {"title": "NVIDIA：在 Blackwell 上优化 DeepSeek-V3.2 的 DSA", "url": "https://nvidia.github.io/TensorRT-LLM/latest/blogs/tech_blog/blog15_Optimizing_DeepSeek_V32_on_NVIDIA_Blackwell_GPUs.html"},
+        ],
+        "relatedQuestions": ["LLM-039", "LLM-040", "LLM-DS-01", "LLM-DS-06"],
+    },
+    {
+        "id": "kb-v41-flash",
+        "category": "DeepSeek",
+        "title": "V4.1-Flash 深度拆解：CED、CSA2、FP4 KV、Engram、DSpark",
+        "subtitle": "面试被追问“到底怎么省”的时候，按这五层答",
+        "readingMinutes": 14,
+        "tags": ["V4.1-Flash", "CED", "CSA2", "FP4", "Engram", "DSpark"],
+        "summary": "V4.1-Flash 不是“更大的 V4”，而是把 40 层拆成 encoder/decoder 的非对称结构；核心目标是 Agent 长输入下的 prefill 成本和 KV 存储。",
+        "body": """
+## 1. 为什么需要新结构
+
+Agent 负载的特征是 **input-heavy**：大量文档、工具返回、历史对话进入 prompt，输出只有少量 token。传统 decoder-only 每个 prompt token 都要穿过全部层，prefill 很贵；KV cache 又随上下文线性涨。
+
+V4.1-Flash 的答案：把“读”和“写”拆开。
+
+## 2. CED：20 层 encoder + 20 层 decoder
+
+- 总 40 层 causal Transformer。
+- 前 20 层是 **causal encoder**，负责理解输入。
+- 后 20 层是 **decoder**，负责生成。
+- decoder 的 global KV 由 encoder 最终隐状态投影生成，prompt token 不必完整穿过 decoder。
+
+结果：
+- prefill 每 token 激活约 **8B**；
+- decode 每 token 激活约 **16B**；
+- 长输入 prefill 计算量接近减半；
+- decode FLOPs 随上下文几乎恒定，4K→1M 只增约 1/4。
+
+> 注意：CED 不是 T5 式双塔，没有独立 cross-attention；它是同一骨干的前后分段 + 全局 KV 投影。decoder 仍保留自己的 sliding-window attention（SWA）。
+
+## 3. CSA2：跨层复用三种模式
+
+CSA2 沿三个维度压缩：head 维（投影共享）、序列维（每 m token 压成一个 entry）、层维（跨层复用）。
+
+三种模式：
+
+| 模式 | main KV | indexer K | Top-K indices |
+| --- | --- | --- | --- |
+| Full | 当前层算 | 当前层算 | 当前层选 |
+| Reindex | 复用前一个 Full 层 | 复用 | 用自己的 indexer Q 重新选 |
+| Reuse | 复用 | 复用 | 直接复用 |
+
+每层仍保留自己的 global Q 和 SWA KV。共享的是 global KV、indexer K、Top-K indices。Reuse 层 prefill 约 15 个 kernel，decode 约 11 个。
+
+## 4. KV 压缩：四个数字
+
+- **890 bytes/token**：global KV（常驻 HBM），约 V4-Flash 的 1/4。
+- **1/8**：persistent KV（SSD/主机内存，用于前缀复用），靠 SWA Bounded Replay。
+- **437 倍**：相对 V1 的 389,120 bytes/token。
+- **FP4**：global KV 精度，进一步省字节。
+
+SWA Bounded Replay：encoder 的局部 SWA 状态只在活跃会话短时间内有用；过期后如果用户继续，就重算最近 128 token 近似恢复。用少量重算换掉长期存储。
+
+## 5. Engram：把“记忆”从计算里拆出去
+
+- 196B 参数，放在第 1、14 层。
+- 2/3/4-gram 多哈希头，每头约 16M 条目，表大小取质数。
+- 确定性寻址，可从主机内存后台 RDMA 预取；不增加每 token 激活计算。
+- 作用是存常见短语/静态知识，让 MoE 专注组合推理。
+
+## 6. DSpark：不是 MTP 的替代，而是独立 drafter
+
+- 3 层 Transformer，滑动窗口 128。
+- 一次前向给 5 个草稿位置的 base logits。
+- Markov 头建模草稿 token 间依赖。
+- confidence head 预测逐位置接受概率。
+- 调度器结合引擎吞吐曲线，动态选验证长度。
+
+和 V3 的 MTP 不同：DSpark 在预训练后单独训练，后训练阶段不回传梯度到主干。
+
+## 7. SinglePass mHC：kernel 级优化
+
+原 mHC 的输入混合系数要等隐藏维规约，导致三个 kernel 串行，激活访存是理论下界两倍。SinglePass 让每个 block 消费上一个 block 的混合系数，依赖消失，Mega-mHC kernel 把访存从 `(4n+4)d` 降到 `(2n+2)d`，约减半。
+
+## 8. 面试时的五层答法
+
+1. 结构：CED 20+20，非对称激活。
+2. 注意力：pure CSA2，Full/Reindex/Reuse 跨层复用。
+3. 缓存：FP4 global KV 890 B/token，SWA Bounded Replay 把 persistent KV 降到 1/8。
+4. 记忆：Engram 查表，不增加激活计算。
+5. 解码：DSpark 草稿 + 置信度调度验证。
+
+最后补一句边界：这些数字是官方在特定负载/精度下的报告，实际部署要看硬件、batch、序列分布；FP4 和 CSA2 对新硬件/框架适配要求高。
+        """,
+        "sources": [
+            {"title": "DeepSeek-V4.1-Flash 技术报告", "url": "https://arxiv.org/abs/2609.19969"},
+            {"title": "DeepSeek V4.1 Flash 官方发布页", "url": "https://www.deepseek.com/news/deepseek-v4-1-flash/"},
+            {"title": "DeepSeek API 更新日志（含 1017 版本）", "url": "https://api-docs.deepseek.com/zh-cn/updates/"},
+            {"title": "AMD ROCm：V4.1 运行时与 SWA Bounded Replay", "url": "https://rocm.docs.amd.com/projects/atom/en/latest/_sources/deepseek_v41_runtime.md"},
+        ],
+        "relatedQuestions": ["LLM-DS-02", "LLM-DS-03", "LLM-DS-04", "LLM-DS-05"],
+    },
+    {
+        "id": "kb-v32-dsa",
+        "category": "DeepSeek",
+        "title": "V3.2 的 DSA：lightning indexer + top-k 到底怎么省",
+        "subtitle": "长上下文注意力从 O(L²) 到 O(Lk)，但 indexer 不是免费的",
+        "readingMinutes": 8,
+        "tags": ["V3.2", "DSA", "稀疏注意力", "top-k"],
+        "summary": "DSA 是 V3.2 相对 V3.1-Terminus 的唯一架构改动；核心是轻量 indexer 选 top-k token，把主注意力成本降下来。",
+        "body": """
+## DSA 的两个组件
+
+1. **Lightning Indexer**：轻量多头，计算 query 对每个历史 token 的 index score：
+   `I(t,s) = sum_j w_j * ReLU(q_j · k_s)`。
+   用 ReLU 和 FP8 是为了吞吐。
+2. **Fine-grained Token Selection**：每个 query 只保留 Top-k 个 KV（默认 k=2048），主注意力只在这些 token 上算。
+
+## 复杂度
+
+- 主注意力：O(L²) → O(Lk)。
+- Indexer 本身仍是 O(L²)，但头少、维度低、FP8，比 MLA 便宜得多。
+- 所以 DSA 不是“所有计算都线性”，而是“把最贵的部分变线性，索引部分用便宜算子”。
+
+## 训练
+
+从 V3.1-Terminus 继续训练：
+
+1. **Dense warm-up**：2.1B tokens，1000 步；冻结主模型，只训 indexer，让它模仿 dense attention 分布（KL）。
+2. **Sparse training**：943.7B tokens，15000 步；打开 top-k，全模型适配；indexer 输入 detach，主模型只受 LM loss，indexer 只受 KL loss。
+
+## 推理实现
+
+NVIDIA TensorRT-LLM 的实现：
+- Top-K = 2048。
+- 短序列 ≤2048 直接走 dense fast path，跳过冗余的 indexer/top-k。
+- DSA 用 MLA 的 MQA 模式，prefill 和 decode 都走 MQA，提升 kernel 效率。
+- FP8 KV cache 可带来吞吐提升。
+
+## 和 CSA2 的区别
+
+- DSA：单层 indexer + top-k，目标是长上下文注意力成本。
+- CSA2：跨层复用 global KV/indexer K/Top-K，加层次化稀疏索引器，目标是压 KV footprint 和索引成本。
+
+面试时不要说“DSA 就是 CSA”，它们是不同代际的稀疏注意力方案。
+        """,
+        "sources": [
+            {"title": "DeepSeek-V3.2 技术报告", "url": "https://arxiv.org/pdf/2512.02556v1"},
+            {"title": "DeepSeek-V3.2 中文模型卡", "url": "https://fe-static.deepseek.com/chat/transparency/deepseek-v3.2-model-card-0414-CN.pdf"},
+            {"title": "NVIDIA TensorRT-LLM：Optimizing DeepSeek-V3.2", "url": "https://nvidia.github.io/TensorRT-LLM/latest/blogs/tech_blog/blog15_Optimizing_DeepSeek_V32_on_NVIDIA_Blackwell_GPUs.html"},
+        ],
+        "relatedQuestions": ["LLM-040", "LLM-DS-06"],
+    },
+    {
+        "id": "kb-ft-map",
+        "category": "微调",
+        "title": "微调全谱系：SFT、LoRA、QLoRA、DPO、PPO、GRPO、蒸馏",
+        "subtitle": "先判断你要改什么，再选方法，不要按名词选",
+        "readingMinutes": 10,
+        "tags": ["SFT", "LoRA", "QLoRA", "DPO", "PPO", "GRPO", "蒸馏"],
+        "summary": "一张决策表和一段口述：格式/话术用 LoRA，事实用 RAG，偏好用 DPO，可验证任务用 GRPO，降本用蒸馏，改底座才全量 SFT。",
+        "body": """
+## 决策表
+
+| 你要解决的问题 | 首选 | 为什么 |
+| --- | --- | --- |
+| 模型输出格式/话术/工具调用模板不稳定 | LoRA / QLoRA | 小数据、低成本、可多租户 |
+| 需要大量会更新的事实知识 | RAG | 可更新、可追溯、不占参数 |
+| 两个回答哪个更好、减少坏偏好 | DPO | 三元组偏好数据，简单稳定 |
+| 数学/代码/工具调用成功率，有自动判分 | GRPO | 组内相对优势，无需 critic |
+| 把大模型能力压到小模型、降推理成本 | 蒸馏 | teacher logits/序列训 student |
+| 改底座默认推理/指令行为 | 全量 SFT / 继续预训练 | 成本最高，最后才考虑 |
+
+## 一句话区分
+
+- **SFT**：教“正确答案长什么样”。
+- **LoRA**：用一个小扰动教“怎么答”，不破坏底座。
+- **DPO**：教“两个答案里哪个更好”。
+- **PPO**：传统 RLHF 的重型方案，四模型链路。
+- **GRPO**：同一 prompt 采样一组，按组内相对表现优化，适合可验证任务。
+- **蒸馏**：老师教学生，目标是压缩/降本。
+
+## 收敛顺序
+
+`Prompt/RAG → LoRA → DPO（有偏好数据）→ GRPO（有自动判分）→ 全量 SFT/蒸馏（有明确目标）`
+
+大多数 FDE 交付停在第二步；再往上要有数据和算力理由。
+
+## 常见坑
+
+- LoRA 学事实：换问法就崩，优先 RAG。
+- DPO 数据里 chosen/rejected 差别不清晰：模型学到噪声。
+- GRPO 奖励函数可钻空子：模型会优化奖励而不是任务。
+- 全量 SFT 数据少：灾难性遗忘比 LoRA 更严重。
+- 蒸馏 teacher 和 student 词表不一致：需要处理 logits 对齐。
+        """,
+        "sources": [
+            {"title": "DeepSeek-V3.2 技术报告（GRPO/RL 部分）", "url": "https://arxiv.org/pdf/2512.02556v1"},
+            {"title": "DeepSeek-V3 技术报告（SFT/RL 流程）", "url": "https://arxiv.org/pdf/2412.19437"},
+        ],
+        "relatedQuestions": ["LLM-001", "LLM-005", "LLM-007", "LLM-008"],
+    },
+    {
+        "id": "kb-lora",
+        "category": "微调",
+        "title": "LoRA / QLoRA 的参数、target 与部署",
+        "subtitle": "rank、alpha、target modules、合并 vs 动态加载",
+        "readingMinutes": 9,
+        "tags": ["LoRA", "QLoRA", "rank", "target modules", "vLLM"],
+        "summary": "LoRA 用低秩增量改行为；QLoRA 把冻结底座压到 4bit 省显存。参数从保守起点开始，用消融和验证集决定，不靠拍脑袋。",
+        "body": """
+## 数学形式
+
+```text
+W' = W + ΔW = W + (B @ A) * (alpha / r)
+A: r × d_in
+B: d_out × r
+```
+
+A 高斯初始化，B 全零，所以训练开始 ΔW=0，不破坏底座。`alpha/r` 是缩放因子。
+
+## 参数起点
+
+```text
+rank: 8 / 16 / 32
+alpha: 8 / 16 / 32（常与 rank 同值或 2 倍）
+lr: 1e-4 ~ 5e-4
+epoch: 2 ~ 5
+warmup: 3% ~ 5%
+batch: 塞满显存 + gradient accumulation
+```
+
+- 格式/话术：rank 8，q/v 或 q/k/v/o。
+- 复杂指令：rank 16，加 MLP。
+- MoE：冻结 router，优先 expert FFN + attention，先小样验证。
+
+## QLoRA
+
+- 底座：4bit NF4，冻结。
+- 双重量化：再压 scale/zero-point。
+- Paged optimizer：显存紧张时分页，防 OOM。
+- 计算：反量化到 BF16 做矩阵乘；adapter 仍 BF16。
+- 代价：慢、量化误差、新架构适配差。
+
+## 部署
+
+**合并**：`merge_and_unload()`，得到独立底座；无额外分支，适合固定业务。
+**动态加载**：vLLM 多 LoRA，底座共享，按租户路由；要预留显存、管理版本、预热、防串租户。
+
+## 验收
+
+不要只看 val loss：
+- 格式集：JSON 可解析率/schema 合规。
+- 业务集：字段准确率/意图 F1。
+- 回归集：通用能力有没有掉。
+- 系统集：p95 延迟/token 成本。
+
+## 常见追问
+
+- 为什么 B 初始化 0？保证初始 ΔW=0。
+- alpha 作用？控制增量强度。
+- LoRA 能学知识吗？弱，优先 RAG。
+- 多 LoRA 怎么隔离？网关路由 + adapter 版本 + 显存上限。
+        """,
+        "sources": [
+            {"title": "LoRA 原论文（Hu et al., 2021）", "url": "https://arxiv.org/abs/2106.09685"},
+            {"title": "QLoRA 原论文（Dettmers et al., 2023）", "url": "https://arxiv.org/abs/2305.14314"},
+        ],
+        "relatedQuestions": ["LLM-002", "LLM-003", "LLM-009", "LLM-010", "LLM-011"],
+    },
+    {
+        "id": "kb-data",
+        "category": "数据",
+        "title": "微调数据工程：格式、规模、质量、合成",
+        "subtitle": "脏数据的破坏力远大于数据量不足",
+        "readingMinutes": 10,
+        "tags": ["ChatML", "ShareGPT", "Alpaca", "数据清洗", "合成数据"],
+        "summary": "ChatML 优先；200–2000 条覆盖交付主场景；质量看格式、一致性、边界、去重、去矛盾、无幻觉、合规；合成数据必须人工定标准 + holdout 隔离。",
+        "body": """
+## 格式
+
+**ChatML**
+```json
+{"messages":[
+  {"role":"system","content":"..."},
+  {"role":"user","content":"..."},
+  {"role":"assistant","content":"..."}
+]}
+```
+**ShareGPT**
+```json
+{"conversations":[
+  {"from":"human","value":"..."},
+  {"from":"gpt","value":"..."}
+]}
+```
+**Alpaca**
+```json
+{"instruction":"...","input":"...","output":"..."}
+```
+
+JSONL：一行一条，不是 JSON 数组。现在优先 ChatML：role 清晰、支持 system、多轮、主流框架都认。
+
+## 规模
+
+| 量 | 适合 |
+| --- | --- |
+| 200–500 | 固定格式、单轮抽取、简单分类 |
+| 500–2000 | 中等领域、多轮、业务规则（交付最常用） |
+| 2000–5000 | 更复杂指令，注意过拟合 |
+| 3000+ / 上万 | 领域继续预训练/复杂能力，LoRA 可能不够 |
+
+关键不是数量，是**覆盖输入分布**。200 条高质量种子可以先跑通链路，再按 bad case 扩。
+
+## 质量清单
+
+1. 每行合法 JSON，role/顺序正确，无空 assistant。
+2. system prompt、输出 schema、字段口径统一。
+3. 同类问题输出稳定，不混 JSON/自由文本。
+4. 覆盖正常、模糊、缺参、越权、拒答、工具报错。
+5. 精确/近重复清理。
+6. 矛盾样本人工裁决。
+7. 无幻觉样本，宁可“不知道/转人工”。
+8. 长度分布合理，长样本不截断。
+9. 脱敏：手机号、订单、姓名、地址。
+10. train/val 按业务/时间分层，测试集不泄漏。
+
+开训门槛：抽 30–50 条人工过，格式 100%，业务口径 ≥95%，边界覆盖。
+
+## loss mask
+
+多轮只对 assistant token 算 loss，其他设 `-100`；padding 也 mask。不同模型 chat template 不同，必须打印 labels 验证。
+
+## 合成数据
+
+种子人工定标准 → 生成带约束 → schema/枚举/去重过滤 → 一致性聚类 → 5%–10% 人工抽检 → holdout 隔离 → 比例消融。没有人工标准的合成，只是放大老师偏见。
+
+## 客户 200 条脏对话
+
+先抽样读 30 条 → 定义目标样本 → 脱敏 → 统一模板 → 去重/去矛盾 → 补边界 → 分层切分 → 跑 Prompt 基线 → 小样训练。第一价值是看懂业务分布，不是立刻开训。
+        """,
+        "sources": [
+            {"title": "OpenAI Chat Completions 消息格式", "url": "https://platform.openai.com/docs/guides/text-generation"},
+            {"title": "HuggingFace TRL SFTTrainer 文档", "url": "https://huggingface.co/docs/trl/sft_trainer"},
+        ],
+        "relatedQuestions": ["LLM-013", "LLM-014", "LLM-015", "LLM-018", "LLM-019", "LLM-020"],
+    },
+    {
+        "id": "kb-training-delivery",
+        "category": "交付",
+        "title": "微调训练链路、成本与交付风险",
+        "subtitle": "从需求对齐到上线回滚，每一步都要有验收物",
+        "readingMinutes": 9,
+        "tags": ["Unsloth", "PEFT", "成本", "交付", "回滚"],
+        "summary": "8 步链路：需求→基线→数据→切分→小样→评估→导出部署→灰度回滚。GPU 是小钱，数据/验收才是大头。",
+        "body": """
+## 8 步链路
+
+1. 需求对齐：输入分布、输出 schema、拒答、延迟/成本。
+2. 基线：Prompt + few-shot + schema 校验，记录失败类型。
+3. 数据构造：ChatML、清洗、脱敏、去重。
+4. 切分验收：train/val 分层 + 独立盲测。
+5. 小样训练：QLoRA 小 rank 2 epoch，验证显存/导出/推理。
+6. 评估：业务集 + 格式集 + 回归集，对比基线。
+7. 导出部署：merge 或 adapter，vLLM/FastAPI，schema 校验 + 兜底。
+8. 灰度回滚：监控格式失败率/延迟/token，adapter 版本化。
+
+## 成本量级（有假设）
+
+7B、QLoRA、L4 24G、序列 1–2k：
+
+| 数据 | 时间 | GPU 成本 |
+| --- | --- | --- |
+| 200 | 10–30 分钟 | 几元到十几元 |
+| 1000 | 1–3 小时 | 十几到几十元 |
+| 2000 | 2–5 小时 | 几十元 |
+
+真实大头：标注、清洗、验收、回归。报价要单列，不要只报 GPU 小时。
+
+## 工具
+
+- Unsloth：QLoRA 快、省显存，适合单卡验证。
+- PEFT + TRL：官方标准，可控性高。
+- Axolotl：YAML 配置，批量实验/复现。
+
+## 风险清单
+
+- 数据：脏、矛盾、泄漏、脱敏不彻底。
+- 训练：OOM、不降 loss、过拟合、遗忘、新架构不兼容。
+- 模型：格式不稳、幻觉、拒答过度。
+- 部署：adapter 加载失败、显存、版本错配、吞吐不足。
+- 业务：验收模糊、期望过高、数据不能出域。
+
+每项都要有 owner + 兜底动作，否则不叫交付。
+
+## 云平台
+
+国内云：稳定、合规、发票；海外按需：便宜、实验；Colab/Kaggle：只适合 Demo；ModelScope/HF Spaces：模板多、自由度低。数据不出域优先本地/专有云/离线包。
+        """,
+        "sources": [
+            {"title": "Unsloth 文档", "url": "https://docs.unsloth.ai/"},
+            {"title": "HuggingFace PEFT 文档", "url": "https://huggingface.co/docs/peft"},
+            {"title": "Axolotl 文档", "url": "https://docs.axolotl.ai/"},
+        ],
+        "relatedQuestions": ["LLM-021", "LLM-022", "LLM-023", "LLM-024", "LLM-025", "LLM-026", "LLM-028"],
+    },
+    {
+        "id": "kb-inference",
+        "category": "原理",
+        "title": "Transformer、KV Cache 与推理优化一张图",
+        "subtitle": "把 QKV、RoPE、KV、PagedAttention、Chunked Prefill、推测解码串起来",
+        "readingMinutes": 10,
+        "tags": ["Transformer", "KV Cache", "PagedAttention", "RoPE", "推测解码"],
+        "summary": "Transformer 前向是 token→embedding→attention→FFN→logits；长上下文要同时解决算得起、存得下、找得到。",
+        "body": """
+## 前向流程
+
+```text
+文本 → tokenizer → token id
+→ embedding + RoPE
+→ N 层 [Self-Attention + FFN + 残差 + Norm]
+→ lm_head → logits → 采样
+→ 新 token 接回，循环
+```
+
+主流 LLM 是 **Decoder-only**，causal mask 只能看前面。MoE 只是把 FFN 换成路由专家，注意力/残差不变。
+
+## Q/K/V
+
+- Q：当前 token 想找什么。
+- K：每个 token 怎么被匹配。
+- V：匹配后取走的信息。
+- `softmax(QK^T / sqrt(d)) @ V`；缩放防 softmax 饱和。
+- 多头：不同子空间学不同关系。
+- MLA：K/V 压成低秩 latent，推理只缓存 latent，省 KV。
+
+## RoPE
+
+旋转位置编码，把位置编码进 Q/K 的旋转角度，点积带相对位置。长上下文远端衰减不是“改个 RoPE 就能解决”，还要注意力结构 + KV 压缩 + 训练分布。
+
+## KV Cache
+
+```text
+KV bytes ≈ 2 * layers * kv_heads * head_dim * seq_len * batch * dtype_bytes
+```
+
+权重显存固定，KV 随并发/长度涨，是推理服务主要变量。GQA/MLA 减少 kv_heads/维度。
+
+## 推理优化栈
+
+| 技术 | 解决 |
+| --- | --- |
+| PagedAttention | KV 分页，减少碎片/过度预留，提并发 |
+| Chunked Prefill | 长 prefill 切块，和 decode 交错，降尾延迟 |
+| Prefix Cache | 复用相同前缀 KV，少算 system/few-shot/多轮历史 |
+| 量化 KV | FP8/FP4，省字节和带宽 |
+| 稀疏 KV / DSA | 只算 top-k，降注意力成本 |
+| SWA | 只保留最近窗口，降缓存长度 |
+| 推测解码 | drafter 猜、主模型验，提吞吐 |
+
+它们不互相替代：Paged 管显存管理，Chunked 管调度，Prefix 管复用，量化管字节，稀疏管读取，SWA 管长度，推测管步数。
+
+## MoE
+
+Router 选 top-k 专家；shared experts 承载通用知识；fine-grained 提高组合灵活性。负载不均衡会导致专家塌缩/通信瓶颈；DeepSeek V3 用 auxiliary-loss-free bias 调整。
+
+## 推测解码
+
+小 drafter 猜 k 个 token，大模型一次验证；接受率决定收益。DSpark 用 confidence head + 吞吐曲线动态选验证长度。
+        """,
+        "sources": [
+            {"title": "Attention Is All You Need", "url": "https://arxiv.org/abs/1706.03762"},
+            {"title": "RoPE 论文", "url": "https://arxiv.org/abs/2104.09864"},
+            {"title": "vLLM PagedAttention 论文", "url": "https://arxiv.org/abs/2309.06180"},
+            {"title": "DeepSeek-V3.2 技术报告", "url": "https://arxiv.org/pdf/2512.02556v1"},
+        ],
+        "relatedQuestions": ["LLM-029", "LLM-030", "LLM-031", "LLM-032", "LLM-033", "LLM-034", "LLM-035", "LLM-036", "LLM-037"],
+    },
+    {
+        "id": "kb-jev",
+        "category": "Agent",
+        "title": "Jev / System One：给 Agent 的“小脑”做快决策",
+        "subtitle": "Choice / Noul / Score，校准概率，70–500ms，和 LLM 快慢分离",
+        "readingMinutes": 9,
+        "tags": ["Jev", "System One", "快慢分离", "校准"],
+        "summary": "Jev 不生成文本，输入 state + typed questions，输出带校准概率的决策；适合路由、护栏、过滤、瘦身，不适合开放式推理。",
+        "body": """
+## 是什么
+
+TypeSafe AI 的 System One 决策模型，2026-09-15 发布。它不做逐 token 生成，而是一次并行评估你定义的一组结构化问题，返回 typed decision + 概率。
+
+三种原语：
+- **Noul**：是/否概率 0–1。
+- **Choice**：从最多 255 个候选里选一个，返回全分布 + confidence。
+- **Score**：按 2–10 级有序 rubric 打分，返回概率加权位置 + 每级分布 + confidence。
+
+官方宣称：70–500ms 量级、输入 $0.042/M tokens、输出免费、schema 错误率 0（由构造保证）；工作流对比中约 193.6x faster / 444.6x cheaper。注意这些是官方/特定工作流数据，不是通用保证。
+
+## 和 LLM/JSON mode/规则引擎
+
+| | Jev | LLM | JSON mode | 规则 |
+| --- | --- | --- | --- | --- |
+| 输出 | typed decision | 文本 | 文本再解析 | 确定值 |
+| 速度 | 快 | 慢 | 慢 | 极快 |
+| 格式错 | 0（schema） | 可能 | 低但非零 | 无 |
+| 语义错 | 可能 | 可能 | 可能 | 覆盖不了模糊 |
+| 适合 | 固定选项高频判定 | 开放推理/生成 | 结构化生成 | 明确条件 |
+
+## 校准
+
+Jev 的核心指标不是 accuracy，而是 **confidence 是否匹配真实正确率**。看 ECE、reliability diagram、子群校准、分流收益（自动放行/人工复核/降级比例）。
+
+## 快慢架构
+
+```text
+请求 → Jev 入口路由
+→ 慢模型规划/生成
+→ Jev 工具前护栏
+→ 工具执行
+→ Jev 结果过滤/继续判定
+→ 慢模型回答
+→ Jev 输出校验
+```
+
+每个决策都要 fallback：低置信/高 stakes → 人工或慢模型。
+
+## 边界
+
+不能生成解释/摘要/代码；会判错；候选/rubric 设计不好会漂移；供应商锁定/限流/合规；高 stakes 不能单独决策。
+
+## 一句话
+
+Jev 是把 `if` 变成可校准概率的工具，不是更便宜的 GPT。RAG 管知道什么，LoRA 管怎么说，Jev 管走哪条路/要不要停。
+        """,
+        "sources": [
+            {"title": "TypeSafe AI 官网（Jev 发布与价格）", "url": "https://typesafe.ai/"},
+            {"title": "Jev 101（第三方整理，含官方 FAQ 摘录）", "url": "https://jev.page/"},
+            {"title": "Jev API 开发者参考（第三方）", "url": "https://jevapi.dev/"},
+        ],
+        "relatedQuestions": ["LLM-JEV-01", "LLM-JEV-02", "LLM-JEV-03", "LLM-JEV-04", "LLM-JEV-05", "LLM-JEV-06"],
+    },
+    {
+        "id": "kb-agent-eval",
+        "category": "Agent",
+        "title": "Agent 评估与失败模式定位",
+        "subtitle": "单元 case、端到端 benchmark、业务回放集，三层缺一不可",
+        "readingMinutes": 8,
+        "tags": ["Agent评估", "失败模式", "trace", "回归"],
+        "summary": "单元 case 防回归，benchmark 看能力上限，业务回放集决定能不能上线；失败按输入/检索/规划/工具/生成五段定位。",
+        "body": """
+## 三层评估
+
+1. **单元 case**：格式、字段、工具选择、指代、权限、拒答；快，适合 CI。
+2. **端到端 benchmark**：Terminal-Bench、Automation-Bench、DeepSWE、AgentBench；看规划/编排/恢复/长程一致性。
+3. **业务回放集**：真实历史 + 人工标注可接受结果；上线门槛和 A/B。
+
+## 指标
+
+- 任务成功率、步骤数、工具正确率、无效调用率。
+- 格式合规、幻觉率、拒答正确率、越权率。
+- p50/p95 延迟、token 成本、人工接管率。
+- 失败模式分布：循环、卡死、工具错、上下文丢失、过早结束。
+
+## 五段定位
+
+1. 输入理解：意图/指代/语言。
+2. 检索：recall@k、脏块、排序、截断。
+3. 规划：步骤/顺序/该调不调/绕圈。
+4. 工具：参数/超时/返回格式/权限。
+5. 生成：幻觉/格式/拒答/复读。
+
+每次失败保存完整 trace：输入、检索块、计划、工具入参出参、模型输出、校验结果。按失败模式打标签，聚类 Top 问题，转回归 case。
+
+## 面试话术
+
+“模型答错”不是结论，要拆成链路哪一段错。能定位到段，才是 Agent 工程师。
+        """,
+        "sources": [
+            {"title": "DeepSeek-V3.2 技术报告（Agentic 评估）", "url": "https://arxiv.org/pdf/2512.02556v1"},
+            {"title": "DeepSeek V4.1 Flash 官方发布页（Agentic Benchmark）", "url": "https://www.deepseek.com/news/deepseek-v4-1-flash/"},
+        ],
+        "relatedQuestions": ["LLM-EVAL-01", "LLM-EVAL-02", "X-RAG-03"],
+    },
+    {
+        "id": "kb-fde",
+        "category": "FDE",
+        "title": "FDE 交付口述：范围、验收、数据不出域",
+        "subtitle": "把“什么都能做”变成“一个场景闭环 + 可验收边界”",
+        "readingMinutes": 7,
+        "tags": ["FDE", "范围管理", "验收", "离线交付"],
+        "summary": "先基线后微调，验收集共同确认，范围分必须/应该/可以/不做；数据不出域用本地 GPU、专有云或离线包。",
+        "body": """
+## 范围四档
+
+- **必须**：一个场景、一个指标、一个验收集、一个回滚。
+- **应该**：数据清洗、基线对比、监控。
+- **可以**：多轮、多语言、多租户、微调。
+- **不做（本期）**：开放问答、全库自动更新、自训练。
+
+话术：
+1. 先定义“输入什么、输出什么、错了谁兜底”。
+2. 先跑 Prompt/RAG 基线，证明微调必要性。
+3. 验收集共同确认，覆盖正常/边界/拒答；上线看集，不看 demo。
+4. 范围外进 backlog，二期评估。
+
+## 数据不出域
+
+1. 本地 GPU + 开源底座 + QLoRA：训练/推理都在客户内网。
+2. 私有云/专有云：客户账号/VPC/存储，交付镜像和脚本。
+3. 离线交付包：训练脚本 + 数据模板 + 评估脚本 + Docker，客户自己跑。
+
+要点：依赖/权重离线打包；日志脱敏；adapter/评估报告可回传，原始样本不回传；合规责任写清。
+
+## 报价
+
+GPU 小时只是小头；标注、清洗、验收、回归、出差支持都要单列。不要把“微调”报成“跑一下脚本”。
+
+## 一句话
+
+FDE 的核心不是“什么都能做”，而是把不确定性变成可验收的边界。
+        """,
+        "sources": [
+            {"title": "NIST AI Risk Management Framework", "url": "https://www.nist.gov/itl/ai-risk-management-framework"},
+            {"title": "OWASP Top 10 for LLM Applications", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+        "relatedQuestions": ["LLM-FDE-01", "LLM-FDE-02", "X-FDE-01"],
+    },
+]

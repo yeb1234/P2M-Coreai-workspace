@@ -6,6 +6,7 @@ from sqlalchemy import func
 from app.auth import hash_password, require_admin
 from app.database import SessionLocal
 from app.models import (
+    AgentRun,
     CalendarEvent,
     ChatMessage,
     ChatSession,
@@ -18,6 +19,7 @@ from app.models import (
     User,
     UserData,
     UserProfile,
+    UserVideoFavorite,
     WatchEvent,
     WatchHistory,
 )
@@ -49,6 +51,7 @@ from app.services.admin_settings import (
     save_assistant_runtime_settings as persist_assistant_runtime_settings,
     save_transcription_settings as persist_transcription_settings,
 )
+from app.services.user_data_cleanup import delete_user_files
 
 
 # 整个管理端统一要求管理员角色。
@@ -512,8 +515,16 @@ def delete_user(user_id: int, admin: User = Depends(require_admin)):
         db.query(CalendarEvent).filter(CalendarEvent.user_id == user_id).delete(synchronize_session=False)
         db.query(MemoryItem).filter(MemoryItem.user_id == user_id).delete(synchronize_session=False)
         db.query(Note).filter(Note.user_id == user_id).delete(synchronize_session=False)
+        # 审计运行和用户收藏也必须随用户删除；否则用户删了，旧对话/推荐
+        # 结果还留在库里，既占空间又可能被后续逻辑当成无主数据。
+        db.query(AgentRun).filter(AgentRun.user_id == user_id).delete(synchronize_session=False)
+        db.query(UserVideoFavorite).filter(UserVideoFavorite.user_id == user_id).delete(
+            synchronize_session=False
+        )
         db.delete(user)
         db.commit()
+        # DB 提交成功后再清磁盘：失败不能留下“用户没了、文件还在”或反过来。
+        delete_user_files(user_id)
         logger.info("管理员 %s 删除了用户 %s（id=%s）", admin.username, user.username, user_id)
         return {"ok": True, "deleted_user_id": user_id}
     finally:

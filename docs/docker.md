@@ -1,226 +1,98 @@
-# Docker 部署
+# Docker 部署组成
 
-三种跑法，按场景选：
+> 状态：事实已核实（核对基线 2026-11-16，`docker-compose.yml` 现状，未跑容器）
 
-| 场景 | 命令 | 起哪些服务 |
-| --- | --- | --- |
-| 全栈一键部署 | `docker compose up -d --build` | postgres + redis + backend + frontend |
-| 本地开发（后端跑 venv） | `docker compose -f docker-compose.pg.yml up -d` | 只有 postgres |
-| GPU 转写 | `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` | 全栈 + 容器内 CUDA |
+## 一、服务清单
 
----
+compose 项目名 `p2-siteyeb`（`docker-compose.yml:9`）。主 compose 文件里**没有写 `container_name`**，容器名交给 compose 按 `<项目名>-<服务名>-1` 生成，例如 `p2-siteyeb-postgres-1`（`docker-compose.yml:30`）。文档和排查命令一律用服务名（`docker compose logs backend`），不要写死旧容器名 `siteyeb-*`。
 
-## 快速开始
+| 服务 | 镜像 | 作用 | 健康检查 | 依据 |
+|---|---|---|---|---|
+| `postgres` | `pgvector/pgvector:pg17` | 业务库 + pgvector | `pg_isready` | `docker-compose.yml:28-29,78-83` |
+| `redis` | `redis:7-alpine` | 队列、限流、配额计数 | `redis-cli ping` | `docker-compose.yml:85-86,110-112` |
+| `backend` | `p2-siteyeb-backend:3.0` | FastAPI 应用，uvicorn 监听内网 8000 | `curl http://127.0.0.1:8000/health` | `docker-compose.yml:116,123,134-135`；`backend/Dockerfile:81-85` |
+| `worker` | 复用 backend 镜像 | RQ 消费者，跑 `python -m app.worker` | 关闭（`healthcheck: disable: true`） | `docker-compose.yml:260-261,271,372-373` |
+| `frontend` | `p2-siteyeb-frontend:3.0` | nginx 托管 `dist`，同源反代 `/api` | `wget --spider http://127.0.0.1/` | `docker-compose.yml:386,405-410`；`Dockerfile:32-45` |
 
-```bash
-cp .env.example .env
-# 必填：POSTGRES_PASSWORD、JWT_SECRET（>= 32 字符）、EXTERNAL_LLM_API_KEY
-# 按需改：VIDEO_HOST_PATH（默认 D:/ITJC）、WEB_PORT（默认 80）
+## 二、端口
 
-docker compose up -d --build
-open http://localhost
-```
+端口规则：`<服务前缀><两位项目号>`，固定五位；P2 尾号 02。123 前端 Web、124 后端 API、125 数据库、126 缓存/中间件（`docker-compose.yml:1-6`）。
 
-首次启动会：
-1. 起 pgvector 容器并等它 healthy
-2. backend 入口脚本等库可连 → 建表建索引 → 起 uvicorn
-3. frontend 等 backend healthy 后起 nginx
+| 宿主端口 | 映射目标 | 绑定 | 说明 | 依据 |
+|---|---|---|---|---|
+| `80` | `frontend:80` | `0.0.0.0` | 裸 localhost 入口 | `docker-compose.yml:407` |
+| `12302` | `frontend:80` | `0.0.0.0` | Web 入口，`WEB_PORT` 默认 12302 | `docker-compose.yml:408`；`.env.example:95` |
+| `12402` | `backend:8000` | **只绑 `127.0.0.1`** | API 常驻发布回环口：宿主调试、前端 dev 代理能连，公网扫不到；对外访问仍走 nginx `/api` | `docker-compose.yml:132-135`；`.env.example:96` |
+| `11112` | — | — | **已作废（2026-11-16 起换号，后端 API 见 12402）**；`docker-compose.yml:3` 旧注释里那句「11112 API」是过期残留，勿照抄 | `docker-compose.yml:3,135` |
+| `12322` | Vite dev | `127.0.0.1` | dev 端口 = 12302 + 20；代理打到 `127.0.0.1:12302`，不进容器 | `vite.config.ts:12,16`；`playwright.config.ts:12,17` |
+| `12502` | `postgres:5432` | 只绑 `127.0.0.1` | `POSTGRES_PORT` 可覆盖 | `docker-compose.yml:75`；`.env.example:6` |
+| `12602` | `redis:6379` | 只绑 `127.0.0.1` | `REDIS_PORT` 可覆盖 | `docker-compose.yml:107`；`.env.example:97` |
+| 监控段 | — | — | **未分配**；旧 11162 已作废，不要编新号 | `docker-compose.yml:6` |
 
----
+容器内部互访走 compose 内网：backend 地址 `backend:8000`（`nginx.conf:100`），Redis `redis:6379`（`docker-compose.yml:201`）。
 
-## 服务与端口
+CORS 允许来源：`http://localhost,http://localhost:12302,http://localhost:12322`（`.env.example:74`）。
 
-| 服务 | 容器名 | 内网端口 | 对外端口 |
-| --- | --- | --- | --- |
-| postgres | siteyeb-pg | 5432 | `${POSTGRES_PORT:-5432}` |
-| redis | siteyeb-redis | 6379 | `${REDIS_PORT:-6379}` |
-| backend | siteyeb-backend | 8000 | 不暴露，仅内网 |
-| frontend | siteyeb-frontend | 80 | `${WEB_PORT:-80}` |
+> 覆盖文件同口径：`docker-compose.pg.yml:50` PG 默认 12502；`docker-compose.https.yml:17` frontend 回环 12302。
 
-backend 不对外暴露是有意的：所有流量从 nginx 进，SSE、静态资源、CORS 都在一层里解决。
+## 三、数据目录
 
-### 数据卷
+命名卷（compose `volumes:` 段声明）：
 
-| 卷 | 内容 |
-| --- | --- |
-| `siteyeb-pgdata` | PostgreSQL 数据（含向量） |
-| `siteyeb-redis` | RQ 队列与缓存（AOF 持久化） |
-| `siteyeb-output` | 字幕、Markdown 笔记 |
-| `siteyeb-thumbnails` / `siteyeb-sprites` | 缩略图与雪碧图 |
-| `siteyeb-work` | 转写临时文件 |
+| 卷名 | 用途 | 依据 |
+|---|---|---|
+| `siteyeb-pgdata` | PostgreSQL 数据目录 | `docker-compose.yml:77,416-417` |
+| `siteyeb-redis` | Redis 持久化 | `docker-compose.yml:109,418-419` |
 
-视频库用绑定挂载 **只读**：`${VIDEO_HOST_PATH}:/videos:ro`。容器不会改你的视频文件。
+绑定挂载：
 
----
+| 宿主路径 | 容器路径 | 用途 | 依据 |
+|---|---|---|---|
+| `${VIDEO_HOST_PATH:-./video-library}` | `/videos:ro` | 视频库只读 | `docker-compose.yml:225,360` |
+| `${VIDEO_HOST_PATH:-./video-library}/thumbnails` | `/data/thumbnails` | 缩略图 | `docker-compose.yml:228,363` |
+| `${VIDEO_HOST_PATH:-./video-library}/sprites` | `/data/sprites` | 雪碧图 | `docker-compose.yml:229,364` |
+| `${VIDEO_HOST_PATH:-./video-library}/output` | `/data/output` | 抽轨音频、转写中间产物 | `docker-compose.yml:230,365` |
+| `${VIDEO_HOST_PATH:-./video-library}/work` | `/data/work` | worker 临时目录 | `docker-compose.yml:231,366` |
+| `./logs` | `/data/logs` | backend / worker 共享落盘目录，文件 `backend.jsonl`、`worker.jsonl` | `docker-compose.yml:234,370,153-154,289-290` |
+| `./data/hf` | `/data/hf` | Whisper / HF 模型缓存，避免重建容器重下 | `docker-compose.yml:374,324` |
+| `./.migration` | `/data/source:ro` | 首次从 SQLite 迁移时的旧库只读目录 | `docker-compose.yml:372,222` |
 
-## 关键设计
+旧文档把 `siteyeb-output` / `siteyeb-thumbnails` / `siteyeb-sprites` / `siteyeb-work` 当成命名卷，实际它们是上面的绑定挂载；compose `volumes:` 段里只有两个数据库卷。
 
-### 容器内访问宿主机模型服务
+`VIDEO_HOST_PATH` 默认 `./video-library`，相对 `docker-compose.yml` 所在目录解析；容器内视频库固定为 `/videos`。当前 Windows 项目在 C 盘、素材在 D 盘时，项目内 `video-library` 用 junction 指向 `D:\ITJC`；完整路径口径和换机步骤见 [runtime-paths.md](runtime-paths.md)。
 
-`localhost` 在容器里指容器自己。LM Studio / Ollama 跑在宿主机时，必须用 `host.docker.internal`：
+## 四、为什么不推荐本机直跑
 
-```yaml
-EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
-OLLAMA_BASE_URL: http://host.docker.internal:11434
-```
+应用依赖 PostgreSQL + pgvector 扩展、Redis、ffmpeg；这些在镜像/compose 里已经装好（`backend/Dockerfile:34` 装 ffmpeg）。本机直跑还要自备 venv、装扩展、对齐 Redis，和容器环境容易不一致。容器路径是默认入口；本机 venv 只留给调试和测试，端口口径见 `docs/run.md`。
 
-compose 里已通过 `extra_hosts: host.docker.internal:host-gateway` 声明，Linux 下也能解析。
-
-**注意**：LM Studio 需要开启「Serve on Local Network」，否则只监听 127.0.0.1，容器连不上。
-
-### 路径映射（容器化最容易踩的坑）
-
-数据库里的 `videos.filepath` 是**容器化之前写入的宿主机绝对路径**：
-
-```
-D:\ITJC\Python\day01\01-环境搭建.mp4
-```
-
-容器里视频挂在 `/videos`，拿原路径必然 `FileNotFoundError`。所以在 `utils/files.py` 加了一层
-`resolve_media_path()`：先试原路径，不存在就按 `PATH_MAP` 做前缀替换。
-
-```yaml
-PATH_MAP: "D:/ITJC/thumbnails=/data/thumbnails;D:/ITJC/sprites=/data/sprites;D:/ITJC/output=/data/output;D:/ITJC/work=/data/work;D:/ITJC=/videos"
-```
-
-要点：
-- **最长前缀优先**，所以 `/thumbnails` 这类更具体的规则必须排在 `/videos` 前面
-- 本地 venv 跑法不受影响（原路径存在就直接返回）
-- 没配 `PATH_MAP` 时行为与改造前一致
-
-配套地，`thumbnails/sprites/output/work` 都改为**绑定宿主机目录**而不是命名卷——否则容器里看到的是空目录，
-1.4 万个视频的缩略图得从头重新生成。
-
-与此相关的一个副作用值得记一笔：`get_thumbnail` 原本的逻辑是「文件不存在就把数据库里的 `thumbnail` 置空」。
-在容器路径没配好时，一次请求就会把好数据洗掉。现在会先判断路径是否属于「另一个平台」
-（Linux 里遇到 `D:\...`），命中就只报 404 并打警告，不动数据。
-
-### 流式对话必须关缓冲
-
-nginx 默认会缓冲响应，SSE 的 token 会被攒成一整块才发给浏览器，看起来像"卡了很久然后一次性出现"。
-
-`nginx.conf` 里对 `/api/assistant/chat/stream` 单独配了：
-
-```nginx
-proxy_buffering off;
-proxy_cache off;
-proxy_read_timeout 3600s;
-```
-
-后端也会发 `X-Accel-Buffering: no` 作为双保险。
-
-### 非 root 运行
-
-容器内用 `appuser`（uid 1000）跑服务，所以后端监听 **8000** 而不是 80——Linux 下非 root 无法绑定 1024 以下端口，由 nginx 和 compose 做映射。
-
-### 健康检查链路
-
-```
-postgres(healthy) ─┐
-                   ├─→ backend(healthy) ─→ frontend(健康检查)
-redis(healthy)  ───┘
-```
-
-`depends_on: condition: service_healthy` 确保后启动的服务前面已经真的可用，而不只是"容器起来了"。
-
-backend 的 `/health` 会返回 PostgreSQL 版本、pgvector 版本、向量条数，可以直接用来看状态：
+## 五、常用命令
 
 ```bash
-curl localhost/health
+docker compose up -d                                 # 起全部 5 个服务
+docker compose up -d postgres redis backend frontend # web-only，不带 worker
+docker compose build backend                         # 改了后端依赖或代码后重建
+docker compose stop                                  # 停容器，保留卷
+docker compose ps                                   # 看服务状态（以服务名为准）
+docker compose logs -f backend                       # 跟后端日志
+docker compose down                                  # 删容器，命名卷保留
 ```
 
----
+宿主机直连后端调试：`curl http://127.0.0.1:12402/health`（回环口，只给本机用）。
 
-## 从 SQLite 迁移数据
+GPU 转写用覆盖文件：`docker-compose.gpu.yml` 给 backend 和 worker 都挂 NVIDIA 设备（`docker-compose.gpu.yml:13-39`），构建参数 `INSTALL_CUDA=true`。
 
-旧库不进镜像，用只读挂载：
+## 六、覆盖文件（overlay）
 
-```bash
-mkdir -p .migration
-cp /path/to/learning_os.db .migration/
+| 文件 | 用途 |
+|---|---|
+| `docker-compose.https.yml` | Caddy 承担 80/443；frontend 只绑回环 12302 |
+| `docker-compose.pg.yml` | 独立 PostgreSQL 实例覆盖（SQLite 迁移/回滚场景），同项目名、同卷名 |
+| `docker-compose.tencent.yml` | 腾讯云部署：资源上限、日志轮转、可选内嵌 embedding 服务 |
+| `docker-compose.gpu.yml` | GPU 转写覆盖 |
 
-# .env 里设
-MIGRATE_SQLITE=true
-SQLITE_SOURCE_DIR=./.migration
+用法是 `-f docker-compose.yml -f docker-compose.<overlay>.yml up -d`，overlay 里同名段会合并覆盖。
 
-docker compose up -d --build backend
-```
+## 配置口径（已统一）
 
-入口脚本会检测 `/data/source/learning_os.db` 并执行迁移。迁移是**幂等**的：目标表非空会跳过，不会重复灌数据。
-
-手动跑：
-
-```bash
-docker compose exec backend python scripts/migrate_sqlite_to_pg.py \
-  --sqlite /data/source/learning_os.db
-```
-
-### 向量回填
-
-首次迁移只带业务数据，向量需要重建（旧的 319 万条已验证为无效数据）。全量约 6 小时：
-
-```bash
-# 建块 + 向量化已经自动化了，不需要手动跑脚本：
-# 转写完成后自动投递，worker 也会定期扫描补齐，进程重启不丢。
-curl localhost/api/admin/embeddings/status        # 看进度
-curl -X POST localhost/api/admin/embeddings/scan  # 手动催一轮（一般不用）
-
----
-
-## GPU 转写
-
-默认镜像**不含 CUDA**（省 2-3GB），转写走 CPU int8，功能正常但慢。
-
-要 GPU：
-
-```bash
-# 先确认宿主机能用 GPU
-docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
-
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
-```
-
-`docker-compose.gpu.yml` 会做三件事：装 CUDA 包、设 `DEVICE_TYPE=cuda`、申请 GPU 设备。
-
----
-
-## 常见问题
-
-**Q: `docker pull` 卡住或报 `dial tcp ...:443 connectex: A connection attempt failed`**
-这台机器直连 Docker Hub 不通，所有基础镜像都走了 `docker.m.daocloud.io` 镜像源（`Dockerfile` 与 compose 里已写死）。
-新增镜像时记得同样加前缀，例如 `docker.m.daocloud.io/library/redis:7-alpine`。
-
-**Q: 启动报 `POSTGRES_PASSWORD 必须在 .env 中设置`**
-compose 用了 `${VAR:?err}` 语法强制校验。填 `.env` 里的 `POSTGRES_PASSWORD`。
-
-**Q: 80 端口被占用**
-改 `.env` 的 `WEB_PORT=8080`，然后 `docker compose up -d`。Windows 上 80 常被 IIS 或其它服务占。
-
-**Q: 前端能打开但接口全 502**
-backend 还没 healthy。`docker compose ps` 看状态，`docker compose logs backend` 看入口脚本卡在哪（通常是等数据库）。
-
-**Q: 检索报"语义检索不可用，已降级为纯词法"**
-embedding 服务连不上。检查 LM Studio 是否在跑、是否开了局域网访问、`EMBEDDING_BASE_URL` 是否用 `host.docker.internal`。
-
-**Q: 容器时区不对**
-镜像里已设 `TZ=Asia/Shanghai` 并链接了 localtime。若仍不对，检查 `.env` 是否覆盖了 `TZ`。
-
-**Q: 重建镜像后数据还在吗**
-在。数据在命名卷里，`docker compose down` 不会删卷。彻底清空要 `docker compose down -v`（会删数据，慎用）。
-
----
-
-## 与本地 venv 开发模式的区别
-
-| | Docker | 本地 venv |
-| --- | --- | --- |
-| 数据库 | 容器内 postgres:5432 | 宿主机 localhost:5432（同一个容器） |
-| 后端地址 | backend:8000（内网） | 127.0.0.1:8100（注意别用 8000，被 Docker 占） |
-| 前端 | nginx 托管 dist，同源代理 | vite dev server，需 `VITE_API_BASE_URL` |
-| 依赖变更 | 要 rebuild | 直接 pip install |
-| 代码变更 | 要 rebuild（未挂载源码） | 热重载 |
-
-日常改代码建议还是用本地 venv；Docker 用于部署和交付给别人。
-
-> 想让 Docker 也支持热重载，可以加一个 `docker-compose.dev.yml` 把 `./backend:/app` 挂进去 +
-> `uvicorn --reload`。当前没做，因为 Windows 下挂载源码会让文件监听变得很慢。
+- `CORS_ORIGINS` 三处默认值已统一为六源：`localhost` / `127.0.0.1` 的 12302、12322，以及裸域 `localhost` / `127.0.0.1`；`.env.example`、`docker-compose.yml:205,341`、`database.py` 代码回退完全一致。
+- 六个运维脚本（`start.bat`、`start.sh`、`scripts/diagnose.sh`、`backup.sh`、`restore.sh`、`preflight.sh`）已统一按 compose 生成名 `p2-siteyeb-<service>-1` 取容器，并保留 `*_CONTAINER` 环境变量覆盖；compose 仍不写死 `container_name`。

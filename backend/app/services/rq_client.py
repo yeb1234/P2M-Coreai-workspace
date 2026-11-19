@@ -53,6 +53,7 @@ AI_JOB_RESULT_TTL_SECONDS = 24 * 60 * 60
 
 _redis_conn: redis.Redis | None = None
 _ai_jobs_queue: Queue | None = None
+_summary_jobs_queue: Queue | None = None
 _background_queue: Queue | None = None
 
 
@@ -68,6 +69,14 @@ def ai_jobs_queue() -> Queue:
     if _ai_jobs_queue is None:
         _ai_jobs_queue = Queue("ai_jobs", connection=get_redis_connection())
     return _ai_jobs_queue
+
+
+def summary_jobs_queue() -> Queue:
+    """只补总结的独立队列；笔记本/备用总结 worker 消费这里。"""
+    global _summary_jobs_queue
+    if _summary_jobs_queue is None:
+        _summary_jobs_queue = Queue("summary_jobs", connection=get_redis_connection())
+    return _summary_jobs_queue
 
 
 def is_job_cancelled(job_id: str) -> bool:

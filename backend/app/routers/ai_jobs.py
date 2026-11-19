@@ -12,6 +12,7 @@ import logging
 
 from app.services.admin_ai_queue import (
     _is_queue_paused,
+    ai_job_status_counts,
     enqueue_ai_jobs,
     reconcile_stuck_ai_jobs,
 )
@@ -96,13 +97,14 @@ def list_ai_jobs(
             .all()
         )
 
+    status_counts = ai_job_status_counts(db)
     return AiJobListOut(
         items=[_job_list_item(job) for job in jobs],
         total=total_all,
-        running=db.query(AiJob).filter(AiJob.status == "running").count(),
-        queued=db.query(AiJob).filter(AiJob.status == "queued").count(),
-        failed=db.query(AiJob).filter(AiJob.status == "failed").count(),
-        completed=db.query(AiJob).filter(AiJob.status == "completed").count(),
+        running=status_counts.get("running", 0),
+        queued=status_counts.get("queued", 0),
+        failed=status_counts.get("failed", 0),
+        completed=status_counts.get("completed", 0),
     )
 
 
@@ -225,6 +227,7 @@ def batch_ai_jobs(
                 status="queued",
                 stage="queued",
                 message="Queued for processing",
+                summary_only=(payload.mode == "missing_summary"),
             )
             _apply_job_options(job, options)
             db.add(job)

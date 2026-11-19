@@ -1,0 +1,630 @@
+﻿severity,id,title,duration,segment_count,char_count,transcript_chars,empty_segments,garbled_segments,invalid_timestamps,overlap_segments,repeat_run_max,coverage_ratio,filler_segments,filler_ratio,flags,sample
+critical,43168,13.装饰器-2023-9-1-顾安,9457.625669,11638,241950,241950,0,0,0,0,10296,0.9986206190161702,233,0.0011,repeat_loop,seg=64 density_high: 如果你在一个类当中没有去实现next和我们的iter方法的话呢
+critical,38663,04,7678.111969,11078,183859,183859,0,0,0,0,7574,0.9940125946084651,8,0.0,repeat_loop,seg=46 density_high: 我上一集可以给大家介绍一下
+critical,40647,8,10545.408,3231,130706,130706,0,0,41,0,3176,1.0,6,0.0001,invalid_timestamps|repeat_loop,seg=33 density_high: 我愿意和你一起走啊
+critical,38925,5 容器类型 - 2-2023-08-14-顾安,8275.863583,6782,125811,125811,0,0,0,0,6387,0.9997240671046475,6452,0.0543,filler_high|repeat_loop,seg=171 density_high: 到这一步没有问题的可以给老师走0啊
+critical,37577,3,10413.985,8060,123546,123546,0,0,3,0,5674,1.0,194,0.0018,invalid_timestamps|repeat_loop,seg=25 density_high: 孤立浑浑巍巍一些 照着人间
+critical,38245,4,10300.992,10036,119963,119963,0,0,1,0,9889,1.0,0,0.0,repeat_loop,那失去的幸福该怎么坠毁
+critical,36553,1,10038.432,8478,93674,93674,0,0,6,0,4181,1.0,23,0.0003,invalid_timestamps|repeat_loop,seg=35 density_high: 所以这种呢我们会去用上这个non-chain的一些框架帮助我们快速的去做这个大模型应用开发的弱地嘛
+critical,45538,22-1多Agent系统(下)-25.7.10,8040.256,6428,80619,80619,0,0,0,0,3359,0.9998363236195463,64,0.001,repeat_loop,seg=172 density_high: 那么我们就要访问OpenAI兼容的web模型
+critical,39856,6,10422.112,7142,76345,76345,0,0,0,0,4951,1.0,0,0.0,repeat_loop,seg=13 density_high: 当时的你
+critical,42507,12,11609.184,7800,70154,70154,0,0,0,0,7746,1.0,0,0.0,repeat_loop,那些年错过的待遇
+critical,50375,腾讯会议视频_主体识别_向量生成_存储向量数据库,17065.888,7358,68735,68735,0,1,0,0,4,0.9664976120785511,95,0.002,garbled_segments,seg=16 density_high: This school
+critical,44670,18--[视频]18.第06周作业点评,13805.833333,4649,68670,68670,0,0,0,0,11,0.9996991610068136,541,0.0121,filler_high|repeat_loop,seg=539 density_high: 这个页面
+critical,41907,10.进阶面向对象-2023-8-25-顾安,9216.883,7267,66589,66589,0,0,0,0,6330,0.9997674918950366,6536,0.1107,filler_high|repeat_loop,seg=35 density_high: 就是说
+critical,45143,20-Agent 核心认知框架-25.7.3,9984.672,6449,64593,64593,0,0,1,0,6345,1.0,6362,0.1095,filler_high|repeat_loop,seg=17 density_high: 那一天你也想起
+critical,38921,5,9850.816,7059,64098,64098,0,0,15,967,3331,0.9999313762433486,7059,0.0,filler_high|invalid_timestamps|repeat_loop|timestamps_overlap,制作公司 : 孙晓婷
+critical,42336,11.迭代器-2023-8-28-顾安,7300.028,3672,64098,64098,0,0,0,0,1746,0.9998824662042392,1302,0.0238,filler_high|repeat_loop,seg=73 density_high: 那么我们现在废话不多说啊
+critical,41215,9--[视频]09.第03周作业点评,14416.444444,7834,64024,64024,0,0,0,0,9,0.9982489133088217,1152,0.0248,filler_high|repeat_loop,seg=571 density_high: 点击
+critical,42722,012,7373.791969,4073,60609,60609,0,0,0,0,2757,0.9959041468586352,16,0.0003,repeat_loop,seg=150 density_high: 那么我们在这里呢
+critical,50103,27633794_tenghuiwangxiao_live_494128_1_2025-04-25-19-17-25_2025-04-25-22-02-31,9910.073667,6643,59792,59792,0,0,0,0,6641,0.9999925664528362,0,0.0,repeat_loop,欢迎订阅我的频道
+critical,42461,11、笔记点评-答疑-6-1,13174.912667,5934,58658,58658,0,1,0,0,4,0.9994517863470859,140,0.0031,garbled_segments,seg=11 density_high: That you and me aren't really fond of
+critical,36854,2,9017.408,4482,58162,58162,0,0,6,0,4465,1.0,4468,0.0832,filler_high|invalid_timestamps|repeat_loop,seg=18 density_high: 听说这个九万字还比较火啊
+critical,38656,4. 容器类型 - 1-2023-08-11-顾安,8441.051542,6198,56818,56818,0,0,6,0,5144,1.0,125,0.0026,invalid_timestamps|repeat_loop,seg=55 density_high: 第二种叫序列
+critical,36606,1.基础知识-2023-8-04-顾安,7971.0,7332,56789,56789,0,0,0,0,5352,0.9996600175636683,218,0.0049,repeat_loop,seg=39 density_high: 然后我们来到教室的啊
+critical,50347,大模型部署实训,7733.066667,3039,56465,56465,0,0,0,0,1059,0.998109848572446,139,0.0099,repeat_loop,seg=27 density_high: 大家可以很直观的看到中间的一些布置
+critical,50104,27633794_tenghuiwangxiao_live_494923_1_2025-04-29-19-15-32_2025-04-29-22-07-36,10327.993667,5278,55167,55167,0,0,40,0,2636,0.9998689322395379,546,0.0132,filler_high|invalid_timestamps|repeat_loop,seg=27 density_high: 优优独播剧场——YoYo Television Series Exclusive
+critical,41400,9,10153.344,7044,54926,54926,0,0,0,0,6216,0.9999897570691981,0,0.0,repeat_loop,你往前走 不要回头
+critical,50106,27633794_tenghuiwangxiao_live_497505_1_2025-05-09-19-26-01_2025-05-09-22-48-12,12135.447667,3747,54776,54776,0,0,61,0,3373,0.999890595960163,0,0.0,invalid_timestamps|repeat_loop,seg=7 density_high: 与优优独播剧场——YoYo Television Series Exclusive
+critical,37501,02AG大模型全栈实践班【AGI大模型2512期】23-Agent 数字人应用-25.7.14,8025.428,4758,54348,54348,0,0,0,0,1443,0.9996712947895116,124,0.0028,repeat_loop,"seg=417 degenerate,repeat_char: 咚咚咚咚咚咚咚"
+critical,41631,10,10361.536,5051,50469,50469,0,0,0,0,5032,1.0,0,0.0,repeat_loop,我愿意倾起一片红颜
+critical,50346,大模型评估,7362.9,3147,50101,50101,0,0,0,0,2325,0.9966453435467004,39,0.0017,repeat_loop,好 我们下个课就回到这边
+critical,40102,7,10736.352,5279,47455,47455,0,0,0,0,5246,1.0,0,0.0,repeat_loop,只好把岁月画成歌
+critical,42299,11,8089.472,6691,47199,47199,0,0,0,0,6648,1.0,0,0.0,repeat_loop,我永遠最疼的
+critical,45386,21-多Agent系统-25.7.7,9020.768,4496,44961,44961,0,0,0,0,4495,1.0,0,0.0,repeat_loop,按下「點選」的按鈕
+critical,44915,19 协程-2-2023-09-15-顾安,9179.727914,3799,44461,44461,0,2,0,0,6,0.998659228888339,268,0.0076,filler_high|garbled_segments|repeat_loop,seg=125 density_high: 叫runutil complete
+critical,50340,何为开源大模型、为何要开源大模型,8330.566667,4874,44388,44388,0,0,5,0,3312,1.0,27,0.0011,invalid_timestamps|repeat_loop,seg=64 density_high: 然后第四个时操也是把我们的项目脱明出来做一个实战的给大家讲一讲全流程的一个一个做一个讲解
+critical,50310,【试听1】做 AI 应用时代最稀缺的人,9267.174625,4024,42885,42885,0,0,0,0,5,0.9999746821432105,153,0.0044,repeat_loop,seg=1013 degenerate: 那个那个那个
+critical,44552,17.进程-2023-9-11-顾安,8895.439,4282,42562,42562,0,0,0,0,7,0.998492598285481,474,0.0137,filler_high|repeat_loop,seg=369 density_high: 下面的这个地方改成Worker2
+critical,40650,8 初识面向对象-2023-08-21-顾安,7202.362721,5603,42162,42162,0,0,0,0,4420,0.9980627578003926,206,0.006,repeat_loop,seg=387 density_high: 比如说呢
+critical,39873,6.函数基础 -2023-08-16-顾安,8594.512005,4743,42047,42047,0,0,0,0,1525,0.973352529513396,320,0.0115,filler_high|repeat_loop,seg=324 density_high: 好
+critical,42750,12.生成器-2023-8-30-顾安,7040.291,3724,41709,41709,0,0,0,0,756,0.9959517298361673,584,0.0168,filler_high|repeat_loop,seg=29 density_high: 我们就会想到迭代器啊
+critical,37605,3 循环语句-2023-08-09-顾安,6345.718,3949,41545,41545,0,0,0,0,2268,0.9935061721935958,199,0.0056,filler_high|repeat_loop,seg=79 density_high: 我们把它全部都写出来啊
+critical,44245,16.线程-2-2023-9-8-顾安,8687.478,3553,41091,41091,0,0,0,0,12,0.9988376373442327,586,0.0179,filler_high|repeat_loop,seg=164 density_high: spather
+critical,41401,09,7646.336,4482,40516,40516,0,0,1,0,3240,1.0,55,0.0014,repeat_loop,seg=28 density_high: 代理人
+critical,43889,15.线程-2023-9-6-顾安,8434.323,3642,38717,38717,0,0,0,0,9,0.9987001920604653,224,0.0074,filler_high|repeat_loop,seg=89 density_high: 它会有一个Chrome这样的一个选项
+critical,36554,01,7468.416,2963,38205,38205,0,0,0,0,1090,0.9989240020909387,25,0.0009,repeat_loop,seg=169 density_high: 然后呢才能够理解这个文字的模态
+critical,43528,14.异常处理与文件读写-2023-9-4-顾安,7766.644,3499,37723,37723,0,0,0,0,8,0.9975376752172496,423,0.0127,filler_high|repeat_loop,seg=72 density_high: 叫Stop iteration
+critical,36198,1-2 串讲-大模型必备Python语言 2025-10-23,9650.710667,4543,37397,37397,0,61,0,0,30,0.9989026023714281,115,0.0047,garbled_segments|repeat_loop,seg=118 density_high: number是吧
+critical,45865,24 mongodb 数据库-2023-09-27-顾安,7650.683,3541,36165,36165,0,0,0,0,29,0.995192193951834,385,0.0126,filler_high|repeat_loop,seg=395 density_high: 跟咱们的那个message一样啊
+critical,45870,24-Agent可视化平合 Coze-25.7.21,7529.664,2590,36149,36149,0,0,4,0,1846,1.0,111,0.0069,invalid_timestamps|repeat_loop,seg=35 density_high: 给大家看一看
+critical,40648,08,7345.44,4046,35941,35941,0,0,0,0,2488,0.9952691738003442,75,0.0021,repeat_loop,seg=265 density_high: 这是一个官方的设计方式
+critical,45344,21 MySQL-2 -2023-09-20-顾安,8137.269274,3425,35900,35900,0,0,0,0,5,0.9986912963499898,300,0.0116,filler_high|repeat_loop,seg=822 density_high: 有一些它的这个ease delete
+critical,50105,27633794_tenghuiwangxiao_live_496311_1_2025-05-06-19-18-42_2025-05-06-22-08-56,10217.840667,1591,35849,35849,0,0,5,0,776,0.9998002839282284,0,0.0,invalid_timestamps|repeat_loop,seg=45 density_high: 请不吝点赞 订阅 转发 打赏支持明镜与点点栏目
+critical,36187,1-1 串讲-大模型必备Python语言 2025-10-21,9038.733333,5124,35562,35562,0,2,0,0,111,0.9986841814486795,207,0.0093,garbled_segments|repeat_loop,seg=373 density_high: Pessing呢
+critical,41685,10--[视频]10.第04周知识精讲,7540.222222,4618,35443,35443,0,0,0,0,9,0.9995408328961581,579,0.0213,filler_high|repeat_loop,seg=966 density_high: 这个是一样的
+critical,40209,7--[视频]07.第03周知识精讲,7821.166667,4538,35075,35075,0,0,13,0,37,1.0,427,0.016,filler_high|invalid_timestamps|repeat_loop,seg=278 density_high: 摇头
+critical,41436,9.深入面向对象-2023-8-23-顾安,7542.704,2372,34777,34777,0,0,0,0,1396,0.9990223665147141,170,0.0164,filler_high|repeat_loop,seg=116 density_high: name
+critical,45867,24--[视频]24.第08周作业点评,11555.444444,3426,34688,34688,0,2,21,0,31,1.0,782,0.0186,filler_high|garbled_segments|invalid_timestamps|repeat_loop,"seg=391 density_high: 啊,"
+critical,50344,大模型微调技术之数据清洗,8118.533333,4216,33653,33653,0,0,0,0,1013,0.9976678875083212,64,0.0023,repeat_loop,seg=151 density_high: 一定要把这个数据加进去
+critical,38922,05,7413.567969,2810,33160,33160,0,0,0,0,1523,0.9993190904809792,12,0.0004,repeat_loop,seg=24 density_high: 这个框架
+critical,40726,8--[视频]08.第03周测评解析,7004.0,3932,32382,32382,0,1,0,0,2,0.9992490005711022,696,0.027,filler_high|garbled_segments,seg=273 density_high: 高薪
+critical,39040,5--[视频]05.第02周测评解析,7120.888889,3855,31986,31986,0,0,8,0,16,1.0,638,0.0268,filler_high|invalid_timestamps|repeat_loop,seg=85 density_high: 你不要去问
+critical,42300,011,7369.856,2724,31726,31726,0,0,0,0,530,0.9952270437848447,570,0.0198,filler_high|repeat_loop,seg=166 density_high: suffering reading等等
+critical,45142,20--[视频]20.第07周测评解析,7585.833333,4370,31128,31128,0,0,0,0,8,0.9988975063604921,613,0.027,filler_high|repeat_loop,seg=53 density_high: user personal
+critical,43377,14--[视频]14.第05周测评解析,6814.777778,4120,29635,29635,0,0,0,0,16,0.9987207538845738,544,0.026,filler_high|repeat_loop,seg=300 density_high: 是不是
+critical,44919,19--[视频]19.第07周知识精讲,6987.055556,1850,28247,28247,0,0,0,0,19,0.9996227944691614,279,0.0267,filler_high|repeat_loop,seg=148 degenerate: 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 从 
+critical,36679,01_deepagents_进阶应用_子智能体以及异步执行处理,5164.033008,3359,27621,27621,0,0,0,0,5,0.9991667349931082,49,0.0022,repeat_loop,seg=318 density_high: 或者lunch chain
+critical,37291,02,7706.4,4355,25796,25796,0,0,0,0,2186,0.9992110453648916,30,0.0014,repeat_loop,seg=61 density_high: 第二步
+critical,37578,03,7780.416,3945,25123,25123,0,0,0,0,2028,0.9905305834546636,29,0.0014,repeat_loop,seg=313 density_high: AlexNet
+critical,37335,2.判断语句-2023-8-07-顾安,7085.57802,4886,23545,23545,0,0,3,0,2284,1.0,241,0.0135,invalid_timestamps|repeat_loop,seg=108 density_high: 第五个是什么
+critical,39533,06,7422.48,4255,23073,23073,0,0,0,0,2750,0.9970306420495576,25,0.0012,repeat_loop,seg=50 density_high: 那么它会有一个问题是呢
+critical,50102,27633794_tenghuiwangxiao_live_493431_1_2025-04-22-19-24-07_2025-04-22-21-44-25,8422.046667,2613,22495,22495,0,0,0,0,1160,0.9999350909557243,34,0.0024,repeat_loop,seg=464 degenerate: 好的好的好的
+critical,40730,8--[视频]23.第08周测评解析,6535.673991,2632,22240,22240,0,4,0,0,3,0.9987324962947346,284,0.0201,filler_high|garbled_segments,seg=464 density_high: 第十一题
+critical,45716,23--[视频]23.第08周测评解析,6536.055556,2598,22155,22155,0,0,0,0,7,0.9992571121896994,301,0.0206,filler_high|repeat_loop,seg=2592 density_high: 谢谢大家
+critical,37604,3 产品思维与产品意识（下）- 第一部分,4020.535011,2234,22123,22123,0,1,0,0,2,0.9980413027175601,23,0.0007,garbled_segments,seg=1000 garbled: 多巴胺的蜂�
+critical,46145,26--[视频]26.第09周测评解析,5788.944444,2140,22112,22112,0,0,1,0,5,1.0,2061,0.0223,filler_high|repeat_loop,"seg=119 density_high: 啊,"
+critical,38127,03_掌柜智库_导入模块_node_item_nameognition_设计向量库和存储,4577.966341,2629,21249,21249,0,0,0,0,8,0.9999090554693967,63,0.0037,repeat_loop,seg=250 density_high: title content等等
+critical,36759,1_掌柜智库_查询模块_web模块_接口实现和说明,3921.866341,2635,20973,20973,0,0,0,0,25,0.9993303338840124,63,0.0038,repeat_loop,seg=957 density_high: 一个是side
+critical,36222,1-43 【项目】新零售行业评价决策系统【基于BERT+P-Tuning方式】-3 2026-01-08,5685.16,1017,20340,20340,0,51,0,0,16,0.9991169993456649,44,0.0025,garbled_segments|repeat_loop,"seg=487 garbled: 软模板的,软模板的,软模板,软模板的,软模板,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模板的,软模"
+critical,36564,1,3448.35,422,19966,19966,0,0,0,0,62,0.9999942001246973,25,0.0013,filler_high|repeat_loop,seg=347 degenerate: 科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学科学
+critical,40105,7 函数进阶 - 2-2023-08-18-顾安,6825.51746,4775,19527,19527,0,0,0,0,3252,0.999899280896426,221,0.016,repeat_loop,seg=94 density_high: 应该没问题了啊
+critical,50386,预科3-pycharm安装和学习方法-2023-8-2-大海,4734.582971,2428,19480,19480,0,0,0,0,6,0.9940178530667892,554,0.038,filler_high|repeat_loop,seg=61 density_high: Python3
+critical,37300,2,3728.2,2525,18955,18955,0,0,2,0,481,1.0,88,0.006,invalid_timestamps|repeat_loop,seg=594 density_high: 这个Problem Tabulator
+critical,36879,2,3784.822556,2077,18573,18573,0,0,0,0,610,0.9144153916842171,36,0.0025,repeat_loop,seg=564 degenerate: 8.8.8.8
+critical,36862,2,3616.306009,2478,18456,18456,0,0,0,0,543,0.9992185370947684,256,0.017,filler_high|repeat_loop,KM版的开源
+critical,37579,3,3510.84,1208,18435,18435,0,2,0,0,28,0.9946280662177712,63,0.007,filler_high|garbled_segments|repeat_loop,seg=103 density_high: 5.6.7.8.9.10
+critical,36859,2,4051.309002,2658,18328,18328,0,0,19,0,27,1.0,101,0.0081,invalid_timestamps|repeat_loop,seg=476 density_high: 比如说这个
+critical,36172,1,3490.870998,2491,18047,18047,0,0,1,0,22,1.0,43,0.0045,repeat_loop,seg=186 density_high: 是不是get
+critical,37591,3,4460.143991,2746,17838,17838,0,0,0,0,508,0.999472216366837,55,0.0046,repeat_loop,seg=1992 density_high: 是不是给你赋予更高的灵活性和权限
+critical,37586,3,3792.452993,2538,17555,17555,0,0,0,0,8,1.0,36,0.0029,repeat_loop,seg=833 density_high: 这个
+critical,36681,01_langchain简介和扯淡闲聊求职学习方法,3164.26833,877,17472,17472,0,0,0,0,33,0.9998583147972158,83,0.0093,filler_high|repeat_loop,seg=635 degenerate: 巴拉巴拉巴拉巴拉巴拉
+critical,36156,1,4217.355011,2527,17388,17388,0,0,0,0,14,0.9984860152907816,60,0.0044,repeat_loop,seg=41 density_high: 周六吧
+critical,36638,1_1,3653.179002,2360,17368,17368,0,0,0,0,18,0.9597805084504316,148,0.0136,filler_high|repeat_loop,seg=509 degenerate: 一个一个一个
+critical,36151,1,3623.156009,2640,17332,17332,0,0,19,0,378,1.0,43,0.0289,invalid_timestamps|repeat_loop,seg=1378 density_high: 就是这个Transformer了
+critical,36559,1,3624.12731,1984,17098,17098,0,0,0,0,67,0.9998903708490308,128,0.0123,filler_high|repeat_loop,seg=592 density_high: 我们讲的是这个Windows部署啊
+critical,38132,3_掌柜智库_查询模块_node_rrf_融合重排和算法说明,3318.533008,2263,17091,17091,0,0,0,0,5,0.9998906119061872,72,0.0055,repeat_loop,seg=162 density_high: 我不知道大家知道吧
+critical,50190,IPS_2026-01-18.15.03.33.9880,3921.852178,2540,16933,16933,0,0,0,0,11,0.9984899537944797,28,0.0019,repeat_loop,seg=120 density_high: 约等约
+critical,38666,4,3753.882444,2237,16711,16711,0,1,1,0,7,1.0,21,0.002,garbled_segments|repeat_loop,seg=114 density_high: Base的话就是我们的game路
+critical,36560,1,3825.75,1183,16648,16648,0,0,0,0,37,0.9987427301836241,24,0.0016,repeat_loop,seg=208 density_high: 戳念并导入
+critical,37301,2,4022.36835,3210,16601,16601,0,0,0,0,2384,1.0,3,0.0002,repeat_loop,转换成围档
+critical,37971,3,2372.831333,223,15980,15980,0,29,0,0,29,0.9950981206130254,6,0.2107,filler_high|garbled_segments|repeat_loop,seg=65 degenerate: 111100
+critical,36561,1,3612.683008,2411,15760,15760,0,0,0,0,476,0.9715743097934154,78,0.0072,repeat_loop,seg=1591 density_high: Longshan
+critical,36858,2,3638.179002,2066,15648,15648,0,2,0,0,5,0.9977381536215023,86,0.0075,garbled_segments|repeat_loop,seg=42 density_high: 这些段落
+critical,37312,2,3482.511995,1869,15633,15633,0,0,0,0,5,0.9984373363228001,72,0.006,repeat_loop,seg=68 density_high: 你在用的时候
+critical,36171,1,3527.0,321,15430,15430,0,0,0,0,62,0.9913325772611284,0,0.0,repeat_loop,seg=72 density_high: 匹配预测
+critical,37310,2,3451.117144,1631,15317,15317,0,0,5,0,274,1.0,58,0.0139,invalid_timestamps|repeat_loop,seg=517 density_high: 你看这个F是不是被识别有其他字符了
+critical,44733,18-掌柜问数-问数智能体-召回字段信息-下,2289.299349,1723,15312,15312,0,0,0,0,6,0.9997338272951215,110,0.011,filler_high|repeat_loop,seg=60 degenerate: 这个这个这个
+critical,36168,1,3697.360333,468,15231,15231,0,0,0,0,192,0.9999945006712442,232,0.0165,filler_high|repeat_loop,seg=388 degenerate: 医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院医院
+critical,36891,2,3658.681995,2246,15162,15162,0,0,0,0,19,1.0,144,0.0115,filler_high|repeat_loop,seg=100 density_high: 这个句子内容
+critical,37296,2,3658.681995,2246,15162,15162,0,0,0,0,19,1.0,144,0.0115,filler_high|repeat_loop,seg=100 density_high: 这个句子内容
+critical,37581,3,4043.101,2387,15067,15067,0,0,10,0,18,1.0,39,0.0047,invalid_timestamps|repeat_loop,seg=1211 density_high: 已经
+critical,36860,2,3832.164144,1147,14928,14928,0,0,0,0,47,0.9999989186266965,73,0.2237,filler_high|repeat_loop,seg=195 density_high: 好
+critical,37972,3,3443.569233,2349,14709,14709,0,0,0,0,572,1.0,171,0.0181,filler_high|repeat_loop,seg=213 density_high: 看一下大语言模型实现金融文本分类
+critical,36570,1,3756.3,1993,14672,14672,0,3,11,0,80,1.0,71,0.0068,garbled_segments|invalid_timestamps|repeat_loop,seg=138 density_high: ProbTune的
+critical,36565,1,3625.3,1594,14637,14637,0,0,0,0,293,0.9999448321518218,39,0.0046,repeat_loop,seg=113 density_high: Location
+critical,40315,07-掌柜问数-项目架构-问数智能体,2480.666016,98,14600,14600,0,0,4,0,11,1.0,82,0.0189,filler_high|invalid_timestamps|repeat_loop,"seg=85 density_high: 这里边哪块可能是比较绕的啊,哪块是比较绕的,其实我个人认为可能就是这个合并召回信息这块是比较绕的,合并召回信息这块是比较绕的啊,这块绕也没关系,咱们我还是那句话,咱现在呢,能听懂多少是多少,因为这些东"
+critical,38253,4,2751.986578,2110,14541,14541,0,0,0,0,5,0.9999576386015353,22,0.0019,repeat_loop,seg=175 density_high: 叫RunNow
+critical,36165,1,3775.238133,2110,14362,14362,0,0,0,0,6,0.999062805344894,47,0.0042,repeat_loop,seg=106 density_high: 购物贵
+critical,39975,06_修剪消息,1302.9,1121,14318,14318,0,0,0,0,970,1.0,1,0.0001,repeat_loop,seg=72 density_high: 它在实际上用的并不是HUMAN MESSAGE
+critical,37302,2,4042.378157,1968,14213,14213,0,1,0,0,4,0.9985879210755888,45,0.0042,garbled_segments,"seg=743 garbled,repeat_char: 瓷铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁铁�铁铁�铁铁铁��������"
+critical,50189,IPS_2026-01-18.14.00.02.9660,3809.764367,636,14147,14147,0,75,0,0,74,0.9987074352832278,61,0.6168,filler_high|garbled_segments|repeat_loop,seg=118 density_high: 还有Deepseek
+critical,36866,2,3727.5,1513,14127,14127,0,42,0,0,41,0.9999973172367538,44,0.0037,garbled_segments|repeat_loop,seg=569 density_high: 非减化
+critical,37297,2,3699.619002,2197,14088,14088,0,0,0,0,43,0.9997245656919134,58,0.0053,repeat_loop,seg=41 density_high: 丸形填空一样
+critical,38043,3_1,2745.579002,835,13900,13900,0,21,0,0,21,0.9999967212744586,7,0.1817,filler_high|garbled_segments|repeat_loop,seg=409 density_high: Deepseek
+critical,38756,04_deepagents_进阶应用_skill介绍和使用,2511.666341,1669,13890,13890,0,0,0,0,14,0.9997585901478623,45,0.0039,repeat_loop,seg=34 density_high: Skill
+critical,50187,IPS_2026-01-18.11.37.50.4560,4015.880678,2066,13837,13837,0,0,8,0,16,1.0,135,0.0129,filler_high|invalid_timestamps|repeat_loop,seg=110 density_high: 18
+critical,37584,3,3740.556009,2299,13829,13829,0,0,5,0,157,1.0,43,0.006,invalid_timestamps|repeat_loop,seg=381 density_high: dataset
+critical,37602,3,3339.871995,1859,13807,13807,0,0,0,0,35,0.9999964085449928,13,0.0017,repeat_loop,seg=807 density_high: 远程访问
+critical,37985,3,3339.848005,1859,13805,13805,0,0,0,0,35,0.9999976031843402,13,0.0017,repeat_loop,seg=807 density_high: 远程访问
+critical,45071,19Agent智调FuncationCalling-25.6.30,10688.096,770,13780,13780,0,0,1,0,329,1.0,60,0.004,filler_high|repeat_loop,seg=25 density_high: 请不吝点赞 订阅 转发 打赏支持明镜与点点栏目
+critical,38248,4,2643.753778,1683,13728,13728,0,0,27,0,37,1.0,94,0.0111,filler_high|invalid_timestamps|repeat_loop,seg=389 density_high: Solvermax
+critical,36577,1,2981.285011,1119,13697,13697,0,25,0,0,22,0.9647316473896161,45,0.0039,garbled_segments|repeat_loop,seg=320 density_high: 欧拉玛
+critical,37008,2--[视频]02.运营类型,2522.84,1420,13687,13687,0,0,21,0,27,1.0,415,0.0364,filler_high|invalid_timestamps|repeat_loop,咱们再讲一下
+critical,36160,1,3437.000998,1935,13623,13623,0,0,0,0,19,0.9992723313139986,130,0.0128,filler_high|repeat_loop,seg=633 density_high: 我们的Editor
+critical,36556,1,3437.650998,2151,13582,13582,0,0,0,0,6,0.9998833511603611,51,0.0046,repeat_loop,seg=111 density_high: 北线
+critical,38081,03_deepagents_快速入门_基本使用和调用流程,2561.266341,1564,13551,13551,0,0,0,0,6,0.9979204267378454,40,0.0035,repeat_loop,seg=198 density_high: 我们这个LongChain
+critical,36563,1,3974.745255,2286,13264,13264,0,0,0,0,659,0.9753732003637552,46,0.0054,repeat_loop,seg=294 density_high: Olama
+critical,36856,2,3805.34,1979,13194,13194,0,0,0,0,16,0.9990697283291374,90,0.012,repeat_loop,"seg=67 degenerate,repeat_char: 对对对对对对对"
+critical,37585,3,3493.449002,1993,13191,13191,0,1,18,0,26,1.0,55,0.0051,garbled_segments|invalid_timestamps|repeat_loop,seg=117 density_high: setis
+critical,37975,3,3459.983333,2445,13064,13064,0,0,0,0,808,1.0,25,0.0025,repeat_loop,seg=294 density_high: Longshine
+critical,36867,2,2998.683333,1394,12904,12904,0,22,0,0,21,0.996890857765007,69,0.0061,garbled_segments|repeat_loop,seg=77 density_high: 这个累加
+critical,39176,05-掌柜问数-元数据知识库-为字段信息建立向量索引-下,1916.533333,1357,12778,12778,0,0,2,0,8,1.0,104,0.0105,filler_high|invalid_timestamps|repeat_loop,seg=186 density_high: 然后还有一个payload
+critical,37976,3,3666.179183,906,12669,12669,0,58,0,0,21,0.9822187678926656,17,0.0015,garbled_segments|repeat_loop,seg=366 density_high: 还有这个关键是这里
+critical,37598,3,3902.129222,814,12662,12662,0,49,0,0,13,0.997639949505496,23,0.002,garbled_segments|repeat_loop,seg=136 density_high: incrudeTest
+critical,37373,2_1,2826.176009,1778,12425,12425,0,0,0,0,25,0.9876985690596456,87,0.0113,repeat_loop,seg=224 density_high: 需要
+critical,37580,3,3922.647007,2916,12388,12388,0,0,11,0,1884,1.0,46,0.0065,invalid_timestamps|repeat_loop,seg=164 density_high: 行拼接
+critical,37307,2,3559.226833,1957,12364,12364,0,0,0,0,55,0.9974947275297752,20,0.0021,repeat_loop,seg=423 density_high: 充电随时函数
+critical,39277,5,2558.712644,1912,12279,12279,0,0,0,0,5,0.9950550742656977,18,0.0017,repeat_loop,seg=89 density_high: 我们这里object
+critical,37295,2,3669.178005,2107,12166,12166,0,0,19,0,24,1.0,84,0.0221,invalid_timestamps|repeat_loop,seg=1003 density_high: query
+critical,41521,09_子图作为节点添加至父图,1981.683991,1311,12102,12102,0,0,3,0,550,0.999049297966499,34,0.0032,invalid_timestamps|repeat_loop,seg=15 density_high: 一个langraph的一个图
+critical,36153,1,2512.287256,1616,12061,12061,0,0,14,0,29,1.0,39,0.005,invalid_timestamps|repeat_loop,Sigma
+critical,37426,02_langgraph_state_schema,1436.4,888,12019,12019,0,0,0,0,333,1.0,8,0.0007,repeat_loop,seg=78 density_high: StateGraph类是主要使用的
+critical,36569,1,3354.420792,1858,11975,11975,0,0,0,0,25,0.999182931370287,48,0.0048,repeat_loop,seg=138 density_high: 咱们放开一下
+critical,36576,1,3064.688511,640,11818,11818,0,11,0,0,24,0.9997459738576349,75,0.1309,filler_high|garbled_segments|repeat_loop,seg=142 density_high: Anaconda
+critical,50186,IPS_2026-01-18.10.24.42.7250,4385.860411,1797,11781,11781,0,21,5,0,585,1.0,39,0.0052,garbled_segments|invalid_timestamps|repeat_loop,"seg=69 degenerate,repeat_char: 等等等等等等吧"
+critical,37696,3--[视频]03.项目信息,2158.6,1231,11657,11657,0,0,0,0,15,0.9999629389419068,348,0.0393,filler_high|repeat_loop,seg=971 density_high: 这个东西都是常识能理解吧
+critical,49810,282.6-6从0-1搭建对话式智分析平台,2382.513,81,11629,11629,0,12,0,0,27,0.9980931898377888,61,0.3948,filler_high|garbled_segments|repeat_loop,"seg=20 garbled: 呢,这里还会有一个词项链的匹配,你比如说,我的数据库里,这个字号叫销售金额啊,这叫销售额,那其实呢,他这里会有一个词项链的匹配啊,他会能够尽量的去匹配到,啊,你这个销售额跟销售金额的词项链,其实就很相"
+critical,41300,09-掌柜问数-基础设施-MySQLClient-编码,1708.7,1234,11579,11579,0,0,17,0,26,1.0,90,0.0099,filler_high|invalid_timestamps|repeat_loop,seg=115 density_high: 两个mycircleclientmanager
+critical,36855,2,2491.180998,1904,11564,11564,0,0,0,0,48,0.997860051917432,25,0.0026,repeat_loop,seg=127 density_high: 二为占量
+critical,36874,2,3525.288433,1709,11447,11447,0,0,0,0,797,1.0,11,0.002,repeat_loop,批住累积部署
+critical,38103,03_stream多模式流,1642.788005,1194,11393,11393,0,0,2,0,546,0.9994838013198178,18,0.0018,invalid_timestamps|repeat_loop,seg=26 degenerate: 这么这么这么
+critical,41770,10-掌柜问数-日志添加request_id,1769.6,1175,11244,11244,0,0,11,0,24,1.0,85,0.0101,filler_high|invalid_timestamps|repeat_loop,seg=22 density_high: 是不是record column inverse
+critical,38135,3_掌柜智库_项目开发_项目流程和确保准确方案,1856.533008,1325,11179,11179,0,0,0,0,5,0.9989480348630568,16,0.0016,repeat_loop,seg=1290 density_high: 奉
+critical,36162,1,3349.533333,444,11033,11033,0,70,0,0,51,0.9987540553906767,27,0.0026,filler_high|garbled_segments|repeat_loop,"seg=38 garbled,degenerate,repeat_char: 扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩扩"
+critical,37306,2,3747.883333,86,10902,10902,0,76,0,0,60,0.9999697607983146,0,0.0007,garbled_segments|repeat_loop,"seg=8 garbled,repeat_char: 第一步啊 试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试"
+critical,37293,2,2730.309778,1304,10868,10868,0,15,0,0,26,0.9974435948417866,67,0.0137,filler_high|garbled_segments|repeat_loop,seg=60 density_high: 那如果
+critical,36166,1,3426.783333,1482,10840,10840,0,0,3,0,22,1.0,46,0.0054,invalid_timestamps|repeat_loop,seg=589 density_high: savemodel
+critical,36435,01-掌柜问数-项目概述,1795.966016,1187,10833,10833,0,0,6,0,12,1.0,116,0.0135,filler_high|invalid_timestamps|repeat_loop,seg=803 density_high: 那这边呢
+critical,37415,02_deepagents_介绍和核心功能说明,1661.766341,1463,10758,10758,0,0,12,0,17,1.0,23,0.0028,invalid_timestamps|repeat_loop,seg=138 density_high: 我不知道大家
+critical,37582,3,2717.32,1740,10693,10693,0,0,0,0,12,0.9995436680258489,74,0.013,repeat_loop,seg=214 density_high: Transformer完整架构
+critical,36863,2,3650.966667,930,10674,10674,0,41,0,0,12,0.7578184772290609,5,0.0005,garbled_segments|repeat_loop,seg=101 density_high: 就是Suite
+critical,36865,2,4760.633991,3173,10646,10646,0,0,0,0,2478,0.9996147590838811,54,0.0135,repeat_loop,
+critical,45410,21-移动端1px的处理,2246.9,1119,10588,10588,0,0,0,0,18,0.99938582046375,49,0.0054,repeat_loop,seg=674 density_high: sars的导入语法是
+critical,38369,4--[视频]1-4B端产品常见分类,1549.64,1411,10585,10585,0,0,0,0,5,1.0,2,0.0002,repeat_loop,对于软件处理
+critical,37294,2,2771.335867,1524,10549,10549,0,4,0,0,3,0.9991246578847096,13,0.0016,garbled_segments,seg=924 density_high: ST
+critical,42090,11-01-os模块,1270.199333,933,10549,10549,0,0,1,0,547,0.9996698683512849,0,0.0,repeat_loop,seg=50 density_high: 文件夹
+critical,37597,3,2113.791544,1616,10491,10491,0,0,0,0,27,0.9977947002327492,55,0.008,repeat_loop,seg=84 density_high: 5
+critical,37123,02-为什么会出现大模型,1544.335964,1187,10413,10413,0,0,0,0,9,1.0,276,0.0322,filler_high|repeat_loop,seg=407 density_high: Handoop啊
+critical,40852,08-智能体的整体介绍_coze的界面功能介绍,1687.433008,881,10400,10400,0,0,16,0,22,1.0,80,0.0209,filler_high|invalid_timestamps|repeat_loop,seg=174 density_high: HyperWrite
+critical,36869,2,2861.136011,1449,10304,10304,0,0,13,0,22,1.0,29,0.0038,invalid_timestamps|repeat_loop,seg=472 density_high: 你这个本地
+critical,44846,18_高级特性之流式处理(Streaming),1779.076022,1569,10223,10223,0,0,0,0,11,1.0,98,0.0111,filler_high|repeat_loop,seg=231 density_high: Tunk
+critical,45429,21.4-1带你写好PRD,1946.84,1358,10221,10221,0,0,12,0,23,1.0,108,0.0133,filler_high|invalid_timestamps|repeat_loop,seg=176 density_high: 你这个产品明年的
+critical,36861,2,2983.211995,1389,10105,10105,0,0,0,0,173,0.9982394831447438,38,0.0046,repeat_loop,seg=500 density_high: 并洞察
+critical,36159,1,2567.319002,1239,10101,10101,0,0,0,0,20,0.999427806985086,121,0.0174,filler_high|repeat_loop,请不吝点赞 订阅 转发 打赏支持明镜与点栏目
+critical,36567,1,3733.733333,2353,10076,10076,0,0,5,0,1504,1.0,53,0.0082,invalid_timestamps|repeat_loop,seg=177 density_high: Sample
+critical,44145,16-小熊奔跑案例,1952.06,1189,9944,9944,0,0,0,0,5,0.9981660399782794,127,0.0157,filler_high|repeat_loop,seg=270 density_high: 为什么
+critical,40839,08-掌柜问数-问数智能体-过滤表信息,1970.3,655,9868,9868,0,29,0,0,29,0.9999644724153682,41,0.3558,filler_high|garbled_segments|repeat_loop,seg=380 density_high: 有description
+critical,37986,3,3152.347007,311,9638,9638,0,69,0,0,68,0.9999977772117142,2,0.0003,garbled_segments|repeat_loop,"seg=242 garbled,repeat_char: S传进栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏栏"
+critical,40833,08-掌柜问数-元数据知识库-读取配置文件,1431.132683,1055,9514,9514,0,0,6,0,18,1.0,121,0.0183,filler_high|invalid_timestamps|repeat_loop,seg=254 density_high: description
+critical,40225,07-Coze案例：客服对话记录分析,1478.232683,602,9508,9508,0,0,22,0,24,1.0,153,0.0266,filler_high|invalid_timestamps|repeat_loop,行我们先停一下啊
+critical,49493,203.4-1用户行为数据分析-DataVault模型,1737.346,1049,9286,9286,0,0,0,0,8,1.0,177,0.0249,filler_high|repeat_loop,seg=343 density_high: Google Analytics
+critical,36864,2,2223.466667,1314,9284,9284,0,0,0,0,41,0.9960751977398542,17,0.002,repeat_loop,seg=470 density_high: Po
+critical,37983,3,3124.166667,1420,9197,9197,0,0,0,0,5,0.9984550545747181,120,0.0239,filler_high|repeat_loop,seg=48 density_high: 成本问题
+critical,47925,65.3-3SQL案例讲解,2217.763,1237,9195,9195,0,0,0,0,11,0.9990201838519266,93,0.0181,filler_high|repeat_loop,seg=20 density_high: 我都会给大家讲到
+critical,36574,1,2634.698733,1226,9185,9185,0,0,0,0,15,0.9932634677438847,27,0.0035,repeat_loop,seg=1055 density_high: 不可导的问题
+critical,37588,3,2069.040998,1350,9173,9173,0,0,0,0,24,0.9955965116163444,15,0.002,repeat_loop,seg=911 density_high: Lanchine
+critical,36170,1,2308.890732,1471,9131,9131,0,0,0,0,10,0.9998437639360754,19,0.0026,repeat_loop,seg=373 density_high: 内存
+critical,37982,3,3023.816667,1429,9096,9096,0,6,13,0,66,1.0,110,0.0231,filler_high|garbled_segments|invalid_timestamps|repeat_loop,seg=162 density_high: 奥特
+critical,36873,2,3308.1,864,9031,9031,0,0,0,0,252,0.9963574257126449,57,0.0104,filler_high|repeat_loop,seg=88 density_high: C-D-LAMPKPG
+critical,42410,11_提示词模板之构造方法,1619.845253,1424,9001,9001,0,0,0,0,6,0.9995399233361213,137,0.0186,filler_high|repeat_loop,seg=136 density_high: LanChin和LanGraph
+critical,47353,44_课堂答疑交流,1698.114484,1348,8999,8999,0,0,0,0,9,0.9997676929301782,96,0.0134,filler_high|repeat_loop,seg=415 density_high: cooks
+critical,37303,2,3736.024211,2517,8975,8975,0,0,19,0,1994,1.0,12,0.0023,invalid_timestamps|repeat_loop,seg=62 density_high: 需要
+critical,44470,17-掌柜问数-问数智能体-召回字段信息-上,1369.466667,1016,8945,8945,0,0,20,0,2,1.0,105,0.0185,filler_high|invalid_timestamps,seg=643 density_high: 就是temperature
+critical,36342,01-二级类目-复选框组件封装,2275.3,1003,8829,8829,0,1,0,0,4,0.999437436821518,23,0.0032,garbled_segments,seg=378 garbled: at 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒号 冒
+critical,46581,30.5-5数据分析常用的使用场景,1586.24,1057,8686,8686,0,0,0,0,9,1.0,110,0.0197,filler_high|repeat_loop,seg=49 density_high: Abitest
+critical,37206,02-掌柜问数-问数智能体-召回字段取值,1296.233333,973,8674,8674,0,0,0,0,5,0.9997119862678304,100,0.0197,filler_high|repeat_loop,seg=208 density_high: search
+critical,49574,220.7-8从0-1落地数据质检平台案例剖析,1581.746,951,8642,8642,0,4,0,0,3,0.9997306773653923,156,0.0224,filler_high|garbled_segments,"seg=240 garbled,repeat_char: 我们去设置一个岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸"
+critical,47462,47_AgentReact推理执行案例,1584.807242,1442,8571,8571,0,0,22,0,28,1.0,109,0.0155,filler_high|invalid_timestamps|repeat_loop,seg=434 density_high: open ai
+critical,41767,10-掌柜问数-基础设施-MySQLClient-参数配置,1330.433333,851,8520,8520,0,1,0,0,2,0.9999599130608976,31,0.0045,garbled_segments,seg=250 density_high: create ASYC engine
+critical,44571,17_api之RuntimeContext运行时上下文,1529.652945,1239,8505,8505,0,0,10,0,29,1.0,88,0.017,filler_high|invalid_timestamps|repeat_loop,seg=249 density_high: loanbook
+critical,36697,01_回顾,1417.35,947,8488,8488,0,0,0,0,28,0.9990051857339401,35,0.006,repeat_loop,seg=25 degenerate: 一连一连一连
+critical,37981,3,2375.483333,1548,8487,8487,0,0,12,0,28,1.0,12,0.0017,invalid_timestamps|repeat_loop,seg=101 density_high: LamaFactory
+critical,49582,222.7-10从0-1落地BI平台的心得体会分分享,1382.663,448,8457,8457,0,2,0,0,2,0.9998676467078385,33,0.0154,filler_high|garbled_segments,seg=89 degenerate: 这个这个这个
+critical,39042,5--[视频]05.需求梳理,1500.76,984,8413,8413,0,0,5,0,17,1.0,121,0.0179,filler_high|invalid_timestamps|repeat_loop,seg=186 density_high: 就这几个点
+critical,37599,3,2690.783333,1363,8401,8401,0,0,6,0,1047,1.0,1,0.0001,invalid_timestamps|repeat_loop,seg=270 density_high: 五百
+critical,39991,6_掌柜智库_项目总结,1558.466341,1100,8382,8382,0,0,0,0,7,0.9894342658761341,22,0.0033,repeat_loop,seg=688 density_high: re-rank
+critical,37595,3,3387.232683,2073,8343,8343,0,0,0,0,1458,0.9992995216974883,8,0.0018,repeat_loop,seg=44 density_high: 汇对每个样本
+critical,40733,08-AutoDL部署服务器_部署XInference_部署LLM,1259.233008,932,8271,8271,0,0,24,0,29,1.0,134,0.0195,filler_high|invalid_timestamps|repeat_loop,seg=857 density_high: Rending Models
+critical,38251,4,1810.486009,1228,8242,8242,0,0,0,0,27,0.9796872172349387,26,0.0037,repeat_loop,seg=601 density_high: 训练方式
+critical,38252,4,1807.833333,272,8230,8230,0,9,0,0,23,0.9946658063970989,20,0.0064,filler_high|garbled_segments|repeat_loop,seg=43 density_high: 获取
+critical,39583,6-6 RepositoryTest 数据仓储层的单元测试,1480.8,759,8228,8228,0,0,0,0,22,0.9972920043219882,3,0.0004,repeat_loop,seg=149 density_high: 是不是这个TestImplementation
+critical,39584,6-6 RepositoryTest 数据仓储层的单元测试,1480.8,759,8228,8228,0,0,0,0,22,0.9972920043219882,3,0.0004,repeat_loop,seg=149 density_high: 是不是这个TestImplementation
+critical,36872,2,3339.061352,1123,8215,8215,0,0,0,0,5,0.9995204185155085,11,0.0018,repeat_loop,seg=153 density_high: input
+critical,36161,1,3517.130283,2412,8027,8027,0,0,21,0,2027,1.0,10,0.002,invalid_timestamps|repeat_loop,seg=311 density_high: 添加一个usermessager
+critical,40126,07-02-字符串的功能1,1671.399333,798,8004,8004,0,0,2,0,16,1.0,90,0.012,filler_high|invalid_timestamps|repeat_loop,seg=202 density_high: 好还有一个叫hello world.title
+critical,37016,2--[视频]3-2需求分析,1375.64,810,7996,7996,0,0,0,0,5,1.0,130,0.0204,filler_high|repeat_loop,seg=408 degenerate: 什么什么什么
+critical,49438,192.1-2数据中台的由来,1453.224694,783,7996,7996,0,10,0,0,6,1.0,235,0.0385,filler_high|garbled_segments|repeat_loop,seg=58 density_high: 就是One Data是什么呢
+critical,36870,2,3562.472629,2109,7978,7978,0,0,15,0,1463,1.0,9,0.0015,invalid_timestamps|repeat_loop,提示位条
+critical,48977,128.13-9从0-1落地数据质检平台案例剖析,1581.746,605,7928,7928,0,20,3,0,19,1.0,119,0.0169,filler_high|garbled_segments|invalid_timestamps|repeat_loop,"seg=231 garbled,repeat_char: 我们去设置一个岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸岸"
+critical,37690,3--[视频]03.智慧城市的应用解析,1384.48,753,7863,7863,0,0,18,0,31,1.0,230,0.0352,filler_high|invalid_timestamps|repeat_loop,seg=724 density_high: 我们下期再见
+critical,43450,14-掌柜问数-问数智能体-流程图搭建,1455.466667,500,7822,7822,0,25,0,0,24,0.9999335835012977,39,0.3862,filler_high|garbled_segments|repeat_loop,seg=391 density_high: 是不是keywords啊
+critical,36857,2,2080.628078,1414,7702,7702,0,0,0,0,40,1.0,20,0.0033,repeat_loop,seg=91 density_high: 核心思想是
+critical,46328,27_智能体技能,1453.848005,1167,7642,7642,0,0,28,0,33,1.0,53,0.0095,invalid_timestamps|repeat_loop,seg=112 degenerate: 巴拉巴拉巴拉
+critical,41981,10_子图通过节点调用,1324.45,822,7614,7614,0,0,0,0,359,1.0,16,0.0025,repeat_loop,seg=51 density_high: 这个parent state里面呢
+critical,36557,1,1783.852993,1023,7611,7611,0,0,22,0,642,1.0,3,0.0005,invalid_timestamps|repeat_loop,seg=4 density_high: 优优独播剧场——YoYo Television Series Exclusive
+critical,36555,1,2011.933567,1135,7583,7583,0,0,0,0,11,0.9871300089502408,11,0.0017,repeat_loop,seg=153 density_high: 偏值
+critical,41173,09-03-装饰器（了解）,1384.466,886,7530,7530,0,0,0,0,418,0.9976698597148649,54,0.0082,filler_high|repeat_loop,seg=332 density_high: 你看sleep它其实指向的是inner
+critical,37854,03-掌柜问数-基础设置-日志相关配置,1095.532683,869,7529,7529,0,1,0,0,2,0.9997237115745639,45,0.0072,filler_high|garbled_segments,seg=69 density_high: logger.one
+critical,38250,4,1970.937007,1189,7435,7435,0,0,0,0,31,0.9993571550001344,1,0.0002,repeat_loop,seg=101 density_high: 接着
+critical,36573,1,2713.15,1416,7423,7423,0,0,2,0,9,1.0,31,0.0058,invalid_timestamps|repeat_loop,seg=321 density_high: 比如
+critical,36241,1--[视频]01.金融基础概念,1479.39,283,7416,7416,0,3,0,0,1,1.0,88,0.0306,filler_high|garbled_segments,"seg=275 garbled,repeat_char: 就这个银行现在也开始有这种抵押贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷贷"
+critical,39754,06-掌柜问数-元数据知识库-脚本参数解析,1081.132683,900,7346,7346,0,0,13,0,17,1.0,72,0.0151,filler_high|invalid_timestamps|repeat_loop,seg=206 density_high: IDED CONFERATION
+critical,42311,11.储区模块的实战任务,1623.899333,844,7304,7304,0,1,0,0,2,0.99850401256369,8,0.0012,garbled_segments,seg=322 density_high: formsgamer
+critical,49443,193.1-3数据中台的价值驱动力,1273.386145,1012,7303,7303,0,0,23,0,29,1.0,64,0.0099,filler_high|invalid_timestamps|repeat_loop,seg=699 density_high: 通过Android
+critical,38389,4--[视频]04.任务执行与安排,1272.16,777,7253,7253,0,0,0,0,24,1.0,150,0.0247,filler_high|repeat_loop,seg=754 density_high: 我在
+critical,48770,111.11-1数据仓库说明与业务场景,1249.729833,774,7215,7215,0,0,24,0,29,1.0,59,0.0113,filler_high|invalid_timestamps|repeat_loop,seg=716 density_high: 还是一个平均值呢
+critical,47231,41_MCP入门概念,1339.999549,1085,7208,7208,0,0,18,0,24,1.0,52,0.0093,invalid_timestamps|repeat_loop,seg=187 degenerate: 什么什么什么
+critical,37687,3--[视频]03.叮当快药的生意公式,1282.52,678,7141,7141,0,0,41,0,55,1.0,181,0.0286,filler_high|invalid_timestamps|repeat_loop,seg=645 density_high: 对啊
+critical,36682,01_langgraph介绍,832.4,386,7113,7113,0,0,0,0,88,1.0,5,0.0012,repeat_loop,然后我们就把这个patcharm的这个顺序都做好
+critical,49610,229.1-5知识图谱的存储,1129.0137,772,7111,7111,0,0,0,0,264,0.9981455495181326,48,0.0085,filler_high|repeat_loop,seg=288 density_high: OranguDB的话
+critical,42383,11_langgraph节点重试机制,1113.85,889,7100,7100,0,0,0,0,5,0.9999910221304484,29,0.0053,repeat_loop,seg=55 density_high: 就是它其实你可以理解为
+critical,37977,3,2121.6381,1048,7089,7089,0,0,0,0,7,0.9960134105811919,27,0.0045,repeat_loop,seg=138 density_high: 问题和答案对
+critical,41512,09_中断补充信息,1242.95,823,7037,7037,0,0,4,0,9,0.9999919546240799,46,0.0091,filler_high|invalid_timestamps|repeat_loop,seg=236 density_high: 当时interrupt了
+critical,48895,121.13-2数据平台正成为企业核心竞争力,1098.329833,727,6980,6980,0,0,32,0,44,1.0,94,0.0181,filler_high|invalid_timestamps|repeat_loop,seg=455 density_high: Face ID 实验处
+critical,44620,17、继承1,1531.5,537,6880,6880,0,0,0,0,6,0.9996474045053869,53,0.0095,filler_high|repeat_loop,
+critical,37014,2--[视频]3-2活动管理,1009.64,614,6861,6861,0,0,9,0,13,1.0,1,0.0002,invalid_timestamps|repeat_loop,我们去查看一些活动的核心功能
+critical,36306,01-article-7-加载数据,1479.866667,831,6840,6840,0,0,0,0,5,1.0,68,0.011,filler_high|repeat_loop,
+critical,42550,12-12 Shell销毁与写入开发实现Agent与命令行交互,1389.333333,718,6717,6717,0,1,0,0,2,0.9998320539826852,0,0.0,garbled_segments,seg=15 density_high: 叫wispone model
+critical,42551,12-12 Shell销毁与写入开发实现Agent与命令行交互,1389.333333,718,6717,6717,0,1,0,0,2,0.9998320539826852,0,0.0,garbled_segments,seg=15 density_high: 叫wispone model
+critical,41045,08_总结消息,1297.55,779,6710,6710,0,0,5,0,3,1.0,24,0.0041,invalid_timestamps,seg=67 density_high: 来搭配使用
+critical,45651,22_时间回溯(Time-Travel),1310.807242,1074,6670,6670,0,0,0,0,7,1.0,83,0.0157,filler_high|repeat_loop,seg=65 degenerate: 这儿这儿这儿
+critical,38154,03_短期记忆,791.2,598,6654,6654,0,0,0,0,456,1.0,0,0.0,repeat_loop,seg=64 density_high: 你这种Long Graph的
+critical,47496,48_A2A案例讲解,1622.806791,456,6649,6649,0,32,0,0,18,0.9998725720146434,40,0.0068,filler_high|garbled_segments|repeat_loop,seg=2 degenerate: A2A2A2A2A2
+critical,38255,4,1648.75,951,6620,6620,0,0,11,0,22,1.0,10,0.0018,invalid_timestamps|repeat_loop,seg=376 density_high: 在这里面是连续的
+critical,37874,03-案例-9-侦听器-3,1451.733333,785,6586,6586,0,0,0,0,5,0.9987027004497389,67,0.0121,filler_high|repeat_loop,
+critical,37974,3,3043.199675,1761,6496,6496,0,0,0,0,1391,0.9996715052882621,6,0.003,repeat_loop,
+critical,37520,2、作业讲解,1363.9,414,6424,6424,0,1,0,0,4,0.9996773957034972,35,0.0102,filler_high|garbled_segments,seg=63 density_high: 解析他解析吗
+critical,37305,2,1247.358233,948,6411,6411,0,0,0,0,24,0.9502402506690314,44,0.0094,repeat_loop,seg=177 density_high: 内幕
+critical,36164,1,2468.809878,179,6372,6372,0,24,0,0,6,0.9983838860839166,24,0.0044,filler_high|garbled_segments|repeat_loop,"seg=121 garbled,degenerate,repeat_char: 瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎瞎"
+critical,38554,04-掌柜问数-基础设施-ESClient-快速入门,902.299349,677,6233,6233,0,0,17,0,24,1.0,8,0.0027,invalid_timestamps|repeat_loop,seg=293 density_high: ReleaseData
+critical,37934,03.1-2经理的内功心法,1341.68,630,6210,6210,0,0,0,0,6,1.0,52,0.0104,filler_high|repeat_loop,谢谢大家
+critical,42100,11-3 完成浏览器工具参数描述编写，掌握参数的声明写法,1530.055011,717,6198,6198,0,0,0,0,17,0.9998071892854316,0,0.0,repeat_loop,seg=42 density_high: view
+critical,42101,11-3 完成浏览器工具参数描述编写，掌握参数的声明写法,1530.055011,717,6198,6198,0,0,0,0,17,0.9998071892854316,0,0.0,repeat_loop,seg=42 density_high: view
+critical,38390,4--[视频]04.具体功能梳理,1284.2,316,6162,6162,0,16,0,0,16,0.9988786793334371,74,0.019,filler_high|garbled_segments|repeat_loop,"seg=146 degenerate,repeat_char: 怪盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖盖"
+critical,49176,147.4-1指标梳理方法,1194.856259,772,6129,6129,0,0,0,0,35,1.0,82,0.019,filler_high|repeat_loop,seg=679 density_high: 麦克斯
+critical,39435,05_模型调用企业版,1115.927823,1061,6087,6087,0,0,0,0,5,1.0,42,0.0084,repeat_loop,seg=45 density_high: 因为DeepSeek
+critical,37600,3,2852.5497,1227,6086,6086,0,0,0,0,24,0.9992639216768072,72,0.02,filler_high|repeat_loop,seg=133 density_high: 手写
+critical,37521,2、作业讲解,1363.9,581,6077,6077,0,2,0,0,3,0.9997213871984749,34,0.0072,filler_high|garbled_segments,seg=375 garbled: 我最多是不是嘴唐 嘴唐 嘴唐 嘴唐 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 嘟 
+critical,38627,04-首页主体-轮播图-逻辑封装,1749.0,778,5966,5966,0,0,0,0,5,0.9994282447112636,10,0.0019,repeat_loop,seg=201 density_high: setterinterwall
+critical,36152,1,1817.267007,1311,5892,5892,0,0,0,0,610,1.0,20,0.0061,repeat_loop,
+critical,38247,4,1374.335156,626,5845,5845,0,0,3,0,27,1.0,10,0.0021,invalid_timestamps|repeat_loop,seg=206 density_high: 这个是Sign Monitor
+critical,38932,05 项目初始化-导入图标素材,1009.278005,633,5792,5792,0,0,0,0,25,0.9976240391764012,27,0.006,repeat_loop,seg=115 density_high: IvanFart
+critical,45926,24.4-4产品1-10阶段,1055.16,703,5791,5791,0,0,10,0,31,1.0,42,0.0092,filler_high|invalid_timestamps|repeat_loop,seg=43 density_high: 以后去用
+critical,37196,02-掌柜问数-API接口-基础-依赖项-上,912.033333,590,5741,5741,0,0,0,0,10,1.0,46,0.0107,filler_high|repeat_loop,seg=60 degenerate: 这个这个这个
+critical,42829,12_时间旅行,1089.85,616,5740,5740,0,0,1,0,9,0.9988714043216956,15,0.0033,repeat_loop,seg=105 density_high: 然后它就出现了一个Compute
+critical,47715,56.1-3数据产品经理职业选择,1016.879833,599,5709,5709,0,1,0,0,2,0.9975514973163992,69,0.0154,filler_high|garbled_segments,seg=374 garbled: 虽然现在有淘宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝、添宝
+critical,41768,10-掌柜问数-基础设施-Qdrant快速入门,849.1,630,5694,5694,0,0,1,0,10,1.0,4,0.0008,repeat_loop,seg=314 density_high: Python里边的一个字典
+critical,49807,281.6-5企业客服对话机器人0-1搭建,1089.746,698,5687,5687,0,0,24,0,33,1.0,73,0.0158,filler_high|invalid_timestamps|repeat_loop,seg=1 density_high: 我是Ditser
+critical,37095,02-Python代码调用Dify平台的工作流,823.966667,596,5619,5619,0,0,20,0,21,1.0,124,0.0258,filler_high|invalid_timestamps|repeat_loop,seg=238 density_high: content type啊
+critical,38498,04-为什么要进行企业级大模型部署_部署方案,769.099349,644,5606,5606,0,0,10,0,18,1.0,36,0.0071,filler_high|invalid_timestamps|repeat_loop,seg=373 density_high: Hunging Face
+critical,45492,21、箭头函数注意点,1560.6,451,5575,5575,0,1,0,0,5,0.9997949506600026,39,0.0075,filler_high|garbled_segments|repeat_loop,seg=195 density_high: 键头函数中的
+critical,36956,02-07-逻辑运算符,1196.666333,619,5550,5550,0,0,2,0,3,0.9996437327697428,19,0.0043,invalid_timestamps,seg=43 density_high: true和force
+critical,37458,02_掌柜智库_导入模块_node_item_nameognition_生成向量和函数介绍,1129.933008,638,5531,5531,0,1,0,0,2,0.9997937860047009,17,0.0043,garbled_segments,seg=153 density_high: 是contest等于contest
+critical,43207,13_api之edge普通边和条件边,1090.595011,895,5508,5508,0,0,4,0,15,1.0,61,0.0141,filler_high|invalid_timestamps|repeat_loop,seg=564 density_high: 那个option的
+critical,43208,13_api之edge普通边和条件边,1090.595011,895,5508,5508,0,0,4,0,15,1.0,61,0.0141,filler_high|invalid_timestamps|repeat_loop,seg=564 density_high: 那个option的
+critical,48943,125.13-6从0-1离线开发平台逻辑与案例,961.663,465,5507,5507,0,0,0,0,9,1.0,41,0.0144,filler_high|repeat_loop,seg=200 density_high: cycle
+critical,49218,152.5-3实时数仓场景与逻辑架构,924.796,579,5501,5501,0,0,4,0,12,1.0,118,0.0252,filler_high|invalid_timestamps|repeat_loop,seg=29 density_high: 这个Spark Streaming的话
+critical,41291,09-工程化落地的整体流程,826.666341,618,5495,5495,0,0,14,0,23,1.0,67,0.0142,filler_high|invalid_timestamps|repeat_loop,下边的几个模块
+critical,38391,4--[视频]04.口碑裂变效应,950.36,479,5475,5475,0,0,0,0,8,1.0,174,0.0366,filler_high|repeat_loop,seg=472 density_high: 这是我们讲的怎么去做列表效应的啊
+critical,37228,02-组件-1-导入,1201.666667,649,5473,5473,0,0,0,0,6,0.9989791952846105,43,0.0106,filler_high|repeat_loop,soul2
+critical,49508,206.4-4标签画像建模,1058.044308,91,5444,5444,0,1,0,0,18,0.9976519811304537,38,0.279,filler_high|garbled_segments|repeat_loop,"seg=70 garbled: 哎,可以能说说,哎,给一个反馈,啊,退订,或者什么呢,哎,这个,不关注这个,哎,就说明这个用户,哎,给他这样推的是不对的,那下次呢,就改进这样的一个行为,啊,这就是一个,反馈的这样一个过程,那这就是,"
+critical,39054,5--[视频]11-5分销电商产品设计,937.879002,460,5437,5437,0,0,7,0,11,1.0,0,0.0,invalid_timestamps|repeat_loop,这边则是有关销设定的
+critical,41163,09-01-函数作用域,1149.466333,555,5437,5437,0,0,2,0,2,0.9992637165824672,103,0.0226,filler_high|invalid_timestamps,seg=398 density_high: 这个non-local in a way呢
+critical,47302,43.9-4高质量简历详细讲解,941.781973,645,5423,5423,0,0,6,0,14,1.0,90,0.0199,filler_high|invalid_timestamps|repeat_loop,seg=632 density_high: 看它是不是符合这样的一个规范
+critical,37893,03-短信登录开发问题说明,1283.2,566,5413,5413,0,0,0,0,5,0.9978179551122195,51,0.013,filler_high|repeat_loop,seg=152 density_high: race
+critical,42108,11-05-作业答案讲解,1115.486625,538,5412,5412,0,0,4,0,8,1.0,57,0.0134,filler_high|invalid_timestamps|repeat_loop,seg=83 density_high: 然后再判断如果n等于n u m
+critical,39762,06-掌柜问数-项目架构-全文索引,897.266667,626,5402,5402,0,0,23,0,29,1.0,84,0.0226,filler_high|invalid_timestamps|repeat_loop,"seg=310 only_filler,density_high: 啊"
+critical,46884,34_用redisStack作为向量存储,1017.26878,828,5347,5347,0,0,0,0,5,1.0,69,0.0162,filler_high|repeat_loop,seg=249 degenerate: 搁拉搁拉搁拉
+critical,39038,5--[视频]05.常用分析方法,996.648005,643,5342,5342,0,0,0,0,13,1.0,100,0.0247,filler_high|repeat_loop,
+critical,47381,45.10-2工作履历交流环节,901.982971,668,5300,5300,0,0,29,0,37,1.0,20,0.0043,invalid_timestamps|repeat_loop,seg=254 density_high: 你说OK
+critical,49448,194.1-4数据中台的能力范式,958.244921,723,5297,5297,0,0,0,0,5,1.0,29,0.0092,repeat_loop,seg=396 density_high: Flame
+critical,45614,22.4-2带你写好DRD文档,996.257007,685,5266,5266,0,0,3,0,18,1.0,56,0.0138,filler_high|invalid_timestamps|repeat_loop,seg=76 density_high: 业务指标
+critical,41974,10_中断封装工具,865.129002,514,5229,5229,0,0,3,0,4,0.9994809999445607,20,0.0054,invalid_timestamps,seg=89 density_high: 就是在我们lonch and long graph中
+critical,40797,08-刷新token-判断401-未删减,2545.6,594,5208,5208,0,0,1,0,12,1.0,22,0.0059,repeat_loop,
+critical,43706,15-02-venv虚拟环境的使用,1035.21525,502,5204,5204,0,0,2,0,2,0.9995022774249124,32,0.0068,filler_high|invalid_timestamps,
+critical,36990,2--[视频]1-2 营销中心主要功能,1158.44,500,5190,5190,0,0,0,0,5,1.0,131,0.0286,filler_high|repeat_loop,
+critical,39582,06-05-可视化观察赋值&copy和deepcopy的区别,1065.666,527,5185,5185,0,0,2,0,3,0.9980613062629379,83,0.0198,filler_high|invalid_timestamps,seg=123 density_high: 那么b等于a等于a等于这个类标对吧
+critical,42987,13-coze案例3之selling_point_generation工作流的搭建,809.966016,593,5165,5165,0,0,1,0,8,1.0,79,0.0192,filler_high|repeat_loop,seg=147 density_high: 传入这个name和description
+critical,43063,13-掌柜问数-问数智能体-langgraph基础回顾,1178.1,145,5114,5114,0,30,0,0,30,0.9999405822935236,27,0.6926,filler_high|garbled_segments|repeat_loop,"seg=115 garbled,degenerate,repeat_char: 呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃"
+critical,42791,12_api之node的异常重试处理机制,917.076022,851,5093,5093,0,0,0,0,7,1.0,82,0.0202,filler_high|repeat_loop,seg=144 density_high: Cursor
+critical,42792,12_api之node的异常重试处理机制,917.076022,851,5093,5093,0,0,0,0,7,1.0,82,0.0202,filler_high|repeat_loop,seg=144 density_high: Cursor
+critical,36155,1,1064.794256,111,5075,5075,0,15,0,0,8,0.9933374396414852,1,0.0028,garbled_segments|repeat_loop,"seg=41 degenerate,repeat_char: CNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"
+critical,39655,06-Dify的安装和部署,798.866341,629,5040,5040,0,0,23,0,31,1.0,44,0.01,filler_high|invalid_timestamps|repeat_loop,seg=539 density_high: 是不是这个XInference
+critical,38977,05-06-随机数random,1061.399333,556,5022,5022,0,0,1,0,7,0.9997179826756117,1,0.0,repeat_loop,seg=34 density_high: 第三个是刘亦热巴
+critical,42535,12-05-对象属性和类属性,1031.198188,502,5002,5002,0,0,1,0,30,0.9992065657120802,55,0.0127,filler_high|repeat_loop,seg=396 density_high: 如果我这个属性是我这个对象独有的
+critical,39614,6--[视频]3-6需求分析-需求的优先级,878.922993,432,5000,5000,0,1,0,0,1,1.0,2,0.0004,garbled_segments,"seg=431 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,39012,5--[视频]1-5内容分发.mp4,794.08,613,4990,4990,0,0,23,0,31,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=593 density_high: 我们学习的
+critical,42115,11-9 在Python中执行js代码获取浏览器可视窗口元素,986.382993,534,4987,4987,0,1,0,0,2,0.9995204773365348,0,0.0,garbled_segments,seg=103 garbled: 几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个
+critical,42116,11-9 在Python中执行js代码获取浏览器可视窗口元素,986.382993,534,4987,4987,0,1,0,0,2,0.9995204773365348,0,0.0,garbled_segments,seg=103 garbled: 几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个
+critical,39628,6--[视频]06.智慧园区,1026.787007,55,4973,4973,0,0,0,0,11,1.0,10,0.0417,filler_high|repeat_loop,seg=44 density_high: 我们现在所讲的一切上面设计的关系
+critical,41765,10-掌柜问数-元数据知识库-为指标信息建立向量索引,706.3,583,4969,4969,0,0,16,0,22,1.0,28,0.0073,invalid_timestamps|repeat_loop,seg=53 density_high: reportray
+critical,37022,2--[视频]4-2认识流程图和结构图,820.24,515,4965,4965,0,0,24,0,30,1.0,0,0.0,invalid_timestamps|repeat_loop,感谢观看
+critical,40201,7--[视频]7-7 积分体系的产品设计,1046.52,470,4951,4951,0,0,1,0,16,1.0,106,0.0245,filler_high|repeat_loop,
+critical,36239,1--[视频]01.每日复习-项目流程,1182.32,200,4932,4932,0,20,0,0,7,0.9999492523174776,31,0.007,filler_high|garbled_segments|repeat_loop,"seg=172 degenerate,repeat_char: 兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴兴"
+critical,41207,9--[视频]3-9下单过程核心页面,945.332993,424,4928,4928,0,0,21,0,30,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=395 density_high: 等等
+critical,37201,02-掌柜问数-基础设施-ESClient-基础概念,759.266667,505,4923,4923,0,0,2,0,7,1.0,20,0.0048,invalid_timestamps|repeat_loop,seg=293 density_high: last name
+critical,47902,64.3-2SQL查询语言,923.843,627,4902,4902,0,0,1,0,11,1.0,60,0.0178,filler_high|repeat_loop,seg=77 density_high: 可能也会比较熟悉
+critical,49158,145.3-3数据分析案例,891.255374,599,4897,4897,0,0,17,0,24,1.0,49,0.0123,filler_high|invalid_timestamps|repeat_loop,seg=4 density_high: 我的Dateser
+critical,42213,11-小米搜索框案例,940.95,632,4888,4888,0,0,0,0,24,0.995483288166215,49,0.0118,filler_high|repeat_loop,seg=306 density_high: 是不是就用search
+critical,39730,06-垃圾回收-引用计数_,1369.85,617,4853,4853,0,1,0,0,2,0.9975252764901268,7,0.0019,garbled_segments,"seg=485 garbled,repeat_char: 然后我们来调整几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几几"
+critical,36695,01_动态组件,1076.6,528,4816,4816,0,0,0,0,6,0.9977150287943528,24,0.0079,repeat_loop,"seg=250 only_filler,density_high: 诶"
+critical,37019,2--[视频]4-2客户管理,685.082993,534,4801,4801,0,0,17,0,24,1.0,0,0.0,invalid_timestamps|repeat_loop,感谢观看
+critical,37448,02_作业_1,813.15,559,4801,4801,0,0,7,0,9,0.9999877021459755,3,0.0007,invalid_timestamps|repeat_loop,seg=61 density_high: 采用追加模式的列表
+critical,39755,06-掌柜问数-基础设施-EmbeddingClient-概述,709.9,494,4779,4779,0,0,21,0,30,1.0,78,0.0202,filler_high|invalid_timestamps|repeat_loop,seg=76 density_high: Hugging Face的话呢
+critical,39450,05_自定义信息流式输出,960.7,525,4737,4737,0,0,0,0,5,0.9999791818465701,19,0.0048,repeat_loop,seg=91 density_high: process progress
+critical,37804,03-关于模型续训的说明,747.333008,525,4735,4735,0,0,20,0,27,1.0,111,0.0271,filler_high|invalid_timestamps|repeat_loop,seg=118 density_high: 你看这个Pretrain-like
+critical,42540,12-7 沙箱服务异常类型定义与应用接口异常捕获,840.733333,406,4721,4721,0,1,0,0,3,0.9996867817776889,0,0.0,garbled_segments,seg=175 density_high: 找到ExceptionHandle
+critical,42541,12-7 沙箱服务异常类型定义与应用接口异常捕获,840.733333,406,4721,4721,0,1,0,0,3,0.9996867817776889,0,0.0,garbled_segments,seg=175 density_high: 找到ExceptionHandle
+critical,47101,38_使用split_text()方法进行文本分割,920.09,751,4651,4651,0,0,6,0,12,1.0,58,0.0151,filler_high|invalid_timestamps|repeat_loop,seg=1 degenerate: 什么什么什么
+critical,48809,114.11-4ETL数据转换组件,781.763,448,4633,4633,0,0,13,0,21,1.0,68,0.023,filler_high|invalid_timestamps|repeat_loop,seg=51 density_high: Flingachar
+critical,37709,3--[视频]6-3 店铺装修-商品类组件,996.2,429,4553,4553,0,0,0,0,7,1.0,69,0.0175,filler_high|repeat_loop,seg=424 density_high: 我们下期再见
+critical,46501,29.5-4数据分析的通用流程,774.72,599,4551,4551,0,1,0,0,2,1.0,23,0.0061,garbled_segments,seg=81 density_high: 因为BI工具的话
+critical,42420,11_用户多轮中断补充,837.59,413,4535,4535,0,0,12,0,13,0.997982306379016,56,0.0147,filler_high|invalid_timestamps|repeat_loop,seg=135 density_high: 就可以了
+critical,48605,99.9-2滴滴RFM模型实战,843.813,541,4528,4528,0,0,4,0,14,1.0,84,0.0221,filler_high|invalid_timestamps|repeat_loop,seg=530 density_high: 谢谢大家的
+critical,40670,08-02-函数入门-返回值,1005.132667,492,4517,4517,0,0,2,0,5,0.99797771272715,50,0.0129,filler_high|invalid_timestamps|repeat_loop,seg=38 density_high: 我们先讲一下
+critical,36471,01-订单管理-条件查询,1279.2,436,4505,4505,0,0,0,0,15,0.9979909318323953,13,0.003,repeat_loop,seg=245 density_high: 我们的loading呢
+critical,50382,讲解视频-视频网站的遮罩效果,810.8,456,4505,4505,0,1,0,0,2,0.9998396645288604,56,0.0165,filler_high|garbled_segments,"seg=139 garbled,repeat_char: 就是100px凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹凹"
+critical,40527,07_中断操作,791.65,480,4498,4498,0,0,3,0,6,0.9991284027032149,6,0.0035,invalid_timestamps|repeat_loop,seg=43 density_high: 也是我们long graph中
+critical,39174,05-掌柜问数-API接口-QueryService依赖注入,903.2,81,4496,4496,0,14,0,0,9,0.9998117803365809,1,0.0071,garbled_segments|repeat_loop,"seg=31 garbled,repeat_char: 依赖函顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺"
+critical,38414,4--[视频]8-4内容管理-内容列表&数据,688.589002,354,4462,4462,0,1,0,0,1,1.0,0,0.0,garbled_segments,"seg=353 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,37204,02-掌柜问数-开发环境-创建UV项目,749.4,401,4452,4452,0,1,0,0,2,0.9999065919402189,43,0.0409,filler_high|garbled_segments,"seg=400 garbled,repeat_char: 在中端里边呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃呃"
+critical,49734,260.1-4掌握AI的三层架构,791.548866,606,4354,4354,0,0,39,0,55,1.0,68,0.0222,filler_high|invalid_timestamps|repeat_loop,seg=40 density_high: 这样的一些
+critical,49686,248.5-3工具化知识图谱落地实例,790.162,414,4323,4323,0,0,15,0,23,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=393 density_high: 就是这样的一个方法
+critical,37984,3,2041.37075,1720,4313,4313,0,0,8,0,1475,1.0,1,0.0012,invalid_timestamps|repeat_loop,这个cd
+critical,49320,169.2-2数仓建模方法,736.279833,525,4309,4309,0,0,0,0,6,1.0,97,0.0294,filler_high|repeat_loop,seg=515 degenerate: 991919
+critical,42518,12-01-理解面向对象,882.799333,444,4292,4292,0,0,1,0,5,0.9972594757273111,61,0.0161,filler_high|repeat_loop,seg=285 density_high: 我们如何去做
+critical,38398,4--[视频]04.职场礼仪,984.016009,201,4282,4282,0,19,0,0,8,0.9909493250937547,49,0.0118,filler_high|garbled_segments|repeat_loop,"seg=173 garbled,degenerate,repeat_char: 端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端"
+critical,38776,04_Send,779.9,451,4266,4266,0,0,2,0,2,0.9999743556866265,3,0.0005,invalid_timestamps,seg=48 density_high: 就是map reduce
+critical,37361,2.登录页面的基础布局,1008.222222,451,4262,4262,0,0,0,0,5,0.9994225261184533,26,0.0069,filler_high|repeat_loop,
+critical,41283,09-处理左侧侧边栏_,806.798,469,4249,4249,0,0,0,0,5,0.9959989985101599,17,0.0045,repeat_loop,seg=143 density_high: 学过吗
+critical,39013,5--[视频]1-5用户留存策略,785.4,308,4247,4247,0,1,0,0,1,0.9990705373058314,0,0.0,garbled_segments,"seg=307 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,40692,08-06-回调函数（了解）,888.466,452,4217,4217,0,0,3,0,12,0.9989577541515375,62,0.0165,filler_high|invalid_timestamps|repeat_loop,seg=111 density_high: 比如说我在上面写一个CB函数
+critical,43710,15-4 A2A客户端管理器的设计实现可视管理远程Agent,893.596009,417,4203,4203,0,0,0,0,22,0.9996463625656143,1,0.0003,repeat_loop,seg=141 density_high: 假设有函数
+critical,43711,15-4 A2A客户端管理器的设计实现可视管理远程Agent,893.596009,417,4203,4203,0,0,0,0,22,0.9996463625656143,1,0.0003,repeat_loop,seg=141 density_high: 假设有函数
+critical,36696,01_回顾,595.080998,402,4185,4185,0,0,0,0,353,1.0,0,0.0,repeat_loop,进行一个map映射
+critical,36424,01-掌柜问数-Docker环境问题,647.366341,408,4174,4174,0,0,14,0,12,1.0,30,0.008,filler_high|invalid_timestamps|repeat_loop,seg=181 density_high: 里边有一个Docker File
+critical,42230,11-提示词的边界_注意点,674.733333,463,4172,4172,0,0,0,0,8,0.996423278824436,53,0.0172,filler_high|repeat_loop,
+critical,47260,42.9-3高质量简历特点总结,822.479833,485,4161,4161,0,0,13,0,19,1.0,90,0.0267,filler_high|invalid_timestamps|repeat_loop,我们来详细的看法
+critical,44154,16-掌柜问数-问数智能体-抽取关键词,625.966016,498,4139,4139,0,0,15,0,25,1.0,62,0.0228,filler_high|invalid_timestamps|repeat_loop,"seg=171 only_filler,density_high: 呃"
+critical,41828,10-遍历对象,877.3,494,4103,4103,0,0,0,0,22,0.9983699988601391,7,0.0022,repeat_loop,"seg=130 degenerate,repeat_char: 隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐隐"
+critical,39736,06-导入内置模块并解构_,952.35,470,4080,4080,0,1,0,0,2,1.0,23,0.0067,garbled_segments,seg=62 density_high: 是不是
+critical,39656,06-Home组件-修改home组件reducer的类型,951.2,479,4068,4068,0,0,0,0,21,0.9995479394449116,20,0.0119,repeat_loop,seg=68 density_high: 什么
+critical,37032,2--[视频]6-2产品需求说明,645.24,370,4060,4060,0,1,0,0,1,1.0,5,0.0014,garbled_segments,"seg=369 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,40206,7--[视频]07.教育产品经理招聘情况,692.08,377,4045,4045,0,0,14,0,21,1.0,157,0.0428,filler_high|invalid_timestamps|repeat_loop,是这些啊
+critical,47147,39_答疑和分割文档对象案例,772.845253,665,4038,4038,0,0,24,0,29,1.0,55,0.0163,filler_high|invalid_timestamps|repeat_loop,seg=222 density_high: 是不是就
+critical,49658,241.3-4算法之社区发现,796.334,358,4023,4023,0,2,0,0,4,0.9960895805026535,111,0.0347,filler_high|garbled_segments,seg=203 density_high: 比两个社区可以更清晰的结设数据啊
+critical,37127,02-事件-3-修饰符,906.133333,511,4022,4022,0,1,0,0,2,0.9984954388605413,66,0.0203,filler_high|garbled_segments,"seg=181 garbled,degenerate,repeat_char: 试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试试"
+critical,40718,8--[视频]5-8 创建优惠券原型演示,1404.2,385,4022,4022,0,0,20,0,24,1.0,64,0.0179,filler_high|invalid_timestamps|repeat_loop,咱们的颜色
+critical,37703,3--[视频]5-3 Xmind的功能结构和主题元素,675.88,339,3991,3991,0,0,1,0,10,1.0,102,0.0364,filler_high|repeat_loop,seg=331 density_high: 我们就讲到这里
+critical,36631,01.课程介绍,687.56,450,3970,3970,0,0,4,0,12,1.0,4,0.0014,invalid_timestamps|repeat_loop,seg=288 density_high: 我们拿到offer
+critical,44463,17-展开运算符_,1020.25,523,3965,3965,0,0,0,0,27,0.9985395736339132,5,0.0017,repeat_loop,seg=113 density_high: 300
+critical,49353,175.4-1实时计算场景,646.996,491,3943,3943,0,0,19,0,31,1.0,88,0.0316,filler_high|invalid_timestamps|repeat_loop,seg=469 density_high: 我们一起交流
+critical,37694,3--[视频]03.需求控制,658.36,387,3927,3927,0,0,0,0,6,1.0,16,0.0048,repeat_loop,我来讲一下
+critical,36236,1--[视频]01.昨日复习,660.52,376,3925,3925,0,0,14,0,21,1.0,117,0.0347,filler_high|invalid_timestamps|repeat_loop,
+critical,50191,IPS_2026-01-18.16.08.56.8760,909.587911,115,3925,3925,0,16,0,0,16,0.9865566474090925,1,0.0032,garbled_segments|repeat_loop,"seg=86 garbled,degenerate,repeat_char: 负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负负"
+critical,48182,77.5-2选择最佳埋点方案,657.496,424,3910,3910,0,0,24,0,19,1.0,39,0.0118,filler_high|invalid_timestamps|repeat_loop,seg=335 density_high: 就或许不到
+critical,39024,5--[视频]4-5 分摊&其他,895.24,357,3900,3900,0,0,14,0,20,1.0,52,0.0155,filler_high|invalid_timestamps|repeat_loop,seg=339 density_high: 我们下期待的设备
+critical,38371,4--[视频]2-4 单品活动-预售B端功能推导,793.76,355,3889,3889,0,0,8,0,13,1.0,133,0.0385,filler_high|invalid_timestamps|repeat_loop,大家可以打开产品原型的绘制啊
+critical,36942,02-05-比较运算符,753.599667,441,3852,3852,0,0,0,0,32,0.9991777238935537,15,0.0047,repeat_loop,seg=155 density_high: 才可以用中文和这个编码的东西
+critical,42565,12--[视频]3-12购物车,675.076009,400,3850,3850,0,0,25,0,37,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=369 density_high: 感谢观看
+critical,39607,6--[视频]2-6 单品活动-预售B端-列表页,876.56,239,3839,3839,0,0,12,0,18,1.0,235,0.0133,filler_high|invalid_timestamps|repeat_loop,"seg=44 density_high: 是不是,"
+critical,39908,06_AI大模型之Git_比较文件,651.483333,421,3810,3810,0,0,3,0,6,0.9999641848090073,47,0.0151,filler_high|invalid_timestamps|repeat_loop,seg=47 density_high: 那比如说啊
+critical,42380,11_FunctionAPI介绍,596.9,439,3804,3804,0,0,2,0,3,0.9985592226503601,13,0.0042,invalid_timestamps,seg=98 density_high: 这个LineGraph
+critical,49646,238.3-1图数据库选型,767.645,441,3796,3796,0,0,16,0,28,1.0,123,0.0412,filler_high|invalid_timestamps|repeat_loop,谢谢大家
+critical,40708,8--[视频]1-6电商平台运营模式,760.24,304,3774,3774,0,0,7,0,13,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=296 density_high: 我可以分成两类角色
+critical,42174,11-vuex-vue3.0模块的用法,1180.5,463,3770,3770,0,1,0,0,2,0.9976365946632783,10,0.0024,garbled_segments,"seg=206 garbled,degenerate,repeat_char: 贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴贴"
+critical,38300,04-05-for循环,780.266,397,3761,3761,0,0,1,0,9,0.9987106960959468,2,0.0006,repeat_loop,seg=103 density_high: 适合列表解决的场景
+critical,37684,3--[视频]3-3线索管理,566.64,395,3755,3755,0,0,5,0,12,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=390 density_high: 这些转移的
+critical,40604,07知识点-DOM对象基本概念介绍,723.533,399,3755,3755,0,0,0,0,5,0.9977706614625732,28,0.0084,filler_high|repeat_loop,seg=10 density_high: Dome对象
+critical,49254,158.7-1产品战略分析,651.179833,459,3743,3743,0,0,18,0,3,1.0,48,0.017,filler_high|invalid_timestamps,seg=249 density_high: 记忆学习
+critical,36163,1,762.85,588,3739,3739,0,0,22,0,47,1.0,12,0.0035,invalid_timestamps|repeat_loop,seg=71 density_high: 我的
+critical,42934,13-02-property属性,484.932667,328,3739,3739,0,0,0,0,6,0.9995202076167824,26,0.0077,filler_high|repeat_loop,seg=138 density_high: 这是property我们需要掌握的
+critical,37042,2--[视频]9-2基础数据建档,632.210998,328,3734,3734,0,0,22,0,26,1.0,0,0.0,invalid_timestamps|repeat_loop,谢谢大家
+critical,37461,2_掌柜智库_查询模块_node_answer_output_模块流程分析,685.3,480,3696,3696,0,0,0,0,6,0.9985991536553336,6,0.0028,repeat_loop,seg=233 density_high: answers
+critical,38325,4-10 js代码分离-静态导入的问题,648.466667,369,3690,3690,0,0,0,0,5,0.9988331443410954,6,0.0015,repeat_loop,seg=51 density_high: npm run build
+critical,38326,4-10 js代码分离-静态导入的问题,648.466667,369,3690,3690,0,0,0,0,5,0.9988331443410954,6,0.0015,repeat_loop,seg=51 density_high: npm run build
+critical,39953,06_langgraph消息列表状态追加,576.9,456,3657,3657,0,0,0,0,5,0.9999653319466112,8,0.0032,repeat_loop,seg=18 density_high: 是Languagraph
+critical,39415,5_掌柜智库_导入模块_node_md_img_端点总结,635.333008,496,3642,3642,0,0,0,0,9,0.9995545517131388,15,0.0051,repeat_loop,seg=254 density_high: 我们对用的summary
+critical,37689,3--[视频]03.数据成果,602.56,350,3640,3640,0,0,14,0,26,1.0,114,0.0343,filler_high|invalid_timestamps|repeat_loop,seg=332 density_high: 咱们这么讲啊
+critical,38249,4,711.5972,323,3636,3636,0,0,0,0,124,0.9802736716783033,8,0.0108,repeat_loop,随移数不一样
+critical,49523,209.5-1数据中台与BI应用,695.046735,448,3630,3630,0,0,2,0,13,1.0,45,0.0179,filler_high|invalid_timestamps|repeat_loop,seg=1 density_high: 我是Diddsir
+critical,37171,02-声明式导航-1-自带类名,708.8,410,3584,3584,0,0,0,0,6,0.99494920993228,37,0.0117,filler_high|repeat_loop,seg=175 density_high: Fred
+critical,45428,21-高阶函数--回调函数,755.55,411,3579,3579,0,0,0,0,7,0.9977632188471974,21,0.0092,filler_high|repeat_loop,
+critical,45034,19.图片地址生成二维码,857.977007,403,3576,3576,0,0,0,0,34,0.998336777106662,44,0.0146,filler_high|repeat_loop,seg=182 density_high: C.
+critical,49236,155.6-3BI业务侧关注内容,648.213,408,3563,3563,0,0,5,0,9,1.0,54,0.0178,filler_high|invalid_timestamps|repeat_loop,seg=199 degenerate: 分析分析分析
+critical,37583,3,1141.982993,613,3553,3553,0,0,17,0,22,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=38 density_high: Acode
+critical,38721,04_AI大模型之Git_设置全局签名,467.366667,309,3550,3550,0,0,0,0,75,0.9998145631553993,28,0.009,filler_high|repeat_loop,我们就把这个git的配置文件呢
+critical,48988,129.13-10从0-1落地数据服务平台,527.463,131,3531,3531,0,0,6,0,5,1.0,32,0.029,filler_high|invalid_timestamps|repeat_loop,我相信这个肯定能够到达的啊 我相信这个肯定能够到达的啊
+critical,43634,14、let提升,937.1,303,3528,3528,0,0,1,0,22,1.0,18,0.008,filler_high|repeat_loop,这次是哪一行?
+critical,48508,93.8-3-AB测试-拉新策略案例解析,583.363,196,3520,3520,0,0,7,0,12,1.0,27,0.0177,filler_high|invalid_timestamps|repeat_loop,我们下轻百万的数据产品人GD
+critical,39035,5--[视频]05.今日任务安排,614.0,365,3509,3509,0,0,0,0,15,1.0,64,0.0268,filler_high|repeat_loop,"seg=351 only_filler,density_high: 嗯"
+critical,37028,2--[视频]5-2商品发布流程梳理,681.48,286,3504,3504,0,1,0,0,1,1.0,0,0.0,garbled_segments,"seg=285 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,42666,12-电梯导航案例上,620.7,373,3499,3499,0,0,0,0,18,0.9850974705977122,13,0.0046,repeat_loop,seg=271 density_high: ITEMS里面的第几个
+critical,37029,2--[视频]5-2联系人管理,492.36,361,3488,3488,0,0,17,0,24,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=340 density_high: 感谢您的观众
+critical,45749,23-条件编译跨端兼容,610.3,360,3461,3461,0,1,0,0,3,0.9977060462067836,52,0.0168,filler_high|garbled_segments,seg=210 density_high: unload
+critical,41833,10-首页-吸顶头部组件-传统实现,994.3,445,3459,3459,0,0,0,0,35,0.999668108216836,11,0.0153,repeat_loop,"seg=142 only_filler,density_high: 诶"
+critical,39604,6--[视频]1-6供应链简介,536.058005,303,3453,3453,0,0,7,0,12,1.0,2,0.0006,invalid_timestamps|repeat_loop,seg=290 density_high: 在整个供应链的核心环节流通的时候
+critical,39610,6--[视频]2-6目标市场现状,668.76,260,3398,3398,0,1,0,0,2,1.0,0,0.0,garbled_segments,"seg=259 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,42533,12-5 多Agent系统Shell工具箱的设计与实现,782.257007,359,3387,3387,0,1,0,0,1,0.9994797016883736,0,0.0,garbled_segments,seg=179 density_high: 叫做wait for process
+critical,42534,12-5 多Agent系统Shell工具箱的设计与实现,782.257007,359,3387,3387,0,1,0,0,1,0.9994797016883736,0,0.0,garbled_segments,seg=179 density_high: 叫做wait for process
+critical,37033,2--[视频]6-2初识墨刀,526.48,360,3377,3377,0,1,0,0,1,0.9994301777845311,108,0.0378,filler_high|garbled_segments,"seg=359 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,42865,12、变量预解析,777.4,277,3348,3348,0,1,0,0,2,0.997401595060458,15,0.0071,filler_high|garbled_segments,seg=70 degenerate: 不不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不 不
+critical,37023,2--[视频]4-2项目方案,496.44,336,3331,3331,0,0,19,0,28,1.0,62,0.0234,filler_high|invalid_timestamps|repeat_loop,seg=312 density_high: 我们就先讲到这里
+critical,41496,09_langgraph自定义状态处理逻辑,540.15,427,3298,3298,0,0,2,425,2,1.0,15,0.0056,invalid_timestamps|timestamps_overlap,seg=17 density_high: register函数
+critical,44507,17-页面显示时间,678.85,436,3262,3262,0,0,0,0,7,0.994976798998306,25,0.01,filler_high|repeat_loop,seg=100 density_high: Month
+critical,49789,275.5-3物体检测、实例分割、图像识别等常用算法,557.027324,341,3254,3254,0,0,18,0,31,1.0,67,0.0299,filler_high|invalid_timestamps|repeat_loop,seg=74 density_high: 还有一个是什么呢
+critical,40137,07-04-作业答案讲解,723.399333,329,3253,3253,0,0,1,0,13,0.9991438573803606,26,0.011,filler_high|repeat_loop,seg=21 density_high: 如果四个字部取出
+critical,39988,06_掌柜智库_导入模块_总结和作业安排,589.666341,390,3215,3215,0,1,0,0,6,0.9975132699663454,5,0.0018,garbled_segments|repeat_loop,"seg=329 garbled,degenerate,repeat_char: 嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓嗓"
+critical,44146,16-小结,528.933008,387,3194,3194,0,0,0,0,5,1.0,58,0.0217,filler_high|repeat_loop,seg=384 density_high: 谢谢大家
+critical,39602,6--[视频]1-5产品经理能力素质,532.56,280,3191,3191,0,0,0,0,5,1.0,11,0.0038,repeat_loop,谢谢大家的聆听
+critical,37719,3--[视频]8-3订单售后流程分析,525.307007,311,3178,3178,0,1,0,0,1,1.0,1,0.0004,garbled_segments,"seg=310 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,38392,4--[视频]04.叮当快药的竞争对手,567.04,301,3140,3140,0,0,2,0,10,1.0,31,0.0116,filler_high|invalid_timestamps|repeat_loop,seg=298 density_high: 我们再去拓换其他人
+critical,47393,45_Agent智能体入门理论,597.999549,499,3127,3127,0,0,2,0,15,1.0,9,0.0038,invalid_timestamps|repeat_loop,seg=147 density_high: 调用哪个tools
+critical,46617,30知识点-增加节点步骤介绍,593.539,366,3124,3124,0,0,1,0,6,1.0,30,0.0102,filler_high|repeat_loop,seg=308 density_high: append
+critical,38331,04-10-作业答案讲解,735.266333,486,3109,3109,0,0,3,0,8,0.9978425055944999,0,0.0,invalid_timestamps|repeat_loop,3540
+critical,45594,22-环境对象this,578.7,345,3107,3107,0,0,0,0,6,0.9951615690340417,4,0.0015,repeat_loop,seg=118 density_high: doc
+critical,41734,10-举报功能-功能完成,660.3,333,3066,3066,0,1,0,0,2,0.9978797516280479,23,0.0081,filler_high|garbled_segments,seg=118 garbled: �令一个事件
+critical,38790,04_加一点业务,563.038011,491,3039,3039,0,0,0,0,5,0.9999502502505111,39,0.0165,filler_high|repeat_loop,seg=25 density_high: Hello World
+critical,38791,04_加一点业务,563.038011,491,3039,3039,0,0,0,0,5,0.9999502502505111,39,0.0165,filler_high|repeat_loop,seg=25 density_high: Hello World
+critical,38792,04_加一点业务,563.038011,491,3039,3039,0,0,0,0,5,0.9999502502505111,39,0.0165,filler_high|repeat_loop,seg=25 density_high: Hello World
+critical,41811,10-组件通讯-子传父的练习,700.9,289,3008,3008,0,1,0,0,2,0.9986731345413041,22,0.01,filler_high|garbled_segments,seg=135 garbled: 艾美的 艾美的 艾美的 艾美的 艾美的 艾美的 艾美的 艾美的 艾美的 艾美的 艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的艾美的
+critical,38405,4--[视频]5-4回款管理,461.242993,290,3004,3004,0,0,1,0,7,1.0,0,0.0,repeat_loop,seg=286 density_high: 我们就学一下核心灵状
+critical,39152,05-大模型的4个要素,467.099675,327,3001,3001,0,0,4,0,10,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=316 density_high: 它到底是怎么训练的
+critical,36423,01-掌柜问数-API接口-基础-中间件,697.366667,100,2990,2990,0,17,0,0,6,0.9999474207734108,11,0.0042,filler_high|garbled_segments|repeat_loop,"seg=81 garbled,degenerate,repeat_char: 顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺顺"
+critical,36998,2--[视频]2-2什么是需求,467.720998,263,2988,2988,0,0,16,0,20,1.0,5,0.0022,invalid_timestamps|repeat_loop,seg=251 density_high: 我们下期间的预期
+critical,37671,3--[视频]1-3B端产品市场介绍,461.24,274,2988,2988,0,0,7,0,10,1.0,0,0.0,invalid_timestamps|repeat_loop,在未来还是技术的市场
+critical,37205,02-掌柜问数-核心思想,504.799349,339,2977,2977,0,0,1,0,6,1.0,19,0.0072,filler_high|repeat_loop,seg=334 density_high: 我先把这个项目的架构了
+critical,44439,17-两种注册事件的区别,510.85,329,2961,2961,0,0,0,0,7,0.9978663012626015,8,0.0031,repeat_loop,seg=215 density_high: 然后写上一个方式
+critical,37728,3--[视频]11-3账号管理,422.93,261,2959,2959,0,0,17,0,22,1.0,9,0.0033,invalid_timestamps|repeat_loop,seg=244 density_high: 我们要注意的是修改
+critical,38552,04-掌柜问数-元数据知识库-为字段信息建立向量索引-中,393.233333,307,2954,2954,0,0,8,0,11,1.0,32,0.0138,filler_high|invalid_timestamps|repeat_loop,seg=58 density_high: 哪个collection
+critical,38872,4、数组解构,759.2,307,2952,2952,0,0,0,0,27,0.9985379346680716,28,0.0157,filler_high|repeat_loop,能力吗?
+critical,49140,143.3-1数字大屏,536.384807,333,2928,2928,0,0,0,0,11,1.0,16,0.0069,repeat_loop,
+critical,39613,6--[视频]3-6用户端首页设计,541.862993,219,2924,2924,0,0,0,0,5,1.0,1,0.0004,repeat_loop,对比会发现实际上的一段时间
+critical,39984,06_工具中的自定义信息流式输出,576.0,355,2874,2874,0,0,1,0,30,0.9971180555555557,8,0.0036,repeat_loop,seg=86 density_high: 等于这个queryDatabase
+critical,49634,235.2-5知识图谱规则应用设计,566.478744,328,2874,2874,0,0,2,0,2,1.0,60,0.0354,filler_high|invalid_timestamps,
+critical,42619,12-克隆节点,533.15,323,2869,2869,0,0,0,0,5,0.9993997936790773,29,0.0135,filler_high|repeat_loop,
+critical,40719,8--[视频]5-8Axure绘制交互演示-跳转&显示隐藏&悬浮显示,425.96,282,2840,2840,0,1,0,0,1,1.0,0,0.0,garbled_segments,"seg=281 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,48224,79.5-4埋点采集背后的DataVault存储模型,467.429833,325,2804,2804,0,0,4,0,12,1.0,36,0.0198,filler_high|invalid_timestamps|repeat_loop,seg=37 density_high: 什么是Link
+critical,49690,249.5-4知识图谱落地实践思考,487.501,241,2803,2803,0,0,0,0,5,1.0,83,0.0368,filler_high|repeat_loop,seg=169 density_high: 其实团队啊也做过这样的不少的项目啊
+critical,45914,24-综合案例-右侧按钮无缝衔接,562.0,385,2792,2792,0,0,0,0,7,0.9968683274021353,36,0.0151,filler_high|repeat_loop,"seg=292 degenerate,repeat_char: 加加加加加加"
+critical,37691,3--[视频]03.消费分期,475.48,275,2779,2779,0,0,21,0,32,1.0,95,0.0383,filler_high|invalid_timestamps|repeat_loop,seg=257 density_high: 消费分期
+critical,40581,7、call方法,806.3,271,2778,2778,0,1,0,0,2,0.9991566414485924,18,0.0086,filler_high|garbled_segments,seg=31 density_high: 就是call
+critical,38395,4--[视频]04.暖暖项目演示,432.92,317,2758,2758,0,0,22,0,28,1.0,98,0.0549,filler_high|invalid_timestamps|repeat_loop,
+critical,45194,20-权限修改完成,619.4,307,2751,2751,0,0,0,0,39,0.9997739748143365,9,0.0037,repeat_loop,seg=136 density_high: 把这个shoot title
+critical,40595,7、对象,614.6,258,2750,2750,0,0,0,0,6,0.9984217377155873,19,0.0094,filler_high|repeat_loop,seg=85 density_high: 这就是个对象
+critical,42457,11、构造函数,606.2,245,2736,2736,0,1,0,0,2,0.9995051138238205,21,0.0117,filler_high|garbled_segments,"seg=135 garbled,degenerate,repeat_char: 丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁丁"
+critical,40901,08.1-7总结,520.24,264,2728,2728,0,0,3,0,8,1.0,38,0.0203,filler_high|invalid_timestamps|repeat_loop,谢谢大家
+critical,37514,2、Prompt的组成元素,440.199333,180,2724,2724,0,0,5,0,4,0.9975026472836568,22,0.0075,filler_high|invalid_timestamps,seg=40 density_high: 你没告诉它
+critical,44678,18-image标签,605.226009,345,2706,2706,0,0,0,0,7,0.9946036539219517,37,0.0191,filler_high|repeat_loop,"seg=72 only_filler,density_high: 诶"
+critical,37826,03-大模型中的计量单位,393.067392,231,2674,2674,0,0,19,0,22,1.0,32,0.0135,filler_high|invalid_timestamps|repeat_loop,seg=68 density_high: 就叫做token
+critical,38665,4,941.016667,37,2674,2674,0,21,0,0,4,0.9945201108749331,2,0.0008,filler_high|garbled_segments,seg=12 degenerate: 载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载试载
+critical,41371,09-部署嵌入模型_部署重排序模型,381.666016,351,2647,2647,0,0,23,0,28,1.0,47,0.0209,filler_high|invalid_timestamps|repeat_loop,seg=262 density_high: 我写的是iPhone
+critical,37522,2、作用域,683.4,240,2643,2643,0,0,0,0,7,0.998990342405619,24,0.0145,filler_high|repeat_loop,
+critical,43024,13-个人中心-渲染用户详细信息,590.8,239,2633,2633,0,1,0,0,1,0.9982566012186865,26,0.0126,filler_high|garbled_segments,seg=108 density_high: normal
+critical,40184,7--[视频]1-7电商平台交易模式,504.687007,220,2618,2618,0,0,11,0,17,1.0,0,0.0,invalid_timestamps|repeat_loop,我们下期间的交易模式
+critical,37057,2--[视频]16-2客服系统的概念及组成,432.84,246,2608,2608,0,0,23,0,3,1.0,0,0.0,invalid_timestamps,
+critical,39063,5--[视频]20-5SaaS产品设计示例,386.172993,221,2604,2604,0,0,13,0,16,1.0,0,0.0,invalid_timestamps|repeat_loop,所以主要就是这样的管理端
+critical,39616,6--[视频]4-6泳道图,436.52,214,2583,2583,0,0,9,0,13,1.0,1,0.0004,invalid_timestamps|repeat_loop,那么这节课就是一种跨职能的
+critical,41368,09-购物车页面-全选操作-本地,669.1,289,2580,2580,0,0,0,0,5,0.9939620385592586,9,0.0044,repeat_loop,invalid
+critical,40308,07-掌柜问数-元数据知识库-代码分层说明,393.033333,276,2557,2557,0,0,5,0,13,1.0,2,0.0009,invalid_timestamps|repeat_loop,
+critical,40697,08-07-作业答案讲解,531.199333,284,2537,2537,0,0,2,0,3,0.9993235439548265,0,0.0,invalid_timestamps,seg=65 density_high: 第二题封装一个函数获取多个数当中的最小数量
+critical,37015,2--[视频]3-2用户端常见产品形态,468.975011,194,2531,2531,0,0,17,0,26,1.0,0,0.0,invalid_timestamps|repeat_loop,感谢观看
+critical,43479,14-获取用户信息,555.6,268,2503,2503,0,0,0,0,5,0.9961303095752341,8,0.004,repeat_loop,seg=128 density_high: z.
+critical,36805,1、课程回顾,616.2,256,2500,2500,0,0,0,0,34,0.9972086984745212,27,0.0159,filler_high|repeat_loop,seg=166 density_high: 哪个问题
+critical,45278,20_数据库检查点(sqlite),439.576022,369,2500,2500,0,0,0,0,5,1.0,36,0.0165,filler_high|repeat_loop,seg=201 density_high: config report
+critical,39041,5--[视频]05.金融互联网,418.32,222,2476,2476,0,0,17,0,21,1.0,21,0.0098,filler_high|invalid_timestamps|repeat_loop,我们讲的这种机构
+critical,37707,3--[视频]5-3合同管理,343.24,206,2464,2464,0,1,0,0,1,1.0,2,0.0014,garbled_segments,"seg=205 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,39486,5、思维链COT,469.533,277,2454,2454,0,0,2,0,3,1.0,1,0.0009,invalid_timestamps,seg=100 density_high: 所以像这种复杂的逻辑推演的这样的一种问题
+critical,38368,4--[视频]1-4.用户促活策略,420.91,175,2445,2445,0,0,0,0,17,1.0,104,0.0,filler_high|repeat_loop,"seg=69 density_high: 好,"
+critical,48525,94.8-4-AB测试-流失召回案例解析,404.979833,261,2432,2432,0,0,19,0,33,1.0,15,0.0092,filler_high|invalid_timestamps|repeat_loop,seg=238 density_high: 加油
+critical,38478,04-profile组件-useSelector的使用,823.4,276,2421,2421,0,0,0,0,9,0.999975710468788,13,0.0103,repeat_loop,
+critical,37038,2--[视频]7-2进销存诞生背景,412.480998,202,2418,2418,0,0,8,0,11,1.0,2,0.0014,invalid_timestamps|repeat_loop,seg=191 density_high: 我们可以进行参考
+critical,41357,09-获取组织架构数据列表,498.6,258,2418,2418,0,0,0,0,5,0.9971520256718812,3,0.0019,repeat_loop,seg=46 density_high: DEPARTMENT
+critical,38591,04-规格组件-SKU&SPU概念,602.9,260,2406,2406,0,1,0,0,3,0.9965665947918395,6,0.0028,garbled_segments,"seg=46 garbled,repeat_char: 光在屏肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚肚"
+critical,43083,13-求数组的最大值和最小值,466.55,316,2404,2404,0,0,0,0,38,0.993076840638731,24,0.0121,filler_high|repeat_loop,seg=169 density_high: 是不是
+critical,37000,2--[视频]2-2项目立项简介,467.8,196,2402,2402,0,1,0,0,1,0.9953826421547669,0,0.0,garbled_segments,"seg=195 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,38380,4--[视频]3-4用户端核心业务及功能,406.56,207,2399,2399,0,0,18,0,24,1.0,0,0.0,invalid_timestamps|repeat_loop,我们下单的课程
+critical,43383,14-coze案例3之selling2buying_point工作流的搭建,396.4,294,2394,2394,0,0,0,0,5,1.0,41,0.0195,filler_high|repeat_loop,seg=290 density_high: 咱们现在要做这个项目的
+critical,42931,13-01-私有属性和私有方法,575.878125,254,2392,2392,0,0,1,0,8,0.9988224504967959,33,0.0154,filler_high|repeat_loop,seg=66 density_high: 这个name
+critical,39037,5--[视频]05.全球化思维,405.607007,217,2391,2391,0,0,17,0,23,1.0,75,0.035,filler_high|invalid_timestamps|repeat_loop,seg=198 density_high: 我们讲的建设
+critical,38370,4--[视频]1-4内容审核,364.461995,262,2389,2389,0,1,0,0,1,1.0,1,0.0005,garbled_segments,"seg=261 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,48541,95.8-5-AB测试-算法迭代案例解析,392.496,242,2384,2384,0,0,1,0,10,1.0,18,0.0093,filler_high|repeat_loop,seg=118 density_high: 工作方式
+critical,49403,185.6-3数据质量具体检核规则,470.091814,264,2372,2372,0,0,11,0,4,1.0,57,0.0303,filler_high|invalid_timestamps,
+critical,44859,18、剩余参数,557.4,201,2371,2371,0,1,0,0,4,0.9993362038033728,12,0.0338,filler_high|garbled_segments,seg=31 density_high: Ontified
+critical,38382,4--[视频]3-4需求分析的步骤-澄清需求,371.6,218,2321,2321,0,0,21,0,30,1.0,1,0.0005,invalid_timestamps|repeat_loop,seg=195 density_high: 感谢观看
+critical,49210,151.5-2离线数仓案例,399.596,296,2320,2320,0,0,0,0,8,0.9979078869658354,2,0.001,repeat_loop,seg=230 density_high: 或者Yammer寄的
+critical,36968,02-09-作业答案讲解,467.399667,231,2289,2289,0,0,0,0,146,0.9994872332675411,0,0.0,repeat_loop,seg=40 density_high: 好不好
+critical,42688,12-转dom对象,389.375011,241,2286,2286,0,0,0,0,34,0.9977270986195876,7,0.0034,repeat_loop,seg=161 density_high: C
+critical,36209,01-04-input输入,923.480844,134,2267,2267,0,0,0,0,5,0.9831931067105059,4,0.0,repeat_loop,seg=2 density_high: So we're going to use our control
+critical,37979,3,1289.083333,327,2266,2266,0,0,13,0,20,1.0,4,0.0021,invalid_timestamps|repeat_loop,我们下期课咱们再见
+critical,37706,3--[视频]5-3原型的概念及分类,352.32,170,2243,2243,0,0,17,0,22,1.0,0,0.0,invalid_timestamps|repeat_loop,感谢观看
+critical,37679,3--[视频]2-3需求收集的常见方法,342.52,225,2239,2239,0,0,12,0,17,1.0,0,0.0,invalid_timestamps|repeat_loop,有两种是定量收集的方法
+critical,39050,5--[视频]8-5内容管理-评论管理,322.829002,170,2236,2236,0,1,0,0,1,1.0,1,0.0005,garbled_segments,"seg=169 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,37716,3--[视频]7-3用户端设计思路,347.92,211,2234,2234,0,0,16,0,22,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=194 density_high: 内容设计划
+critical,37701,3--[视频]4-3流程图的绘制-流程图常见结构,374.44,234,2214,2214,0,0,1,0,9,1.0,0,0.0,repeat_loop,seg=232 density_high: 就有这种符号
+critical,42562,12--[视频]1-11 认识产品经理章节总结,374.6,244,2202,2202,0,0,3,0,10,1.0,64,0.0342,filler_high|invalid_timestamps|repeat_loop,seg=243 density_high: 我认识产品维度
+critical,36319,01-list-3-获取数据,433.0,252,2194,2194,0,0,0,0,14,0.9963048498845265,15,0.0078,filler_high|repeat_loop,seg=59 density_high: ur
+critical,37723,3--[视频]9-3马甲管理,325.893991,185,2176,2176,0,1,0,0,1,1.0,1,0.0005,garbled_segments,"seg=184 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,40720,8--[视频]5-8类目关联相关场景,372.8,166,2169,2169,0,1,0,0,1,1.0,7,0.0041,garbled_segments,"seg=165 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,36219,1-18 主流大模型介绍-1 2025-11-19,991.84,272,2157,2157,0,0,14,0,27,1.0,3,0.0043,invalid_timestamps|repeat_loop,seg=149 density_high: Transformer架构
+critical,40491,07_api之基本的State定义,357.383714,354,2150,2150,0,0,33,0,39,1.0,19,0.0111,filler_high|invalid_timestamps|repeat_loop,seg=296 density_high: Totter
+critical,40492,07_api之基本的State定义,357.383714,354,2150,2150,0,0,33,0,39,1.0,19,0.0111,filler_high|invalid_timestamps|repeat_loop,seg=296 density_high: Totter
+critical,40493,07_api之基本的State定义,357.383714,354,2150,2150,0,0,33,0,39,1.0,19,0.0111,filler_high|invalid_timestamps|repeat_loop,seg=296 density_high: Totter
+critical,45174,20-作用域小结以及调试看作用域,375.3,296,2148,2148,0,0,0,0,33,0.9962696509459098,19,0.0098,filler_high|repeat_loop,seg=5 density_high: 选举
+critical,40687,08-05-匿名函数lambda,469.466,243,2121,2121,0,0,1,0,6,0.9943212074995846,0,0.0,repeat_loop,seg=31 density_high: x星星
+critical,37724,3--[视频]10-3敏感词管理,312.611995,189,2116,2116,0,1,0,0,1,1.0,5,0.0027,garbled_segments,"seg=188 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,45807,23_RunnableLambda回答同学提问,329.883714,280,2116,2116,0,0,20,0,24,1.0,30,0.0164,filler_high|invalid_timestamps|repeat_loop,seg=102 density_high: Python
+critical,49682,247.5-2知识图谱架构设计,451.434978,196,2068,2068,0,0,0,0,7,1.0,0,0.0,repeat_loop,seg=192 density_high: 感谢大家的学习
+critical,38383,4--[视频]4-4 生效顺序,419.84,197,2050,2050,0,0,8,0,13,1.0,22,0.0129,filler_high|invalid_timestamps|repeat_loop,seg=185 density_high: 咱们的活动顺序就先讲解了
+critical,39690,06-todo-5-新增,415.2,239,2049,2049,0,0,0,0,5,0.9946772639691716,11,0.0061,repeat_loop,Trim
+critical,50109,AG大模型全栈实践班【AGI大模型2512期】23-Agent 数字人应用-25.7.14,483.72,49,2008,2008,0,0,21,0,49,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=13 density_high: 优优独播剧场——YoYo Television Series Exclusive
+critical,48573,97.9.标签画像驱动产品运营-章节导读,343.36,294,1978,1978,0,0,20,0,31,1.0,11,0.0065,invalid_timestamps|repeat_loop,seg=25 density_high: 如果你烧钱
+critical,41205,9--[视频]2-9 单品活动-直降&折扣,436.2,27,1977,1977,0,0,0,0,6,1.0,10,0.2712,filler_high|repeat_loop,"seg=21 degenerate: 呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,呃,"
+critical,46822,33_文本嵌入模型常用编码模板,388.806791,313,1973,1973,0,1,0,0,2,0.9976163199268812,17,0.0103,filler_high|garbled_segments,seg=48 density_high: Inbanding
+critical,37678,3--[视频]2-3立项说明书结构,352.52,181,1944,1944,0,0,18,0,24,1.0,0,0.0,invalid_timestamps|repeat_loop,我们一起来小结构
+critical,39010,5--[视频]1-5-货-在电商的体现,365.84,152,1912,1912,0,0,17,0,24,1.0,1,0.0006,invalid_timestamps|repeat_loop,seg=132 density_high: 第二个是自财
+critical,43057,13-得到数组对象里面的属性值,422.25,218,1909,1909,0,0,0,0,5,0.9952397868561279,10,0.0066,repeat_loop,seg=94 degenerate: 对象对象对象
+critical,49746,263.2-2人脸识别-AI产品经理需要了解的CV通识-,361.259887,243,1900,1900,0,0,5,0,16,1.0,13,0.0163,filler_high|invalid_timestamps|repeat_loop,seg=124 degenerate: 这个这个这个
+critical,49801,279.6-3知识图谱助力企业风控平台,313.844739,231,1883,1883,0,0,22,0,27,1.0,23,0.0128,filler_high|invalid_timestamps|repeat_loop,
+critical,42221,11-折线图生成以及配置项总结,315.083333,201,1852,1852,0,0,0,0,11,0.9725681047051765,25,0.0152,filler_high|repeat_loop,seg=55 density_high: 这一个呢
+critical,38385,4--[视频]4-4产品规划,260.72,175,1849,1849,0,0,17,0,27,1.0,61,0.0386,filler_high|invalid_timestamps|repeat_loop,seg=151 density_high: 我们先讲到这里啊
+critical,38923,5,638.146733,422,1831,1831,0,0,0,0,38,1.0,23,0.0234,filler_high|repeat_loop,seg=160 density_high: 所以为1吧
+critical,41677,10--[视频]2-10 单品活动-拼团C端,389.123991,144,1831,1831,0,1,0,0,1,1.0,10,0.0061,filler_high|garbled_segments,"seg=143 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,39039,5--[视频]05.智慧医疗,314.32,178,1816,1816,0,0,6,0,13,1.0,69,0.0439,filler_high|invalid_timestamps|repeat_loop,
+critical,43064,13-掌柜问数-问数智能体-校正SQL,248.733333,227,1775,1775,0,0,24,0,29,1.0,12,0.0123,filler_high|invalid_timestamps|repeat_loop,seg=43 density_high: strainoutputpasser
+critical,43984,15、预解析练习,669.9,144,1749,1749,0,1,0,0,18,0.9997760859829826,11,0.0129,filler_high|garbled_segments|repeat_loop,seg=121 garbled: 几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个几个
+critical,39534,6,506.592533,24,1729,1729,0,14,0,0,13,0.9967971636091999,0,0.0012,garbled_segments|repeat_loop,"seg=10 garbled,repeat_char: 这个需求,我给你看一眼,教读字符书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书书"
+critical,44585,17_外部加载Prompt,353.76833,182,1724,1724,0,1,0,0,1,0.9989305713148489,23,0.0195,filler_high|garbled_segments,"seg=81 garbled,repeat_char: 专转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转转"
+critical,39043,5--[视频]6-5 店铺装修-产品设计,388.8,133,1718,1718,0,1,0,0,2,1.0,18,0.012,filler_high|garbled_segments,"seg=132 garbled,density_high: 我设计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创建计创"
+critical,36235,1--[视频]01.昨日复习,276.44,149,1658,1658,0,0,4,0,10,1.0,35,0.0232,filler_high|invalid_timestamps|repeat_loop,
+critical,40273,07-函数为什么需要返回值,287.95,184,1643,1643,0,0,0,0,16,1.0,2,0.0021,repeat_loop,seg=170 density_high: OK
+critical,37714,3--[视频]7-3 什么是用户画像,329.889002,125,1626,1626,0,0,0,0,5,1.0,31,0.0226,filler_high|repeat_loop,就算是用户花像的分类哈
+critical,41206,9--[视频]2-9认识产品架构图,358.842993,90,1599,1599,0,4,0,0,3,1.0,0,0.0,garbled_segments,"seg=85 garbled,degenerate,repeat_char: 端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端端"
+critical,46172,26-纯组件的基本使用,374.6,168,1596,1596,0,0,0,0,5,0.9941804591564335,9,0.0064,filler_high|repeat_loop,
+critical,38729,04_AI大模型之Numpy_Pandas_布尔索引,315.95,10,1584,1584,0,1,0,0,1,0.999936698844754,1,0.0153,garbled_segments,"seg=7 garbled,repeat_char: 这个过滤了他去其实是我先要匹配所影然后呢看一下他当前我现在呢这个布尔丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽丽"
+critical,39064,05-AuthRoute-使用push替换replace,322.0,186,1581,1581,0,0,0,0,5,0.994472049689441,11,0.0087,filler_high|repeat_loop,seg=37 density_high: Homogong video
+critical,37035,2--[视频]7-2 精细化运营的目的,320.0,134,1576,1576,0,0,10,0,14,1.0,16,0.0111,filler_high|invalid_timestamps|repeat_loop,接下来会针对用户的方式
+critical,42205,11-学成在线案例填充数据,304.35,222,1559,1559,0,0,0,0,31,0.9939214719894857,7,0.0068,repeat_loop,seg=63 density_high: Li
+critical,37726,3--[视频]10-3采购订单功能设计,254.4,164,1535,1535,0,0,22,0,28,1.0,0,0.0,invalid_timestamps|repeat_loop,
+critical,37309,2,527.833333,164,1528,1528,0,1,0,0,2,0.9963182829152625,3,0.0022,garbled_segments,"seg=123 garbled,degenerate,repeat_char: 尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝尝"
+critical,39638,6--[视频]10-6采购退货核心业务介绍,255.08,116,1512,1512,0,1,0,0,1,1.0,0,0.0,garbled_segments,"seg=115 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,40502,07_langgraph列表状态追加,257.8,165,1496,1496,0,0,2,0,2,1.0,3,0.0015,invalid_timestamps,seg=63 density_high: 就会实现这种operator_add
+critical,39635,6--[视频]7-6评价管理,253.03,116,1461,1461,0,0,0,0,6,1.0,0,0.0,repeat_loop,seg=111 density_high: 我们下期再见
+critical,38089,03_langgraph_state_reducer_1,212.787007,168,1446,1446,0,0,0,0,6,1.0,3,0.0024,repeat_loop,seg=28 density_high: more than you can make
+critical,37734,3--[视频]14-3采购及销售报表,214.530998,123,1420,1420,0,1,0,0,1,1.0,0,0.0,garbled_segments,"seg=122 garbled,density_high: 请不吝点赞 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转发 转"
+critical,45608,22-输出用户名和姓名案例,285.5,199,1383,1383,0,1,0,0,2,0.9904728546409807,16,0.0135,filler_high|garbled_segments,"seg=150 garbled,degenerate,repeat_char: 刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘刘"
+critical,37673,3--[视频]1-3零售三要素,268.0,114,1335,1335,0,0,16,0,24,1.0,1,0.0008,invalid_timestamps|repeat_loop,seg=91 density_high: 也就是人或厂
+critical,38765,04_model_provider课间答疑,216.03756,172,1324,1324,0,0,22,0,27,1.0,4,0.0052,invalid_timestamps|repeat_loop,seg=10 density_high: 就是Deepseek
+critical,42131,11--[视频]2-11产品设计思路,221.8,108,1244,1244,0,0,3,0,11,1.0,0,0.0,invalid_timestamps|repeat_loop,再详细的去进行相应的实践
+critical,50367,核心编程解答课06-2023-09-23-柏汌,7631.910816,54,1224,1224,0,0,0,0,6,0.9821328079837982,4,0.0,filler_high|repeat_loop,seg=4 density_high: How do you like the summer?
+critical,36995,2--[视频]2-2 营销活动-活动分类,260.96,139,1197,1197,0,0,0,0,20,1.0,38,0.0378,filler_high|repeat_loop,seg=123 density_high: 拜拜
+critical,49214,151：SparkStreaming_SparkStreaming 其他算子介绍,173.76,92,1187,1187,0,1,0,0,2,0.9950506445672193,7,0.0038,filler_high|garbled_segments,seg=9 density_high: reparlating
+critical,45468,21_构建Agent实现记忆存储,176.383714,172,1161,1161,0,0,19,0,24,1.0,5,0.0051,invalid_timestamps|repeat_loop,seg=92 density_high: CQLite
+critical,42314,11.商品列表 - 判断数据是否加载完毕,200.156009,113,1151,1151,0,0,24,0,20,1.0,2,0.0048,invalid_timestamps|repeat_loop,
+critical,39641,6--[视频]11-6销售退货核心业务介绍,178.04,80,1134,1134,0,1,0,0,1,0.9796113232981353,0,0.0,garbled_segments,"seg=79 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,40715,8--[视频]3-8 产品解决方案章节总结,172.44,135,1108,1108,0,0,8,0,13,1.0,7,0.0072,filler_high|invalid_timestamps|repeat_loop,我们下期待的主要内容
+critical,45023,19.jwt - 了解jwt的工作原理,197.322993,73,1107,1107,0,1,0,0,1,0.9896464524030405,4,0.0039,filler_high|garbled_segments,seg=33 garbled: 那所以说服务器拿到这个token资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金资金
+critical,36877,2,695.766667,48,1101,1101,0,7,0,0,4,0.9958367263949425,0,0.0,garbled_segments,"seg=39 garbled,degenerate,repeat_char: 专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专专"
+critical,41532,09_模型参数temperature补充,194.049002,164,1053,1053,0,0,1,0,9,1.0,16,0.018,filler_high|repeat_loop,seg=4 density_high: 是不是有个temperature
+critical,49383,181.5-3数仓各层开发规范,189.919864,97,1052,1052,0,0,5,0,13,1.0,14,0.0157,filler_high|invalid_timestamps|repeat_loop,在这一章里也在C区体现一下
+critical,41216,9--[视频]10-9以销定采,162.286009,84,1008,1008,0,0,9,0,16,1.0,0,0.0,invalid_timestamps|repeat_loop,我们下游客户有了
+critical,38366,4--[视频]1-4 运营基础章节总结,207.241995,94,994,994,0,0,3,0,11,1.0,16,0.0211,filler_high|invalid_timestamps|repeat_loop,
+critical,49802,279_06数据可视化—第二十四章Pyecharts绘图案例实战-【绘图实战】北京地图上绘制汽车流量热力图,264.591383,9,989,989,0,1,0,0,1,0.9902060945045968,1,0.0041,garbled_segments,"seg=0 garbled,repeat_char: 那么这一节我们在介绍我们使用派一刹测绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘绘"
+critical,38280,04-02-while循环练习,224.933,92,988,988,0,0,2,0,2,0.9880275459803587,0,0.0,invalid_timestamps,seg=53 density_high: 在这儿用S加等于I是不是就可以了
+critical,40721,8--[视频]6-8 内容管理章节总结,204.44,25,969,969,0,0,2,0,4,1.0,2,0.0272,filler_high|invalid_timestamps,
+critical,38411,4--[视频]7-4平台端订单管理,141.921995,105,955,955,0,0,9,0,18,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=88 density_high: 对于订单的核心
+critical,49672,244：Git下载安装,157.593832,109,945,945,0,0,0,0,9,0.9890615515967656,11,0.0132,filler_high|repeat_loop,next
+critical,42682,12-补充,157.85,129,924,924,0,0,0,0,31,0.9957554640481471,6,0.0075,repeat_loop,seg=30 density_high: Mose
+critical,36211,01-05-Python变量,1183.799333,43,897,897,0,0,0,0,5,0.4167936120977693,3,0.0,coverage_low|filler_high|repeat_loop,"seg=12 density_high: For the convenience of it, then use it to do other things."
+critical,42133,11--[视频]5-11 活动管理-营销工具章节总结,149.726009,55,851,851,0,1,0,0,1,1.0,4,0.008,filler_high|garbled_segments,"seg=54 garbled,density_high: 请不吝点赞 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订阅 订"
+critical,49054,135.15.产品人的职业成长-章节导读,108.4178,105,847,847,0,0,31,0,35,1.0,2,0.0027,invalid_timestamps|repeat_loop,seg=81 density_high: 我们下期再见
+critical,50384,预科1-开班典礼-柏汌-安娜-2023-7-28,7881.632,110,784,784,0,0,0,0,9,0.9490369507228961,14,0.0,filler_high|repeat_loop,"seg=0 density_high: Hello, everyone, good morning."
+critical,40212,7--[视频]11-7销售退货订单功能设计,91.93,48,696,696,0,0,7,0,10,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=40 density_high: 在这一段时间里面有关销售退货订单
+critical,50381,视频教程,93.901655,63,649,649,0,0,13,0,18,1.0,0,0.0,invalid_timestamps|repeat_loop,seg=48 density_high: 我们下软件的软件
+critical,39640,6--[视频]11-6平台端-运营管理章节总结,67.84,31,626,626,0,1,0,0,1,0.9942511792452831,0,0.0,garbled_segments,"seg=30 garbled,density_high: 这一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习的一张学习"
+critical,50341,作业讲解课1-2023-08-20-柏汌,9086.820045,104,618,618,0,0,0,0,16,0.7739187048025226,0,0.0,repeat_loop,"seg=15 density_high: I said, this is so small."
+critical,50365,核心编程解答课02-2023-8-27-柏汌,9454.155,93,587,587,0,0,0,0,8,0.7834978377232021,0,0.0,repeat_loop,"seg=0 density_high: When I hear about you, I don't believe"
+critical,37290,2.mac版本pycharm安装视频,226.633333,19,561,561,0,0,0,0,1,0.4486983386508286,0,0.0,coverage_low,seg=18 density_high: We will download Python 3.
+critical,36277,1--[视频]8-1自媒体端产品设计章节目标,74.560998,30,545,545,0,0,1,0,5,1.0,0,0.0,repeat_loop,seg=29 density_high: 所以就学习最后一部分叫做粉丝的管理
+critical,36230,1--[视频]1-1内容产品模型章节目标,68.245011,31,533,533,0,0,5,0,10,1.0,0,0.0,invalid_timestamps|repeat_loop,是内容产品上的设计方案
+critical,36255,1--[视频]4-1 活动管理-营销规则章节目标,88.8,43,509,509,0,0,8,0,13,1.0,0,0.0,invalid_timestamps|repeat_loop,我们可以参加的
+critical,39015,5--[视频]2-5.数据分析流程章节总结,56.36,31,480,480,0,0,11,0,15,1.0,0,0.0,invalid_timestamps|repeat_loop,我们要进行分析框架了
+critical,38184,3、RAG系统搭建流程,1314.737,26,472,472,0,0,0,0,7,0.042609282312736314,4,0.0,coverage_low|filler_high|repeat_loop,seg=24 density_high: I'm going to
+critical,45574,22-多Agent系统,428.224,39,457,457,0,0,13,0,38,1.0,0,0.0026,invalid_timestamps|repeat_loop,seg=11 density_high: 中文字幕志愿者 李宗盛
+critical,50366,核心编程解答课03-2023-09-03-柏汌,7073.085,28,449,449,0,0,0,0,7,0.685285133714638,0,0.0,repeat_loop,seg=17 density_high: I can see the screen.
+critical,36899,02-01-占位符,770.599333,33,444,444,0,0,0,0,19,0.8298735446738311,0,0.0,repeat_loop,
+critical,50364,核心编程第十五期阶段测试试题讲解-2023-10-13-柏汌,7560.69483,88,433,433,0,0,0,0,25,0.9607370966988228,3,0.0,repeat_loop,"seg=57 density_high: ,"
+critical,40189,7--[视频]3-7 活动管理-总价活动章节总结,95.6,19,392,392,0,0,9,0,14,1.0,1,0.0134,invalid_timestamps|repeat_loop,
+critical,46301,27.Git的基本操作 - 取消暂存的文件,293.407007,10,239,239,0,0,0,0,10,0.9999761184980833,0,0.0,repeat_loop,请不吝点赞 订阅 转发 打赏支持明镜与点点栏目
+critical,36247,1--[视频]2-1电商立项章节目标,40.88,13,216,216,0,0,0,0,5,1.0,0,0.0,repeat_loop,seg=9 density_high: 感谢观看

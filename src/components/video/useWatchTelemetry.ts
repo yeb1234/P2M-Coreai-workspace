@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE } from '../../lib/apiBase';
+import { userScopedSessionStorage } from '../../lib/userScopedStorage';
 
 /**
  * 播放行为埋点。
@@ -31,7 +32,7 @@ interface PendingEvent {
 function newSessionId(): string {
   const id = `${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 8)}`;
   try {
-    sessionStorage.setItem(SESSION_KEY, id);
+    userScopedSessionStorage.setItem(SESSION_KEY, id);
   } catch {
     /* 隐私模式下 sessionStorage 可能不可用，退化为内存态 */
   }
@@ -40,7 +41,7 @@ function newSessionId(): string {
 
 function currentSessionId(): string {
   try {
-    return sessionStorage.getItem(SESSION_KEY) || newSessionId();
+    return userScopedSessionStorage.getItem(SESSION_KEY) || newSessionId();
   } catch {
     return newSessionId();
   }

@@ -45,6 +45,50 @@ def _mapping_pairs() -> list[tuple[str, str]]:
     return pairs
 
 
+def _implicit_video_roots() -> list[str]:
+    """已知的视频库根路径别名。
+
+    目录结构迁移后，同一个视频库可能以不同前缀出现：
+    - 容器内 `/videos`
+    - 旧数据库的 `D:/ITJC`
+    - 仓库里的 `./video-library`（Windows Junction 到 D:/ITJC）
+    - 宿主机绝对路径 `C:/SiteYeb/video-library`
+
+    这里不做硬编码迁移，只在原路径不存在时互相尝试。显式 PATH_MAP
+    仍然优先；这个列表只兜底“路径前缀换了、文件其实还在”的情况。
+    """
+    return [
+        "/videos",
+        "D:/ITJC",
+        "./video-library",
+        "C:/SiteYeb/video-library",
+    ]
+
+
+def _alias_candidates(raw_path: str | Path) -> list[Path]:
+    """把路径前缀替换成其它已知视频库根，返回可能存在的候选。"""
+    text = str(raw_path).replace("\\", "/")
+    normalized = _normalize(text)
+    roots = _implicit_video_roots()
+    matched_root = ""
+    for root in roots:
+        root_norm = _normalize(root)
+        if normalized == root_norm or normalized.startswith(root_norm + "/"):
+            if len(root_norm) > len(_normalize(matched_root)):
+                matched_root = root
+    if not matched_root:
+        return []
+
+    suffix = text[len(matched_root):].lstrip("/\\")
+    candidates: list[Path] = []
+    for root in roots:
+        if _normalize(root) == _normalize(matched_root):
+            continue
+        candidate = Path(root) / suffix if suffix else Path(root)
+        candidates.append(candidate)
+    return candidates
+
+
 def resolve_media_path(raw_path: str | Path | None) -> Path:
     """把数据库里存的宿主机绝对路径解析成当前运行环境可用的路径。
 
@@ -54,8 +98,9 @@ def resolve_media_path(raw_path: str | Path | None) -> Path:
 
     解析顺序：
     1. 原路径存在 → 直接用（本地 venv 跑法不受影响）
-    2. 按 PATH_MAP 做前缀替换，命中就用映射后的路径
-    3. 都不匹配 → 返回原路径，让调用方按「不存在」处理
+    2. 按 PATH_MAP 做前缀替换，命中且文件存在就用映射后的路径
+    3. 按已知视频库根别名互换前缀（/videos、D:/ITJC、video-library）
+    4. 都不匹配 → 返回原路径，让调用方按「不存在」处理
     """
     if raw_path is None:
         return Path("")
@@ -76,9 +121,17 @@ def resolve_media_path(raw_path: str | Path | None) -> Path:
         suffix = str(raw_path).replace("\\", "/")[len(src_norm):].lstrip("/")
         mapped = Path(dst) / suffix if suffix else Path(dst)
         if mapped.exists():
+            logger.info("PATH_MAP 命中: %s -> %s", raw_path, mapped)
             return mapped
-        # 映射到了但文件确实不在，如实返回该路径，便于日志定位
-        logger.debug("路径映射命中但文件不存在: %s -> %s", raw_path, mapped)
-        return mapped
+        logger.debug("PATH_MAP 命中但文件不存在: %s -> %s", raw_path, mapped)
+        # 不在这里直接返回：目录结构换过时，别的别名可能仍然存在。
+
+    for candidate in _alias_candidates(raw_path):
+        try:
+            if candidate.exists():
+                logger.info("视频库路径别名命中: %s -> %s", raw_path, candidate)
+                return candidate
+        except OSError:
+            continue
 
     return path

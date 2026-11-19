@@ -14,7 +14,7 @@ import logging
 from sqlalchemy import text
 
 from app.database import Base, settings
-from app.tables import CONTENT_CHUNKS, content_chunks_ddl
+from app.tables import CONTENT_CHUNKS, content_chunks_ddl, content_chunks_history_ddl
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +63,15 @@ def _claim_legacy_ownership(conn) -> None:
         )
         logger.info("已将用户 id=%s 提升为管理员", owner_id)
 
-    # 历史数据归属
+    # 历史数据归属：这些表都要按 user_id 过滤，不能再把 NULL 当公共数据。
     for table, column in (
         ("watch_events", "user_id"),
         ("watch_history", "user_id"),
         ("learning_goals", "user_id"),
         ("learning_paths", "user_id"),
+        ("agent_runs", "user_id"),
+        ("chat_sessions", "user_id"),
+        ("memory_items", "user_id"),
     ):
         try:
             result = conn.execute(
@@ -79,6 +82,15 @@ def _claim_legacy_ownership(conn) -> None:
                 logger.info("归属历史数据 %s.%s: %s 行 -> 用户 %s", table, column, result.rowcount, owner_id)
         except Exception as exc:
             logger.debug("归属 %s 失败（表或列可能不存在）: %s", table, exc)
+
+    # 归属完成后收紧约束。只处理业务上必须有 owner 的表：
+    # notes 的 shared 笔记必须允许 NULL，chat_sessions/memory_items 暂不收紧，
+    # 避免把历史空值直接变成升级失败。
+    for table in ("learning_goals", "learning_paths", "agent_runs"):
+        try:
+            conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN user_id SET NOT NULL"))
+        except Exception as exc:
+            logger.warning("设置 %s.user_id NOT NULL 失败（可能仍有空归属）: %s", table, exc)
 
 
 def upgrade_postgres(engine) -> None:
@@ -158,6 +170,23 @@ def upgrade_postgres(engine) -> None:
         for statement in content_chunks_ddl(dim):
             conn.execute(text(statement))
 
+        # 旧库的 content_chunks 没有 vector_version；带默认值加列在 PG 11+
+        # 是元数据操作，不会重写 6 万行。存量统一视为 1.0.0 legacy。
+        conn.execute(
+            text(
+                "ALTER TABLE content_chunks ADD COLUMN IF NOT EXISTS "
+                "vector_version TEXT NOT NULL DEFAULT '1.0.0'"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_content_chunks_vector_version "
+                "ON content_chunks (vector_version)"
+            )
+        )
+        for statement in content_chunks_history_ddl(dim):
+            conn.execute(text(statement))
+
         # 中文模糊检索：pg_trgm 的 GIN 索引支持 ILIKE '%词%' 走索引
         conn.execute(
             text(
@@ -193,10 +222,19 @@ def upgrade_postgres(engine) -> None:
             text("ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_failed_at TIMESTAMP")
         )
 
+        # 只补总结标记：旧库没有这列，worker 启动时补上。
+        conn.execute(
+            text(
+                "ALTER TABLE ai_jobs ADD COLUMN IF NOT EXISTS "
+                "summary_only BOOLEAN NOT NULL DEFAULT false"
+            )
+        )
+
         # 业务查询索引
+        # 注意：ix_videos_favorite 已由 Alembic 迁移删除，这里不要再补建。
+        # 它和 ix_videos_is_favorite 功能重叠，且 pg_stat 显示从未被扫描。
         for statement in (
             "CREATE INDEX IF NOT EXISTS ix_videos_category_sort ON videos (category_id, sort_key)",
-            "CREATE INDEX IF NOT EXISTS ix_videos_favorite ON videos (is_favorite, favorited_at DESC)",
             "CREATE INDEX IF NOT EXISTS ix_watch_history_video_watched ON watch_history (video_id, watched_at DESC)",
             "CREATE INDEX IF NOT EXISTS ix_subtitle_segments_video_index ON subtitle_segments (video_id, segment_index)",
             "CREATE INDEX IF NOT EXISTS ix_ai_jobs_status_created ON ai_jobs (status, created_at DESC)",
@@ -239,6 +277,20 @@ def upgrade_sqlite_legacy(engine) -> None:
 
         connection.exec_driver_sql(
             """
+            CREATE TABLE IF NOT EXISTS user_video_favorites (
+                user_id INTEGER NOT NULL,
+                video_id INTEGER NOT NULL,
+                favorited_at DATETIME NOT NULL,
+                PRIMARY KEY (user_id, video_id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_user_video_favorites_video "
+            "ON user_video_favorites (video_id)"
+        )
+        connection.exec_driver_sql(
+            """
             CREATE TABLE IF NOT EXISTS app_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
@@ -262,6 +314,7 @@ def upgrade_sqlite_legacy(engine) -> None:
             ("subtitle_correction_scope", "TEXT"),
             ("subtitle_correction_prompt", "TEXT"),
             ("whisper_engine", "TEXT"),
+            ("summary_only", "BOOLEAN NOT NULL DEFAULT 0"),
         ):
             if column_name not in ai_job_columns:
                 connection.exec_driver_sql(f"ALTER TABLE ai_jobs ADD COLUMN {column_name} {column_sql}")

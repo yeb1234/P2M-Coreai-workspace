@@ -29,6 +29,40 @@ export interface ChatMentionedVideo {
   video_id: number;
 }
 
+export interface ChatHitlOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface ChatHitl {
+  runId: string;
+  interruptId: string;
+  kind: 'clarify' | 'supplement' | 'confirm' | string;
+  question: string;
+  options: ChatHitlOption[];
+  allowCustom: boolean;
+  context?: string;
+  intent?: string | null;
+  originalMessage?: string;
+  status: 'pending' | 'answered' | 'cancelled';
+  selected?: string;
+  selectedLabel?: string;
+  customText?: string;
+}
+
+export interface ChatAction {
+  id: string;
+  action_type: 'note' | 'calendar' | 'todo' | string;
+  status: 'applied' | 'failed' | 'undone' | string;
+  title: string;
+  summary?: string | null;
+  target_id?: string | null;
+  created_at?: string | null;
+  undone_at?: string | null;
+  can_undo?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -43,8 +77,12 @@ export interface ChatMessage {
   degraded_from?: string;
   /** 这条回答用的意图模板 id —— 存消息上，刷新后还能看出当时的策略 */
   intent?: string;
+  /** 本轮真正落库的笔记/日历/Todo 动作，下面渲染执行回执与撤回按钮 */
+  actions?: ChatAction[];
   /** 流式输出中，用于显示光标 */
   streaming?: boolean;
+  /** 等待用户选择/补充/确认的 HITL 卡片 */
+  hitl?: ChatHitl;
 }
 
 interface AIState {
@@ -55,6 +93,8 @@ interface AIState {
   activeTemplateId: string;
   chatOpen: boolean;
   chatWidth: number;
+  /** 题目详情等入口预填到输入框的一次性草稿，不持久化。 */
+  pendingPrompt: string;
   messages: ChatMessage[];
   /** 后端会话 id，刷新页面后仍能接着上次聊 */
   sessionId: string;
@@ -69,6 +109,8 @@ interface AIState {
   toggleChat: () => void;
   setChatOpen: (open: boolean) => void;
   setChatWidth: (width: number) => void;
+  setPendingPrompt: (prompt: string) => void;
+  consumePendingPrompt: () => string;
   addMessage: (message: ChatMessage) => void;
   updateMessage: (id: string, updates: Partial<ChatMessage>) => void;
   setMessages: (messages: ChatMessage[]) => void;
@@ -120,6 +162,7 @@ export const useAIStore = create<AIState>()(
       activeTemplateId: DEFAULT_PROMPT_TEMPLATES[0].id,
       chatOpen: false,
       chatWidth: 380,
+      pendingPrompt: '',
       messages: [],
       sessionId: '',
       setEndpoint: (endpoint) => set({ endpoint: normalizeEndpoint(endpoint) }),
@@ -155,6 +198,12 @@ export const useAIStore = create<AIState>()(
       toggleChat: () => set((state) => ({ chatOpen: !state.chatOpen })),
       setChatOpen: (chatOpen) => set({ chatOpen }),
       setChatWidth: (chatWidth) => set({ chatWidth: clampChatWidth(chatWidth) }),
+      setPendingPrompt: (pendingPrompt) => set({ pendingPrompt }),
+      consumePendingPrompt: () => {
+        const pendingPrompt = get().pendingPrompt;
+        if (pendingPrompt) set({ pendingPrompt: '' });
+        return pendingPrompt;
+      },
       addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
       // 流式结束后把富内容补写回消息本身。
       // 原来这些只存在 AIChatPanel 的 useState 里 —— 刷新/换页面就全丢，

@@ -106,6 +106,7 @@ class OpenAICompatibleClient:
         messages: list[Message],
         temperature: float = 0.2,
         max_tokens: int | None = None,
+        extra_body: dict[str, object] | None = None,
     ) -> str:
         payload: dict[str, object] = {
             "model": model,
@@ -114,6 +115,10 @@ class OpenAICompatibleClient:
         }
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
+        if extra_body:
+            # LM Studio 用 chat_template_kwargs 关掉 Qwen3 的 thinking；
+            # 普通 OpenAI 兼容服务不传这个字段，保持请求最小。
+            payload.update(extra_body)
 
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -130,7 +135,22 @@ class OpenAICompatibleClient:
 
         data = response.json()
         try:
-            return data["choices"][0]["message"]["content"].strip()
+            message = data["choices"][0]["message"]
+            content = message.get("content")
+            if content is None:
+                # 不要把 reasoning_content 当正文写进总结：那是模型的
+                # 思考过程（常含“我们需要回答…”），会污染视频摘要。
+                # 内容为空就明确失败，让上层换模型或重试。
+                finish_reason = data["choices"][0].get("finish_reason")
+                usage = data.get("usage") or {}
+                raise RuntimeError(
+                    "OpenAI-compatible response has empty content "
+                    f"(finish_reason={finish_reason}, usage={json.dumps(usage, ensure_ascii=False)}): "
+                    + json.dumps(data, ensure_ascii=False)[:500]
+                )
+            if not isinstance(content, str):
+                content = str(content)
+            return content.strip()
         except (KeyError, IndexError, TypeError):
             raise RuntimeError(f"Unexpected OpenAI-compatible response: {json.dumps(data, ensure_ascii=False)[:500]}")
 

@@ -1,7 +1,9 @@
 # 上线前安全与稳定性审计
 
-审计时间：2026-11-15
-审计范围：`backend/app`（96 个路由、48 个写端点）、`nginx.conf`、`docker-compose.yml`、前端 `apiFetch`
+> 状态：历史审计记录（两轮：2026-11-15 第一轮、当晚第二轮）。2026-11-16 已按当前代码复核：第一轮 P0/P1 修复在代码中可核到出处；第二轮遗留项状态见第七节与第二轮第 8 节对照表。文中「原第 N 行」为审计时的文件位置，不作为现行行号引用。
+>
+> 审计时间：2026-11-15
+> 审计范围：`backend/app`（审计时 96 个路由、48 个写端点；现行 `backend/app/routers/` 为 14 个模块，口径：`main.py` 里 `include_router` 计数，不含 `__init__.py`）、`nginx.conf`、`docker-compose.yml`、前端 `apiFetch`
 
 ---
 
@@ -162,6 +164,10 @@ refresh token 需要服务端存储 + 轮换 + 盗用检测，工作量接近重
 | `agent_runs` / `chat_sessions` | ✅ 有字段 | ❌ | 会话全局共享，任何人能读任何人的对话 |
 | `notes` | ❌ | ❌ | 见下方说明 |
 
+> 复核（2026-11-16）：上表 ❌ 项在第一轮修复中已补齐——`watch_events` 写入时绑定 `user_id`，
+> `watch_history` 补了 `user_id` 列，`profile.py` 严格按 `resolved_id` 过滤，learning 路径/目标按用户隔离，
+> 会话按用户归属；`notes` 表仍不落 `user_id`（AI 转写产物，按管理员权限改）。表内为审计时的半成品状态。
+
 ### 最隐蔽的一个：画像把所有人加在一起算
 
 **证据**：`backend/app/services/profile.py` 原第 174-182 行
@@ -203,16 +209,18 @@ def recompute_profile(db: Session, user_id: int | None = None) -> UserProfile:
 
 审计时以为「笔记没有 user_id 是严重问题」，查下来发现不是：
 
-**前端的笔记根本不走数据库。** `src/stores/notesStore.ts` 是 Zustand + `persist`，
-数据在浏览器 localStorage 里。后端的 `notes` 表只被 `ai_jobs.py` 用来存**AI 转写产物**，
+**前端笔记不走 `notes` 表。** `src/stores/notesStore.ts` 是 Zustand + `persist`，
+本地落 IndexedDB（`idbStorage`，键 `p2m-notes-storage`），并经 `src/lib/notesSync` 把快照推到
+`user_data`（kind `notes-v1`）做云端同步。后端的 `notes` 表只被 `ai_jobs.py` 用来存**AI 转写产物**，
 属于视频的附属资源，共享是合理的。
 
 所以 `notes` 的 PUT 接口设成 `require_admin`（改转写产物等于改检索语料），但不加 `user_id`。
 
-**真正的问题是另一件事**：笔记、番茄钟这些存在 localStorage，
+**真正的问题是另一件事**：笔记、番茄钟这些存在浏览器本地，
 **换账号登录能看到上一个账号的数据**。这是浏览器级隔离，不是账号级隔离。
-要改成账号级需要把它们迁到后端（`user_data` 表已经具备条件）。
-**这次没做，因为涉及前端 5 个 store 的改造，风险高于收益。记在遗留项里。**
+
+> **复核（2026-11-16）：该问题第二轮已修**——IndexedDB key 加用户前缀 `u{id}:{key}`，
+> 登录/登出后整页重载清掉内存状态；笔记另走云端快照同步。遗留判断见第二轮第 5、8 节。
 
 ---
 
@@ -245,7 +253,7 @@ def assistant_models(payload: AssistantModelListCreate):
 
 ### 端口暴露：数据库和 Redis 对全世界开放
 
-**证据**：`docker-compose.yml` 原第 58-59、74-75 行
+**证据（审计时）**：`docker-compose.yml` 原第 58-59、74-75 行
 
 ```yaml
 ports:
@@ -259,11 +267,24 @@ Redis 尤其危险：**没有密码**，任何人都能读写队列、注入任�
 **修复**：改绑 `127.0.0.1`。容器之间走 Docker 内部网络，不受影响；
 宿主机上的工具（psql、redis-cli）照常能连；公网扫不到。
 
+**现行端口（2026-11-16，口径：`docker-compose.yml` 头部注释与各段 `ports`、`.env`）**：
+端口规则为 `<服务前缀><两位项目号>`，P2 尾号 02——Web `80` + `12302`（同一 nginx）；
+API `127.0.0.1:12402:8000`（只绑回环，对外仍走 `http://localhost/api`）；
+PG `127.0.0.1:12502:5432`；Redis `127.0.0.1:12602:6379`；dev `12322`（=12302+20）；
+监控段未分配，旧 `11162` 已作废。
+
+**CORS 白名单（已统一，2026-11-16）**：中间件 `allow_origins=settings.cors_origin_list`、
+`allow_credentials=True`（Cookie 会话必须显式来源，不能用 `"*"`，`main.py:212-214`）。
+
+`.env` / `.env.example:74`、`docker-compose.yml:205,341` 内联默认值、`database.py:25` 代码内置回退默认三处已统一为六源：`http://localhost,http://localhost:12302,http://localhost:12322,http://127.0.0.1,http://127.0.0.1:12302,http://127.0.0.1:12322`。
+
+显式 `.env` 覆盖时以 `.env` 为准；不再保留 5002 / 5173 旧号。
+
 ### 安全响应头：一个都没有
 
 原来响应头只有 `Server: nginx/1.31.8`（还顺带告诉别人版本号）。
 
-**修复**（`nginx.conf`）：
+**修复**（`nginx.conf` 通过 `include /etc/nginx/security-headers.conf` 引入，仓库源文件为 `nginx-security-headers.conf`，构建期 COPY 进镜像）：
 
 | 头 | 取值 | 挡住什么 |
 |---|---|---|
@@ -366,25 +387,27 @@ _executor.submit(_work)    # 没有任何上限
 
 后端加鉴权后，前端会全部 401。同步修复：
 
-- 自动附加 `Bearer` 令牌
-- **401 统一处理**：清除本地令牌 + 广播 `p2m:auth-expired` 事件 → `authStore` 清空登录态
-- 错误信息解析后端结构化错误（`{error: {code, message}}`），而不是把 JSON 原文丢给用户
+- 自动附加 `Bearer` 令牌（**该方案第二轮已被 httpOnly Cookie 取代**：现行前端靠 Cookie 自动携带会话，`credentials` 透传；不再在请求头里带令牌）
+- **401 统一处理**：清除本地登录态 + 广播 `p2m:auth-expired` 事件 → `authStore` 清空登录态（保留）
+- 错误信息解析后端结构化错误（`{error: {code, message}}`），而不是把 JSON 原文丢给用户（保留）
 - 修了一个潜伏 bug：`{ headers: {...}, ...fetchInit }` 的展开顺序会让调用方传的
-  `headers` **覆盖**掉默认的 `Content-Type`。改成先展开 `fetchInit` 再写 `headers`
+  `headers` **覆盖**掉默认的 `Content-Type`。改成先展开 `fetchInit` 再写 `headers`（保留）
 
 ---
 
 ## 七、没有修的问题（说清楚，别假装都解决了）
 
-| 问题 | 为什么不修 | 风险等级 |
-|---|---|---|
-| **令牌存在 localStorage** | 改 httpOnly Cookie 需要同时做 CSRF 防护 + 跨域策略调整，是认证体系重做 | 中：XSS 可窃取令牌。已用 12 小时过期 + 改密码撤销缓解 |
-| **没有 refresh token** | 见上文，工作量接近重做认证 | 低：12 小时重新登录一次可接受 |
-| **没有 HTTPS** | 需要证书 + 域名。当前是局域网/本机访问 | **高（若上公网）**：明文传输密码和令牌。公网部署必须加反向代理 + 证书 |
-| **笔记/番茄钟在 localStorage，不按账号隔离** | 涉及前端 5 个 store 改造 | 中：同一浏览器换账号能看到上一个账号的数据 |
-| **视频文件、缩略图公开可访问** | `<video>` 标签不会带自定义 header。要鉴权得改成签名 URL 或 Cookie 鉴权 | 低：视频库是小团队共享资源，不涉隐私 |
-| **没有备份策略** | 需要外部存储 | **高**：PG 数据卷是单点。`docker compose down -v` 会全丢 |
-| **单进程 ThreadPoolExecutor** | 多副本部署时任务会分散到不同进程，状态在库里所以能工作，但没有分布式锁 | 低：单机部署无影响 |
+下表为第一轮结束时的遗留清单；「复核状态（2026-11-16）」列按第二轮落地情况与当前代码补记。
+
+| 问题 | 为什么不修（第一轮判断） | 风险等级 | 复核状态（2026-11-16） |
+|---|---|---|---|
+| **令牌存在 localStorage** | 改 httpOnly Cookie 需要同时做 CSRF 防护 + 跨域策略调整，是认证体系重做 | 中：XSS 可窃取令牌。已用 12 小时过期 + 改密码撤销缓解 | ✅ **已修**：第二轮改 httpOnly Cookie + CSRF 中间件（见第二轮第 1、2 节） |
+| **没有 refresh token** | 见上文，工作量接近重做认证 | 低：12 小时重新登录一次可接受 | ⬜ 仍未做。12 小时过期 + 改密码即撤销 |
+| **没有 HTTPS** | 需要证书 + 域名。当前是局域网/本机访问 | **高（若上公网）**：明文传输密码和令牌。公网部署必须加反向代理 + 证书 | 🟡 **已提供方案**：`docker-compose.https.yml` + `Caddyfile` 自动证书；`Caddyfile:23` 兜底端口已改为 12302，与 compose 默认一致；实际域名/证书仍需部署时配 |
+| **笔记/番茄钟在本地存储，不按账号隔离** | 涉及前端 5 个 store 改造 | 中：同一浏览器换账号能看到上一个账号的数据 | ✅ **已修**：IndexedDB key 加用户前缀 + 切号整页重载（第二轮第 5 节）；笔记另有云端同步 |
+| **视频文件、缩略图公开可访问** | `<video>` 标签不会带自定义 header。要鉴权得改成签名 URL 或 Cookie 鉴权 | 低：视频库是小团队共享资源，不涉隐私 | ⬜ 产品选择，未改 |
+| **没有备份策略** | 需要外部存储 | **高**：PG 数据卷是单点。`docker compose down -v` 会全丢 | 🟡 **脚本已备**：`scripts/backup.sh` / `restore.sh`；定时任务（cron）与异地存储需部署时配 |
+| **单进程 ThreadPoolExecutor** | 多副本部署时任务会分散到不同进程，状态在库里所以能工作，但没有分布式锁 | 低：单机部署无影响 | ⬜ 未改；多副本需要分布式锁 |
 
 ---
 
@@ -400,8 +423,8 @@ ALLOW_REGISTRATION=false
 # 3. 确认文档接口关闭
 ENABLE_DOCS=false
 
-# 4. 确认数据库端口只绑本地
-docker compose config | grep -A2 "5432:5432"    # 应看到 127.0.0.1:
+# 4. 确认数据库/缓存端口只绑回环（现行：PG 127.0.0.1:12502:5432，Redis 127.0.0.1:12602:6379）
+docker compose config | grep -E "12502|12602"    # 应看到 127.0.0.1: 前缀
 
 # 5. 确认安全头生效
 curl -sI http://localhost/ | grep -iE "x-content-type|x-frame|content-security"
@@ -409,8 +432,8 @@ curl -sI http://localhost/ | grep -iE "x-content-type|x-frame|content-security"
 # 6. 确认管理端挡住了普通用户
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost/api/admin/health    # 应为 401
 
-# 7. 确认密码不再是无盐 SHA-256
-docker exec siteyeb-pg psql -U p2user -d p2learning -c \
+# 7. 确认密码不再是无盐 SHA-256（容器名由 compose 生成，以 docker ps 为准，形如 p2-siteyeb-postgres-1）
+docker exec p2-siteyeb-postgres-1 psql -U p2user -d p2learning -c \
   "SELECT username, left(password_hash, 16) FROM users;"    # 应为 pbkdf2_sha256$6
 ```
 
@@ -533,7 +556,7 @@ await upsertUser(currentUser!, newHash);   // 只改了浏览器 IndexedDB
 1. `flushAllPending()` 改为可 `await`，登出时**先落盘再清会话**（顺序反了数据就丢）
 2. IndexedDB 的 key 加用户前缀 `u{id}:{key}`。后端本来就按 `user_id` 隔离，
    但 IndexedDB 是「后端不可用时的兜底」，不分区就会把上一个人的数据当自己的读
-3. 登录/登出后**整页重载**。9 个 store 的内存状态都是上一个账号的，
+3. 登录/登出后**整页重载**。各 store 的内存状态都是上一个账号的（现行 `src/stores/` 12 个 zustand store，口径见 `project-structure.md`），
    只换 authStore 的字段会留下一大堆脏数据
 
 第 3 点看起来笨，但它是最可靠的隔离手段 —— 不用逐个 store 写清理逻辑，
@@ -560,6 +583,8 @@ await upsertUser(currentUser!, newHash);   // 只改了浏览器 IndexedDB
 | `scripts/restore.sh` | 恢复前自动建回滚点，需输入 `yes` 确认 |
 | `scripts/preflight.sh` | 16 项上线自检，输出 PASS/WARN/FAIL |
 
+> 已核对：上述脚本与 `start.bat` / `start.sh` / `diagnose.sh` 已统一按 compose 生成的 `p2-siteyeb-<service>-1` 取容器，并保留 `*_CONTAINER` 环境变量覆盖。
+
 自检实跑抓到的问题：**`JWT_SECRET` 仍是示例值**。
 这意味着任何人都能用公开的默认密钥伪造管理员令牌 —— 第一轮加了鉴权，
 但密钥没换，等于给门上装了锁却把钥匙挂在门把手上。已换成 64 字符随机串，
@@ -572,7 +597,7 @@ await upsertUser(currentUser!, newHash);   // 只改了浏览器 IndexedDB
 | 令牌存 localStorage | ✅ **已修**，改 httpOnly Cookie |
 | 笔记/番茄钟不按账号隔离 | ✅ **已修**，IndexedDB/存储按 `user_id` 分区 + 切号重载 |
 | 无 HTTPS | ✅ **已提供方案**，Caddy 一键；实际证书需要域名 |
-| 无备份策略 | ✅ **已修**，脚本 + cron 示例；实际定时任务需部署时配置 |
+| 无备份策略 | 🟡 脚本已备（`backup.sh` / `restore.sh`）；定时任务、异地存储与脚本内旧容器名需部署时核对 |
 | 无 refresh token | ⬜ 仍未做。12 小时过期 + 改密码即撤销，够用 |
 | 视频文件公开可访问 | ⬜ 仍是共享资源（产品选择，非疏漏），要鉴权需改签名 URL |
 | 单进程 ThreadPoolExecutor | ⬜ 单机部署无影响；多副本需要分布式锁 |

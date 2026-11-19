@@ -3,7 +3,9 @@ const { chromium } = require('playwright');
 const path = require('path');
 
 (async () => {
-  const file = 'file:///C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/docs/project-story.html';
+  const file = require('url').pathToFileURL(
+    path.join(__dirname, '..', 'docs', 'project-story.html')
+  ).href;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 950 }, deviceScaleFactor: 1.5 });
 

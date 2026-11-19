@@ -45,7 +45,8 @@ class Category(Base):
 class Video(Base):
     __tablename__ = "videos"
 
-    id = Column(Integer, primary_key=True, index=True)
+    # 主键自带唯一索引，不再额外建 ix_videos_id（重复索引只增加写放大）
+    id = Column(Integer, primary_key=True)
     title = Column(String, index=True, nullable=False)
     filename = Column(String, nullable=False)
     filepath = Column(String, unique=True, nullable=False)
@@ -82,6 +83,8 @@ class Video(Base):
     ai_status = Column(String, default="idle")
     ai_stage = Column(String, nullable=True)
     ai_error = Column(Text, nullable=True)
+    # 已废弃：这是视频库的全局字段，不代表当前用户收藏。
+    # 新代码读写 user_video_favorites；保留列只为兼容旧库/回滚。
     is_favorite = Column(Boolean, default=False, index=True)
     favorited_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
@@ -109,6 +112,28 @@ class WatchHistory(Base):
     video = relationship("Video", back_populates="watch_history")
 
 
+class UserVideoFavorite(Base):
+    """用户个人收藏。
+
+    原来的 `videos.is_favorite` 是共享库字段，谁改都影响所有人。
+    多用户语义下收藏必须是 (user_id, video_id) 的关联表；共享库如果
+    还需要“运营精选”，应另设 admin-only 字段，不能复用收藏。
+    """
+
+    __tablename__ = "user_video_favorites"
+    __table_args__ = (
+        Index("ix_user_video_favorites_video", "video_id"),
+    )
+
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    video_id = Column(
+        Integer, ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True
+    )
+    favorited_at = Column(DateTime, default=datetime.now, nullable=False)
+
+
 class AiJob(Base):
     __tablename__ = "ai_jobs"
 
@@ -122,6 +147,9 @@ class AiJob(Base):
     whisper_model = Column(String, default="small")
     language = Column(String, default="zh")
     do_summary = Column(Boolean, default=True)
+    # 只补总结：视频已有字幕时跳过抽音频/Whisper，直接用现有字幕文本总结。
+    # 这是批量「只补总结」和普通重转写的区分标记，避免把全库总结又跑成转写。
+    summary_only = Column(Boolean, default=False, nullable=False, server_default="false")
     word_limit = Column(Integer, default=200)
     ollama_model = Column(String, nullable=True)
     cpu_threads = Column(Integer, nullable=True)
@@ -192,7 +220,8 @@ class SubtitleSegment(Base):
         Index("ix_subtitle_segments_video_index", "video_id", "segment_index"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    # 主键自带唯一索引，不再额外建 ix_subtitle_segments_id
+    id = Column(Integer, primary_key=True)
     video_id = Column(Integer, ForeignKey("videos.id"), nullable=False, index=True)
     segment_index = Column(Integer, nullable=False)
     start_sec = Column(Float, nullable=False)
@@ -207,7 +236,7 @@ class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
     id = Column(String, primary_key=True, index=True)
-    title = Column(String, nullable=False, default="Learning Assistant")
+    title = Column(String, nullable=False, default="新对话")
     scope = Column(String, nullable=False, default="global")
     video_id = Column(Integer, ForeignKey("videos.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
@@ -392,7 +421,7 @@ class LearningGoal(Base):
     )
 
     id = Column(String, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String, nullable=False)
     target_role = Column(String, nullable=True)
     description = Column(Text, nullable=True)
@@ -417,7 +446,7 @@ class LearningPath(Base):
 
     id = Column(String, primary_key=True)
     goal_id = Column(String, ForeignKey("learning_goals.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)
     summary = Column(Text, nullable=True)
     # draft / active / completed / archived
@@ -508,7 +537,8 @@ class AgentRun(Base):
 
     id = Column(String, primary_key=True)
     session_id = Column(String, nullable=True)
-    user_id = Column(Integer, nullable=True)
+    # 审计必须能定位到人：无主运行不是“公共”，而是迁移/隔离区。
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     # chat / plan / embed
     kind = Column(String, nullable=False, default="chat")
     status = Column(String, nullable=False, default="running")
@@ -522,6 +552,42 @@ class AgentRun(Base):
     latency_ms = Column(Integer, nullable=True)
     error = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
+
+class AgentAction(Base):
+    """助手个人动作审计：笔记、日历、Todo 的写入与撤回记录。
+
+    和 AgentRun 的分工：
+      AgentRun    记录「模型这一轮怎么想、调了哪些工具」；
+      AgentAction 记录「用户真正被改动了什么、能不能撤回」。
+
+    只记录已执行的写动作（apply / failed / undone）。用户取消的确认不在这里，
+    因为它没有改变任何用户数据。
+    """
+
+    __tablename__ = "agent_actions"
+    __table_args__ = (
+        Index("ix_agent_actions_user_created", "user_id", "created_at"),
+        Index("ix_agent_actions_run", "run_id"),
+        Index("ix_agent_actions_status", "status"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: uuid.uuid4().hex)
+    run_id = Column(String, nullable=True)
+    session_id = Column(String, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    # note / calendar / todo
+    action_type = Column(String, nullable=False, index=True)
+    # applied / failed / undone
+    status = Column(String, nullable=False, default="applied")
+    title = Column(String, nullable=False, default="")
+    summary = Column(Text, nullable=True)
+    # 给前端和历史消息看的轻量快照，不存完整长正文
+    payload = Column(JsonColumn, nullable=True)
+    target_id = Column(String, nullable=True)
+    result = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    undone_at = Column(DateTime, nullable=True)
+
 
 class BackgroundTask(Base):
     """通用后台任务。任何「跑到一半断了要能接着跑」的活都挂这里。
@@ -560,3 +626,85 @@ class BackgroundTask(Base):
     created_at = Column(DateTime, default=datetime.now)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
+
+
+class InterviewAttempt(Base):
+    """一次面试题作答 + AI 评估结果。
+
+    题库本身是版本化静态数据（src/data/interview/questions.json），
+    这张表只存「我答过什么、AI 怎么评、薄弱点在哪」，方便后面做错题本、
+    能力雷达和面试 Agent 的长期记忆。
+    """
+
+    __tablename__ = "interview_attempts"
+    __table_args__ = (
+        Index("ix_interview_attempts_user_question", "user_id", "question_id"),
+        Index("ix_interview_attempts_created", "created_at"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: uuid.uuid4().hex)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id = Column(String, nullable=False, index=True)
+    group_key = Column(String, nullable=True)
+    question_title = Column(String, nullable=False)
+    # evaluate / followup / reference
+    mode = Column(String, nullable=False, default="evaluate")
+    answer = Column(Text, nullable=False)
+    score = Column(Integer, nullable=True)
+    # pass / borderline / fail
+    verdict = Column(String, nullable=True)
+    # {"dimensions": [...], "strengths": [...], "gaps": [...], "rewrite": "..."}
+    feedback = Column(JsonColumn, nullable=True)
+    provider = Column(String, nullable=True)
+    model = Column(String, nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+
+
+class InterviewCardState(Base):
+    """题目级学习状态：收藏、掌握、最近一次评分、练习次数。"""
+
+    __tablename__ = "interview_card_states"
+    __table_args__ = (
+        UniqueConstraint("user_id", "question_id", name="uq_interview_state_user_question"),
+        Index("ix_interview_state_user_starred", "user_id", "starred"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id = Column(String, nullable=False, index=True)
+    starred = Column(Boolean, nullable=False, default=False)
+    mastered = Column(Boolean, nullable=False, default=False)
+    # 0 不会 / 1 模糊 / 2 掌握；和 mastered 是两个维度：自评是主观，mastered 是收口
+    confidence = Column(SmallInteger, nullable=False, default=0)
+    last_score = Column(Integer, nullable=True)
+    practice_count = Column(Integer, nullable=False, default=0)
+    last_practiced_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class InterviewQuestionReport(Base):
+    """用户对题目内容的纠错反馈。
+
+    题库是静态 JSON，改题需要人工；没有反馈入口时，错题只能靠使用者自己
+    记下来。这里单独存一张报告表，保留用户、题目、错误类型和补充说明，
+    `status` 预留给后台按 open / fixed / ignored 处理。
+    """
+
+    __tablename__ = "interview_question_reports"
+    __table_args__ = (
+        Index("ix_interview_reports_user_created", "user_id", "created_at"),
+        Index("ix_interview_reports_question_status", "question_id", "status"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: uuid.uuid4().hex)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id = Column(String, nullable=False, index=True)
+    question_title = Column(String, nullable=False, default="")
+    # stem / answer / rubric / classification / typo / other
+    reason = Column(String, nullable=False, index=True)
+    detail = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="open", index=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    resolved_at = Column(DateTime, nullable=True)
+

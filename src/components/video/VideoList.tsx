@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckSquare, ChevronRight, Folder, PlayCircle, RefreshCw, Search, Square } from 'lucide-react';
-import { openVideoAt } from '../../lib/videoNavigation';
+import { markVideoAutoplay, openVideoAt } from '../../lib/videoNavigation';
+import { userScopedStorage } from '../../lib/userScopedStorage';
 import { useVideoStore } from '../../stores/videoStore';
 import {
   fetchContinueVideo,
@@ -18,7 +19,7 @@ const MAX_THUMBNAIL_BATCH_SIZE = 12;
 
 function loadVideoGridColumns(): number {
   try {
-    const raw = Number(localStorage.getItem(VIDEO_GRID_COLUMNS_KEY));
+    const raw = Number(userScopedStorage.getItem(VIDEO_GRID_COLUMNS_KEY));
     return Number.isFinite(raw) && raw >= 2 && raw <= 8 ? raw : DEFAULT_VIDEO_GRID_COLUMNS;
   } catch {
     return DEFAULT_VIDEO_GRID_COLUMNS;
@@ -234,8 +235,8 @@ export function VideoList() {
       setRecentVideosFallback(recent.fallback);
       const history = await fetchRecentHistory(30);
       setHistoryVideos(history);
-    } catch (e: any) {
-      setRescanMsg(`刷新失败: ${e?.message ?? '未知错误'}`);
+    } catch (e: unknown) {
+      setRescanMsg(`刷新失败: ${e instanceof Error ? e.message : '未知错误'}`);
       setTimeout(() => setRescanMsg(''), 4000);
     } finally {
       setRefreshLoading(false);
@@ -350,7 +351,7 @@ export function VideoList() {
     const next = Math.max(2, Math.min(8, columns));
     setColumnsPerRow(next);
     try {
-      localStorage.setItem(VIDEO_GRID_COLUMNS_KEY, String(next));
+      userScopedStorage.setItem(VIDEO_GRID_COLUMNS_KEY, String(next));
     } catch {
       // ignore storage quota or private mode failures
     }
@@ -409,6 +410,9 @@ export function VideoList() {
     ? `文件夹列表（${total} 个视频）`
     : undefined;
   const playVideo = useCallback((videoId: number) => {
+    // 点卡片就是明确的“播放”动作，不是打开详情页看封面。
+    // 标记给播放器，等 metadata 就绪后自动开始，避免用户看到画面却停在暂停态。
+    markVideoAutoplay(videoId);
     void loadCurrentVideo(videoId);
   }, [loadCurrentVideo]);
   const toggleVideoFavorite = useCallback((videoId: number, nextFavorite: boolean) => {

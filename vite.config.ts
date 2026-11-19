@@ -6,11 +6,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: 5002,
+    // 端口规则：<服务前缀><两位项目号>。P2 的 Web 入口是 12302；
+    // dev 取 12322（= 12302 + 20，沿用旧 11102→11122 的 +20 惯例），
+    // 代理仍打到生产入口 12302（同源，不触发 CORS）
+    port: 12322,
     strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:80',
+        target: 'http://127.0.0.1:12302',
         changeOrigin: true,
       },
     },
