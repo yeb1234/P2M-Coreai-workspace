@@ -146,7 +146,9 @@ def _cache_key(kind: str, payload: Any = None) -> str:
     if payload is not None:
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
         suffix = ":" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
-    return f"{_CACHE_PREFIX}:{data_version()}:{kind}{suffix}"
+    from app.services.redis_keys import p2_key
+
+    return p2_key(f"{_CACHE_PREFIX}:{data_version()}:{kind}{suffix}")
 
 
 def _read_through(key: str, builder, ttl: int = _CACHE_TTL_SECONDS):

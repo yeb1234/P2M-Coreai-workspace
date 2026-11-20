@@ -1,0 +1,89 @@
+# P2 7.2 Lite：云上轻量 demo
+#
+# 只跑 Agent、面试题、笔记、待办、日历这些 OLTP 业务：
+#   - 不启动视频扫描、转写、缩略图、embedding、RQ worker
+#   - 不依赖 pgvector，不建 content_chunks / HNSW 索引
+#   - PostgreSQL / Redis 由外部共享实例提供，不在这一层起库
+#
+# 用法（在仓库根目录）：
+#   cp infra/lite/.env.example infra/lite/.env
+#   docker compose --env-file infra/lite/.env \
+#     -f infra/docker-compose.lite.yml up -d --build
+#
+# 共享 PG / Redis 的初始化见 infra/docker-compose.shared.yml 与 docs/2026-11-20-p2-7.2-lite.md。
+
+name: p2lite
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      args:
+        PIP_INDEX: ${PIP_INDEX:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    image: p2-siteyeb-lite-backend:7.2
+    env_file:
+      - ./lite/.env
+    environment:
+      # 这两个是 Lite 的硬边界，不允许被 env 文件覆盖成 full
+      APP_PROFILE: lite
+      AI_WORKER_EMBEDDED: "false"
+      TZ: Asia/Shanghai
+    # 只给前端 nginx 回源，不直接把 API 暴露到公网
+    ports:
+      - "127.0.0.1:${LITE_API_PORT:-12705}:8000"
+    extra_hosts:
+      # 备用：如果不用共享 docker 网络，改 DATABASE_URL/REDIS_URL 走宿主机端口
+      - "host.docker.internal:host-gateway"
+    networks:
+      - shared
+    mem_limit: ${LITE_BACKEND_MEM_LIMIT:-640m}
+    cpus: ${LITE_BACKEND_CPUS:-1}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+        # 构建期就裁掉视频/学习路径页面，不是运行时隐藏
+        VITE_APP_PROFILE: lite
+    image: p2-siteyeb-lite-frontend:7.2
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - shared
+    ports:
+      # 本地 demo 默认 12305；云上单栈可改成 80:80
+      - "${LITE_WEB_PORT:-12305}:80"
+    mem_limit: ${LITE_FRONTEND_MEM_LIMIT:-96m}
+    cpus: ${LITE_FRONTEND_CPUS:-0.5}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  shared:
+    external: true
+    name: ${SHARED_NETWORK:-p2-shared}

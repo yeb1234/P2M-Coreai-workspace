@@ -191,6 +191,11 @@ class Note(Base):
               只有 admin 能改（因为它服务于共享视频库）
       private 用户自己写的，只属于该用户，别人看不到
 
+    surface 区分前端两个功能面：
+      sticky  便签墙的轻量速记
+      md      Markdown 长文档笔记
+    老数据默认 md；便签页只同步 sticky，笔记页只同步 md，互不污染。
+
     以前没有这个区分，所有笔记混在一起，导致两件事说不清：
     成就墙的「手写笔记」把 8770 条 AI 产物也算成用户写的；
     用户想写自己的笔记时，会和系统笔记混在一个列表里。
@@ -204,6 +209,9 @@ class Note(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     # shared / private
     scope = Column(String, nullable=False, default="shared", index=True)
+    # sticky / md：便签墙与 Markdown 笔记是两个功能面。
+    # 老数据与视频笔记统一落到 md，避免升级后突然铺满便签墙。
+    surface = Column(String(20), nullable=False, default="md", index=True)
     title = Column(String, nullable=False)
     content = Column(Text, default="")
     source = Column(String, default="manual")

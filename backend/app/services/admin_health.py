@@ -7,7 +7,7 @@ import requests
 from sqlalchemy import text
 
 from app.database import SessionLocal, engine, settings
-from app.models import Video
+from app.models import Note, ScheduleItem, Video
 from app.services.admin_ai_queue import _is_queue_paused, ai_job_status_counts
 from app.services.llm_client import OllamaClient, OpenAICompatibleClient
 
@@ -27,6 +27,22 @@ def health_item(name: str, ok: bool, message: str, details: dict | None = None) 
         "message": message,
         "details": details or {},
     }
+
+
+def _database_details() -> dict:
+    """健康页只展示主机/库名，不把带密码的 DSN 原样回给前端。"""
+    try:
+        from sqlalchemy.engine import make_url
+
+        parsed = make_url(settings.database_url)
+        return {
+            "host": parsed.host or "",
+            "port": parsed.port or "",
+            "database": parsed.database or "",
+            "user": parsed.username or "",
+        }
+    except Exception:
+        return {"url": "<配置已隐藏>"}
 
 
 def check_http_json(name: str, url: str, timeout_s: float = _HTTP_PROBE_TIMEOUT_S) -> dict:
@@ -119,15 +135,79 @@ def probe_llm_contexts(
     return probes
 
 
-def backend_health() -> dict:
+def _lite_backend_health() -> dict:
+    """Lite 的健康口径。
+
+    Lite 本来就没有视频库、转写、GPU 和向量索引，不能拿完整版的检查项去判红。
+    这里只看 Lite 真正依赖的东西：数据库、LLM 配置、站内数据是否可读。
+    """
     checks = []
 
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-        checks.append(health_item("数据库", True, "数据库连接正常", {"url": settings.database_url}))
+        checks.append(health_item("数据库", True, "数据库连接正常", _database_details()))
     except Exception as exc:
-        checks.append(health_item("数据库", False, str(exc), {"url": settings.database_url}))
+        checks.append(health_item("数据库", False, str(exc)[:200], _database_details()))
+
+    try:
+        from app.services.llm import llm_health
+
+        llm = llm_health()
+        configured = bool(llm.get("configured"))
+        checks.append(health_item(
+            "LLM 配置",
+            configured,
+            "外部模型配置完整" if configured else "外部模型缺少 API Key / Base URL / Model",
+            {
+                "provider": llm.get("provider"),
+                "model": llm.get("model"),
+                "base_url": llm.get("base_url"),
+                "policy": llm.get("policy"),
+            },
+        ))
+    except Exception as exc:
+        checks.append(health_item("LLM 配置", False, f"读取运行配置失败：{str(exc)[:160]}", {}))
+
+    db = SessionLocal()
+    try:
+        notes = db.query(Note).count()
+        todos = db.query(ScheduleItem).filter(
+            ScheduleItem.type == "todo",
+            ScheduleItem.deleted_at.is_(None),
+        ).count()
+        checks.append(health_item(
+            "站内数据",
+            True,
+            f"{notes} 篇笔记，{todos} 个 Todo",
+            {"notes": notes, "todos": todos},
+        ))
+    except Exception as exc:
+        checks.append(health_item("站内数据", False, f"读取失败：{str(exc)[:160]}", {}))
+    finally:
+        db.close()
+
+    checks.append(health_item(
+        "Lite 能力边界",
+        True,
+        "视频、转写、GPU 和向量检索在 Lite 中按设计不启用",
+        {"profile": "lite"},
+    ))
+    return {"ok": all(item["ok"] for item in checks), "checks": checks}
+
+
+def backend_health() -> dict:
+    if settings.is_lite:
+        return _lite_backend_health()
+
+    checks = []
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        checks.append(health_item("数据库", True, "数据库连接正常", _database_details()))
+    except Exception as exc:
+        checks.append(health_item("数据库", False, str(exc), _database_details()))
 
     for name, folder in (
         ("视频目录", settings.video_folder),

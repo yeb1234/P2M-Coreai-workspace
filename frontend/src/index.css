@@ -2492,6 +2492,14 @@ video::cue(backdrop) {
 
 /* 灵境小助手回答的 Markdown 排版：聊天气泡里空间小，
    标题、列表和代码块都压到正文尺度，避免 h2 把气泡撑开。 */
+/* 聊天正文必须始终可选中：拖动侧栏/助手宽度时 useDragResize 会给
+   body 加 user-select:none，若窗口外松开导致恢复失败，这里兜底，
+   避免整块回答变成“点得动但选不了”。 */
+.ai-md,
+.ai-md * {
+  -webkit-user-select: text;
+  user-select: text;
+}
 .ai-md > * + * { margin-top: 0.45rem; }
 .ai-md h1, .ai-md h2, .ai-md h3, .ai-md h4 {
   margin: 0;

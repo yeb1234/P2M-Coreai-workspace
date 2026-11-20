@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Save, Trash2, Plus, Pencil, X, RotateCcw } from 'lucide-react';
 import { useAIStore } from '../../stores';
-import { buildAIRequestSystemPrompt, DEFAULT_PROMPT_TEMPLATES } from '../../lib/aiPromptDefaults';
+import {
+  buildAIRequestSystemPrompt,
+  DEFAULT_PROMPT_TEMPLATES,
+  LITE_PROMPT_TEMPLATES,
+} from '../../lib/aiPromptDefaults';
+import { IS_LITE } from '../../config/appProfile';
 import {
   ApiError,
   MASKED_SECRET,
@@ -15,6 +20,8 @@ import {
   type LlmUsagePolicy,
 } from '../../lib/videoApi';
 import { playInteractionSound } from '../../lib/sounds';
+
+const ACTIVE_PROMPT_TEMPLATES = IS_LITE ? LITE_PROMPT_TEMPLATES : DEFAULT_PROMPT_TEMPLATES;
 
 const POLICY_OPTIONS: Array<{ value: LlmUsagePolicy; label: string }> = [
   { value: 'local_first', label: '先本地，失败后外部' },
@@ -405,7 +412,9 @@ export function AISettings() {
         >
           {POLICY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">影响灵境小助手对话、视频总结和字幕校对。保存后新请求生效。</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          {IS_LITE ? '影响灵境小助手对话与面试题讲解。保存后新请求生效。' : '影响灵境小助手对话、视频总结和字幕校对。保存后新请求生效。'}
+        </p>
       </div>
 
       <div>
@@ -576,15 +585,15 @@ export function AISettings() {
           onClick={() => {
             const confirmed = window.confirm('确定重置为默认提示词模板吗？所有自定义模板将被清除。');
             if (!confirmed) return;
-            const defaultIds = new Set(DEFAULT_PROMPT_TEMPLATES.map((t) => t.id));
+            const defaultIds = new Set(ACTIVE_PROMPT_TEMPLATES.map((t) => t.id));
             promptTemplates.forEach((t) => {
               if (!defaultIds.has(t.id)) removeTemplate(t.id);
             });
-            DEFAULT_PROMPT_TEMPLATES.forEach((t) => {
+            ACTIVE_PROMPT_TEMPLATES.forEach((t) => {
               updateTemplate(t.id, { name: t.name, content: t.content });
             });
-            if (!defaultIds.has(activeTemplateId) && DEFAULT_PROMPT_TEMPLATES.length > 0) {
-              setActiveTemplateId(DEFAULT_PROMPT_TEMPLATES[0].id);
+            if (!defaultIds.has(activeTemplateId) && ACTIVE_PROMPT_TEMPLATES.length > 0) {
+              setActiveTemplateId(ACTIVE_PROMPT_TEMPLATES[0].id);
             }
           }}
           className="mt-3 flex items-center gap-1.5 rounded-lg bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[#e7e5e4]"

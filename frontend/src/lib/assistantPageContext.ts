@@ -1,4 +1,5 @@
-import { useMdNotesStore, useNotesStore, useUIStore, useVideoStore } from '../stores';
+import { useMdNotesStore, useNotesStore, useScheduleStore, useUIStore, useVideoStore } from '../stores';
+import { useCalendarStore } from '../stores/calendarStore';
 import { useInterviewContextStore } from '../stores/interviewContextStore';
 import type { VideoItem } from './videoApi';
 
@@ -31,14 +32,17 @@ const INTERVIEW_TYPE_LABELS: Record<string, string> = {
 export interface AssistantPageNote {
   title: string;
   markdown: string;
+  surface: 'sticky' | 'md';
 }
 
 export interface AssistantPageContext {
-  kind: 'video' | 'notes' | 'interview' | 'none';
+  kind: 'video' | 'notes' | 'interview' | 'schedule' | 'none';
   label: string;
   promptContext: string;
   /** 当前笔记的完整正文，供聊天工具保存；不在提示词里展开。 */
   notePayload?: AssistantPageNote;
+  /** AI 保存笔记后应该写回哪个页面：便签墙 / Markdown 笔记。 */
+  noteTarget?: 'sticky' | 'md';
 }
 
 function truncateText(value: string | null | undefined, max: number): string {
@@ -107,6 +111,14 @@ function buildNotesContext(): AssistantPageContext {
       kind: 'notes',
       label: `已探测当前便签：${activeNote.title}`,
       promptContext: truncateText(body, MAX_CONTEXT_CHARS),
+      noteTarget: 'sticky',
+      // 便签页也要把完整正文交给保存工具；否则模型只看到 9000 字提示词，
+      // 保存时正文会缺失或截断。
+      notePayload: {
+        title: activeNote.title.slice(0, 240),
+        markdown: activeNote.content.slice(0, MAX_MD_NOTE_CHARS),
+        surface: 'sticky',
+      },
     };
   }
 
@@ -114,7 +126,14 @@ function buildNotesContext(): AssistantPageContext {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
   if (recentNotes.length === 0) {
-    return { kind: 'notes', label: '便签页暂无便签', promptContext: '当前页面：便签\n暂无便签内容。' };
+    return {
+      kind: 'notes',
+      label: '便签页暂无便签',
+      promptContext: '当前页面：便签\n暂无便签内容。',
+      noteTarget: 'sticky',
+      // 没有打开的便签时也要把页面归属带给保存工具，否则会按默认落进笔记页。
+      notePayload: { title: '', markdown: '', surface: 'sticky' },
+    };
   }
 
   const body = [
@@ -130,6 +149,7 @@ function buildNotesContext(): AssistantPageContext {
     kind: 'notes',
     label: `已探测便签页：${recentNotes.length} 条最近便签`,
     promptContext: truncateText(body, MAX_CONTEXT_CHARS),
+    noteTarget: 'sticky',
   };
 }
 
@@ -143,6 +163,8 @@ function buildMdNotesContext(): AssistantPageContext {
       kind: 'notes',
       label: '笔记页：当前没有打开的笔记',
       promptContext: '当前页面：笔记\n当前没有打开的笔记。',
+      noteTarget: 'md',
+      notePayload: { title: '', markdown: '', surface: 'md' },
     };
   }
 
@@ -161,7 +183,9 @@ function buildMdNotesContext(): AssistantPageContext {
     notePayload: {
       title: active.title.slice(0, 240),
       markdown: active.markdown.slice(0, MAX_MD_NOTE_CHARS),
+      surface: 'md',
     },
+    noteTarget: 'md',
   };
 }
 
@@ -221,12 +245,34 @@ function buildInterviewContext(): AssistantPageContext {
   };
 }
 
+function buildScheduleContext(view: 'todo' | 'calendar' | 'calendar2'): AssistantPageContext {
+  const label = view === 'todo' ? '待办事项' : view === 'calendar' ? '日历看板' : '周历';
+  const selectedDate = useCalendarStore.getState().selectedDate;
+  const items = Object.values(useScheduleStore.getState().items);
+  const pendingTodos = items.filter((item) => item.type === 'todo' && !item.deletedAt && item.status !== 'completed');
+  const events = items.filter((item) => item.type === 'event' && !item.deletedAt);
+  const lines = [
+    `当前页面：${label}`,
+    selectedDate ? `当前选中日期：${selectedDate}` : '',
+    `当前未完成待办：${pendingTodos.length} 条`,
+    `当前日程：${events.length} 条`,
+  ].filter(Boolean);
+  return {
+    kind: 'schedule',
+    label: `已探测${label}页面`,
+    promptContext: truncateText(lines.join('\n'), MAX_CONTEXT_CHARS),
+  };
+}
+
 export function getAssistantPageContext(): AssistantPageContext {
   const activeView = useUIStore.getState().activeView;
   if (activeView === 'video') return buildVideoContext(useVideoStore.getState().currentVideo);
   if (activeView === 'mdnotes') return buildMdNotesContext();
   if (activeView === 'notes') return buildNotesContext();
   if (activeView === 'interview') return buildInterviewContext();
+  if (activeView === 'todo' || activeView === 'calendar' || activeView === 'calendar2') {
+    return buildScheduleContext(activeView);
+  }
   return { kind: 'none', label: '当前页面无专属上下文', promptContext: '' };
 }
 

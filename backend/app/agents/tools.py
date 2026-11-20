@@ -22,9 +22,9 @@ from app.agents.tool_context import (
     record_search_hits,
     take_search_hits,
 )
+from app.agents.write_guard import consume_write_grant
 from app.database import SessionLocal
 from app.models import (
-    CalendarEvent,
     LearningGoal,
     LearningPath,
     Note,
@@ -39,6 +39,7 @@ from app.utils.textclean import clean_promo_text
 from app.services.learning_context import active_path_text
 from app.services.note_ai import summarize_note
 from app.services.note_library import MAX_NOTE_CONTENT, save_private_note
+from app.services.lite_activity import build_lite_activity, format_lite_activity
 from app.services.profile import get_profile_data, profile_summary_text
 from app.services.interview_library import (
     format_knowledge,
@@ -85,6 +86,11 @@ def _run_id() -> str | None:
     return _tool_run_id.get()
 
 
+def current_run_id() -> str | None:
+    """供确认 hook 发放写许可时读取当前 run_id。"""
+    return _run_id()
+
+
 def _session_id() -> str | None:
     return _tool_session_id.get()
 
@@ -98,6 +104,7 @@ def _current_note() -> dict[str, str]:
     return {
         "title": str(note.get("title") or "").strip(),
         "markdown": str(note.get("markdown") or "").strip(),
+        "surface": str(note.get("surface") or "md").strip(),
     }
 
 
@@ -257,6 +264,28 @@ def get_recent_activity(days: int = 7) -> str:
         for title, secs in by_video:
             lines.append(f"- 《{title}》 {float(secs or 0)/60:.0f} 分钟")
         return "\n".join(lines)
+    finally:
+        db.close()
+
+
+@tool
+def get_lite_learning_status(days: int = 7) -> str:
+    """读取 Lite 站内自己的学习记录并生成状态快照。
+
+    只在 P2 Lite 使用。统计最近 N 天的 Todo、日历、私人笔记、面试练习
+    和站内使用痕迹；不包含视频观看、视频检索或学习路径数据。
+    回答「我最近学习状况如何」「这段时间坚持得怎么样」前先调用。
+    """
+    uid = _uid()
+    if uid is None:
+        return "请先登录后再查看 Lite 学习状态。"
+    db = SessionLocal()
+    try:
+        stats = build_lite_activity(db, uid, days=days)
+        return format_lite_activity(stats)
+    except Exception as exc:
+        logger.warning("读取 Lite 学习状态失败: %s", exc)
+        return "暂时读不到 Lite 站内学习记录，请稍后再试。"
     finally:
         db.close()
 
@@ -520,12 +549,12 @@ def save_note(
     如果当前页面没有笔记，**必须把要保存的正文完整写进 content**，
     只回复「确认卡已弹出」而不调用本工具不会产生任何写入。
     如果用户要求「总结后保存」，把总结放在 summary，工具会把总结和原文一起保存。
-    confirm 由运行时确认闸门在用户确认后置为 true；模型不要主动传 true。
+    confirm 参数仅保留兼容；真正的写权限只由运行时确认卡发放，模型传 true 无效。
     """
     uid = _uid()
     if uid is None:
         return "请先登录后再保存笔记。"
-    if confirm is not True:
+    if not consume_write_grant("save_note", _run_id()):
         return "保存笔记需要用户明确确认；确认卡会在模型发起本工具调用后由运行时弹出。"
 
     note = _current_note()
@@ -564,6 +593,7 @@ def save_note(
                 title=saved_title,
                 content=final,
                 source="assistant",
+                surface=note["surface"],
                 db=db,
             )
             action = record_action(
@@ -578,6 +608,7 @@ def save_note(
                     "content_chars": len(final),
                     "content_preview": final[:300],
                     "with_summary": bool(summary),
+                    "surface": note["surface"],
                 },
                 summary=f"保存笔记，正文 {len(final)} 字",
                 run_id=_run_id(),
@@ -603,12 +634,12 @@ def summarize_and_save_note(title: str = "", content: str = "", confirm: bool = 
     用户明确说「总结后保存 / 总结再存到笔记 / 把这篇总结一下存起来」时调用。
     当前页面上的笔记正文会由系统带上，content 留空即可；没有页面笔记时
     必须把正文写进 content。
-    confirm 由运行时确认闸门在用户确认后置为 true；模型不要主动传 true。
+    confirm 参数仅保留兼容；真正的写权限只由运行时确认卡发放，模型传 true 无效。
     """
     uid = _uid()
     if uid is None:
         return "请先登录后再总结并保存笔记。"
-    if confirm is not True:
+    if not consume_write_grant("summarize_and_save_note", _run_id()):
         return "总结并保存需要用户明确确认；确认卡会在模型发起本工具调用后由运行时弹出。"
 
     note = _current_note()
@@ -640,6 +671,7 @@ def summarize_and_save_note(title: str = "", content: str = "", confirm: bool = 
                 title=f"{head} · AI 总结"[:240],
                 content=summary,
                 source="assistant",
+                surface=note["surface"],
                 db=db,
             )
             action = record_action(
@@ -654,6 +686,7 @@ def summarize_and_save_note(title: str = "", content: str = "", confirm: bool = 
                     "content_chars": len(summary),
                     "content_preview": summary[:300],
                     "with_summary": True,
+                    "surface": note["surface"],
                 },
                 summary=f"生成总结并另存笔记，{len(summary)} 字",
                 run_id=_run_id(),
@@ -687,12 +720,12 @@ def create_calendar_event(
     date 用 YYYY-MM-DD；start_time/end_time 用 HH:MM（24 小时制），
     全天日程可以只传 date。用户说「安排到日历 / 加个日程 / 提醒我某天做某事」时调用。
     一次只创建一个日程，不要把一个计划拆成多条。
-    confirm 由运行时确认闸门在用户确认后置为 true；模型不要主动传 true。
+    confirm 参数仅保留兼容；真正的写权限只由运行时确认卡发放，模型传 true 无效。
     """
     uid = _uid()
     if uid is None:
         return "请先登录后再安排日历。"
-    if confirm is not True:
+    if not consume_write_grant("create_calendar_event", _run_id()):
         return "创建日程需要用户明确确认；确认卡会在模型发起本工具调用后由运行时弹出。"
 
     title = (title or "").strip()[:240]
@@ -739,28 +772,45 @@ def create_calendar_event(
                     "为避免重复写入，没有再次创建。"
                 )
 
+            if start:
+                start_dt = datetime.strptime(f"{day.isoformat()} {start}", "%Y-%m-%d %H:%M")
+                due_dt = (
+                    datetime.strptime(f"{day.isoformat()} {end}", "%Y-%m-%d %H:%M")
+                    if end
+                    else start_dt + timedelta(hours=1)
+                )
+            else:
+                # 全天日程没有具体时间：用当天 00:00–23:59 占位，保证日历页能
+                # 按 start_at 找到它。页面展示仍由日期分组，不把它当 24 小时工作块。
+                start_dt = datetime.combine(day, datetime.min.time())
+                due_dt = datetime.combine(day, datetime.max.time()).replace(second=0, microsecond=0)
+
             now = datetime.now()
-            event = CalendarEvent(
+            item = ScheduleItem(
                 id=uuid4().hex,
                 user_id=uid,
-                title=title,
-                date=day.isoformat(),
-                start_time=start,
-                end_time=end,
                 type="event",
-                color="#8b5cf6",
-                description=description,
+                title=title,
+                description=description or "",
+                status="pending",
+                priority="medium",
+                start_at=start_dt,
+                due_at=due_dt,
+                pomodoro_count=0,
+                pomodoro_rounds=0,
+                total_focus_minutes=0,
+                sort_order=0,
                 created_at=now,
                 updated_at=now,
             )
-            db.add(event)
+            db.add(item)
             db.flush()
             action = record_action(
                 db,
                 user_id=uid,
                 action_type="calendar",
                 title=title,
-                target_id=event.id,
+                target_id=item.id,
                 result=f"{day.isoformat()} {start or '全天'}",
                 payload={
                     "date": day.isoformat(),
@@ -772,7 +822,7 @@ def create_calendar_event(
                 run_id=_run_id(),
                 session_id=_session_id(),
             )
-            event_id = event.id
+            item_id = item.id
             action_id = action.id
             db.commit()
     except Exception as exc:  # noqa: BLE001
@@ -781,7 +831,7 @@ def create_calendar_event(
 
     time_text = f"{start}-{end}" if start and end else (start or "全天")
     return (
-        f"已加入日历：{day.isoformat()} {time_text}，{title}，id={event_id}。"
+        f"已加入日历：{day.isoformat()} {time_text}，{title}，id={item_id}。"
         f"动作记录 id={action_id}，可在聊天里撤回。"
     )
 
@@ -792,6 +842,7 @@ def create_todo(
     content: str = "",
     due_date: str = "",
     priority: str = "medium",
+    pomodoro_rounds: int = 1,
     confirm: bool = False,
 ) -> str:
     """创建一个 Todo，**只创建一个汇总大块，不拆成多个子任务**。
@@ -800,12 +851,14 @@ def create_todo(
     title 是这一整块 Todo 的标题；content 放完整说明、步骤或清单，
     全部塞进同一个 description，不要连续调用本工具创建多条。
     due_date 可选，格式 YYYY-MM-DD；不传就是无截止日期的待办。
-    confirm 由运行时确认闸门在用户确认后置为 true；模型不要主动传 true。
+    pomodoro_rounds 是这个任务的预计番茄数，按内容估 1–8，不要因为
+    due_date 只写了一天就把 24 小时直接折算成 8 个番茄。
+    confirm 参数仅保留兼容；写权限只由运行时确认卡发放，模型传 true 无效。
     """
     uid = _uid()
     if uid is None:
         return "请先登录后再创建 Todo。"
-    if confirm is not True:
+    if not consume_write_grant("create_todo", _run_id()):
         return "创建 Todo 需要用户明确确认；确认卡会在模型发起本工具调用后由运行时弹出。"
 
     title = (title or "").strip()[:240]
@@ -815,6 +868,12 @@ def create_todo(
     priority = (priority or "medium").strip().lower()
     if priority not in allowed_priority:
         priority = "medium"
+
+    try:
+        rounds = int(pomodoro_rounds)
+    except (TypeError, ValueError):
+        rounds = 1
+    rounds = max(1, min(8, rounds))
 
     start_at = None
     due_at = None
@@ -849,6 +908,7 @@ def create_todo(
                 priority=priority,
                 start_at=start_at,
                 due_at=due_at,
+                pomodoro_rounds=rounds,
                 sort_order=0,
                 created_at=now,
                 updated_at=now,
@@ -864,6 +924,7 @@ def create_todo(
                 result=f"{len(description)} 字说明",
                 payload={
                     "due_date": due_date.strip() or None,
+                    "pomodoro_rounds": rounds,
                     "description_chars": len(description),
                     "description_preview": description[:300],
                 },
@@ -880,7 +941,7 @@ def create_todo(
 
     due_text = f"，截止 {due_date.strip()}" if (due_date or "").strip() else ""
     return (
-        f"已创建 Todo：{title}（单条汇总，不拆碎项{due_text}），id={item_id}。"
+        f"已创建 Todo：{title}（单条汇总，预计 {rounds} 个番茄{due_text}），id={item_id}。"
         f"动作记录 id={action_id}，可在聊天里撤回。"
     )
 
@@ -1059,6 +1120,7 @@ ALL_TOOLS = [
     get_video_summary,
     get_learning_profile,
     get_recent_activity,
+    get_lite_learning_status,
     get_learning_goal,
     get_my_learning_path,
     recommend_next_videos,

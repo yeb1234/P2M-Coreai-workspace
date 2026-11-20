@@ -278,6 +278,8 @@ class NoteOut(BaseModel):
     user_id: Optional[int] = None
     # shared（AI 转写产物，系统共有）/ private（用户自己写的）
     scope: str = "shared"
+    # sticky（便签墙）/ md（Markdown 笔记）
+    surface: str = "md"
     title: str
     content: str
     source: str
@@ -328,6 +330,8 @@ class AssistantPageNote(BaseModel):
 
     title: str = Field(default="", max_length=240)
     markdown: str = Field(default="", max_length=60_000)
+    # 当前页面属于便签墙还是 Markdown 笔记；决定保存后的归属与回填目标。
+    surface: Literal["sticky", "md"] = "md"
 
 
 class AssistantResume(BaseModel):

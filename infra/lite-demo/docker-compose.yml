@@ -1,0 +1,105 @@
+# P2 Lite Demo：独立演示库 + 独立端口 + 登录页预填账号
+#
+# 与正式 Lite 隔离：
+#   - 数据库：shared-postgres / db_p2_demo / u_p2_demo
+#   - Redis：shared-redis DB 5，前缀 p2demo:
+#   - 端口：12306（前端）/ 12706（API）
+#
+# 用法（在仓库根目录）：
+#   cp infra/lite-demo/.env.example infra/lite-demo/.env
+#   docker compose --env-file infra/lite-demo/.env \
+#     -f infra/lite-demo/docker-compose.yml up -d --build
+#
+# 演示账号密码只通过构建参数注入 demo 前端；正式 Lite / Media 不会带。
+
+name: p2lite-demo
+
+services:
+  demo-backend:
+    image: p2-siteyeb-lite-backend:7.2
+    env_file:
+      - ./.env
+    environment:
+      APP_PROFILE: lite
+      AI_WORKER_EMBEDDED: "false"
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${DEMO_API_PORT:-12706}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - shared
+    mem_limit: ${DEMO_BACKEND_MEM_LIMIT:-640m}
+    cpus: ${DEMO_BACKEND_CPUS:-1}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_APP_PROFILE: lite
+        VITE_DEMO_MODE: "true"
+        VITE_DEMO_USERNAME: ${DEMO_USERNAME:-demo}
+        VITE_DEMO_PASSWORD: ${DEMO_PASSWORD:-P2Demo2026}
+        BACKEND_HOST: demo-backend
+    image: p2-siteyeb-lite-demo-frontend:7.2
+    depends_on:
+      demo-backend:
+        condition: service_healthy
+    networks:
+      - shared
+    ports:
+      - "${DEMO_WEB_PORT:-12306}:80"
+    mem_limit: ${DEMO_FRONTEND_MEM_LIMIT:-96m}
+    cpus: ${DEMO_FRONTEND_CPUS:-0.5}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  seed:
+    image: p2-siteyeb-lite-backend:7.2
+    env_file:
+      - ./.env
+    environment:
+      APP_PROFILE: lite
+      TZ: Asia/Shanghai
+      PYTHONPATH: /app
+      DEMO_USERNAME: ${DEMO_USERNAME:-demo}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-P2Demo2026}
+      DEMO_DISPLAY_NAME: ${DEMO_DISPLAY_NAME:-演示用户}
+    depends_on:
+      demo-backend:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./seed_demo.py:/demo/seed_demo.py:ro
+    command: ["python", "/demo/seed_demo.py"]
+    restart: "no"
+    networks:
+      - shared
+
+networks:
+  shared:
+    external: true
+    name: ${SHARED_NETWORK:-p2-shared}

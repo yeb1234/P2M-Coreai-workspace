@@ -23,10 +23,22 @@ export interface TrashedNote {
 
 export type NoteInsertPosition = 'before' | 'after';
 
+/** 服务端 notes 表返回的私人笔记；用于 AI 保存后回填便签墙。 */
+export interface ServerNoteLike {
+  id: number;
+  title: string;
+  content: string;
+  source?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 interface NotesState {
   notes: Note[];
   trash: Record<string, TrashedNote>;
   addNote: (data: Partial<Note> & { title: string }) => string;
+  importServerNote: (note: ServerNoteLike) => string;
+  removeServerNote: (serverId: number) => void;
   upsertTodayAiNote: (payload?: { title?: string; content?: string }) => string;
   updateNote: (id: string, updates: Partial<Note>) => void;
   reorderNotes: (fromId: string, toId: string, position?: NoteInsertPosition) => void;
@@ -153,6 +165,43 @@ export const useNotesStore = create<NotesState>()(
         };
         set((state) => ({ notes: [note, ...state.notes] }));
         return id;
+      },
+
+      importServerNote: (data) => {
+        // 服务端笔记用稳定 id，重复同步不会生成多张便签。
+        const id = `srv-${data.id}`;
+        const existing = get().notes.find((note) => note.id === id);
+        if (existing) return id;
+        // 已在垃圾箱里的副本不再自动复活；永久删除时才删服务端记录。
+        if (get().trash[id]) return id;
+        // 保存「当前便签」时，本地原文和刚写入服务端的副本内容一致；
+        // 直接返回原便签，避免页面上出现两条一模一样的便签。
+        const sameContent = get().notes.find(
+          (note) => note.title === (data.title || '').slice(0, 240) && note.content === (data.content || '')
+        );
+        if (sameContent) return sameContent.id;
+        const created = data.createdAt || now();
+        const updated = data.updatedAt || created;
+        const note: Note = {
+          id,
+          title: (data.title || '未命名笔记').slice(0, 240),
+          content: data.content || '',
+          color: 'sticky-blue',
+          pinned: false,
+          tag: data.source === 'assistant' ? 'AI' : '云端',
+          createdAt: created,
+          updatedAt: updated,
+        };
+        set((state) => ({ notes: [note, ...state.notes] }));
+        return id;
+      },
+
+      removeServerNote: (serverId) => {
+        const id = `srv-${serverId}`;
+        set((state) => ({
+          notes: state.notes.filter((note) => note.id !== id),
+          trash: Object.fromEntries(Object.entries(state.trash).filter(([key]) => key !== id)),
+        }));
       },
 
       upsertTodayAiNote: (payload) => {

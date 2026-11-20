@@ -4,21 +4,25 @@ import { idbStorage } from '../lib/idbStorage';
 import { IS_DESKTOP_CLIENT } from '../lib/clientContext';
 import { type ThemeVars, type ThemeScheduleRule, THEME_PRESETS, applyTheme, DEFAULT_THEME_SCHEDULE_RULES } from '../lib/themes';
 import { VIEW_PATH } from '../config/pageRegistry';
+import { isPageEnabled } from '../config/appProfile';
 
-export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'mdnotes' | 'pomodoro' | 'timecenter' | 'learning' | 'journey' | 'video' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
+export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'mdnotes' | 'pomodoro' | 'timecenter' | 'learning' | 'journey' | 'video' | 'videopreview' | 'media' | 'transcribe' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
 
 export type FontSize = 'sm' | 'md' | 'lg';
 export type ThemeId = string;
 export type NoteEnterBehavior = 'enter_save' | 'enter_newline';
 export type NavPlacement = 'left' | 'top';
 
-const DEFAULT_NAV_ORDER: ActiveView[] = [
+const DEFAULT_NAV_ORDER_ALL: ActiveView[] = [
   'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'mdnotes', 'pomodoro', 'timecenter',
-  'health', 'bookmarks', 'learning', 'journey', 'video', 'compare', 'shop', 'esports',
+  'health', 'bookmarks', 'learning', 'journey', 'video', 'videopreview', 'media', 'transcribe',
+  'compare', 'shop', 'esports',
   'stats', 'reader', 'snippets', 'habits',
   'flashcards', 'tokens',
   'leetcode', 'interview', 'codenav', 'aiagent', 'openclaw', 'hermes',
 ];
+
+export const DEFAULT_NAV_ORDER: ActiveView[] = DEFAULT_NAV_ORDER_ALL.filter(isPageEnabled);
 
 const clampSidebarWidth = (width: number | undefined) => Math.max(148, Math.min(240, Math.round(width || 184)));
 
@@ -256,6 +260,12 @@ export const useUIStore = create<UIState>()(
           }
         }
         const validHidden = savedHidden.filter((id) => validSet.has(id));
+        const safeActiveView = saved.activeView && isPageEnabled(saved.activeView)
+          ? saved.activeView
+          : current.activeView;
+        const safePreviousView = saved.previousViewBeforeSettings && isPageEnabled(saved.previousViewBeforeSettings)
+          ? saved.previousViewBeforeSettings
+          : current.previousViewBeforeSettings;
         if (import.meta.env?.DEV) {
           console.log('[uiStore merge] persisted:', persisted, 'savedOrder:', savedOrder, 'savedHidden:', savedHidden, 'merged:', merged, 'validHidden:', validHidden);
         }
@@ -270,6 +280,8 @@ export const useUIStore = create<UIState>()(
             : current.navPlacement,
           navOrder: merged,
           hiddenNavItems: validHidden,
+          activeView: safeActiveView,
+          previousViewBeforeSettings: safePreviousView,
         };
       },
     }

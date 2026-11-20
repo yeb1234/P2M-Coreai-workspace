@@ -11,6 +11,7 @@ from rq import Queue
 from rq.command import send_kill_horse_command
 
 from app.database import settings
+from app.services.redis_keys import p2_key
 
 # 转写任务的兜底超时（视频时长未知时用这个）。
 #
@@ -67,7 +68,7 @@ def get_redis_connection() -> redis.Redis:
 def ai_jobs_queue() -> Queue:
     global _ai_jobs_queue
     if _ai_jobs_queue is None:
-        _ai_jobs_queue = Queue("ai_jobs", connection=get_redis_connection())
+        _ai_jobs_queue = Queue(p2_key("queue:ai_jobs"), connection=get_redis_connection())
     return _ai_jobs_queue
 
 
@@ -75,13 +76,13 @@ def summary_jobs_queue() -> Queue:
     """只补总结的独立队列；笔记本/备用总结 worker 消费这里。"""
     global _summary_jobs_queue
     if _summary_jobs_queue is None:
-        _summary_jobs_queue = Queue("summary_jobs", connection=get_redis_connection())
+        _summary_jobs_queue = Queue(p2_key("queue:summary_jobs"), connection=get_redis_connection())
     return _summary_jobs_queue
 
 
 def is_job_cancelled(job_id: str) -> bool:
     """Check whether a job has been marked for cancellation in Redis."""
-    return bool(get_redis_connection().exists(f"ai_job:cancelled:{job_id}"))
+    return bool(get_redis_connection().exists(p2_key(f"ai_job:cancelled:{job_id}")))
 
 
 def cancel_job(job_id: str) -> None:
@@ -92,12 +93,12 @@ def cancel_job(job_id: str) -> None:
     用户以为取消了，实际还在烧 CPU。多留 2 小时覆盖排队等待。
     """
     ttl = _TIMEOUT_MAX_SECONDS + 2 * 3600
-    get_redis_connection().setex(f"ai_job:cancelled:{job_id}", ttl, "1")
+    get_redis_connection().setex(p2_key(f"ai_job:cancelled:{job_id}"), ttl, "1")
 
 
 def clear_job_cancelled(job_id: str) -> None:
     """Remove cancellation flag after the job finishes or is cleaned up."""
-    get_redis_connection().delete(f"ai_job:cancelled:{job_id}")
+    get_redis_connection().delete(p2_key(f"ai_job:cancelled:{job_id}"))
 
 
 def send_kill_to_worker(worker_name: str) -> None:
@@ -120,5 +121,5 @@ def background_queue() -> Queue:
     """
     global _background_queue
     if _background_queue is None:
-        _background_queue = Queue("background", connection=get_redis_connection())
+        _background_queue = Queue(p2_key("queue:background"), connection=get_redis_connection())
     return _background_queue

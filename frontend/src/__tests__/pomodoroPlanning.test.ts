@@ -63,6 +63,35 @@ describe('pomodoro planning from schedule time range', () => {
       pomodoroRounds: 10,
     }, defaultConfig)).toBe(8);
   });
+
+  it('does not turn a date-only all-day todo into 8 pomodoros', () => {
+    const item = {
+      startAt: '2026-11-21T00:00:00',
+      dueAt: '2026-11-21T23:59:00',
+      pomodoroRounds: 0,
+    };
+    expect(calculateSchedulePomodoroRounds(item, defaultConfig)).toBe(1);
+    const plan = getSchedulePomodoroPlan(item, defaultConfig);
+    expect(plan.rounds).toBe(1);
+    expect(plan.plannedMinutes).toBe(25);
+    expect(plan.plannedFocusMinutes).toBe(25);
+  });
+
+  it('keeps the default four-round target for an unscheduled todo', () => {
+    const item = { startAt: null, dueAt: null, pomodoroRounds: 0 };
+    expect(calculateSchedulePomodoroRounds(item, defaultConfig)).toBe(4);
+    expect(getSchedulePomodoroPlan(item, defaultConfig).rounds).toBe(4);
+  });
+
+  it('keeps an explicit pomodoro estimate on a date-only todo', () => {
+    const item = {
+      startAt: '2026-11-21T00:00:00',
+      dueAt: '2026-11-21T23:59:00',
+      pomodoroRounds: 2,
+    };
+    expect(calculateSchedulePomodoroRounds(item, defaultConfig)).toBe(2);
+    expect(getSchedulePomodoroPlan(item, defaultConfig).rounds).toBe(2);
+  });
 });
 
 describe('getSchedulePomodoroPlan', () => {

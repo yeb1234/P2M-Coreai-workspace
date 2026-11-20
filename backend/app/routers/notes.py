@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 from app.schemas import NoteOut, NoteUpdate
 from app.services.daily_digest import generate_daily_note
 from app.services.note_ai import NoteAIError, extract_note_actions, polish_note, summarize_note
-from app.services.note_library import save_private_note
+from app.services.note_library import NOTE_SURFACES, save_private_note
 from app.services.user_data_cleanup import delete_private_note_files
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -37,6 +37,7 @@ class NoteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     content: str = Field(default="", max_length=60_000)
     video_id: int | None = None
+    surface: Literal["sticky", "md"] = "md"
 
 
 class DailyNoteIn(BaseModel):
@@ -170,6 +171,7 @@ def note_ai(
 @router.get("", response_model=list[NoteOut])
 def list_notes(
     scope: str | None = None,
+    surface: str | None = None,
     video_id: int | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -183,9 +185,21 @@ def list_notes(
     )
     if scope in ("shared", "private"):
         q = q.filter(Note.scope == scope)
+    if surface in NOTE_SURFACES:
+        q = q.filter(Note.surface == surface)
     if video_id is not None:
         q = q.filter(Note.video_id == video_id)
     return q.order_by(Note.updated_at.desc()).limit(500).all()
+
+
+@router.get("/{note_id}", response_model=NoteOut)
+def get_note(
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """读取单篇笔记。AI 保存后前端用它把正文回填到对应笔记页。"""
+    return _load_visible(note_id, user, db)
 
 
 @router.post("", response_model=NoteOut)
@@ -199,6 +213,7 @@ def create_note(
         title=payload.title,
         content=payload.content,
         source="manual",
+        surface=payload.surface,
         video_id=payload.video_id,
     )
 

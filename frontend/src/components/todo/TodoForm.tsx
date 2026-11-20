@@ -34,6 +34,16 @@ function getReminderDefaultParts(startDate: string, startTime: string, fallbackD
   };
 }
 
+function isAllDayInput(startDate: string, startTime: string, dueDate: string, endTime: string): boolean {
+  return Boolean(
+    startDate
+    && dueDate
+    && startDate === dueDate
+    && startTime === '00:00'
+    && endTime === '23:59'
+  );
+}
+
 interface TodoFormProps {
   todo?: ScheduleItem | null;
   defaultDate?: string | null;
@@ -70,19 +80,26 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
   const initialPomodoroCount = todo?.pomodoroRounds && todo.pomodoroRounds > 0
     ? clampToAllowedRounds(todo.pomodoroRounds, pomodoroConfig.longBreakInterval)
     : (startDate && startTime && dueDate && endTime
-      ? inferAllowedRoundsFromDuration(
-        getScheduleDurationMinutes(
-          combineLocalDateTime(startDate, startTime),
-          combineLocalDateTime(dueDate, endTime)
-        ),
-        pomodoroConfig
-      )
+      ? (isAllDayInput(startDate, startTime, dueDate, endTime)
+        ? 1
+        : inferAllowedRoundsFromDuration(
+          getScheduleDurationMinutes(
+            combineLocalDateTime(startDate, startTime),
+            combineLocalDateTime(dueDate, endTime)
+          ),
+          pomodoroConfig
+        ))
       : clampToAllowedRounds(pomodoroConfig.longBreakInterval, pomodoroConfig.longBreakInterval));
   const [pomodoroCount, setPomodoroCount] = useState(initialPomodoroCount);
 
-  // 当排程时间变化时，自动反推番茄钟数量
+  // 当排程时间变化时，自动反推番茄钟数量；日期型 Todo 保持 1 个，
+  // 不把 00:00-23:59 的 24 小时折成 8 个番茄。
   React.useEffect(() => {
     if (!startDate || !startTime || !dueDate || !endTime) return;
+    if (isAllDayInput(startDate, startTime, dueDate, endTime)) {
+      if (!todo?.pomodoroRounds) setPomodoroCount(1);
+      return;
+    }
     const duration = getScheduleDurationMinutes(
       combineLocalDateTime(startDate, startTime),
       combineLocalDateTime(dueDate, endTime)
@@ -90,7 +107,7 @@ export const TodoForm: React.FC<TodoFormProps> = ({ todo, defaultDate, defaultPr
     if (duration <= 0) return;
     const inferred = inferAllowedRoundsFromDuration(duration, pomodoroConfig);
     setPomodoroCount(inferred);
-  }, [startDate, startTime, dueDate, endTime, pomodoroConfig]);
+  }, [startDate, startTime, dueDate, endTime, pomodoroConfig, todo?.pomodoroRounds]);
 
   const priorities: TodoPriority[] = ['high', 'medium', 'low', 'green'];
 

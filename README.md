@@ -1,7 +1,7 @@
 # P2 7.2 Media / 灵境工作台
 
 > 状态：现行（P2 7.2 产品线分叉）
-> 当前发布：P2 7.2 Media；配套 P2 7.2 Transcribe；P2 7.2 Lite 规划中
+> 当前发布：P2 7.2 Media；配套 P2 7.2 Transcribe；P2 7.2 Lite 已在 `feat/p2-lite` 实测
 
 一个本地优先的个人学习工作台：React 前端 + FastAPI 后端 + PostgreSQL 17（pgvector）+ Redis（RQ 队列）。把视频学习、笔记、待办、日历、番茄钟、时间中心、AI 助手和长期记忆放在一个界面里，本机和局域网都能用。
 
@@ -9,9 +9,10 @@
 >
 > - **P2 7.2 Media**：主站保留视频浏览、字幕阅读、视频检索、笔记与学习路径；转写入口从主站正面移除。
 > - **P2 7.2 Transcribe**：独立本机控制台（默认 `http://127.0.0.1:12703`），负责扫描路径、批量转写 / 总结、队列暂停与 worker 监控。
-> - **P2 7.2 Lite**：后续轻量版，目标 2GB 内存云 demo，砍掉视频与视频检索，主要能力收敛到 Agent 与题目学习。
+> - **P2 7.2 Lite**：独立轻量 profile，不建 pgvector、不跑视频/转写/embedding/worker；只保留 Agent、面试题、笔记、待办、日历等 OLTP 页面，另带 3 个不接后端的静态产品演示页（视频检索 Mock / P2 Media / P2 Transcribe），与 P1 共用一套 2GB PostgreSQL 和 Redis（`db_p2` / Redis DB 1 / `p2:` key 前缀）。默认入口 `http://127.0.0.1:12305`。
+> - **P2 7.2 Lite Demo**：独立演示库 `db_p2_demo`（Redis DB 5 / `p2demo:`），入口 `http://127.0.0.1:12306`；登录页预填 `demo / P2Demo2026`，自带便签、笔记、待办、日历、番茄、面试和 AI 会话样例数据。导航另有“产品线”分组：视频检索 Mock、P2 Media 真能力、P2 Transcribe 控制台三页静态演示，不接 Lite 后端。部署与重置见 [infra/lite-demo/README.md](infra/lite-demo/README.md)。
 >
-> 拆分说明见 [docs/2026-11-20-p2-7.2-media-split.md](docs/2026-11-20-p2-7.2-media-split.md)。
+> 拆分说明见 [docs/2026-11-20-p2-7.2-media-split.md](docs/2026-11-20-p2-7.2-media-split.md)；Lite 边界、共享库与内存验收见 [docs/2026-11-20-p2-7.2-lite.md](docs/2026-11-20-p2-7.2-lite.md)。
 
 项目目前偏个人使用，也欢迎拿去研究、改造和提交想法。定位是个人、家庭、小团队在可信局域网里使用的内部工具底座，不是开箱即用的公网 SaaS；要对外暴露前需要自行做权限、审计和安全加固。
 
@@ -213,7 +214,9 @@ npm run test:e2e
 cd ../backend && python -m compileall app
 ```
 
-测试基线（P2 7.2 Media）：前端 40 文件 / 351 用例；后端 71 项；`npm run build` 2688 modules 通过。
+测试基线（P2 7.2 Media）：前端 52 文件 / 406 用例（共享代码）；后端 99 项；Media 构建 2700 modules，前端/后端镜像已按同一套代码重建。
+
+测试基线（P2 7.2 Lite）：后端 99 项（含 profile 边界、Lite 学习状态、动作联动、确认卡跨重启恢复、Lite MCP/能力清单/健康检查、Demo 登录预填）；前端 52 文件 / 406 用例；Lite / Demo 构建 2700 modules；4 路并发 Agent 峰值 189.8 MiB（backend 177.7 + frontend 12.1）。
 
 日常改前端时至少跑：
 

@@ -6,7 +6,7 @@ import type { ActiveView } from '../../stores/uiStore';
 import { useDragResize } from '../../hooks/useDragResize';
 import { groupNavOrder, type NavGroup } from './navOrder';
 
-// 侧边栏分组。24 项平铺认知负担太重，按使用场景分三组。
+// 侧边栏分组。页面多了以后平铺认知负担太重，按使用场景分组。
 // 分组只决定「标题插在哪」和组间顺序，组内顺序完全跟随用户拖拽后的
 // navOrder；否则 reorderNav 写入成功，渲染时又被固定 ids 排回去，
 // 表现就是「拖了没反应」。
@@ -19,6 +19,10 @@ const NAV_GROUPS: NavGroup<ActiveView>[] = [
   {
     label: '学习',
     ids: ['bookmarks', 'learning', 'journey', 'video', 'flashcards', 'leetcode', 'interview', 'reader', 'snippets'],
+  },
+  {
+    label: '产品线',
+    ids: ['videopreview', 'media', 'transcribe'],
   },
   {
     label: '工具',

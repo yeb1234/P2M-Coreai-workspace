@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { useCalendarStore, usePomodoroStore, useNotificationStore, useScheduleStore } from '../stores';
-import { PRIORITY_COLORS, type PomodoroSession } from '../types';
+import { usePomodoroStore, useNotificationStore, useScheduleStore } from '../stores';
+import { type PomodoroSession } from '../types';
 import { playBreakSound, playPomodoroCue, playNotificationSound } from '../lib/sounds';
-import { toLocalDateString } from '../lib/date';
+import { toISODateTimeString } from '../lib/date';
 import { calculateSchedulePomodoroRounds } from '../lib/pomodoroPlanning';
 
 const TODO_REMINDER_GRACE_MS = 2 * 60 * 1000;
@@ -182,35 +182,41 @@ export const useCrossModuleSync = (enabled = true) => {
       // Defer to avoid mutating stores inside a subscription callback
       setTimeout(async () => {
         const scheduleStore = useScheduleStore.getState();
-        const calendarStore = useCalendarStore.getState();
 
         for (const session of pending) {
-          const linkedTodo = scheduleStore.items[session.todoId!];
-          if (linkedTodo) {
-            const nextPomodoroCount = linkedTodo.pomodoroCount + 1;
+          const linkedTodo = session.todoId ? scheduleStore.items[session.todoId] : null;
+          if (linkedTodo && !linkedTodo.deletedAt) {
+            // 番茄结束时的计数与专注时长已经由 pomodoroStore 写回待办，这里只补
+            // “是否达成计划番茄数”的状态，避免同一轮完成被重复累加。
             const pomodoroConfig = usePomodoroStore.getState().config;
             const plannedPomodoros = calculateSchedulePomodoroRounds(linkedTodo, pomodoroConfig);
-            const reachedTarget = plannedPomodoros > 0 && nextPomodoroCount >= plannedPomodoros;
-            scheduleStore.updateItem(linkedTodo.id, {
-              pomodoroCount: nextPomodoroCount,
-              totalFocusMinutes: linkedTodo.totalFocusMinutes + session.actualDuration,
-              status: reachedTarget ? 'completed' : 'in_progress',
-            });
+            const reachedTarget =
+              plannedPomodoros > 0 && linkedTodo.pomodoroCount >= plannedPomodoros;
+            if (reachedTarget && linkedTodo.status !== 'completed') {
+              scheduleStore.updateItem(linkedTodo.id, { status: 'completed' });
+            }
           }
-          const color = linkedTodo ? PRIORITY_COLORS[linkedTodo.priority] : '#10b981';
 
           try {
-            const eventId = await calendarStore.addEvent({
-              title: `专注 ${session.actualDuration}分钟`,
-              date: toLocalDateString(session.startTime),
-              type: 'pomodoro',
-              color,
-              todoId: session.todoId,
-              pomodoroSessionId: session.id,
+            // 专注记录必须和日历页读同一张 schedule_items，否则日历上看不到
+            // 番茄产生的专注事件；legacy calendar_events 不再写入。
+            const start = new Date(session.startTime);
+            const end = session.endTime ? new Date(session.endTime) : null;
+            const dueAt = end && end.getTime() > start.getTime()
+              ? session.endTime!
+              : toISODateTimeString(
+                  new Date(start.getTime() + Math.max(1, session.actualDuration) * 60_000),
+                );
+            const eventId = await scheduleStore.addEvent({
+              title: `专注 ${Math.max(1, session.actualDuration)}分钟`,
+              description: session.todoId ? '番茄钟专注记录' : '',
+              startAt: session.startTime,
+              dueAt,
+              priority: linkedTodo?.priority || 'green',
             });
             usePomodoroStore.getState().updateSession(session.id, { calendarEventId: eventId });
           } catch {
-            // 保存日历事件失败时不阻塞 pomodoro 状态更新
+            // 保存专注记录失败时不阻塞 pomodoro 状态更新
           }
         }
       }, 0);

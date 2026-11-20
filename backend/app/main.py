@@ -17,10 +17,33 @@ from app.core.errors import register_exception_handlers
 from app.core.observability import RequestContextMiddleware, setup_from_settings
 from app.database import SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
-from app.routers import admin, agent_actions, ai_jobs, assistant, auth, calendar_events, categories, interview, learning, mcp, memory_admin, notes, ops, schedule_items, search, user_data, videos, watch_events
+from app.routers import (
+    admin,
+    agent_actions,
+    assistant,
+    auth,
+    calendar_events,
+    interview,
+    mcp,
+    memory_admin,
+    notes,
+    schedule_items,
+    user_data,
+)
 from app.routers import asset_registry
 from app.schemas import StatsOut
-from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
+
+# Lite 只注册无视频、无检索的控制面；完整版保留全部路由。
+if not settings.is_lite:
+    from app.routers import (
+        ai_jobs,
+        categories,
+        learning,
+        ops,
+        search,
+        videos,
+        watch_events,
+    )
 
 DIST_DIR = Path(__file__).resolve().parents[2] / "dist"
 APP_STARTED_AT = time.time()
@@ -31,6 +54,8 @@ logger = logging.getLogger(__name__)
 
 def run_startup_scan() -> None:
     try:
+        from app.services.file_scanner import scan_video_library
+
         result = scan_video_library()
         logger.info("Startup video scan finished: %s", result)
     except Exception:
@@ -163,6 +188,16 @@ def _warmup_retrieval() -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     ensure_runtime_schema()
+
+    if settings.is_lite:
+        # Lite 没有视频库、转写队列和 embedding 模型，启动时只做 schema 自举。
+        # 这一步很关键：少起 4 类后台线程，2G 云实例的启动峰值会低很多。
+        logger.info("P2 Lite profile：跳过视频扫描、缩略图、embedding 与 worker")
+        yield
+        return
+
+    from app.services.file_scanner import start_file_watcher, stop_file_watcher
+
     start_file_watcher()
     threading.Thread(target=run_startup_scan, name="startup-video-scan", daemon=True).start()
     threading.Thread(target=_warmup_retrieval, name="embedding-warmup", daemon=True).start()
@@ -196,10 +231,9 @@ async def lifespan(_app: FastAPI):
     if supervisor is not None:
         supervisor.stop()
 
-
 app = FastAPI(
-    title="P2 Learning OS API",
-    version="7.0.0",
+    title=f"P2 7.2 {'Lite' if settings.is_lite else 'Media'} API",
+    version="7.2.0",
     lifespan=lifespan,
     docs_url="/api/docs" if settings.enable_docs else None,
     openapi_url="/api/openapi.json" if settings.enable_docs else None,
@@ -221,9 +255,14 @@ async def client_type_middleware(request: Request, call_next):
 
 @app.get("/api/client-info")
 async def client_info(request: Request):
-    """给桌面/网页自测用：确认 header 是否被识别。"""
+    """给桌面/网页自测用：确认 header 与当前产品形态是否被识别。"""
     client_type = getattr(request.state, "client_type", "web")
-    return {"client_type": client_type, "ui_mode": client_type}
+    return {
+        "client_type": client_type,
+        "ui_mode": client_type,
+        "app_profile": settings.normalized_app_profile,
+        "edition": "Lite" if settings.is_lite else "Media",
+    }
 
 
 # 显式来源：allow_origins=["*"] 与 allow_credentials=True 是无效组合，
@@ -247,26 +286,31 @@ register_exception_handlers(app)
 app.include_router(auth.router)
 app.include_router(user_data.router)
 app.include_router(schedule_items.router)
-app.include_router(videos.router)
-app.include_router(categories.router)
-app.include_router(ai_jobs.router)
 app.include_router(assistant.router)
-app.include_router(search.router)
 app.include_router(memory_admin.router)
-app.include_router(learning.router)
-app.include_router(watch_events.router)
 app.include_router(notes.router)
 app.include_router(agent_actions.router)
 app.include_router(calendar_events.router)
-app.include_router(mcp.router)
 app.include_router(interview.router)
 app.include_router(admin.router)
-app.include_router(ops.router)
 app.include_router(asset_registry.router)
+app.include_router(mcp.router)
 
-app.mount("/output", StaticFiles(directory=settings.output_dir), name="output")
-app.mount("/thumbnails", StaticFiles(directory=settings.thumbnail_dir), name="thumbnails")
-app.mount("/sprites", StaticFiles(directory=settings.sprite_dir), name="sprites")
+if not settings.is_lite:
+    app.include_router(videos.router)
+    app.include_router(categories.router)
+    app.include_router(ai_jobs.router)
+    app.include_router(search.router)
+    app.include_router(learning.router)
+    app.include_router(watch_events.router)
+    app.include_router(ops.router)
+
+if Path(settings.output_dir).is_dir():
+    app.mount("/output", StaticFiles(directory=settings.output_dir), name="output")
+if Path(settings.thumbnail_dir).is_dir():
+    app.mount("/thumbnails", StaticFiles(directory=settings.thumbnail_dir), name="thumbnails")
+if Path(settings.sprite_dir).is_dir():
+    app.mount("/sprites", StaticFiles(directory=settings.sprite_dir), name="sprites")
 
 if (DIST_DIR / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="static-assets")
@@ -349,12 +393,9 @@ def health():
 
 @app.get("/ready")
 def ready():
-    """就绪探针：检索链路可用才返回 200，用于发布前判断。"""
+    """就绪探针：完整版检查检索链路；Lite 只检查数据库与 LLM 配置。"""
     from fastapi.responses import JSONResponse
     from app.database import check_database, check_transactions
-    from app.migrations import embedding_stats
-    from app.services.embeddings import get_embedding_client
-    from app.services.llm import llm_health
 
     checks: dict = {}
     try:
@@ -363,12 +404,6 @@ def ready():
     except Exception as exc:
         checks["database"] = f"fail: {str(exc)[:120]}"
 
-    try:
-        stats = embedding_stats(engine)
-        checks["vectors"] = stats
-    except Exception as exc:
-        checks["vectors"] = f"fail: {str(exc)[:120]}"
-
     # 长事务不参与 ready 判定（它不是「不能服务」，而是「会拖住 schema 变更」），
     # 但必须在这里可见，否则排查时又要连数据库
     try:
@@ -376,9 +411,28 @@ def ready():
     except Exception as exc:  # noqa: BLE001
         checks["transactions"] = f"fail: {str(exc)[:120]}"
 
-    checks["embedding_model"] = get_embedding_client().health()
-    checks["llm"] = llm_health()
+    if settings.is_lite:
+        # Lite 没有 embedding / 向量索引，不能把检索可用性当成就绪条件。
+        from app.services.llm import llm_health
 
+        checks["profile"] = "lite"
+        checks["vectors"] = "skipped (lite)"
+        checks["llm"] = llm_health()
+        ok = checks.get("database") == "ok"
+        return JSONResponse(
+            status_code=200 if ok else 503,
+            content={"ready": ok, "checks": checks},
+        )
+
+    from app.migrations import embedding_stats
+    from app.services.embeddings import get_embedding_client
+
+    try:
+        checks["vectors"] = embedding_stats(engine)
+    except Exception as exc:
+        checks["vectors"] = f"fail: {str(exc)[:120]}"
+
+    checks["embedding_model"] = get_embedding_client().health()
     ok = checks.get("database") == "ok" and checks["embedding_model"].get("ok")
     return JSONResponse(status_code=200 if ok else 503, content={"ready": ok, "checks": checks})
 

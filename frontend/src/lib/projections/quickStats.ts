@@ -20,8 +20,8 @@ export interface QuickStatsProjectionInput {
   notes: { id: string }[];
   /**
    * calendarStore.events 原始切片。
-   * 预留入参：StatsPage 的「日程管理」徽章仍按这份 legacy 全量日历事件计数（徽章不动），
-   * 本投影的「今日事件」口径不消费它 —— 日视图真正渲染的是 schedule items。
+   * 保留入参用于兼容旧测试；「今日事件」与「日程管理」徽章都已改读
+   * schedule_items，日视图真正渲染的也是 schedule items。
    */
   calendarEvents: Record<string, CalendarEvent>;
   /** 可注入的今天日期（YYYY-MM-DD），测试固定日期用 */

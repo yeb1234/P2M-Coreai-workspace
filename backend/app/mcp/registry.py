@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from app.agents.tool_registry import DEFAULT_REGISTRY
 from app.agents.tools import set_tool_user
-from app.database import SessionLocal
+from app.database import SessionLocal, settings
 from app.models import CalendarEvent, ScheduleItem
 from app.services.note_ai import (
     NoteAIError,
@@ -352,6 +352,37 @@ def _build_existing_tools() -> list[McpToolSpec]:
 MCP_TOOLS: list[McpToolSpec] = [*NATIVE_TOOLS, *_build_existing_tools()]
 _BY_NAME = {tool.name: tool for tool in MCP_TOOLS}
 
+# MCP 原生工具始终属于「笔记 / 待办 / 日程」这条共享业务线，
+# Lite 也具备这些能力，所以不受 profile 过滤。
+_MCP_NATIVE_NAMES = frozenset(tool.name for tool in NATIVE_TOOLS)
+
+
+def _lite_mcp_tool_names() -> frozenset[str]:
+    """Lite 只暴露当前能力包真正可用的 MCP 工具。
+
+    Lite 没有视频库、学习路径和向量检索；如果直接把完整 MCP 清单给它，
+    页面会展示一堆一点就 404 / 报错的工具，客户端也会误以为这些能力存在。
+    `list_skills()` 是 Lite 的权威白名单，这里只取其中只读工具，
+    再加原生笔记/待办/日程工具。完整版仍返回全量 MCP_TOOLS。
+    """
+    from app.agents.skills import list_skills
+
+    names = set(_MCP_NATIVE_NAMES)
+    for skill in list_skills():
+        for name in skill.tools:
+            tool = _BY_NAME.get(name)
+            if tool is not None and tool.read_only:
+                names.add(name)
+    return frozenset(names)
+
+
+def active_tools() -> list[McpToolSpec]:
+    """按 profile 返回当前真正可用的 MCP 工具。"""
+    if not settings.is_lite:
+        return MCP_TOOLS
+    allowed = _lite_mcp_tool_names()
+    return [tool for tool in MCP_TOOLS if tool.name in allowed]
+
 
 def list_tools() -> list[dict[str, Any]]:
     return [
@@ -367,7 +398,7 @@ def list_tools() -> list[dict[str, Any]]:
                 "openWorldHint": True,
             },
         }
-        for tool in MCP_TOOLS
+        for tool in active_tools()
     ]
 
 
@@ -375,6 +406,8 @@ def call_tool(name: str, args: dict[str, Any], user_id: int) -> Any:
     tool = _BY_NAME.get(name)
     if tool is None:
         raise KeyError(f"未知工具: {name}")
+    if settings.is_lite and name not in _lite_mcp_tool_names():
+        raise KeyError(f"当前 Lite profile 不提供工具: {name}")
     if not isinstance(args, dict):
         raise ValueError("arguments 必须是对象")
     if tool.destructive and args.get("confirm") is not True:

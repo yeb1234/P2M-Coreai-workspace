@@ -1,11 +1,13 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Clock, Filter, GripVertical, Pin, Plus, RotateCcw, Save, Search, SlidersHorizontal, StickyNote, Tag, Trash2, X } from 'lucide-react';
+import { Clock, Filter, GripVertical, Pin, Plus, RefreshCw, RotateCcw, Save, Search, SlidersHorizontal, StickyNote, Tag, Trash2, X } from 'lucide-react';
 import { CollapsibleToolPanel, EmptyState, PageTitle } from '../shared';
 import { useNotesStore, useUIStore } from '../../stores';
 import type { Note, NoteColor, NoteInsertPosition } from '../../stores/notesStore';
 import { getNoteTags, NOTE_COLOR_OPTIONS } from '../../stores/notesStore';
 import { splitNotesByPinned } from '../../lib/projections/notes';
 import { apiFetch } from '../../lib/videoApi';
+import { syncAllServerNotesIntoLocal, removeServerNoteFromLocal } from '../../lib/serverNotesSync';
+import { useServerNotesAutoSync } from '../../hooks';
 import { playInteractionSound } from '../../lib/sounds';
 
 const COLOR_DOT = Object.fromEntries(NOTE_COLOR_OPTIONS.map((item) => [item.value, item.dot])) as Record<NoteColor, string>;
@@ -39,6 +41,10 @@ export const NotesPage: React.FC = () => {
   const noteEnterBehavior = useUIStore((s) => s.noteEnterBehavior);
   const contentInputRef = useRef<HTMLTextAreaElement>(null);
 
+  // 便签和笔记共用一张服务端 notes 表，但只同步 surface=sticky 的记录；
+  // 打开便签页、切回窗口时自动对齐，避免只能靠聊天回填。
+  useServerNotesAutoSync('sticky');
+
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState<string>('all');
   const [activeColor, setActiveColor] = useState<NoteColor | 'all'>('all');
@@ -49,6 +55,7 @@ export const NotesPage: React.FC = () => {
   const [showToolbar, setShowToolbar] = useState(false);
   const [aiNoteLoading, setAiNoteLoading] = useState(false);
   const [aiNoteError, setAiNoteError] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [insertPosition, setInsertPosition] = useState<NoteInsertPosition>('after');
@@ -110,6 +117,20 @@ export const NotesPage: React.FC = () => {
     if (created) startEdit(created);
     playInteractionSound('success');
   }, [activeColor, activeTag, addNote, startEdit]);
+
+  const handleSyncServerNotes = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setAiNoteError('');
+    try {
+      const imported = await syncAllServerNotesIntoLocal('sticky');
+      playInteractionSound(imported > 0 ? 'success' : 'save');
+    } catch (error) {
+      setAiNoteError(error instanceof Error ? error.message : '同步失败，稍后再试');
+    } finally {
+      setSyncing(false);
+    }
+  }, [syncing]);
 
   const createTodayAiNote = useCallback(async () => {
     if (aiNoteLoading) return;
@@ -185,6 +206,32 @@ export const NotesPage: React.FC = () => {
     if (edit.id === id) setActiveNoteId(null);
     playInteractionSound('delete');
   }, [deleteNote, edit.id, setActiveNoteId]);
+
+  const deleteServerCopy = useCallback((id: string) => {
+    if (!id.startsWith('srv-')) return;
+    const serverId = Number(id.slice(4));
+    if (!Number.isFinite(serverId)) return;
+    // 先压住本地回填，避免 DELETE 还没返回就被下一次同步插回来。
+    removeServerNoteFromLocal(serverId);
+    void apiFetch(`/api/notes/${serverId}`, { method: 'DELETE' }).catch(() => {
+      // 服务端删除失败时保留本地操作；下次同步若记录仍在，会重新出现。
+    });
+  }, []);
+
+  const handlePermanentDelete = useCallback((id: string) => {
+    permanentDeleteNote(id);
+    deleteServerCopy(id);
+    playInteractionSound('delete');
+  }, [deleteServerCopy, permanentDeleteNote]);
+
+  const handleClearTrash = useCallback(() => {
+    const serverCopies = trashedNotes
+      .map(({ note }) => note.id)
+      .filter((id) => id.startsWith('srv-'));
+    clearTrash();
+    serverCopies.forEach(deleteServerCopy);
+    playInteractionSound('delete');
+  }, [clearTrash, deleteServerCopy, trashedNotes]);
 
   const handleNoteDragOver = useCallback((event: React.DragEvent<HTMLDivElement>, noteId: string) => {
     event.preventDefault();
@@ -401,6 +448,9 @@ export const NotesPage: React.FC = () => {
               <Trash2 size={14} />
               {trashedNotes.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[var(--danger)] text-white text-xs rounded-full flex items-center justify-center">{trashedNotes.length}</span>}
             </button>
+            <button onClick={handleSyncServerNotes} disabled={syncing} className="p-1.5 rounded-lg text-[var(--text-muted)] disabled:opacity-60" title="从服务端同步便签">
+              <RefreshCw size={14} className={syncing ? 'animate-spin' : undefined} />
+            </button>
             <button onClick={createTodayAiNote} disabled={aiNoteLoading} className="p-1.5 rounded-lg text-[#7c3aed] bg-[#f5f3ff] disabled:opacity-60" title="AI 今日便签">
               <StickyNote size={14} className={aiNoteLoading ? 'animate-pulse' : undefined} />
             </button>
@@ -465,7 +515,7 @@ export const NotesPage: React.FC = () => {
       <div className="hidden md:block">
         <PageTitle
           title="便签"
-          subtitle={`${notes.length} 条便签，${trashedNotes.length} 条在垃圾箱；拖动卡片手柄调整顺序`}
+          subtitle={`轻量速记 · ${notes.length} 条便签，${trashedNotes.length} 条在垃圾箱；拖动卡片手柄调整顺序`}
           icon={<StickyNote size={22} />}
           action={
             <div className="flex items-center gap-2">
@@ -480,6 +530,14 @@ export const NotesPage: React.FC = () => {
                     {trashedNotes.length}
                   </span>
                 )}
+              </button>
+              <button
+                onClick={handleSyncServerNotes}
+                disabled={syncing}
+                className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--warn)] hover:bg-[#fffbeb] transition-colors disabled:opacity-60"
+                title="从服务端同步便签"
+              >
+                <RefreshCw size={16} className={syncing ? 'animate-spin' : undefined} />
               </button>
               {aiNoteError && (
                 <span className="max-w-[220px] text-xs text-[var(--danger)]">{aiNoteError}</span>
@@ -602,7 +660,7 @@ export const NotesPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
               {trashedNotes.length > 0 && !collapsedTrash && (
-                    <button onClick={() => { clearTrash(); playInteractionSound('delete'); }} className="text-xs text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors px-2 py-1">
+                    <button onClick={handleClearTrash} className="text-xs text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors px-2 py-1">
                   清空垃圾箱
                 </button>
               )}
@@ -627,7 +685,7 @@ export const NotesPage: React.FC = () => {
                       <RotateCcw size={12} />
                       恢复
                     </button>
-                    <button onClick={() => { permanentDeleteNote(note.id); playInteractionSound('delete'); }} className="p-1 text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors" title="永久删除">
+                    <button onClick={() => handlePermanentDelete(note.id)} className="p-1 text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors" title="永久删除">
                       <X size={14} />
                     </button>
                   </div>

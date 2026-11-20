@@ -93,6 +93,16 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         requires_login=True,
         tags=("learning", "activity"),
     ),
+    "get_lite_learning_status": ToolSpec(
+        name="get_lite_learning_status",
+        version="1.0.0",
+        scopes=("profile:read", "learning:read"),
+        timeout_s=12.0,
+        max_calls_per_turn=1,
+        max_result_chars=5000,
+        requires_login=True,
+        tags=("lite", "learning", "activity", "review"),
+    ),
     "get_learning_goal": ToolSpec(
         name="get_learning_goal",
         version="1.0.0",

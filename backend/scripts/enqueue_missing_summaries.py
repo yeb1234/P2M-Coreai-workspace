@@ -22,10 +22,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.database import SessionLocal
 from app.models import AiJob, Video
-from app.services.rq_client import compute_job_timeout, get_redis_connection
+from app.services.rq_client import compute_job_timeout, summary_jobs_queue
 from app.utils.files import unique_suffix
-
-from rq import Queue
 
 
 def has_subtitles(video: Video) -> bool:
@@ -87,7 +85,7 @@ def main() -> int:
 
         db.commit()
 
-        queue = Queue("summary_jobs", connection=get_redis_connection())
+        queue = summary_jobs_queue()
         failed = 0
         for job, duration in jobs:
             try:

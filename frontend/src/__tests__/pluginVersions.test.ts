@@ -7,7 +7,9 @@ describe('plugin version ledger', () => {
     for (const page of PAGES) {
       expect(PLUGIN_VERSIONS[page.id], `missing version for ${page.id}`).toBeTruthy();
     }
-    expect(Object.keys(PLUGIN_VERSIONS)).toHaveLength(PAGES.length);
+    // Ledger 也保留 Lite 专属演示页，完整版 PAGES 会裁掉它们；
+    // 因此这里验证“可见页全覆盖”，不把台账条目数锁死成当前形态的页数。
+    expect(Object.keys(PLUGIN_VERSIONS).length).toBeGreaterThanOrEqual(PAGES.length);
   });
 
   it('uses semver and a readable stage label', () => {

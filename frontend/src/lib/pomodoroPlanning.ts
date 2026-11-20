@@ -1,4 +1,5 @@
 import type { PomodoroConfig, ScheduleItem } from '../types';
+import { isAllDaySchedule } from './scheduleTime';
 
 export function getScheduleDurationMinutes(startAt: string | null, dueAt: string | null): number {
   if (!startAt || !dueAt) return 0;
@@ -35,6 +36,9 @@ export function calculateSchedulePomodoroRounds(
   config: Pick<PomodoroConfig, 'workDuration' | 'shortBreakDuration' | 'longBreakDuration' | 'longBreakInterval'>
 ): number {
   if (item.pomodoroRounds > 0) return Math.min(2 * config.longBreakInterval, item.pomodoroRounds);
+  // 日期型 Todo 只代表「截止到这一天」，不能把 23 小时 59 分折算成 8 个番茄。
+  // 没有显式轮次时按 1 个起算，和后端 create_todo 的默认值保持一致。
+  if (isAllDaySchedule(item)) return 1;
   if (!item.startAt || !item.dueAt) return config.longBreakInterval;
   return calculatePomodoroRounds(getScheduleDurationMinutes(item.startAt, item.dueAt), config);
 }
@@ -44,12 +48,16 @@ export function getSchedulePomodoroPlan(
   config: Pick<PomodoroConfig, 'workDuration' | 'shortBreakDuration' | 'longBreakDuration' | 'longBreakInterval'>
 ) {
   const durationMinutes = getScheduleDurationMinutes(item.startAt, item.dueAt);
+  const hasWindow = Boolean(item.startAt && item.dueAt);
+  const allDay = isAllDaySchedule(item);
   const rounds = item.pomodoroRounds > 0
     ? Math.min(2 * config.longBreakInterval, item.pomodoroRounds)
-    : (item.startAt && item.dueAt ? calculatePomodoroRounds(durationMinutes, config) : config.longBreakInterval);
+    : (allDay ? 1 : (hasWindow ? calculatePomodoroRounds(durationMinutes, config) : config.longBreakInterval));
 
   let plannedMinutes: number;
-  if (rounds <= config.longBreakInterval) {
+  if (rounds <= 0) {
+    plannedMinutes = 0;
+  } else if (rounds <= config.longBreakInterval) {
     plannedMinutes = rounds * config.workDuration + (rounds - 1) * config.shortBreakDuration;
     if (rounds === config.longBreakInterval) {
       plannedMinutes += config.longBreakDuration;

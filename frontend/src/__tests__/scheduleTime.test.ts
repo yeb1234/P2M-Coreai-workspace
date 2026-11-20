@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getNextWholeHour } from '../lib/scheduleTime';
+import { getNextWholeHour, isAllDaySchedule } from '../lib/scheduleTime';
 
 describe('getNextWholeHour', () => {
   it('returns current hour when exactly on the hour', () => {
@@ -40,5 +40,28 @@ describe('getNextWholeHour', () => {
     expect(result.startTime).toBe('23:00');
     expect(result.endTime).toBe('00:00');
     expect(result.endDate).toBe('2026-05-13');
+  });
+});
+
+describe('isAllDaySchedule', () => {
+  it('recognizes a same-day 00:00-23:59 todo as date-only', () => {
+    expect(isAllDaySchedule({
+      startAt: '2026-11-21T00:00:00',
+      dueAt: '2026-11-21T23:59:00',
+    })).toBe(true);
+  });
+
+  it('does not treat a real timed block as all-day', () => {
+    expect(isAllDaySchedule({
+      startAt: '2026-11-21T09:00:00',
+      dueAt: '2026-11-21T17:00:00',
+    })).toBe(false);
+  });
+
+  it('does not treat a cross-day range as all-day', () => {
+    expect(isAllDaySchedule({
+      startAt: '2026-11-21T00:00:00',
+      dueAt: '2026-11-22T23:59:00',
+    })).toBe(false);
   });
 });

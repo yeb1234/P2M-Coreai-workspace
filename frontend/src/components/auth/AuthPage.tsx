@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { LogIn, UserPlus, Loader2 } from 'lucide-react';
+import { LogIn, UserPlus, Loader2, Sparkles } from 'lucide-react';
 import { useAuthStore } from '../../stores';
 import { playInteractionSound } from '../../lib/sounds';
+import { DEMO_CREDENTIALS, IS_DEMO } from '../../lib/demoMode';
 
 // 只记住用户名。早期版本把明文密码也塞进 localStorage 实现「记住密码」——
 // 那是把口令写在硬盘上，任何 XSS 或共享电脑都能直接读走。
@@ -31,9 +32,9 @@ function loadRememberedUsername(): string {
 export const AuthPage: React.FC = () => {
   const rememberedName = loadRememberedUsername();
   const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState(rememberedName);
-  const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(!!rememberedName);
+  const [username, setUsername] = useState(DEMO_CREDENTIALS?.username || rememberedName);
+  const [password, setPassword] = useState(DEMO_CREDENTIALS?.password || '');
+  const [remember, setRemember] = useState(!!(DEMO_CREDENTIALS?.username || rememberedName));
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -60,9 +61,18 @@ export const AuthPage: React.FC = () => {
   };
 
   const toggleMode = () => {
-    setIsRegister((v) => !v);
-    clearError();
-    setConfirm('');
+    setIsRegister((v) => {
+      const next = !v;
+      clearError();
+      setConfirm('');
+      if (next) {
+        setPassword('');
+      } else if (DEMO_CREDENTIALS) {
+        setUsername(DEMO_CREDENTIALS.username);
+        setPassword(DEMO_CREDENTIALS.password);
+      }
+      return next;
+    });
   };
 
   return (
@@ -71,7 +81,9 @@ export const AuthPage: React.FC = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-[#3d2b1f] tracking-wide">灵境</h1>
-          <p className="text-sm text-[#8b7355] mt-1">CoreAI 个人工作站</p>
+          <p className="text-sm text-[#8b7355] mt-1">
+            {IS_DEMO ? 'P2 Lite 演示环境' : 'CoreAI 个人工作站'}
+          </p>
         </div>
 
         {/* Card */}
@@ -80,6 +92,21 @@ export const AuthPage: React.FC = () => {
             {isRegister ? <UserPlus size={18} /> : <LogIn size={18} />}
             {isRegister ? '注册账号' : '登录'}
           </h2>
+
+          {IS_DEMO && !isRegister && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-bg)] px-3 py-2">
+              <Sparkles size={14} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+              <div>
+                <p className="text-xs font-medium text-[var(--text-primary)]">演示账号已填充</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-[var(--text-secondary)]">
+                  {DEMO_CREDENTIALS && `账号 ${DEMO_CREDENTIALS.username} · 密码 ${DEMO_CREDENTIALS.password}`}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-4 text-[var(--text-secondary)]">
+                  直接点「登录」进入，演示数据可随意操作
+                </p>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -166,12 +193,16 @@ export const AuthPage: React.FC = () => {
           </form>
 
           <div className="mt-4 text-center">
-            <button
-              onClick={toggleMode}
-              className="text-xs text-[#8b7355] hover:text-[var(--accent)] transition-colors"
-            >
-              {isRegister ? '已有账号？去登录' : '没有账号？去注册'}
-            </button>
+            {IS_DEMO ? (
+              <p className="text-[11px] text-[var(--text-muted)]">演示环境不开放注册</p>
+            ) : (
+              <button
+                onClick={toggleMode}
+                className="text-xs text-[#8b7355] hover:text-[var(--accent)] transition-colors"
+              >
+                {isRegister ? '已有账号？去登录' : '没有账号？去注册'}
+              </button>
+            )}
           </div>
         </div>
       </div>

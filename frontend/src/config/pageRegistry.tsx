@@ -3,9 +3,10 @@ import {
   LayoutDashboard, ListTodo, Calendar, StickyNote, Timer, PlayCircle, BarChart3,
   BookOpen, Code2, Target, Layers, Bookmark, Heart, GitCompare, ShoppingCart,
   Trophy, Coins, MessageSquare, Compass, Bot, Package, Workflow, Settings,
-  AlarmClock, Route, Activity, FileText,
+  AlarmClock, Route, Activity, FileText, Sparkles, Mic,
 } from 'lucide-react';
 import type { ActiveView } from '../stores/uiStore';
+import { isPageEnabled } from './appProfile';
 
 function lazyPage<T extends React.ComponentType>(loader: () => Promise<Record<string, T>>, exportName: string): React.LazyExoticComponent<T> {
   return React.lazy(async () => {
@@ -23,6 +24,9 @@ const MarkdownNotesPage = lazyPage(() => import('../components/mdnotes/MarkdownN
 const PomodoroPage = lazyPage(() => import('../components/pomodoro/PomodoroPage'), 'PomodoroPage');
 const TimeCenterPage = lazyPage(() => import('../components/timecenter/TimeCenterPage2'), 'TimeCenterPage2');
 const VideoPage = lazyPage(() => import('../components/video/VideoPage'), 'VideoPage');
+const VideoPreviewPage = lazyPage(() => import('../components/showcase/VideoPreviewPage'), 'VideoPreviewPage');
+const MediaShowcasePage = lazyPage(() => import('../components/showcase/MediaShowcasePage'), 'MediaShowcasePage');
+const TranscribeShowcasePage = lazyPage(() => import('../components/showcase/TranscribeShowcasePage'), 'TranscribeShowcasePage');
 const LearningPathPage = lazyPage(() => import('../components/learning/LearningPathPage'), 'LearningPathPage');
 const JourneyPage = lazyPage(() => import('../components/journey/JourneyPage'), 'JourneyPage');
 const HealthPage = lazyPage(() => import('../components/health/HealthPage'), 'HealthPage');
@@ -65,6 +69,9 @@ const PAGE_LOADERS: Record<ActiveView, () => Promise<unknown>> = {
   pomodoro: () => import('../components/pomodoro/PomodoroPage'),
   timecenter: () => import('../components/timecenter/TimeCenterPage2'),
   video: () => import('../components/video/VideoPage'),
+  videopreview: () => import('../components/showcase/VideoPreviewPage'),
+  media: () => import('../components/showcase/MediaShowcasePage'),
+  transcribe: () => import('../components/showcase/TranscribeShowcasePage'),
   learning: () => import('../components/learning/LearningPathPage'),
   journey: () => import('../components/journey/JourneyPage'),
   health: () => import('../components/health/HealthPage'),
@@ -107,7 +114,7 @@ export function preloadPage(id: ActiveView): void {
  * 其余 15 项确认是静态占位：交互元素为 0，或者数据是 MOCK_*（如 tokens 页的
  * MOCK_MODELS / WEEKLY_SPEND，三个「交互」只是切换 today/week/month 标签）。
  */
-export const PAGES: PageEntry[] = [
+const ALL_PAGES: PageEntry[] = [
   { id: 'dashboard', path: '', component: DashboardPage, label: '工作台', icon: <LayoutDashboard size={20} />, color: 'text-[var(--accent)]' },
   { id: 'todo', path: 'todo', component: TodoPage, label: '待办事项', icon: <ListTodo size={20} />, color: 'text-[var(--info)]' },
   // calendar = 日历看板（月视图，传统日历格子）
@@ -119,6 +126,9 @@ export const PAGES: PageEntry[] = [
   { id: 'pomodoro', path: 'pomodoro', component: PomodoroPage, label: '番茄钟', icon: <Timer size={20} />, color: 'text-[var(--accent)]' },
   { id: 'timecenter', path: 'timecenter', component: TimeCenterPage, label: '时间中心', icon: <AlarmClock size={20} />, color: 'text-[var(--accent)]' },
   { id: 'video', path: 'video', component: VideoPage, label: 'IT视频站', icon: <PlayCircle size={20} />, color: 'text-[#ec4899]' },
+  { id: 'videopreview', path: 'video-preview', component: VideoPreviewPage, label: '视频检索', icon: <PlayCircle size={20} />, color: 'text-[#ec4899]' },
+  { id: 'media', path: 'media', component: MediaShowcasePage, label: 'P2 Media', icon: <Sparkles size={20} />, color: 'text-[#ec4899]' },
+  { id: 'transcribe', path: 'transcribe', component: TranscribeShowcasePage, label: 'P2 Transcribe', icon: <Mic size={20} />, color: 'text-[#0f766e]' },
   { id: 'learning', path: 'learning', component: LearningPathPage, label: '学习路径', icon: <Route size={20} />, color: 'text-[var(--success)]' },
   { id: 'bookmarks', path: 'bookmarks', component: BookmarksPage, label: '书签收藏', icon: <Bookmark size={20} />, color: 'text-[#06b6d4]' },
   { id: 'journey', path: 'journey', component: JourneyPage, label: '学习轨迹', icon: <Activity size={20} />, color: 'text-[var(--accent)]' },
@@ -140,6 +150,10 @@ export const PAGES: PageEntry[] = [
   { id: 'hermes', path: 'hermes', component: HermesPage, label: 'Hermes', icon: <Workflow size={20} />, color: 'text-[var(--accent)]', dev: true },
   { id: 'settings', path: 'settings', component: SettingsPage, label: '设置', icon: <Settings size={20} />, color: 'text-[var(--text-secondary)]' },
 ];
+
+// 可见页面按产品形态裁剪；PAGE_LOADERS / PAGE_MAP 仍保留完整 id，
+// 避免完整版按需加载与类型推导被 Lite 分支污染。
+export const PAGES: PageEntry[] = ALL_PAGES.filter((page) => isPageEnabled(page.id));
 
 PAGES.forEach((page) => {
   page.preload = () => PAGE_LOADERS[page.id]?.();

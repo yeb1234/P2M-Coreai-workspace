@@ -6,6 +6,7 @@ import { BUILT_IN_THEME_IDS, THEME_PRESETS, applyTheme } from '../../lib/themes'
 import { NotificationPanel } from './NotificationPanel';
 import { toLocalDateString } from '../../lib/date';
 import { useClockNow } from '../../hooks/useClockNow';
+import { IS_LITE } from '../../config/appProfile';
 
 function LiveClock({ active, onClick }: { active: boolean; onClick: () => void }) {
   const time = useClockNow();
@@ -182,6 +183,7 @@ export const Header: React.FC = () => {
           </div>
 
           <div className="relative flex items-center gap-1">
+            {!IS_LITE && (
             <button
               ref={favoritesButtonRef}
               onClick={() => setShowFavorites((v) => !v)}
@@ -195,8 +197,9 @@ export const Header: React.FC = () => {
                 </span>
               )}
             </button>
+            )}
 
-            {showFavorites &&
+            {!IS_LITE && showFavorites &&
               createPortal(
                 <div
                   ref={favoritesRef}
