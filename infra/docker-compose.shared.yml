@@ -1,0 +1,105 @@
+# 共享数据底座：一套 2GB PostgreSQL + 一套 Redis
+#
+# P1 / P2 / P3 / P4 各用一个 database + role：
+#   P1: db_p1 / u_p1    Redis DB 0
+#   P2: db_p2 / u_p2    Redis DB 1
+#   P3: db_p3 / u_p3    Redis DB 2
+#   P4: db_p4 / u_p4    Redis DB 3
+#
+# 用法（在仓库根目录）：
+#   cp infra/shared/.env.example infra/shared/.env
+#   docker compose --env-file infra/shared/.env \
+#     -f infra/docker-compose.shared.yml up -d
+#
+# 首次启动时 init 脚本会按 env 里的 P1..P4 口令建库建角色；
+# 已有同名库不会覆盖。之后 P2 Lite 只连 db_p2，不需要 vector 扩展。
+
+name: p2shared
+
+services:
+  postgres:
+    # 与 P1 最终稿的 postgres:16 对齐；Lite 不依赖 pgvector，不需要 17 的镜像特性
+    image: docker.m.daocloud.io/library/postgres:16-alpine
+    container_name: shared-postgres
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    environment:
+      POSTGRES_USER: ${SHARED_PG_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${SHARED_PG_SUPERPASSWORD:?set SHARED_PG_SUPERPASSWORD in infra/shared/.env}
+      POSTGRES_DB: postgres
+      # init 脚本读取；不配的项目会跳过，不会阻塞启动
+      P1_DB_PASSWORD: ${P1_DB_PASSWORD:-}
+      P2_DB_PASSWORD: ${P2_DB_PASSWORD:-}
+      P3_DB_PASSWORD: ${P3_DB_PASSWORD:-}
+      P4_DB_PASSWORD: ${P4_DB_PASSWORD:-}
+      P2_DEMO_DB_PASSWORD: ${P2_DEMO_DB_PASSWORD:-}
+      P1_APP_PASSWORD: ${P1_APP_PASSWORD:-}
+    volumes:
+      - shared_pgdata:/var/lib/postgresql/data
+      - ./shared/postgresql.2g.conf:/etc/postgresql/postgresql.conf:ro
+      - ./shared/init-shared-databases.sh:/docker-entrypoint-initdb.d/10-shared-databases.sh:ro
+    ports:
+      # 仅本机调试；云上不要发布，直接走 p2-shared 内部网络
+      - "127.0.0.1:${SHARED_PG_PORT:-12500}:5432"
+    mem_limit: ${SHARED_PG_MEM_LIMIT:-2g}
+    cpus: ${SHARED_PG_CPUS:-1.5}
+    shm_size: 256m
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SHARED_PG_SUPERUSER:-postgres} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - shared
+
+  redis:
+    image: docker.m.daocloud.io/library/redis:7-alpine
+    container_name: shared-redis
+    command:
+      - redis-server
+      - --requirepass
+      - ${SHARED_REDIS_PASSWORD:?set SHARED_REDIS_PASSWORD in infra/shared/.env}
+      - --maxmemory
+      - ${SHARED_REDIS_MAXMEMORY:-256mb}
+      # 队列任务不能像缓存一样被 LRU 清掉；满了宁可写入失败也不要静默丢任务
+      - --maxmemory-policy
+      - noeviction
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+    environment:
+      REDISCLI_AUTH: ${SHARED_REDIS_PASSWORD:?set SHARED_REDIS_PASSWORD in infra/shared/.env}
+    volumes:
+      - shared_redisdata:/data
+    ports:
+      - "127.0.0.1:${SHARED_REDIS_PORT:-12600}:6379"
+    mem_limit: ${SHARED_REDIS_MEM_LIMIT:-256m}
+    cpus: ${SHARED_REDIS_CPUS:-0.5}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - shared
+
+networks:
+  shared:
+    name: ${SHARED_NETWORK:-p2-shared}
+    driver: bridge
+
+volumes:
+  shared_pgdata:
+  shared_redisdata:

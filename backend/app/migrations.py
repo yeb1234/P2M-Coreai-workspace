@@ -93,6 +93,41 @@ def _claim_legacy_ownership(conn) -> None:
             logger.warning("设置 %s.user_id NOT NULL 失败（可能仍有空归属）: %s", table, exc)
 
 
+def _ensure_note_surface(conn) -> None:
+    """notes 表补 surface（sticky / md）。create_all 不会给旧表加列。"""
+    conn.execute(
+        text(
+            "ALTER TABLE IF EXISTS notes ADD COLUMN IF NOT EXISTS "
+            "surface VARCHAR(20) NOT NULL DEFAULT 'md'"
+        )
+    )
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_notes_surface ON notes (surface)"))
+
+
+def upgrade_postgres_lite(engine) -> None:
+    """P2 Lite 的 PostgreSQL 自举：只用普通 OLTP 表，不装 pgvector。
+
+    Lite 跑在共享 2G PG 的独立 database（db_p2）上，和 P1/P3/P4 共用实例。
+    这里刻意不做三件事：
+    1. 不执行 CREATE EXTENSION vector / pg_trgm；
+    2. 不创建 content_chunks / content_chunks_history；
+    3. 不跑需要 DDL 锁的向量表迁移。
+    业务表本身由 Base.metadata.create_all 建，视频表保留但为空，方便同一套
+    ORM 模型在 future 版本兼容；没有向量列，也就没有 HNSW 索引常驻内存。
+    """
+    from app import models  # noqa: F401  确保 metadata 已注册
+
+    with engine.begin() as conn:
+        # 只做一次轻量锁超时保护，避免共享实例上被别的项目长事务拖住。
+        conn.execute(text("SET LOCAL lock_timeout = '20s'"))
+
+    Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("SET LOCAL lock_timeout = '20s'"))
+        _ensure_note_surface(conn)
+    logger.info("P2 Lite PostgreSQL schema 就绪（无 pgvector / 无 content_chunks）")
+
+
 def upgrade_postgres(engine) -> None:
     """建扩展、建表、建索引。可重复执行。"""
     from app import models  # noqa: F401  确保 metadata 已注册
@@ -114,6 +149,9 @@ def upgrade_postgres(engine) -> None:
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP",
         ):
             conn.execute(text(statement))
+
+        # ---- notes：前端功能面 ----
+        _ensure_note_surface(conn)
 
         conn.execute(
             text("ALTER TABLE watch_history ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)")

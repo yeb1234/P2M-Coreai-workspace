@@ -1,6 +1,6 @@
 # Backend（FastAPI）
 
-> 状态：现行（最后校对 2026-11-16）
+> 状态：现行（最后校对 2026-11-20）
 
 本地视频学习工作台的服务端：API、Agent 链路、检索与记忆、AI 任务队列消费者。与前端、PostgreSQL/pgvector、Redis 一起由根目录 `docker-compose.yml` 编排；本目录只放后端代码。
 
@@ -22,15 +22,15 @@ backend/
   app/
     main.py          FastAPI 装配、中间件、异常处理、静态文件挂载
     database.py      引擎 / Session / ensure_runtime_schema / 健康检查
-    models.py        21 个 ORM 模型
+    models.py        34 个 ORM 模型
     worker.py        RQ SimpleWorker，消费 ai_jobs + background 两个队列
     auth.py          密码哈希 / 校验、登录令牌
-    routers/         14 个业务路由（前缀见下表）
-    services/        39 个服务模块（检索 / 转录 / 记忆 / Agent / 管理）
+    routers/         19 个业务路由（前缀见下表）
+    services/        61 个服务模块（检索 / 转录 / 记忆 / Agent / 管理）
     agents/          chat_agent、plan_agent、tools
     core/            CSRF、异常处理、观测等中间件
   alembic/           迁移版本（2 个 revision，链条见「数据与迁移」）
-  tests/             5 个 pytest 测试文件
+  tests/             19 个测试文件
   scripts/           回填 / 建块 / 去重 / 迁移 / 回归脚本
 ```
 
@@ -39,14 +39,19 @@ backend/
 | 前缀 | 文件 | 职责 |
 | --- | --- | --- |
 | `/api/admin` | `admin.py` | 队列管理、缩略图、嵌入覆盖率、后台任务、库管理 |
+| `/api/agent-actions` | `agent_actions.py` | Agent 写动作回执、审计与撤回 |
 | `/api/ai-jobs` | `ai_jobs.py` | AI 任务中心：列表 / 取消 / 重试 / 批量插队 |
+| `/api/asset-registry` | `asset_registry.py` | 配置资产版本库（Git 风格读写） |
 | `/api/assistant` | `assistant.py` | 对话 SSE 流式、会话历史、记忆读写 |
 | `/api/auth` | `auth.py` | 注册 / 登录 / 登出、Cookie 会话 |
 | `/api/calendar-events` | `calendar_events.py` | 日历事件 |
 | `/api/categories` | `categories.py` | 课程 / 分类 |
+| `/api/interview` | `interview.py` | 面试题库、练习与评估 |
 | `/api/learning` | `learning.py` | 学习路径、学习轨迹、画像 |
+| `/api/mcp` | `mcp.py` | MCP HTTP 工具清单与调用 |
 | `/api/memory` | `memory_admin.py` | 长期记忆条目管理 |
-| `/api/notes` | `notes.py` | 笔记共享 / 私有 |
+| `/api/notes` | `notes.py` | 笔记共享 / 私有、笔记 AI |
+| `/api/ops` | `ops.py` | 转写控制面：扫描、队列、监控快照 |
 | `/api/schedule-items` | `schedule_items.py` | 待办 / 提醒 / 番茄排程 |
 | `/api/search` | `search.py` | 混合检索（三路召回 + RRF + 重排） |
 | `/api/user-data` | `user_data.py` | 用户档案 KV |
@@ -113,10 +118,10 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```bash
 cd backend
 python -m compileall app
-pytest tests/
+python scripts/run_unit_tests.py
 ```
 
-`backend/tests` 共 5 个 pytest 文件；仓库根 `tests/` 下只有 `contracts` 与 `e2e`，后端没有 API 级集成测试。
+`backend/tests` 共 19 个测试文件、99 项断言，由 `scripts/run_unit_tests.py` 统一执行；仓库根 `tests/` 下只有 `contracts` 与 `e2e`，后端没有 API 级集成测试。
 
 回归脚本：
 

@@ -29,12 +29,19 @@ from app.agents.tool_runtime import build_governed_toolset
 from app.agents.tools import (
     ask_user,
     begin_search_trace,
+    current_run_id,
     set_tool_note_context,
     set_tool_run,
     set_tool_user,
     take_search_hits,
 )
-from app.database import SessionLocal
+from app.agents.write_guard import (
+    WRITE_TOOL_LABELS,
+    WRITE_TOOL_NAMES,
+    clear_write_grants,
+    grant_write,
+)
+from app.database import SessionLocal, settings
 from app.models import AgentRun, Video
 from app.services.learning_context import active_path_text
 from app.services.agent_actions import actions_for_run
@@ -128,6 +135,36 @@ BASE_PROMPT = """你是「灵境小助手」，一个长在本地视频学习平
 默认 150-400 字。除非用户明确要求展开，否则不要写长文。"""
 
 
+LITE_BASE_PROMPT = """你是「灵境小助手 Lite」，P2 Lite 的面试与学习 Agent。
+
+## 这个版本没有什么
+- 没有视频库、视频字幕、视频检索，也没有向量索引；不要声称能找视频或课程片段。
+- 没有学习路径规划器；不要承诺生成或调整学习路径。
+- 你的知识来自通用模型能力、面试题库、知识库文章、私人笔记和用户档案；
+  Lite 站内的 Todo、日历、笔记、面试练习和使用痕迹，只能通过
+  `get_lite_learning_status` 工具读取，不能凭空编造。
+
+## 你的职责
+1. 讲解面试题：先给结论，再给关键点、易错点和可能的追问。
+2. 用户问「有没有类似题」时，检索题库；问概念时，检索知识库文章。
+3. 用户要保存笔记、建待办或排日历，直接调用对应工具，由确认卡兜底。
+4. 用户问学习安排时，结合当前时间、笔记和已确认的目标给可执行的小步骤，不编造课程。
+5. 用户问「我最近学得怎么样 / 学习状态 / 坚持得如何」时，必须先调用
+   `get_lite_learning_status`，只基于它返回的站内记录评价；记录少就直说
+   「这段时间站内数据很少」，不要用视频观看、课程进度或学习时长来补。
+
+## 硬性规则
+- 不引用视频标题、时间点或「第几节课」，不编造站内内容。
+- 检索 0 条就如实说没找到，并建议换关键词或直接讲通用解法。
+- 中文回答，技术术语保留英文原名；不用表情符号堆砌。
+- 默认 150-400 字；用户明确要求展开时再写长。
+
+## 主动澄清与确认
+有 `ask_user` 时，仅在意图存在两种以上合理解释、或缺少执行必需信息时使用。
+保存笔记、创建日历、创建 Todo 等写操作不要预先询问；直接调工具，运行时确认闸门会暂停。
+"""
+
+
 @dataclass
 class AgentContext:
     session_id: str
@@ -174,6 +211,8 @@ _VIDEO_SEEKING_RE = re.compile(
 
 
 def _needs_video_references(intent: str | None, message: str = "") -> bool:
+    if settings.is_lite:
+        return False
     if intent == _COURSE_INTENT:
         return True
     # 问题解答的正文来自通用知识，相关视频是回答后的延伸入口；
@@ -224,19 +263,10 @@ _HITL_CHECKPOINTER = MemorySaver()
 
 # 写操作的人工确认不能只靠提示词：模型完全可能直接传 confirm=true。
 # 这里在图层面加一道闸门，模型刚生成 tool_calls、工具还没执行时先中断。
+# 写工具名单与许可逻辑集中在 write_guard，工具侧会消费一次性许可。
 # 注意：hook 在 LangGraph 图节点里运行，不能把它包进线程池，否则会丢暂停上下文。
-_WRITE_TOOL_NAMES = {
-    "save_note",
-    "summarize_and_save_note",
-    "create_calendar_event",
-    "create_todo",
-}
-_WRITE_TOOL_LABELS = {
-    "save_note": "保存笔记",
-    "summarize_and_save_note": "总结并另存笔记",
-    "create_calendar_event": "创建日历日程",
-    "create_todo": "创建 Todo",
-}
+_WRITE_TOOL_NAMES = WRITE_TOOL_NAMES
+_WRITE_TOOL_LABELS = WRITE_TOOL_LABELS
 
 
 def _tool_call_name(call) -> str:
@@ -270,8 +300,68 @@ def _write_call_preview(name: str, args: dict) -> str:
         return f"《{title or '未命名日程'}》{f'（{when}）' if when else ''}"
     if name == "create_todo":
         due = str(args.get("due_date") or "").strip()
-        return f"《{title or '未命名 Todo'}》{f'（截止 {due}）' if due else ''}"
+        try:
+            rounds = max(0, int(args.get("pomodoro_rounds") or 0))
+        except (TypeError, ValueError):
+            rounds = 0
+        details = []
+        if due:
+            details.append(f"截止 {due}")
+        if rounds:
+            details.append(f"预计 {rounds} 个番茄")
+        suffix = f"（{'，'.join(details)}）" if details else ""
+        return f"《{title or '未命名 Todo'}》{suffix}"
     return title or name
+
+
+def _is_write_approved(selected: str, label_text: str, text: str) -> bool:
+    """判断确认卡的选择是否真的是“确认”。
+
+    不能只做 `"确认" in text`：用户回“不确认”“取消确认”时同样包含
+    “确认”两个字，会被误判成批准。这里先排除否定词，再要求确认语义。
+    """
+    if selected == "B":
+        return False
+    if selected == "A" or "确认" in label_text:
+        return True
+    candidate = text.strip()
+    negative = ("不确认", "不要", "不用", "取消", "否", "别")
+    return bool(candidate) and "确认" in candidate and not any(
+        word in candidate for word in negative
+    )
+
+
+def _pending_write_step(steps: list[dict] | None) -> dict | None:
+    """从审计轨迹里找回「已弹确认卡、但工具还没执行」的那一步。
+
+    这层兜底只服务于写操作：checkpoint 丢失后仍能凭这一步的参数完成
+    用户已经确认过的写入，不需要重新问一遍模型，也不会重新生成动作。
+    """
+    for step in reversed(steps or []):
+        if not isinstance(step, dict):
+            continue
+        if step.get("tool") not in WRITE_TOOL_NAMES:
+            continue
+        if step.get("ok") is None:
+            return step
+    return None
+
+
+def _write_result_ok(result: str) -> bool:
+    """工具返回的是自然语言；用稳定的失败前缀判断，而不是假设一定抛异常。"""
+    text = str(result or "").strip()
+    return not any(
+        marker in text
+        for marker in (
+            "失败",
+            "需要用户明确确认",
+            "请先登录",
+            "没有可保存的内容",
+            "正文太长",
+            "Error:",
+            "Traceback",
+        )
+    )
 
 
 def _write_confirmation_hook(state):
@@ -340,18 +430,11 @@ def _write_confirmation_hook(state):
         if text in {"A", "a", "A.", "a."}:
             selected = "A"
 
-    approved = (
-        selected == "A"
-        or "确认" in label_text
-        or (not selected and text and "确认" in text)
-    ) and selected != "B"
+    approved = _is_write_approved(selected, label_text, text)
     if approved:
-        # 人工确认通过后，把工具参数里的 confirm 置为 True，避免模型
-        # 原本传了 confirm=false 又被工具自身的二次确认挡回来。
-        if isinstance(write_calls[0], dict):
-            call_args = write_calls[0].setdefault("args", {})
-            if isinstance(call_args, dict):
-                call_args["confirm"] = True
+        # 用户确认后发放一次性许可；工具侧只认这个许可，不再认模型传入的
+        # confirm=true。这样同步 /chat 等没有 HITL 的链路也写不进去。
+        grant_write(name, current_run_id())
         return {}
 
     suffix = f" 你的补充：{text}" if text else ""
@@ -395,18 +478,19 @@ def _schedule_memory_extract(ctx: AgentContext, user_message: str, answer: str) 
 
 def build_system_prompt(ctx: AgentContext) -> str:
     """拼装系统提示词。任何一段取不到都跳过，不影响对话。"""
-    parts = [BASE_PROMPT]
+    parts = [LITE_BASE_PROMPT if settings.is_lite else BASE_PROMPT]
 
     if ctx.system_prompt_extra.strip():
         parts.append(f"## 用户自定义要求\n{ctx.system_prompt_extra.strip()}")
 
     db = SessionLocal()
     try:
-        try:
-            profile_data = get_profile_data(db, ctx.user_id)
-            parts.append(f"## 学习者真实数据\n{profile_summary_text(profile_data)}")
-        except Exception as exc:
-            logger.warning("画像读取失败: %s", exc)
+        if not settings.is_lite:
+            try:
+                profile_data = get_profile_data(db, ctx.user_id)
+                parts.append(f"## 学习者真实数据\n{profile_summary_text(profile_data)}")
+            except Exception as exc:
+                logger.warning("画像读取失败: %s", exc)
 
         # 档案和助手设定放在画像和记忆之前 —— 它们定义「这个人是谁」「我该怎么说话」，
         # 后面的数据都是在这个前提下解读的。
@@ -451,16 +535,16 @@ def build_system_prompt(ctx: AgentContext) -> str:
             logger.warning("长期记忆读取失败: %s", exc)
 
         # 路径是「用户自己确认过的节奏」，比模型临场发挥的建议优先级更高。
-        # 放进系统提示词而不是只做成工具，是为了让模型每轮都看得见，
-        # 不会在推荐时给出一套和已有路径冲突的方案。
-        try:
-            path_text = active_path_text(db, ctx.user_id)
-            if path_text:
-                parts.append(
-                    "## 当前学习路径（用户已确认，回答「下一步」时优先对齐它）\n" + path_text
-                )
-        except Exception as exc:
-            logger.warning("学习路径读取失败: %s", exc)
+        # Lite 没有学习路径模块，整段跳过。
+        if not settings.is_lite:
+            try:
+                path_text = active_path_text(db, ctx.user_id)
+                if path_text:
+                    parts.append(
+                        "## 当前学习路径（用户已确认，回答「下一步」时优先对齐它）\n" + path_text
+                    )
+            except Exception as exc:
+                logger.warning("学习路径读取失败: %s", exc)
     finally:
         db.close()
 
@@ -483,6 +567,8 @@ def build_system_prompt(ctx: AgentContext) -> str:
         "- 安排日历：create_calendar_event；创建待办：create_todo。\n"
         "- 用户明确要求执行时，直接调用对应工具，不要先用 ask_user 问「要不要」；\n"
         "  运行时会在真正写入前弹出确认卡，用户确认后才落库。\n"
+        "- 创建 Todo 时同时给 pomodoro_rounds：按任务内容估 1–8 个番茄，\n"
+        "  只是截止日期落在某一天并不等于要占满 24 小时，不要因此默认成 8 个。\n"
         "- 一次只执行一个写动作，不要把同一个计划拆成多个笔记、多个日程或多个 Todo。\n"
         "  Todo 只创建一个汇总大块，把步骤写进同一个 content，不拆碎项。\n"
         "- 没有真正调用工具时，绝对不要声称「确认卡已弹出」「已保存」「已加入日历」\n"
@@ -666,7 +752,17 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
     set_tool_note_context(ctx.note_context)
     # 同步路径原来没有清空检索轨迹，引用区可能继承上一轮命中；这里补上。
     begin_search_trace()
-    toolset = build_governed_toolset(ctx.intent, user_id=ctx.user_id)
+    # 同步 /chat 没有 HITL 确认卡，不能挂写工具。历史上这条链路曾让模型
+    # 直接调用 create_todo，用户没点确认却已经落库；现在只给它只读工具。
+    toolset = build_governed_toolset(
+        ctx.intent, user_id=ctx.user_id, allow_writes=False
+    )
+    system_prompt += (
+        "\n\n## 当前是同步只读接口\n"
+        "本接口没有确认卡，不能创建 Todo、日历、笔记，也不能执行任何写操作。\n"
+        "如果用户要求保存或创建，明确告诉他：请在聊天窗口中确认后执行，"
+        "或改用流式对话入口；不要声称已经写入。"
+    )
     logger.info(
         "agent_toolset",
         extra={
@@ -755,6 +851,135 @@ def run_chat(ctx: AgentContext, message: str) -> AgentResult:
         db.close()
 
 
+def _recover_stale_write(
+    *,
+    ctx: AgentContext,
+    resume: dict,
+    run_id: str,
+    started: float,
+    tools: list,
+):
+    """确认卡还在、但 LangGraph 的内存 checkpoint 已经丢了时的兜底。
+
+    典型场景：Lite 后端在用户点「确认执行」前被重建/重启。卡片来自旧进程，
+    MemorySaver 里的暂停点随进程消失，直接 resume 会断开 SSE，页面只剩一句
+    「请求失败」。这里用 AgentRun.steps 里已保存的工具名和参数，把用户已经
+    确认过的这一次写入直接执行掉；没有确认（B）就只记录取消，绝不补写。
+    """
+    db = SessionLocal()
+    try:
+        run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
+        if run is None:
+            yield {"type": "error", "message": "找不到这条确认对应的执行记录，请重新发起。"}
+            return
+        if run.status == "completed":
+            yield {"type": "error", "message": "这条确认已经执行过了，不需要重复提交。"}
+            return
+
+        steps = [dict(item) for item in (run.steps or []) if isinstance(item, dict)]
+        pending = _pending_write_step(steps)
+        if pending is None:
+            run.status = "failed"
+            run.error = "HITL checkpoint lost and no pending write step"
+            db.commit()
+            yield {
+                "type": "error",
+                "message": "确认状态已失效（后端重启过），且没有找到待执行的写入。请重新发起这条操作。",
+            }
+            return
+
+        name = str(pending.get("tool") or "")
+        args = pending.get("args") if isinstance(pending.get("args"), dict) else {}
+        selected = str(resume.get("selected") or "").strip()
+        text = str(resume.get("text") or "").strip()
+        approved = _is_write_approved(selected, "", text)
+
+        if not approved:
+            result = "已取消写入，没有保存任何内容。需要调整标题、正文或保存位置时，直接告诉我。"
+            pending["ok"] = False
+            pending["result_preview"] = "用户取消"
+            latency_ms = round((time.perf_counter() - started) * 1000)
+            run.status = "completed"
+            run.output_text = result[:4000]
+            run.steps = steps
+            run.latency_ms = latency_ms
+            run.error = None
+            db.commit()
+            yield {"type": "token", "text": result}
+            yield {
+                "type": "done",
+                "run_id": run_id,
+                "session_id": ctx.session_id,
+                "latency_ms": latency_ms,
+                "steps": steps,
+                "actions": [],
+                "references": [],
+                "mentioned_videos": [],
+                "provider": "hitl-recovery",
+            }
+            return
+
+        tool = next((item for item in tools if getattr(item, "name", "") == name), None)
+        if tool is None:
+            run.status = "failed"
+            run.error = f"pending write tool unavailable: {name}"
+            db.commit()
+            yield {
+                "type": "error",
+                "message": f"确认状态已恢复，但当前执行器没有挂载 {name}，请重新发起这条操作。",
+            }
+            return
+
+        grant_write(name, run_id)
+        try:
+            result = str(tool.invoke(args))
+        except Exception as exc:  # noqa: BLE001 - 工具失败也要变成可读回执
+            logger.exception("HITL 兜底执行写入失败")
+            result = f"写入失败：{exc}"
+        finally:
+            clear_write_grants(run_id)
+
+        ok = _write_result_ok(result)
+        pending["ok"] = ok
+        pending["result_preview"] = result[:200]
+        latency_ms = round((time.perf_counter() - started) * 1000)
+        run.status = "completed" if ok else "failed"
+        run.output_text = result[:4000]
+        run.steps = steps
+        run.latency_ms = latency_ms
+        run.error = None if ok else result[:1000]
+        db.commit()
+
+        logger.info(
+            "HITL 兜底完成写入",
+            extra={
+                "extra_fields": {
+                    "run_id": run_id,
+                    "tool": name,
+                    "ok": ok,
+                    "provider": "hitl-recovery",
+                }
+            },
+        )
+
+        actions = actions_for_run(db, user_id=ctx.user_id, run_id=run_id)
+        yield {"type": "token", "text": result}
+        yield {
+            "type": "done",
+            "run_id": run_id,
+            "session_id": ctx.session_id,
+            "latency_ms": latency_ms,
+            "steps": steps,
+            "actions": actions,
+            "references": [],
+            "mentioned_videos": [],
+            "provider": "hitl-recovery",
+        }
+    finally:
+        db.close()
+        clear_write_grants(run_id)
+
+
 async def stream_chat(
     ctx: AgentContext,
     message: str,
@@ -800,6 +1025,25 @@ async def stream_chat(
 
     # 按兜底方案决定第一顺位（原来写死 external，设置页的「兜底方案」形同虚设）
     order = fallback_order()
+
+    # 确认卡跨进程失效：MemorySaver 只在当前进程里有暂停点。Lite 重建/重启后，
+    # 旧卡片再点「确认执行」会拿不到 checkpoint，直接 resume 只会断开 SSE。
+    # 这里先用审计轨迹里的待写参数兜底，能写就直接写，绝不把用户确认吞掉。
+    if resume:
+        checkpoint = await _HITL_CHECKPOINTER.aget_tuple(
+            {"configurable": {"thread_id": run_id}}
+        )
+        if checkpoint is None:
+            for event in _recover_stale_write(
+                ctx=ctx,
+                resume=resume,
+                run_id=run_id,
+                started=started,
+                tools=toolset.tools,
+            ):
+                yield event
+            return
+
     model = build_chat_model(order[0], temperature=0.3, streaming=True)
 
     messages: list[dict] = list(history)
@@ -1230,6 +1474,9 @@ async def stream_chat(
         finally:
             db.close()
 
+        # 正常结束/异常结束都清掉未消费的许可，避免同一 run_id 残留到下一轮。
+        clear_write_grants(run_id)
+
         yield {
             "type": "done",
             "run_id": run_id,
@@ -1254,6 +1501,7 @@ async def stream_chat(
                 db.commit()
         finally:
             db.close()
+        clear_write_grants(run_id)
         # 别再用一句「对话生成失败」把原因盖住：能分类的就告诉用户是什么问题
         # （两台通道都试过还在 this 里，说明确实没救了）
         detail = (

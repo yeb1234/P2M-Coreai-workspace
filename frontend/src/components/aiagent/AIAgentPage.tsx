@@ -23,9 +23,14 @@ import {
 import { PageTitle } from '../shared';
 import { useAIStore } from '../../stores';
 import { apiFetch } from '../../lib/videoApi';
+import { IS_LITE } from '../../config/appProfile';
 import {
   ASSISTANT_INTENTS,
   INTENT_PRIORITY,
+  LITE_ASSISTANT_INTENTS,
+  LITE_MCP_TOTAL_SNAPSHOT,
+  LITE_SKILL_SNAPSHOT,
+  LITE_TOOL_SNAPSHOT,
   PAGE_CONTEXT_FEATURES,
   MCP_NATIVE_TOOLS,
   MCP_TOTAL_SNAPSHOT,
@@ -83,8 +88,8 @@ interface McpManifest {
 type CapabilitySource = 'loading' | 'live' | 'partial' | 'snapshot';
 
 const INITIAL_CAPABILITIES: CapabilityResponse = {
-  tools: TOOL_SNAPSHOT,
-  skills: SKILL_SNAPSHOT,
+  tools: IS_LITE ? LITE_TOOL_SNAPSHOT : TOOL_SNAPSHOT,
+  skills: IS_LITE ? LITE_SKILL_SNAPSHOT : SKILL_SNAPSHOT,
 };
 
 function intentNumber(index: number): string {
@@ -153,7 +158,7 @@ export const AIAgentPage: React.FC = () => {
   }, [capabilities.skills]);
 
   const intentRows = useMemo(
-    () => ASSISTANT_INTENTS.map((intent) => ({
+    () => (IS_LITE ? LITE_ASSISTANT_INTENTS : ASSISTANT_INTENTS).map((intent) => ({
       intent,
       skill: skillByIntent.get(intent.id) ?? skillByName.get(intent.skill),
     })),
@@ -181,8 +186,18 @@ export const AIAgentPage: React.FC = () => {
     [mcpTools],
   );
 
-  const mcpTotal = mcpTools.length > 0 ? mcpTools.length : MCP_TOTAL_SNAPSHOT;
+  const mcpTotal = mcpTools.length > 0
+    ? mcpTools.length
+    : (IS_LITE ? LITE_MCP_TOTAL_SNAPSHOT : MCP_TOTAL_SNAPSHOT);
   const mcpReadOnlyCount = Math.max(0, mcpTotal - MCP_NATIVE_TOOLS.length);
+  const pageContextFeatures = IS_LITE
+    ? PAGE_CONTEXT_FEATURES.filter((item) => item.page === '便签 / 笔记' || item.page === '面试题库')
+    : PAGE_CONTEXT_FEATURES;
+  const runtimePromptLayers = IS_LITE
+    ? RUNTIME_PROMPT_LAYERS.filter(
+        (layer) => layer.title !== '学习者真实数据' && layer.title !== '当前学习路径',
+      )
+    : RUNTIME_PROMPT_LAYERS;
 
   const sourceLabel =
     capabilitySource === 'loading' ? '读取注册表…'
@@ -339,7 +354,7 @@ export const AIAgentPage: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <code className="text-[10px] text-[var(--text-secondary)]">{rule.id}</code>
                   <span className="text-xs font-medium text-[var(--text-primary)]">{rule.label}</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">→ {rule.skill}</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">→ {skillByIntent.get(rule.id)?.name ?? rule.skill}</span>
                 </div>
                 <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">{rule.condition}</p>
                 {rule.note && <p className="mt-1 text-[10px] leading-relaxed text-[var(--warn)]">{rule.note}</p>}
@@ -361,7 +376,7 @@ export const AIAgentPage: React.FC = () => {
           右侧助手不是只认聊天框。打开这些页面时，它会带上当前对象的状态，再按页面能力回答；没有上下文的页面不会假装知道。
         </p>
         <div className="grid gap-2 md:grid-cols-2">
-          {PAGE_CONTEXT_FEATURES.map((item) => (
+          {pageContextFeatures.map((item) => (
             <div key={item.page} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-hover)] px-3 py-2.5">
               <p className="text-xs font-medium text-[var(--text-primary)]">{item.page}</p>
               <p className="mt-1 text-[10px] leading-relaxed text-[var(--text-muted)]">上下文：{item.context}</p>
@@ -401,7 +416,7 @@ export const AIAgentPage: React.FC = () => {
           <div className="flex items-start gap-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-hover)] px-3 py-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
             <Info size={13} className="mt-0.5 shrink-0 text-[var(--info)]" />
             <span>
-              这个输入框只是「用户自定义要求」层。右侧助手每一轮实际看到的是基础人设 + 这一层 + 画像、设定、记忆、学习路径、页面上下文和意图规则，完整顺序见下一块。
+              这个输入框只是「用户自定义要求」层。右侧助手每一轮实际看到的是基础人设 + 这一层 + 画像、设定、记忆、{IS_LITE ? '页面上下文' : '学习路径、页面上下文'}和意图规则，完整顺序见下一块。
             </span>
           </div>
         </div>
@@ -452,7 +467,7 @@ export const AIAgentPage: React.FC = () => {
           右侧助手每一轮不是只拿上面那段提示词。后端会依次拼装下面 8 层，页面上的输入框只是其中第 2 层——这也是为什么页面看起来和真实回答策略不完全是一回事。
         </p>
         <div className="grid gap-2 md:grid-cols-2">
-          {RUNTIME_PROMPT_LAYERS.map((layer, index) => (
+          {runtimePromptLayers.map((layer, index) => (
             <div key={layer.title} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-hover)] p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-card)] font-mono text-[10px] text-[var(--accent)]">

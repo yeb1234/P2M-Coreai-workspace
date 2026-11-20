@@ -4,10 +4,11 @@ import {
   Eye, EyeOff, FilePlus2, FileText, Folder, FolderPlus, Hash, Heading1, Heading2, Heading3,
   Image as ImageIcon, Italic, Link2, List, ListChecks, ListOrdered, ListTodo, Loader2, Maximize2,
   MoreHorizontal, PanelLeft, PanelRight,
-  Palette, Highlighter, Pilcrow, Plus, Quote, Redo2, RotateCcw, Search, Sparkles, Star, Strikethrough, Table2,
+  Palette, Highlighter, Pilcrow, Plus, Quote, RefreshCw, Redo2, RotateCcw, Search, Sparkles, Star, Strikethrough, Table2,
   Trash2, Type, Underline, Undo2, Upload, Wand2, X,
 } from 'lucide-react';
 import { useMdNotesStore } from '../../stores/mdNotesStore';
+import { useNoteAiStore } from '../../stores/noteAiStore';
 import type { MdNote, MdNoteFont, MdNoteSize } from '../../stores/mdNotesStore';
 import { htmlToMarkdown, markdownStats, plainText, renderMarkdown } from '../../lib/markdown';
 import {
@@ -20,9 +21,10 @@ import {
 import {
   createCalendarEventFromAi,
   createTodoFromAi,
-  runNoteAi,
 } from '../../lib/noteAiApi';
 import type { NoteAiAction, NoteAiEvent, NoteAiTodo } from '../../lib/noteAiApi';
+import { syncAllServerNotesIntoLocal } from '../../lib/serverNotesSync';
+import { useServerNotesAutoSync } from '../../hooks/useServerNotesAutoSync';
 import { flushAllPending } from '../../lib/idbStorage';
 import './MarkdownNotesPage.css';
 
@@ -218,6 +220,10 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
   const deleteFolder = useMdNotesStore((s) => s.deleteFolder);
   const moveNoteToFolder = useMdNotesStore((s) => s.moveNoteToFolder);
 
+  // 打开笔记页或从其他窗口切回来时，自动把服务端新笔记补齐；
+  // 不再要求用户先点右上角的“从服务端同步”。
+  useServerNotesAutoSync('md');
+
   const [mode, setMode] = useState<EditorMode>('split');
   const [filter, setFilter] = useState<Filter>({ kind: 'all' });
   const [query, setQuery] = useState('');
@@ -235,16 +241,26 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
   const [tagInput, setTagInput] = useState('');
   const [toast, setToast] = useState('');
   const [richLoadedId, setRichLoadedId] = useState<string | null>(null);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiView, setAiView] = useState<NoteAiAction>('summary');
-  const [aiLoading, setAiLoading] = useState<NoteAiAction | null>(null);
-  const [aiError, setAiError] = useState('');
-  const [aiSummary, setAiSummary] = useState('');
-  const [aiPolished, setAiPolished] = useState('');
-  const [aiTodos, setAiTodos] = useState<NoteAiTodo[]>([]);
-  const [aiEvents, setAiEvents] = useState<NoteAiEvent[]>([]);
-  const [createdActions, setCreatedActions] = useState<Record<string, boolean>>({});
-  const [creatingAction, setCreatingAction] = useState<string | null>(null);
+  const [syncingServerNotes, setSyncingServerNotes] = useState(false);
+
+  const aiSession = useNoteAiStore((s) => (activeNoteId ? s.sessions[activeNoteId] : undefined));
+  const openAiSession = useNoteAiStore((s) => s.openSession);
+  const closeAiSession = useNoteAiStore((s) => s.closeSession);
+  const setAiSessionError = useNoteAiStore((s) => s.setSessionError);
+  const markAiActionCreated = useNoteAiStore((s) => s.markCreatedAction);
+  const setAiCreatingAction = useNoteAiStore((s) => s.setCreatingAction);
+  const runAiSession = useNoteAiStore((s) => s.runSession);
+
+  const aiOpen = aiSession?.open ?? false;
+  const aiView = aiSession?.view ?? 'summary';
+  const aiLoading = aiSession?.loading ?? null;
+  const aiError = aiSession?.error ?? '';
+  const aiSummary = aiSession?.summary ?? '';
+  const aiPolished = aiSession?.polished ?? '';
+  const aiTodos = aiSession?.todos ?? [];
+  const aiEvents = aiSession?.events ?? [];
+  const createdActions = aiSession?.createdActions ?? {};
+  const creatingAction = aiSession?.creatingAction ?? null;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const richRef = useRef<HTMLDivElement>(null);
@@ -256,7 +272,6 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
   const richTimerRef = useRef<number | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
-  const aiRunRef = useRef(0);
 
   const activeNotes = useMemo(() => notes.filter((note) => !note.trashedAt), [notes]);
   const trashedNotes = useMemo(
@@ -273,17 +288,6 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
   useEffect(() => {
     setTagInput(activeNote?.tags.join(', ') || '');
     setRichLoadedId(null);
-    setAiOpen(false);
-    setAiView('summary');
-    setAiLoading(null);
-    setAiError('');
-    setAiSummary('');
-    setAiPolished('');
-    setAiTodos([]);
-    setAiEvents([]);
-    setCreatedActions({});
-    setCreatingAction(null);
-    aiRunRef.current += 1;
     if (activeNote && !historyRef.current[activeNote.id]) {
       historyRef.current[activeNote.id] = { stack: [activeNote.markdown], index: 0 };
     }
@@ -432,94 +436,72 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
       ? htmlToMarkdown(richRef.current.innerHTML)
       : activeNote.markdown;
     if (!source.trim()) {
-      setAiOpen(true);
-      setAiView(view);
-      setAiError('这篇笔记还是空的，先写点内容再让 AI 处理');
+      openAiSession(activeNote.id, view);
+      setAiSessionError(activeNote.id, '这篇笔记还是空的，先写点内容再让 AI 处理');
       return;
     }
 
-    const requestId = aiRunRef.current + 1;
-    aiRunRef.current = requestId;
-    setAiOpen(true);
-    setAiView(view);
-    setAiLoading(view);
-    setAiError('');
-
-    try {
-      const response = await runNoteAi({
-        action: view,
-        title: activeNote.title,
-        markdown: source,
-      });
-      if (aiRunRef.current !== requestId) return;
-      if (view === 'summary') {
-        setAiSummary(response.result.summary || '');
-      } else if (view === 'polish') {
-        setAiPolished(response.result.markdown || '');
-      } else {
-        setAiTodos(response.result.todos || []);
-        setAiEvents(response.result.events || []);
-        setCreatedActions({});
-      }
-    } catch (err) {
-      if (aiRunRef.current !== requestId) return;
-      setAiError(err instanceof Error ? err.message : 'AI 请求失败，请稍后重试');
-    } finally {
-      if (aiRunRef.current === requestId) setAiLoading(null);
-    }
-  }, [activeNote, aiLoading, locked, mode]);
+    await runAiSession(activeNote.id, view, {
+      title: activeNote.title,
+      markdown: source,
+    });
+  }, [activeNote, aiLoading, locked, mode, openAiSession, runAiSession, setAiSessionError]);
 
   const insertAiSummary = useCallback(() => {
     if (!activeNote || !aiSummary.trim()) return;
     const body = activeNote.markdown.replace(/\s*$/, '');
     setMarkdown(`${body}\n\n## AI 摘要\n\n${aiSummary.trim()}\n`);
     if (mode === 'rich') setRichLoadedId(null);
-    setAiOpen(false);
+    closeAiSession(activeNote.id);
     showToast('摘要已插入正文');
-  }, [activeNote, aiSummary, mode, setMarkdown, showToast]);
+  }, [activeNote, aiSummary, closeAiSession, mode, setMarkdown, showToast]);
 
   const replaceWithAiPolish = useCallback(() => {
     if (!activeNote || !aiPolished.trim()) return;
     if (!window.confirm('用 AI 润色版替换当前正文？原来的内容可以用撤销恢复。')) return;
     setMarkdown(aiPolished);
     if (mode === 'rich') setRichLoadedId(null);
-    setAiOpen(false);
+    closeAiSession(activeNote.id);
     showToast('已替换为润色版');
-  }, [activeNote, aiPolished, mode, setMarkdown, showToast]);
+  }, [activeNote, aiPolished, closeAiSession, mode, setMarkdown, showToast]);
 
   const createTodoAction = useCallback(async (item: NoteAiTodo, index: number) => {
+    const noteId = activeNote?.id;
+    if (!noteId) return;
     const key = `todo:${index}:${item.title}`;
     if (createdActions[key] || creatingAction) return;
-    setCreatingAction(key);
+    setAiCreatingAction(noteId, key);
     try {
       await createTodoFromAi(item);
-      setCreatedActions((prev) => ({ ...prev, [key]: true }));
+      markAiActionCreated(noteId, key);
       showToast('已加入待办');
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : '创建待办失败');
+      setAiSessionError(noteId, err instanceof Error ? err.message : '创建待办失败');
     } finally {
-      setCreatingAction(null);
+      setAiCreatingAction(noteId, null);
     }
-  }, [createdActions, creatingAction, showToast]);
+  }, [activeNote?.id, createdActions, creatingAction, markAiActionCreated, setAiCreatingAction, setAiSessionError, showToast]);
 
   const createEventAction = useCallback(async (item: NoteAiEvent, index: number) => {
+    const noteId = activeNote?.id;
+    if (!noteId) return;
     const key = `event:${index}:${item.title}`;
     if (createdActions[key] || creatingAction) return;
     if (!item.date) {
-      setAiError('这条日程没有明确日期，先把它写清楚再试');
+      setAiSessionError(noteId, '这条日程没有明确日期，先把它写清楚再试');
       return;
     }
-    setCreatingAction(key);
+    setAiCreatingAction(noteId, key);
     try {
       await createCalendarEventFromAi(item);
-      setCreatedActions((prev) => ({ ...prev, [key]: true }));
+      markAiActionCreated(noteId, key);
       showToast('已加入日历');
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : '创建日程失败');
+      setAiSessionError(noteId, err instanceof Error ? err.message : '创建日程失败');
     } finally {
-      setCreatingAction(null);
+      setAiCreatingAction(noteId, null);
     }
-  }, [createdActions, creatingAction, showToast]);
+  }, [activeNote?.id, createdActions, creatingAction, markAiActionCreated, setAiCreatingAction, setAiSessionError, showToast]);
 
   const syncRichNow = useCallback(() => {
     if (!activeNote || locked || mode !== 'rich' || !richRef.current) return;
@@ -846,6 +828,23 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
     showToast('已新建笔记');
   }, [createNote, filter, setActiveNote, showToast]);
 
+  const handleSyncServerNotes = useCallback(async () => {
+    if (syncingServerNotes) return;
+    const keepId = useMdNotesStore.getState().activeNoteId;
+    setSyncingServerNotes(true);
+    try {
+      const count = await syncAllServerNotesIntoLocal('md');
+      if (keepId && useMdNotesStore.getState().notes.some((note) => note.id === keepId && !note.trashedAt)) {
+        setActiveNote(keepId);
+      }
+      showToast(count > 0 ? `已从服务端同步 ${count} 篇笔记` : '服务端没有可同步的笔记');
+    } catch {
+      showToast('同步失败，请确认已登录');
+    } finally {
+      setSyncingServerNotes(false);
+    }
+  }, [setActiveNote, showToast, syncingServerNotes]);
+
   const handleDelete = useCallback(() => {
     if (!activeNote) return;
     if (!window.confirm(`把「${activeNote.title}」移入垃圾箱？`)) return;
@@ -929,6 +928,16 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
           </div>
           <button type="button" className="mdn-new-btn" onClick={handleNewNote} title="新建笔记">
             <Plus size={16} />
+          </button>
+          <button
+            type="button"
+            className="mdn-sync-btn"
+            onClick={handleSyncServerNotes}
+            disabled={syncingServerNotes}
+            title="从服务端同步笔记"
+            aria-label="从服务端同步笔记"
+          >
+            {syncingServerNotes ? <Loader2 size={15} className="mdn-spin" /> : <RefreshCw size={15} />}
           </button>
           <button
             type="button"
@@ -1257,12 +1266,12 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
                 type="button"
                 className={`mdn-ai-trigger${aiOpen ? ' is-active' : ''}`}
                 onClick={() => {
+                  if (!activeNoteId) return;
                   if (aiOpen) {
-                    setAiOpen(false);
+                    closeAiSession(activeNoteId);
                     return;
                   }
-                  setAiOpen(true);
-                  setAiView('summary');
+                  openAiSession(activeNoteId);
                 }}
                 disabled={locked}
                 title="打开笔记 AI 助手"
@@ -1401,7 +1410,7 @@ export const MarkdownNotesPage: React.FC<{ standalone?: boolean }> = ({ standalo
                       <small>读当前正文，结果不自动写库</small>
                     </div>
                   </div>
-                  <button type="button" className="mdn-ai-close" onClick={() => setAiOpen(false)} aria-label="关闭 AI 助手">
+                  <button type="button" className="mdn-ai-close" onClick={() => activeNoteId && closeAiSession(activeNoteId)} aria-label="关闭 AI 助手">
                     <X size={15} />
                   </button>
                 </div>

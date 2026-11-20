@@ -5,6 +5,8 @@
  * 想恢复把值改回 true、重新构建即可。
  */
 
+import { IS_LITE } from './appProfile';
+
 type FeatureFlags = {
   /** 回答下方的「相关片段」卡片。 */
   chatVideoReferences: boolean;
@@ -18,7 +20,7 @@ export const FEATURES: FeatureFlags = {
    * 但用户问代码/技术概念时，回答本身来自通用知识，底部一组
    * 站内视频卡片正好作为「想继续看」的延伸入口。其他意图仍然隐藏。
    */
-  chatVideoReferences: true,
+  chatVideoReferences: !IS_LITE,
 };
 
 /** 相关视频卡片只属于「问题解答」和明确要视频的「面试题讲解」。 */

@@ -4,7 +4,7 @@ import type { ScheduleItem } from '../../types';
 import { usePomodoroStore, useScheduleStore } from '../../stores';
 import { POMODORO_VIRTUAL_TODO_ID } from '../../stores/pomodoroStore';
 import { formatDate, formatDuration } from '../../lib/date';
-import { dateTimeParts, hasScheduleTime } from '../../lib/scheduleTime';
+import { dateTimeParts, hasScheduleTime, isAllDaySchedule } from '../../lib/scheduleTime';
 import { getSchedulePomodoroPlan, getPlannedMinutesForRounds } from '../../lib/pomodoroPlanning';
 import { playInteractionSound, playNotificationSound } from '../../lib/sounds';
 import { resetAmbientSoundSelection } from '../../hooks/useAmbientSoundController';
@@ -69,7 +69,9 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
     setEditing(false);
   }, [editValue, todo.id, todo.title, updateItem]);
 
-  // 有排期时才显示预计信息；未排期 todo 不显示预计，但点运行时走 1 轮
+  // 有排期时显示预计信息；日期型 Todo 不再按 24 小时反推 8 个，
+  // 没有显式轮次时按 1 个起算。
+  const allDay = isAllDaySchedule(todo);
   const effectiveRounds = hasTimeRange
     ? Math.max(1, todo.pomodoroRounds > 0 ? todo.pomodoroRounds : plannedRounds)
     : 0;
@@ -217,7 +219,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onEdit, onD
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock size={12} />
-                  {startParts?.time} - {dueParts?.time}
+                  {allDay ? '全天' : `${startParts?.time} - ${dueParts?.time}`}
                 </span>
               </>
             ) : null}

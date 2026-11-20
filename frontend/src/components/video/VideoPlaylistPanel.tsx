@@ -1,5 +1,4 @@
-import type React from 'react';
-import { CheckCircle2, FolderTree, List, Loader2, PlayCircle, RotateCcw, Sparkles } from 'lucide-react';
+import { FolderTree, List, PlayCircle } from 'lucide-react';
 import { getThumbnailUrl, type PlaylistItem, type VideoItem } from '../../lib/videoApi';
 import { getVideoAiCompletion } from '../../lib/videoAiStatus';
 import type { PlaylistScope } from './useVideoPlaylist';
@@ -12,16 +11,11 @@ interface VideoPlaylistPanelProps {
   playlistScope: PlaylistScope;
   width: number;
   isPlaying: boolean;
-  isProcessing: boolean;
-  jobStatus: string | null;
   autoPlay: boolean;
   onResizeStart: (clientX: number) => void;
-  onTriggerAi: () => void;
-  onCorrectSubtitles: () => void;
   onToggleAutoPlay: () => void;
   onToggleScope: () => void;
   onSelectItem: (item: PlaylistItem) => void;
-  footer?: React.ReactNode;
 }
 
 interface PlaylistRowProps {
@@ -79,16 +73,11 @@ export function VideoPlaylistPanel({
   playlistScope,
   width,
   isPlaying,
-  isProcessing,
-  jobStatus,
   autoPlay,
   onResizeStart,
-  onTriggerAi,
-  onCorrectSubtitles,
   onToggleAutoPlay,
   onToggleScope,
   onSelectItem,
-  footer,
 }: VideoPlaylistPanelProps) {
   const isMobile = useIsMobile(1024);
   const aiCompletion = getVideoAiCompletion(currentVideo);
@@ -115,34 +104,7 @@ export function VideoPlaylistPanel({
       </div>
 
       <div className="theme-surface rounded-xl border p-2">
-        <div className="auto-grid-compact">
-          {!isProcessing ? (
-            <>
-              <button
-                onClick={onTriggerAi}
-                className="flex min-w-0 items-center justify-center gap-1 rounded-lg bg-[var(--accent)] px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
-                title="生成字幕和总结，默认不做 AI 校对。"
-              >
-                {jobStatus === 'completed' ? <RotateCcw size={13} className="shrink-0" /> : <Sparkles size={13} className="shrink-0" />}
-                <span className="truncate">{jobStatus === 'completed' ? '重新生成' : '生成字幕'}</span>
-              </button>
-              <button
-                onClick={onCorrectSubtitles}
-                className="flex min-w-0 items-center justify-center gap-1 rounded-lg border border-[color-mix(in_srgb,var(--accent)_45%,var(--border-light))] bg-[var(--bg-card)] px-2 py-1.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-bg)]"
-                title="使用 large-v3 重新生成并交给灵境小助手校对。"
-              >
-                <CheckCircle2 size={13} className="shrink-0" />
-                <span className="truncate">校对字幕</span>
-              </button>
-            </>
-          ) : (
-            <div className="col-span-2 flex items-center justify-center gap-1 rounded-lg bg-[var(--accent-bg)] px-2 py-1.5 text-xs font-medium text-[var(--accent)]">
-              <Loader2 size={13} className="animate-spin" />
-              处理中
-            </div>
-          )}
-        </div>
-        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-[var(--text-muted)]">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-[var(--text-muted)]">
           <span className={`rounded-full border px-1.5 py-0.5 ${
             aiCompletion.complete
               ? 'border-[color-mix(in_srgb,var(--success)_35%,var(--border-light))] text-[var(--success)]'
@@ -152,9 +114,12 @@ export function VideoPlaylistPanel({
           }`}>
             {aiCompletion.label}
           </span>
-          <span>{aiCompletion.hasSubtitles ? '有字幕' : '缺字幕'}</span>
-          <span>{aiCompletion.hasSummary ? '有总结' : '缺总结'}</span>
+          <span>{aiCompletion.hasSubtitles ? '有字幕' : '无字幕'}</span>
+          <span>{aiCompletion.hasSummary ? '有总结' : '无总结'}</span>
         </div>
+        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+          转写、校对和批量任务已迁移到独立的 P2 Transcribe 控制台。
+        </p>
       </div>
 
       <div className="flex min-w-0 items-center gap-2">
@@ -192,7 +157,6 @@ export function VideoPlaylistPanel({
           />
         ))}
       </div>
-      {footer}
     </div>
   );
 }

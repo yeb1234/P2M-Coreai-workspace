@@ -120,12 +120,16 @@ def build_governed_toolset(
     intent: str | None,
     *,
     user_id: int | None = None,
+    allow_writes: bool = True,
     registry: ToolRegistry = DEFAULT_REGISTRY,
 ) -> GovernedToolSet:
     """按意图解析 Skill，并生成带预算的工具列表。
 
     `requires_login=True` 的工具在匿名请求里会被过滤掉：例如学习画像、
     学习路径、推荐、笔记都依赖当前用户，不能在没有用户上下文时读到别人的数据。
+
+    `allow_writes=False` 用于没有 HITL 确认能力的同步接口：只挂只读工具，
+    避免模型在用户看不到确认卡的情况下写入个人数据。
 
     登录用户额外获得一组个人动作工具（笔记 / 日历 / Todo）。它们不绑意图，
     否则「可以」这类承接上文的短回答会因为意图识别为空而拿不到写工具。
@@ -135,9 +139,10 @@ def build_governed_toolset(
         name
         for name in skill.tools
         if registry.spec(name).enabled
+        and (allow_writes or registry.spec(name).read_only)
         and (not registry.spec(name).requires_login or user_id is not None)
     ]
-    if user_id is not None:
+    if user_id is not None and allow_writes:
         for name in PERSONAL_ACTION_TOOLS:
             if name in allowed_names:
                 continue

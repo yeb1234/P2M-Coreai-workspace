@@ -15,6 +15,11 @@ from app.models import Note
 
 MAX_NOTE_TITLE = 240
 MAX_NOTE_CONTENT = 60_000
+NOTE_SURFACES = ("sticky", "md")
+
+
+def normalize_note_surface(value: str | None) -> str:
+    return value if value in NOTE_SURFACES else "md"
 
 
 def save_private_note(
@@ -23,6 +28,7 @@ def save_private_note(
     title: str,
     content: str,
     source: str = "assistant",
+    surface: str = "md",
     video_id: int | None = None,
     db: Session | None = None,
 ) -> Note:
@@ -43,6 +49,7 @@ def save_private_note(
             user_id=user_id,
             scope="private",
             source=source,
+            surface=normalize_note_surface(surface),
             created_at=now,
             updated_at=now,
         )

@@ -179,6 +179,9 @@ def undo_action(db: Session, *, user_id: int, action_id: str) -> dict[str, Any]:
                 db.delete(note)
                 db.flush()
         elif action.action_type == "calendar":
+            # 日历动作历史上写 calendar_events；现在 create_calendar_event 已统一
+            # 写 schedule_items（日历/周历/待办共用同一份数据）。两种都要兼容，
+            # 否则老动作能撤回、新动作撤不回。
             event = (
                 db.query(CalendarEvent)
                 .filter(CalendarEvent.id == str(action.target_id or ""), CalendarEvent.user_id == user_id)
@@ -186,6 +189,19 @@ def undo_action(db: Session, *, user_id: int, action_id: str) -> dict[str, Any]:
             )
             if event is not None:
                 db.delete(event)
+                db.flush()
+            item = (
+                db.query(ScheduleItem)
+                .filter(
+                    ScheduleItem.id == str(action.target_id or ""),
+                    ScheduleItem.user_id == user_id,
+                    ScheduleItem.type == "event",
+                )
+                .first()
+            )
+            if item is not None:
+                item.deleted_at = datetime.now().replace(second=0, microsecond=0)
+                item.updated_at = datetime.now()
                 db.flush()
         elif action.action_type == "todo":
             item = (

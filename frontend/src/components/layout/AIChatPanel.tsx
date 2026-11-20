@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal, Plus, History, Check, HelpCircle, ArrowRight, Undo2, FileText, CalendarDays, ListTodo } from 'lucide-react';
+import { AlertCircle, Bot, Send, X, Trash2, Loader2, PlayCircle, Wrench, SlidersHorizontal, Plus, History, Check, HelpCircle, ArrowRight, Undo2, FileText, CalendarDays, ListTodo, Copy } from 'lucide-react';
 import { useAIStore } from '../../stores';
 import type { ChatHitl, ChatAction } from '../../stores/aiStore';
 import { authFetch } from '../../lib/authApi';
@@ -13,9 +13,13 @@ import {
 } from '../../lib/videoApi';
 import { useDragResize } from '../../hooks/useDragResize';
 import { getAssistantPageContext } from '../../lib/assistantPageContext';
+import { syncAssistantActions, syncAssistantActionUndo } from '../../lib/assistantActionSync';
+import { type ServerNoteTarget } from '../../lib/serverNotesSync';
 import {
   DEFAULT_PROMPT_TEMPLATES,
   DEFAULT_SYSTEM_PROMPT,
+  LITE_PROMPT_TEMPLATES,
+  LITE_SYSTEM_PROMPT,
   buildAIRequestSystemPrompt,
   detectIntent,
 } from '../../lib/aiPromptDefaults';
@@ -23,9 +27,12 @@ import { playInteractionSound } from '../../lib/sounds';
 import { renderMarkdown } from '../../lib/markdown';
 import { useAssistantPageContext } from '../../hooks/useAssistantPageContext';
 import { canShowChatVideoReferences } from '../../config/features';
+import { IS_LITE } from '../../config/appProfile';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const ASSISTANT_SETTINGS_CHANGED_EVENT = 'p2m:assistant-settings-changed';
+const ACTIVE_PROMPT_TEMPLATES = IS_LITE ? LITE_PROMPT_TEMPLATES : DEFAULT_PROMPT_TEMPLATES;
+const ACTIVE_SYSTEM_PROMPT = IS_LITE ? LITE_SYSTEM_PROMPT : DEFAULT_SYSTEM_PROMPT;
 
 /** 正文里提到的视频：text 是回答原文里的书名号片段，video_id 用于跳转 */
 interface MentionedVideo {
@@ -100,7 +107,11 @@ function HitlCard({
     : hitl.selectedLabel || hitl.selected || '';
 
   return (
-    <div className="mt-2.5 rounded-[var(--r-2)] border border-[var(--accent)]/40 bg-[var(--bg-card)] p-2.5 shadow-sm">
+    <div
+      data-hitl-card
+      data-hitl-status={hitl.status}
+      className="mt-2.5 rounded-[var(--r-2)] border border-[var(--accent)]/40 bg-[var(--bg-card)] p-2.5 shadow-sm"
+    >
       <p className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-[var(--accent)]">
         <HelpCircle size={11} />
         {HITL_LABELS[hitl.kind] || '需要你确认'}
@@ -421,6 +432,8 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
   const [error, setError] = useState('');
   const [toolHint, setToolHint] = useState('');
   const [undoingActionId, setUndoingActionId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copiedTimerRef = useRef<number | null>(null);
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   // 本轮没检索到片段时，保留上一轮的引用但标记出来 —— 直接清空的话
   // 用户会以为「推荐的东西没了」，而留着不标记又会让人误当成这轮的依据。
@@ -455,6 +468,41 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
     setHistoryOpen(false);
   };
 
+  const copyAssistantMessage = async (messageId: string, text: string) => {
+    const fallbackCopy = () => {
+      // 非安全上下文/旧浏览器/剪贴板权限被拒时的兜底：临时 textarea + execCommand。
+      const helper = document.createElement('textarea');
+      helper.value = text;
+      helper.setAttribute('readonly', '');
+      helper.style.position = 'fixed';
+      helper.style.opacity = '0';
+      document.body.appendChild(helper);
+      helper.select();
+      const ok = document.execCommand('copy');
+      helper.remove();
+      if (!ok) throw new Error('execCommand copy failed');
+    };
+    try {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          fallbackCopy();
+        }
+      } else {
+        fallbackCopy();
+      }
+      setCopiedId(messageId);
+      if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = window.setTimeout(() => {
+        setCopiedId((current) => (current === messageId ? null : current));
+        copiedTimerRef.current = null;
+      }, 1600);
+    } catch {
+      setError('复制失败，请手动选中文字后复制。');
+    }
+  };
+
   const loadSessions = async () => {
     setLoadingSessions(true);
     try {
@@ -473,6 +521,10 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
     if (next) void loadSessions();
   };
 
+  const syncActions = (actions?: ChatAction[]) => {
+    syncAssistantActions(actions, noteTargetRef.current);
+  };
+
   const handleUndoAction = async (messageId: string, action: ChatAction) => {
     if (undoingActionId) return;
     setUndoingActionId(action.id);
@@ -487,6 +539,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
             undone_at: result.action.undone_at ?? action.undone_at,
           }
         : { ...action, status: 'undone', can_undo: false };
+      syncAssistantActionUndo(action);
       const existing = messages.find((m) => m.id === messageId)?.actions ?? [];
       updateMessage(messageId, {
         actions: existing.map((item) => (item.id === action.id ? updatedAction : item)),
@@ -571,7 +624,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
   const effectiveTemplateId = liveIntent ?? lastIntent ?? activeTemplateId;
   const editableTemplate =
     promptTemplates.find((t) => t.id === effectiveTemplateId)
-    ?? DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === effectiveTemplateId);
+    ?? ACTIVE_PROMPT_TEMPLATES.find((t) => t.id === effectiveTemplateId);
 
   const togglePromptEditor = () => {
     if (!promptExpanded) {
@@ -591,8 +644,8 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
   };
 
   const resetPromptEditor = () => {
-    setDraftSystem(DEFAULT_SYSTEM_PROMPT);
-    const def = DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === effectiveTemplateId);
+    setDraftSystem(ACTIVE_SYSTEM_PROMPT);
+    const def = ACTIVE_PROMPT_TEMPLATES.find((t) => t.id === effectiveTemplateId);
     if (def) setDraftTemplate(def.content);
   };
   const [pageContext, setPageContext] = useAssistantPageContext(chatOpen);
@@ -636,10 +689,28 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
   const abortRef = useRef<AbortController | null>(null);
   const bufferRef = useRef('');
   const rafRef = useRef<number | null>(null);
+  // 发请求时记下当前是便签页还是笔记页；确认/续跑后按这个目标回填。
+  const noteTargetRef = useRef<ServerNoteTarget>('md');
+  // 确认卡双提交保护：loading 是 React state，同一事件循环内的两次点击
+  // 都可能是 false；用同步 ref 先占位，避免同一 run 被 resume 两次。
+  const hitlResumeInFlightRef = useRef<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
+
+  // HITL 卡可能落在消息流上方或刚好滚出视口，确认按钮必须让用户可见。
+  // 只在“新出现一个待确认卡”时滚一次，避免每个 token 都触发滚动。
+  const pendingHitlMessageId = messages.find((message) => message.hitl?.status === 'pending')?.id;
+  useEffect(() => {
+    if (!pendingHitlMessageId) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .querySelector('[data-hitl-status="pending"]')
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingHitlMessageId]);
 
   // 题目详情等入口通过 pendingPrompt 预填问题；面板已经开着时也要生效。
   useEffect(() => {
@@ -653,6 +724,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
   useEffect(() => () => {
     abortRef.current?.abort();
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current);
   }, []);
 
   const activeTemplate = useMemo(
@@ -757,6 +829,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
     try {
       const context = getAssistantPageContext();
       setPageContext(context);
+      noteTargetRef.current = context.noteTarget ?? 'md';
 
       // 按用户这次的问题自动选意图模板。认不出来就退回手动选的模板 ——
       // 宁可不认，也不要认错（认错会让 AI 用完全错误的策略回答）。
@@ -831,6 +904,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
               if (event.actions?.length) {
                 // 执行回执跟着这条回答走：保存了什么、在哪、能不能撤回
                 updateMessage(assistantId, { actions: event.actions as ChatAction[] });
+                syncActions(event.actions as ChatAction[]);
               }
               if (event.degraded_from) {
                 // 主通道挂了、是备用救回来的。不提示的话用户只会觉得
@@ -905,7 +979,9 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
     text: string,
     label: string,
   ) => {
-    if (loading || hitl.status !== 'pending') return;
+    const resumeKey = `${assistantId}:${hitl.runId}:${hitl.interruptId}`;
+    if (loading || hitl.status !== 'pending' || hitlResumeInFlightRef.current) return;
+    hitlResumeInFlightRef.current = resumeKey;
     setError('');
     setToolHint('');
 
@@ -1011,6 +1087,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
               }
               if (event.actions?.length) {
                 updateMessage(nextAssistantId, { actions: event.actions as ChatAction[] });
+                syncActions(event.actions as ChatAction[]);
               }
               if (event.degraded_from) {
                 updateMessage(nextAssistantId, { degraded_from: event.degraded_from });
@@ -1062,6 +1139,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
     } finally {
       if (watchdog.timer) window.clearTimeout(watchdog.timer);
       abortRef.current = null;
+      if (hitlResumeInFlightRef.current === resumeKey) hitlResumeInFlightRef.current = null;
       setLoading(false);
       setToolHint('');
     }
@@ -1175,7 +1253,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
                     >
                       {item.title || '未命名对话'}
                     </p>
-                    {item.scope === 'video' && (
+                    {!IS_LITE && item.scope === 'video' && (
                       <span className="shrink-0 rounded-full bg-[var(--accent-bg)] px-1.5 py-0.5 text-[10px] text-[var(--accent)]">
                         视频
                       </span>
@@ -1215,7 +1293,7 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
             if (!effective) return activeTemplate?.name ?? '默认模板';
             return (
               promptTemplates.find((t) => t.id === effective)?.name
-              ?? DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === effective)?.name
+              ?? ACTIVE_PROMPT_TEMPLATES.find((t) => t.id === effective)?.name
               ?? effective
             );
           })()}
@@ -1305,10 +1383,11 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
           <div className="space-y-2">
             <p className="text-xs text-[var(--text-muted)]">试试这样问：</p>
             {[
-              '库里有讲 React Hooks 的视频吗',
-              '我最近学得怎么样',
-              '下一步该学什么',
-            ].map((q) => (
+              IS_LITE ? '看看我最近 7 天的学习状态' : '库里有讲 React Hooks 的视频吗',
+              IS_LITE ? '讲讲这道面试题的考点' : '我最近学得怎么样',
+              IS_LITE ? '查一道同类的面试题' : '下一步该学什么',
+              IS_LITE ? '把刚才的结论整理成笔记' : null,
+            ].filter((q): q is string => Boolean(q)).map((q) => (
               <button
                 key={q}
                 onClick={() => setInput(q)}
@@ -1318,7 +1397,9 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
               </button>
             ))}
             <p className="pt-1 text-[11px] leading-5 text-[var(--text-muted)]">
-              回答会带上视频名与时间点，点一下直接跳到那一秒。
+              {IS_LITE
+                ? '这个版本没有视频库；助手会围绕面试题、笔记、站内学习记录和你的安排回答。'
+                : '回答会带上视频名与时间点，点一下直接跳到那一秒。'}
             </p>
           </div>
         )}
@@ -1327,8 +1408,8 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
             <div
               className={`max-w-[88%] rounded-xl px-3 py-2 text-xs leading-6 ${
                 message.role === 'user'
-                  ? 'bg-[var(--accent)] text-white whitespace-pre-wrap'
-                  : 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-light)] whitespace-normal'
+                  ? 'bg-[var(--accent)] text-white whitespace-pre-wrap select-text'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-light)] whitespace-normal select-text'
               }`}
             >
               {message.content
@@ -1361,6 +1442,20 @@ export const AIChatPanel: React.FC<{ mobile?: boolean }> = ({ mobile = false }) 
                 : (message.streaming ? '…' : '')}
               {message.streaming && message.content && (
                 <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-[var(--accent)] align-middle" />
+              )}
+              {message.role === 'assistant' && message.content && !message.streaming && (
+                <div className="mt-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void copyAssistantMessage(message.id, message.content)}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                    title="复制这条回答"
+                    aria-label="复制这条回答"
+                  >
+                    {copiedId === message.id ? <Check size={11} /> : <Copy size={11} />}
+                    {copiedId === message.id ? '已复制' : '复制'}
+                  </button>
+                </div>
               )}
               {message.role === 'assistant' && message.hitl && (
                 <HitlCard

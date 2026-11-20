@@ -14,7 +14,7 @@ from app.services.admin_ai_queue import sync_db_queue_to_rq
 from app.services.ai_jobs import requeue_interrupted_ai_jobs
 from app.services.background_tasks import reconcile_background_tasks, requeue_stale_tasks
 from app.services.background_handlers import register_all as _register_bg_handlers
-from app.services.rq_client import ai_jobs_queue, background_queue, get_redis_connection
+from app.services.rq_client import ai_jobs_queue, background_queue, get_redis_connection, summary_jobs_queue
 from rq.worker import DequeueStrategy, SimpleWorker
 
 logger = logging.getLogger(__name__)
@@ -217,11 +217,11 @@ def main() -> None:
     logger.info("AI worker initialized, waiting for jobs...")
 
     # Import rq here to avoid issues if Redis is not available at import time
-    from rq import Queue, Worker
+    from rq import Worker
 
     queue = ai_jobs_queue()
     bg_queue = background_queue()
-    summary_queue = Queue("summary_jobs", connection=redis_conn)
+    summary_queue = summary_jobs_queue()
 
     # Clean stale worker registrations so this new process can register
     _clean_dead_workers(redis_conn)
@@ -247,7 +247,7 @@ def main() -> None:
 
     # 向量扫描线程跟着 background 消费者走：vector-worker 独占扫描，
     # 避免 primary 只消费 ai_jobs 时也起一个没人消费的扫描线程。
-    if any(q.name == "background" for q in queues):
+    if any(q.name == bg_queue.name for q in queues):
         from app.services.embedding_pipeline import start_auto_scan
 
         start_auto_scan()
@@ -275,7 +275,7 @@ def main() -> None:
 
     # 只要这个 worker 消费 background，就参与运行期校对。
     # 不依赖重启：vector-worker 被 kill 后留下的 queued 任务会被自动补投。
-    if any(q.name == "background" for q in queues):
+    if any(q.name == bg_queue.name for q in queues):
         _start_background_reconciler(redis_conn, interval=30)
 
     # On Windows RQ uses SimpleWorker which runs jobs in the same process.

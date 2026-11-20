@@ -25,11 +25,23 @@ export interface MdNote {
   trashedAt?: string;
 }
 
+/** 服务端 notes 表返回的私人笔记；用于 AI 保存后回填 Markdown 笔记。 */
+export interface ServerMdNoteLike {
+  id: number;
+  title: string;
+  content: string;
+  source?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 interface MdNotesState {
   notes: MdNote[];
   folders: MdFolder[];
   activeNoteId: string | null;
   createNote: (data?: Partial<MdNote> & { title?: string }) => string;
+  importServerNote: (note: ServerMdNoteLike) => string;
+  removeServerNote: (serverId: number) => void;
   createFolder: (name: string) => string | null;
   updateNote: (id: string, updates: Partial<MdNote>) => void;
   deleteNote: (id: string) => void;
@@ -212,6 +224,48 @@ export const useMdNotesStore = create<MdNotesState>()(
         };
         set((state) => ({ notes: [note, ...state.notes], activeNoteId: id }));
         return id;
+      },
+
+      importServerNote: (data) => {
+        const id = `srv-${data.id}`;
+        const existing = get().notes.find((note) => note.id === id);
+        if (existing) {
+          set({ activeNoteId: id });
+          return id;
+        }
+        // 保存当前 Markdown 笔记时，本地正文和刚写入服务端的副本一致，
+        // 不要再插一条重复笔记。
+        const sameContent = get().notes.find(
+          (note) => note.title === (data.title || '').slice(0, 240) && note.markdown === (data.content || '')
+        );
+        if (sameContent) {
+          set({ activeNoteId: sameContent.id });
+          return sameContent.id;
+        }
+        const created = data.createdAt || now();
+        const updated = data.updatedAt || created;
+        const note: MdNote = {
+          id,
+          title: (data.title || '未命名笔记').slice(0, 240),
+          markdown: data.content || '',
+          folderId: null,
+          tags: [data.source === 'assistant' ? 'AI' : '云端'],
+          starred: false,
+          font: 'sans',
+          fontSize: 15,
+          createdAt: created,
+          updatedAt: updated,
+        };
+        set((state) => ({ notes: [note, ...state.notes], activeNoteId: id }));
+        return id;
+      },
+
+      removeServerNote: (serverId) => {
+        const id = `srv-${serverId}`;
+        set((state) => ({
+          notes: state.notes.filter((note) => note.id !== id),
+          activeNoteId: state.activeNoteId === id ? null : state.activeNoteId,
+        }));
       },
 
       createFolder: (name) => {

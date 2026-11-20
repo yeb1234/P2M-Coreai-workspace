@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { renderMarkdown } from '../../lib/markdown';
+import { IS_LITE } from '../../config/appProfile';
 import { useAIStore } from '../../stores';
 import { BOOK_TITLES, typeLabel } from '../../data/interview/labels';
 import { fetchInterviewQuestionReport, reportInterviewQuestion } from '../../lib/interviewApi';
@@ -233,9 +234,11 @@ export const QuestionDrawer: React.FC<QuestionDrawerProps> = ({
             <button className="iv-btn iv-btn-ai" onClick={() => askAssistant('explain')}>
               <Sparkles size={15} /> 助手讲这题
             </button>
+            {!IS_LITE && (
             <button className="iv-btn iv-btn-ai" onClick={() => askAssistant('video')}>
               <Video size={15} /> 推荐相关视频
             </button>
+            )}
             <button
               ref={reportTriggerRef}
               className={`iv-btn iv-report-btn ${reported ? 'is-reported' : ''}`}

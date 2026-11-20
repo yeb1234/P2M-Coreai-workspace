@@ -1,10 +1,10 @@
 # 文档索引
 
-> 状态：现行（最后校对 2026-11-21）
+> 状态：现行（最后校对 2026-11-20）
 
 这份索引管全项目的文档：哪个文件讲什么、现在还可不可信、最后一次对照代码是哪天。写新文档或改老文档前，先在这里定位，不要另起一套。
 
-代码基线：`main` 已合并 7.0（`feat/7.0-framework-overhaul`），发布标签 `v7.0.0`；6.0 对照线 `P2U-3.0-LangChain` 冻结在 `cae8d1b` / `v6.0.0`。
+代码基线：`main` 已合并 7.0（`v7.0.0`）、7.1（`v7.1.0`）与 P2 7.2 Media / Transcribe / Lite（2026-11-20 收尾合并）；6.0 对照线 `P2U-3.0-LangChain` 冻结在 `cae8d1b` / `v6.0.0`。
 
 ## 状态怎么读
 
@@ -29,44 +29,50 @@
 
 | 用途 | 端口 | 说明 |
 |---|---|---|
-| 前端 Web | `80`、`12302` | 同一个 nginx；`80` 是宿主 localhost 入口，P2 独占 |
-| 后端 API | `127.0.0.1:12402` | 只绑回环；对外统一走 `http://localhost/api` |
-| 前端 dev | `12322` | Vite，`/api` 代理到 `127.0.0.1:12302` |
-| PostgreSQL | `127.0.0.1:12502` | 只绑回环 |
-| Redis | `127.0.0.1:12602` | 只绑回环 |
+| P2 Media 前端 Web | `80`、`12302` | 同一个 nginx；`80` 是宿主 localhost 入口，P2 独占 |
+| P2 Media 后端 API | `127.0.0.1:12402` | 只绑回环；对外统一走 `http://localhost/api` |
+| P2 Media 前端 dev | `12322` | Vite，`/api` 代理到 `127.0.0.1:12302` |
+| P2 Media PostgreSQL | `127.0.0.1:12502` | 只绑回环，Media 专用库 |
+| P2 Media Redis | `127.0.0.1:12602` | 只绑回环 |
+| P2 Lite 前端 Web | `12305` | profile=lite，独立 nginx；本机与 P5 并存时用 `12315` |
+| P2 Lite 后端 API | `127.0.0.1:12705` | profile=lite，只绑回环；本机并存时用 `12715` |
+| P2 Lite Demo 前端 Web | `12306` | 独立演示入口，登录页预填 `demo / P2Demo2026`；本机与 P6 并存时用 `12316` |
+| P2 Lite Demo 后端 API | `127.0.0.1:12706` | 独立 `db_p2_demo`，只绑回环；本机并存时用 `12716` |
+| Lite / Demo 共享 PostgreSQL | `127.0.0.1:12500` | `shared-postgres`，库 `db_p2` / `db_p2_demo` |
+| Lite / Demo 共享 Redis | `127.0.0.1:12600` | `shared-redis`，Lite DB 1 / Demo DB 5 |
 | 监控 | 未分配 | 旧 `11162` 作废，不再沿用 |
 
-已作废、不要再出现的写法：`11000+(n−1)×100` 号段、`11102` / `11112` / `11122` / `11132` / `11142` / `11162`、「backend 不映射宿主端口」。
+已作废、不要再出现的写法：`11000+(n−1)×100` 号段、`11102` / `11112` / `11122` / `11132` / `11142` / `11162`、「backend 不映射宿主端口」。Lite / Demo 的 `12305` / `12306` 是 compose 默认值；本机全项目并存只通过 gitignored 的本地 `.env` 改为 `12315` / `12316`，文档和示例文件仍写默认值。
 
-### 数据基线（截至 2026-11-16）
+### 数据基线（截至 2026-11-20）
 
 | 项 | 数量 |
 |---|---|
-| `videos` | 14,327 |
-| `content_chunks` | 60,259（向量覆盖 100%） |
-| `subtitle_segments` | 3,593,723 |
-| 有字幕视频 | 8,785 |
+| `videos` | 14,380 |
+| `content_chunks` | 98,271（向量覆盖 100%） |
+| `subtitle_segments` | 5,667,374（约 566 万） |
+| 有字幕视频 | 14,160 |
 | SpringBoot 视频 | 22 个（第 5 章 8 / 第 6 章 14） |
 
-引用这些数字时带上「截至 2026-11-16」，重新统计后回来改这一张表。
+引用这些数字时带上「截至 2026-11-20」，重新统计后回来改这一张表。旧文档里的 `60,259` / `3,593,723` / `8,785` 是 2026-11-16 的历史快照，不要再当作当前基线。
 
 ### 结构计数（口径写在括号里）
 
-- 前端页面 29 个（`src/config/pageRegistry.tsx` 第 59–87 行注册的 key，含 `calendar2`；侧栏三组 7 / 9 / 13 相加也是 29）
-- zustand store 12 个（`src/stores/` 不含 `index.ts`）；hook 12 个（`src/hooks/` 不含 `index.ts`）
+- 前端页面：完整版 29 个 + Lite-only 3 个静态产品页（`ALL_PAGES` 32 个；Lite profile 保留 15 个）
+- zustand store 15 个（`src/stores/` 不含 `index.ts`）；hook 13 个（`src/hooks/` 不含 `index.ts`）
 - dashboard 插件 5 个（`src/plugins/`，`registry.ts` + `registerAllPlugins`）
-- 后端 router 15 个（`main.py` 的 `include_router` 计数，含 `mcp`）；service 44 个（`backend/app/services/*.py`，不含 `__init__.py`）；ORM 模型 21 个（`models.py` 的 `__tablename__` 计数）
-- 测试：`src/__tests__` 28 个文件 + `tests/contracts` 1 个 = 29 个文件 / 232 个用例；`tests/e2e` 1 个规格（桌面 26 passed / 1 skipped，三项目合计 50 passed / 31 skipped / 0 failed）；`backend/tests` 8 个 `.py`。后端**没有** API 级集成测试，`pytest` 尚未加入运行镜像。
+- 后端 router 19 个（`main.py` 的 `include_router` 计数，含 `mcp` / `ops`）；service 61 个（`backend/app/services/*.py`，不含 `__init__.py`）；ORM 模型 34 个（`models.py` 的 `__tablename__` 计数）
+- 测试：`src/__tests__` 51 个文件 + `tests/contracts` 1 个 = 52 个文件 / 406 个用例；`tests/e2e` 1 个规格（桌面 26 passed / 1 skipped，三项目合计 50 passed / 31 skipped / 0 failed）；`backend/tests` 19 个 `.py`，99 项。后端**没有** API 级集成测试，`pytest` 尚未加入运行镜像。
 
 ## 项目根目录的门面文档
 
 | 文件 | 用途 | 状态 | 最后校对 |
 |---|---|---|---|
-| [README.md](../README.md) | 项目总览、能力清单、五服务 compose 与端口、启动方式、技术栈 | 现行 | 2026-11-16 |
-| [README_cn.md](../README_cn.md) | 与 README 对应的中文版，多了 3.0 架构 / 安全 / 会话 / 部署几块 callout | 现行 | 2026-11-21 |
-| [backend/README.md](../backend/README.md) | 后端入口：14 路由前缀、服务分组、两队列与状态机、迁移双机制、环境变量、安全要点 | 现行 | 2026-11-16 |
-| [CHANGELOG.md](../CHANGELOG.md) | 面向用户的版本变化（现行记录以这份为准） | 现行 | 2026-11-16 |
-| [BUGFIXES.md](../BUGFIXES.md) | 缺陷修复台账，带 commit 溯源 | 现行 | 2026-11-16 |
+| [README.md](../README.md) | 项目总览、能力清单、五服务 compose 与端口、启动方式、技术栈 | 现行 | 2026-11-20 |
+| [README_cn.md](../README_cn.md) | 与 README 对应的中文版，多了 3.0 架构 / 安全 / 会话 / 部署几块 callout | 现行 | 2026-11-20 |
+| [backend/README.md](../backend/README.md) | 后端入口：19 路由前缀、服务分组、两队列与状态机、迁移双机制、环境变量、安全要点 | 现行 | 2026-11-20 |
+| [CHANGELOG.md](../CHANGELOG.md) | 面向用户的版本变化（现行记录以这份为准） | 现行 | 2026-11-20 |
+| [BUGFIXES.md](../BUGFIXES.md) | 缺陷修复台账，带 commit 溯源 | 现行 | 2026-11-20 |
 | [PERFORMANCE.md](../PERFORMANCE.md) | 性能与规模实测记录、检索延迟、库量 | 现行 | 2026-11-16 |
 | [ai-job-center-refactor-report.md](../ai-job-center-refactor-report.md) | AI 任务中心那轮重构的方案与过程 | 历史参考 | 2026-11-16 |
 
@@ -107,6 +113,9 @@
 
 | 文件 | 用途 | 状态 | 最后校对 |
 |---|---|---|---|
+| [2026-11-20-p2-7.2-media-split.md](2026-11-20-p2-7.2-media-split.md) | P2 7.2 产品线拆分：Media 去转写、Transcribe 独立控制台、Lite 轻量 profile 与子目录扫描 / OPS_TOKEN | 现行发布记录（Lite 已并入 main） | 2026-11-20 |
+| [2026-11-20-p2-7.2-lite.md](2026-11-20-p2-7.2-lite.md) | P2 Lite 边界、共享 2GB PG / Redis 分库分前缀、Lite 构建与内存验收（实测 189.8 MiB）、独立 Demo 入口与预填账号 | 现行 | 2026-11-20 |
+| [2026-11-20-7.1-workbench.md](2026-11-20-7.1-workbench.md) | 7.1 灵境工作台：健康检查、侧栏排序、笔记三栏、插件版本台账 | 现行发布记录 | 2026-11-20 |
 | [2026-11-21-7.0-framework-overhaul.md](2026-11-21-7.0-framework-overhaul.md) | 7.0 框架级重构：monorepo、配置资产版本库、发布与回退 | 现行发布记录 | 2026-11-21 |
 | [2026-11-20-6.0-smartagents-release.md](2026-11-20-6.0-smartagents-release.md) | 6.0 SmartAgents 发布说明：工具与模型解耦、HITL 写动作、审计与撤回 | 历史发布记录（对照线保留） | 2026-11-20 |
 | [project-structure.md](project-structure.md) | 目录树与结构计数（第一节现状；后面几节是未执行的重构提案） | 部分现行 | 2026-11-16 |

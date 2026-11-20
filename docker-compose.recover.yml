@@ -1,0 +1,80 @@
+# 临时恢复用：把 P2 容器挂载到近期工作树，避免覆盖 C:\SiteYeb 旧源码。
+# 用法：
+# docker compose -p p2-siteyeb -f docker-compose.yml -f docker-compose.batch.yml -f docker-compose.recover.yml up -d --scale worker2=0 --force-recreate backend worker frontend vector-worker summary-worker-laptop
+services:
+  backend:
+    volumes: !override
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/backend:/app"
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/prompts:/app/prompts:ro"
+      - "D:/ITJC:/videos:ro"
+      - "C:/SiteYeb/data/audio-cache:/data/audio-cache"
+      - "C:/SiteYeb/data/hf:/data/hf"
+      - "C:/SiteYeb/logs:/data/logs"
+      - "D:/ITJC/output:/data/output"
+      - "C:/SiteYeb/.migration:/data/source:ro"
+      - "D:/ITJC/sprites:/data/sprites"
+      - "D:/ITJC/thumbnails:/data/thumbnails"
+      - "D:/ITJC/work:/data/work"
+
+  worker:
+    volumes: !override
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/backend:/app"
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/prompts:/app/prompts:ro"
+      - "D:/ITJC:/videos:ro"
+      - "C:/SiteYeb/data/audio-cache:/data/audio-cache"
+      - "C:/SiteYeb/data/hf:/data/hf"
+      - "C:/SiteYeb/logs:/data/logs"
+      - "D:/ITJC/output:/data/output"
+      - "C:/SiteYeb/.migration:/data/source:ro"
+      - "D:/ITJC/sprites:/data/sprites"
+      - "D:/ITJC/thumbnails:/data/thumbnails"
+      - "D:/ITJC/work:/data/work"
+
+  worker2:
+    volumes: !override
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/backend:/app"
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/prompts:/app/prompts:ro"
+      - "D:/ITJC:/videos:ro"
+      - "C:/SiteYeb/data/audio-cache:/data/audio-cache"
+      - "C:/SiteYeb/data/hf:/data/hf"
+      - "C:/SiteYeb/logs:/data/logs"
+      - "D:/ITJC/output:/data/output"
+      - "C:/SiteYeb/.migration:/data/source:ro"
+      - "D:/ITJC/sprites:/data/sprites"
+      - "D:/ITJC/thumbnails:/data/thumbnails"
+      - "D:/ITJC/work:/data/work"
+
+  vector-worker:
+    volumes: !override
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/backend:/app"
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/prompts:/app/prompts:ro"
+      - "D:/ITJC:/videos:ro"
+      - "C:/SiteYeb/data/audio-cache:/data/audio-cache"
+      - "C:/SiteYeb/data/hf:/data/hf"
+      - "C:/SiteYeb/logs:/data/logs"
+      - "D:/ITJC/output:/data/output"
+      - "C:/SiteYeb/.migration:/data/source:ro"
+      - "D:/ITJC/sprites:/data/sprites"
+      - "D:/ITJC/thumbnails:/data/thumbnails"
+      - "D:/ITJC/work:/data/work"
+
+  summary-worker-laptop:
+    volumes: !override
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/backend:/app"
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/prompts:/app/prompts:ro"
+      - "D:/ITJC:/videos:ro"
+      - "C:/SiteYeb/data/audio-cache:/data/audio-cache"
+      - "C:/SiteYeb/data/hf:/data/hf"
+      - "C:/SiteYeb/logs:/data/logs"
+      - "D:/ITJC/output:/data/output"
+      - "C:/SiteYeb/.migration:/data/source:ro"
+      - "D:/ITJC/sprites:/data/sprites"
+      - "D:/ITJC/thumbnails:/data/thumbnails"
+      - "D:/ITJC/work:/data/work"
+
+  frontend:
+    volumes: !override
+      - "C:/Users/yeb12/WorkBuddy/Worktrees/SiteYeb/p2u-3-0-langchain-529238b4/dist:/usr/share/nginx/html:ro"
+      - "C:/SiteYeb/demo-hub/site:/demo-site:ro"
+      - "C:/SiteYeb/demo-hub/nginx-demo.conf:/etc/nginx/conf.d/demo.conf:ro"
+      - "C:/SiteYeb/demo-hub/nginx-p2-demo.conf:/etc/nginx/nginx.conf:ro"

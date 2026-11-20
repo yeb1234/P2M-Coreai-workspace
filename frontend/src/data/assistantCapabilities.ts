@@ -29,9 +29,9 @@ export const ASSISTANT_INTENTS: AssistantIntentCopy[] = [
     id: 'note-save',
     label: '保存笔记',
     skill: 'note-library',
-    summary: '当前页有 MD 笔记时，把原文保存；或先做 AI 总结，再把总结另存为私人笔记。',
+    summary: '当前页有便签或 Markdown 笔记时，把原文保存；或先做 AI 总结，再把总结另存为私人笔记。',
     triggers: ['保存刚才笔记', '存到笔记', '总结后保存', '归档 Markdown'],
-    output: '私人笔记；写操作必须 confirm=true',
+    output: '私人笔记；写许可由运行时确认卡发放',
     accent: '#b45309',
     write: true,
   },
@@ -125,6 +125,101 @@ export interface IntentPriorityRule {
   skill: string;
   note?: string;
 }
+
+/** Lite 的意图说明：保留完整版的意图 ID，但不能再声称视频/路径能力。 */
+export const LITE_ASSISTANT_INTENTS: AssistantIntentCopy[] = [
+  {
+    id: 'note-save',
+    label: '保存笔记',
+    skill: 'lite-note-library',
+    summary: '当前页有便签或 Markdown 笔记时，把原文保存；或先做 AI 总结，再把总结另存为私人笔记。',
+    triggers: ['保存刚才笔记', '存到笔记', '总结后保存', '归档 Markdown'],
+    output: '私人笔记；写许可由运行时确认卡发放',
+    accent: '#b45309',
+    write: true,
+  },
+  {
+    id: 'learning-path',
+    label: '路径规划',
+    skill: 'lite-general-answer',
+    summary: 'Lite 不生成学习路径；结合站内笔记、Todo 和日历，给一个当天能做完的小步骤。',
+    triggers: ['下一步学什么', '学习路径', '从哪开始', '怎么学'],
+    output: '一个动作 + 完成标志',
+    accent: '#0f766e',
+  },
+  {
+    id: 'course-recommend',
+    label: '课程推荐',
+    skill: 'lite-general-answer',
+    summary: 'Lite 没有视频库，不推荐站内课程；只给通用学习方向、自测题和下一步练习。',
+    triggers: ['有没有课', '推荐视频', '学什么', '适合我的教程'],
+    output: '通用学习建议 + 自测方式',
+    accent: '#7c3aed',
+  },
+  {
+    id: 'study-summary',
+    label: '学习总结',
+    skill: 'lite-study-review',
+    summary: '只读 Lite 站内 Todo、日历、私人笔记、面试练习和使用痕迹；不引用视频观看数据。',
+    triggers: ['学得怎么样', '总结一下', '复盘', '掌握多少'],
+    output: '结论 + 站内数据点 + 下一步练习',
+    accent: '#0369a1',
+  },
+  {
+    id: 'coding-helper',
+    label: '代码助手',
+    skill: 'lite-coding-helper',
+    summary: '代码报错或实现问题，先查私人笔记，不查视频；没有再给通用解法。',
+    triggers: ['报错', 'bug', '写个函数', '这段代码'],
+    output: '问题点 + 最小 diff + 验证方法',
+    accent: '#be123c',
+  },
+  {
+    id: 'knowledge-qa',
+    label: '知识问答',
+    skill: 'lite-general-answer',
+    summary: 'Lite 没有视频库；按通用知识和面试知识库回答，不声称站内讲过。',
+    triggers: ['什么是 X', '原理', '区别', '怎么实现'],
+    output: '结论 + 原理 + 可选面试延伸',
+    accent: '#2563eb',
+  },
+  {
+    id: 'question-answer',
+    label: '问题解答',
+    skill: 'lite-general-answer',
+    summary: '具体技术概念用通用知识讲清；该能力包零工具，正文不依赖视频库。',
+    triggers: ['什么是 X', '原理', '区别', '怎么实现', '面试'],
+    output: '概念 + 最小示例 + 可选面试延伸',
+    accent: '#4f46e5',
+  },
+  {
+    id: 'interview-question',
+    label: '面试题讲解',
+    skill: 'lite-interview-coach',
+    summary: '读当前题号、题干、评分点和追问；可继续讲、找同类题、查知识库，不推荐站内视频。',
+    triggers: ['这题怎么答', '展开讲讲', '继续', '评分点', '下一题'],
+    output: '答题骨架 + 关键点/易错点 + 追问 + 同类题',
+    accent: '#0f766e',
+  },
+  {
+    id: 'task-planning',
+    label: '任务拆解',
+    skill: 'lite-task-planning',
+    summary: '把学习目标拆成今天能做完的步骤，参考历史笔记，不读取学习路径。',
+    triggers: ['拆解', '拆成', '计划', '安排', 'todo', '待办'],
+    output: '今日步骤 + 优先级 + 阻塞点 + 耗时',
+    accent: '#ca8a04',
+  },
+  {
+    id: 'fallback',
+    label: '兜底分流',
+    skill: 'lite-fallback',
+    summary: '意图为空或规则没命中时的保守能力包，只允许只读检索，不做写操作。',
+    triggers: ['未命中任何规则', '模糊问题'],
+    output: '保守回答；必要时只读检索',
+    accent: 'var(--text-muted)',
+  },
+];
 
 /** 与 configs/prompts/clientPrompts.ts 的 detectIntent() 顺序保持一致。 */
 export const INTENT_PRIORITY: IntentPriorityRule[] = [
@@ -277,7 +372,7 @@ export const RUNTIME_PROMPT_LAYERS: RuntimePromptLayer[] = [
   {
     title: '本轮意图规则',
     source: 'intent',
-    description: '按 detectIntent() 结果补规则：问题解答零工具；保存笔记必须 confirm；知识问答只依据库内内容；面试题讲解可查题库/知识库。',
+    description: '按 detectIntent() 结果补规则：问题解答零工具；保存笔记由运行时确认卡发放写许可；知识问答只依据库内内容；面试题讲解可查题库/知识库。',
   },
 ];
 
@@ -429,7 +524,7 @@ export const TOOL_SNAPSHOT: AssistantToolSnapshot[] = [
   },
   {
     name: 'save_note',
-    description: '把当前 MD 笔记或给定正文保存到个人笔记库；必须用户明确确认。',
+    description: '把当前便签或 Markdown 笔记、或给定正文保存到个人笔记库；写许可由运行时确认卡发放。',
     scopes: ['notes:write'],
     timeout_s: 12,
     max_calls_per_turn: 1,
@@ -440,7 +535,7 @@ export const TOOL_SNAPSHOT: AssistantToolSnapshot[] = [
   },
   {
     name: 'summarize_and_save_note',
-    description: '对当前 MD 笔记做 AI 总结，并把总结另存为新的私人笔记；必须用户明确确认。',
+    description: '对当前便签或 Markdown 笔记做 AI 总结，并把总结另存为新的私人笔记；写许可由运行时确认卡发放。',
     scopes: ['notes:write', 'notes:ai'],
     timeout_s: 70,
     max_calls_per_turn: 1,
@@ -535,7 +630,7 @@ export const SKILL_SNAPSHOT: AssistantSkillSnapshot[] = [
   {
     name: 'note-library',
     version: '1.0.0',
-    description: '用户明确要求保存当前 MD 笔记，或总结后另存为私人笔记。',
+    description: '用户明确要求保存当前便签/Markdown 笔记，或总结后另存为私人笔记。',
     intents: ['note-save'],
     tools: ['save_note', 'summarize_and_save_note'],
     max_total_tool_calls: 2,
@@ -565,9 +660,141 @@ export const TOOL_LABELS: Record<string, string> = {
   search_interview_knowledge: '知识库检索',
   save_note: '保存当前笔记',
   summarize_and_save_note: '总结后另存',
+  get_lite_learning_status: 'Lite 学习状态',
+  create_calendar_event: '创建日程',
+  create_todo: '创建 Todo',
+  ask_user: '澄清 / 确认',
 };
 
+/** Lite 只暴露这些工具；能力接口不可用时，页面不能回落到完整版清单。 */
+const LITE_TOOL_NAMES = new Set([
+  'get_lite_learning_status',
+  'search_notes',
+  'search_interview_questions',
+  'get_interview_question',
+  'search_interview_knowledge',
+  'save_note',
+  'summarize_and_save_note',
+  'create_calendar_event',
+  'create_todo',
+  'ask_user',
+]);
+
+const LITE_EXTRA_TOOLS: AssistantToolSnapshot[] = [
+  {
+    name: 'get_lite_learning_status',
+    description: '读取 Lite 站内 Todo、日历、私人笔记、面试练习和使用痕迹；不包含视频观看。',
+    scopes: ['profile:read', 'learning:read'],
+    timeout_s: 12,
+    max_calls_per_turn: 1,
+    requires_login: true,
+    read_only: true,
+    enabled: true,
+    version: '1.0.0',
+  },
+  {
+    name: 'create_calendar_event',
+    description: '在个人日历里创建一个日程；写许可由运行时确认卡发放。',
+    scopes: ['calendar:write'],
+    timeout_s: 12,
+    max_calls_per_turn: 1,
+    requires_login: true,
+    read_only: false,
+    enabled: true,
+    version: '1.0.0',
+  },
+  {
+    name: 'create_todo',
+    description: '创建一个汇总 Todo；写许可由运行时确认卡发放。',
+    scopes: ['todo:write'],
+    timeout_s: 12,
+    max_calls_per_turn: 1,
+    requires_login: true,
+    read_only: false,
+    enabled: true,
+    version: '1.0.0',
+  },
+  {
+    name: 'ask_user',
+    description: '暂停当前任务，向用户提出带选项的澄清或确认问题。',
+    scopes: ['chat:human'],
+    timeout_s: 1,
+    max_calls_per_turn: 1,
+    requires_login: false,
+    read_only: true,
+    enabled: true,
+    version: '1.0.0',
+  },
+];
+
+export const LITE_TOOL_SNAPSHOT: AssistantToolSnapshot[] = [
+  ...TOOL_SNAPSHOT.filter((tool) => LITE_TOOL_NAMES.has(tool.name)),
+  ...LITE_EXTRA_TOOLS,
+];
+
+export const LITE_SKILL_SNAPSHOT: AssistantSkillSnapshot[] = [
+  {
+    name: 'lite-general-answer',
+    version: '1.0.0',
+    description: '纯知识/代码/职业问题，直接回答，不依赖视频库或向量检索。',
+    intents: ['question-answer', 'knowledge-qa', 'course-recommend', 'learning-path'],
+    tools: [],
+    max_total_tool_calls: 0,
+  },
+  {
+    name: 'lite-study-review',
+    version: '1.0.0',
+    description: '基于 Lite 站内 Todo、日历、笔记、面试练习和使用痕迹，评价最近学习状态。',
+    intents: ['study-summary'],
+    tools: ['get_lite_learning_status'],
+    max_total_tool_calls: 1,
+  },
+  {
+    name: 'lite-coding-helper',
+    version: '1.0.0',
+    description: '代码问题优先查私人笔记，不查视频。',
+    intents: ['coding-helper'],
+    tools: ['search_notes'],
+    max_total_tool_calls: 2,
+  },
+  {
+    name: 'lite-task-planning',
+    version: '1.0.0',
+    description: '把学习任务拆成步骤，结合笔记与个人动作落地。',
+    intents: ['task-planning'],
+    tools: ['search_notes'],
+    max_total_tool_calls: 2,
+  },
+  {
+    name: 'lite-interview-coach',
+    version: '1.0.0',
+    description: '讲解当前面试题、检索同类题与知识库，不推荐站内视频。',
+    intents: ['interview-question'],
+    tools: ['get_interview_question', 'search_interview_questions', 'search_interview_knowledge'],
+    max_total_tool_calls: 5,
+  },
+  {
+    name: 'lite-note-library',
+    version: '1.0.0',
+    description: '保存当前笔记，或总结后另存为私人笔记。',
+    intents: ['note-save'],
+    tools: ['save_note', 'summarize_and_save_note'],
+    max_total_tool_calls: 2,
+  },
+  {
+    name: 'lite-fallback',
+    version: '1.0.0',
+    description: '未识别意图时的保守能力包：只允许查私人笔记与面试题。',
+    intents: [],
+    tools: ['search_notes', 'search_interview_questions', 'get_interview_question', 'search_interview_knowledge'],
+    max_total_tool_calls: 3,
+  },
+];
+
 export const MCP_TOTAL_SNAPSHOT = 19;
+
+/** Lite 的 MCP 清单 = 6 个原生笔记/待办/日程 + 5 个 Lite 只读工具。 */
+export const LITE_MCP_TOTAL_SNAPSHOT = 11;
 
 export interface McpToolCopy {
   name: string;

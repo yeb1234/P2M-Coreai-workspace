@@ -26,7 +26,12 @@ const GROUPS: NavGroup[] = [
   {
     title: '学习',
     description: '课程、字幕和刷题',
-    ids: ['bookmarks', 'learning', 'transcriber', 'flashcards', 'leetcode', 'interview', 'reader', 'snippets'],
+    ids: ['bookmarks', 'learning', 'flashcards', 'leetcode', 'interview', 'reader', 'snippets'],
+  },
+  {
+    title: '产品线',
+    description: 'P2 Media 与 Transcribe 预览',
+    ids: ['videopreview', 'media', 'transcribe'],
   },
   {
     title: '工具',

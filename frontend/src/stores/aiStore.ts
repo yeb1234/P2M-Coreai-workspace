@@ -6,7 +6,13 @@ import {
   DEFAULT_AI_MODEL,
   DEFAULT_PROMPT_TEMPLATES,
   DEFAULT_SYSTEM_PROMPT,
+  LITE_PROMPT_TEMPLATES,
+  LITE_SYSTEM_PROMPT,
 } from '../lib/aiPromptDefaults';
+import { IS_LITE } from '../config/appProfile';
+
+const ACTIVE_PROMPT_TEMPLATES = IS_LITE ? LITE_PROMPT_TEMPLATES : DEFAULT_PROMPT_TEMPLATES;
+const ACTIVE_SYSTEM_PROMPT = IS_LITE ? LITE_SYSTEM_PROMPT : DEFAULT_SYSTEM_PROMPT;
 
 export interface PromptTemplate {
   id: string;
@@ -135,20 +141,20 @@ function clampChatWidth(width: number | undefined): number {
 }
 
 function sanitizeTemplates(templates: unknown): PromptTemplate[] {
-  if (!Array.isArray(templates)) return DEFAULT_PROMPT_TEMPLATES;
+  if (!Array.isArray(templates)) return ACTIVE_PROMPT_TEMPLATES;
   const clean = templates.filter((item): item is PromptTemplate => {
     if (!item || typeof item !== 'object') return false;
     const t = item as Partial<PromptTemplate>;
     return !!t.id && !!t.name && !!t.content && !hasCorruptText(t.name) && !hasCorruptText(t.content);
   });
-  if (clean.length === 0) return DEFAULT_PROMPT_TEMPLATES;
+  if (clean.length === 0) return ACTIVE_PROMPT_TEMPLATES;
 
   // 合并新增的默认模板。老用户 localStorage 里只有原来那 3 个
   // （学习总结 / 代码助手 / 任务拆解），不补的话自动识别到
   // course-recommend 时找不到模板，UI 只能显示 id 字符串。
   // 用户自己改过的同名模板不动，也不删除用户自建的模板。
   const existingIds = new Set(clean.map((t) => t.id));
-  const missing = DEFAULT_PROMPT_TEMPLATES.filter((t) => !existingIds.has(t.id));
+  const missing = ACTIVE_PROMPT_TEMPLATES.filter((t) => !existingIds.has(t.id));
   return [...clean, ...missing];
 }
 
@@ -157,9 +163,9 @@ export const useAIStore = create<AIState>()(
     (set, get) => ({
       endpoint: DEFAULT_AI_ENDPOINT,
       model: DEFAULT_AI_MODEL,
-      systemPrompt: DEFAULT_SYSTEM_PROMPT,
-      promptTemplates: DEFAULT_PROMPT_TEMPLATES,
-      activeTemplateId: DEFAULT_PROMPT_TEMPLATES[0].id,
+      systemPrompt: ACTIVE_SYSTEM_PROMPT,
+      promptTemplates: ACTIVE_PROMPT_TEMPLATES,
+      activeTemplateId: ACTIVE_PROMPT_TEMPLATES[0].id,
       chatOpen: false,
       chatWidth: 380,
       pendingPrompt: '',
@@ -231,7 +237,7 @@ export const useAIStore = create<AIState>()(
           ...state,
           endpoint: normalizeEndpoint(state.endpoint),
           model: hasCorruptText(state.model) || !state.model ? DEFAULT_AI_MODEL : state.model,
-          systemPrompt: hasCorruptText(state.systemPrompt) || !state.systemPrompt ? DEFAULT_SYSTEM_PROMPT : state.systemPrompt,
+          systemPrompt: hasCorruptText(state.systemPrompt) || !state.systemPrompt ? ACTIVE_SYSTEM_PROMPT : state.systemPrompt,
           promptTemplates,
           activeTemplateId,
           chatWidth: clampChatWidth(state.chatWidth),

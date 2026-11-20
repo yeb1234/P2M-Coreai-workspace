@@ -76,15 +76,35 @@ MASKED_SECRET = "__MASKED__"
 @router.get("/capabilities")
 def get_capabilities(_admin: User = Depends(require_admin)):
     """只读管理面：列出已注册工具与能力包，方便排查「模型到底能调什么」。"""
-    from app.agents.skills import SKILLS
+    from app.agents.skills import list_skills
     from app.agents.tool_registry import DEFAULT_REGISTRY
+    from app.database import settings
+
+    if settings.is_lite:
+        from app.agents.chat_agent import LITE_BASE_PROMPT
+        base_prompt = LITE_BASE_PROMPT
+    else:
+        base_prompt = BASE_PROMPT
 
     def describe_tool(name: str) -> str:
         handler = DEFAULT_REGISTRY.get(name)
         return ((handler.description if handler else "") or "").strip()[:400]
 
+    skills = list_skills()
+    tool_specs = DEFAULT_REGISTRY.specs()
+    if settings.is_lite:
+        # Lite 只展示真正会挂给模型的能力包工具，外加运行时始终可用的
+        # 个人动作和 ask_user。否则页面会把视频/学习路径工具算进 Lite，
+        # 用户点开能力清单看到的是一套并不存在的能力。
+        from app.agents.tool_runtime import PERSONAL_ACTION_TOOLS
+
+        lite_names = {name for skill in skills for name in skill.tools}
+        lite_names.update(PERSONAL_ACTION_TOOLS)
+        lite_names.add("ask_user")
+        tool_specs = tuple(spec for spec in tool_specs if spec.name in lite_names)
+
     return {
-        "base_prompt": BASE_PROMPT,
+        "base_prompt": base_prompt,
         "tools": [
             {
                 "name": spec.name,
@@ -101,7 +121,7 @@ def get_capabilities(_admin: User = Depends(require_admin)):
                 "breaker_cooldown_s": spec.breaker_cooldown_s,
                 "tags": list(spec.tags),
             }
-            for spec in DEFAULT_REGISTRY.specs()
+            for spec in tool_specs
         ],
         "skills": [
             {
@@ -113,7 +133,7 @@ def get_capabilities(_admin: User = Depends(require_admin)):
                 "max_total_tool_calls": skill.max_total_tool_calls,
                 "enabled": skill.enabled,
             }
-            for skill in SKILLS
+            for skill in skills
         ],
     }
 

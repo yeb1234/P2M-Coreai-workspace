@@ -72,14 +72,14 @@ curl -s http://localhost/ready     # database / vectors / transactions / embeddi
 - 前端：`cd frontend && npm run dev`，Vite 端口 12322，`/api` 代理到 `127.0.0.1:12302`，不需要再单独配 `VITE_API_BASE_URL`。
 - embedding：本机跑 LM Studio 等兼容服务时，容器侧用 `EMBEDDING_BASE_URL_DOCKER=http://host.docker.internal:1234/v1`（`docker-compose.yml:164`；`.env.example:100`）。
 
-## 五、当前数据基线（2026-11-16 口径）
+## 五、当前数据基线（2026-11-20 口径）
 
 以下为核对基线，不是运行承诺值；实时数字以 `/api/stats` 与管理接口为准：
 
-- 视频 14,327
-- 语义块（content_chunks）60,259
-- 字幕片段 3,593,723
-- 有字幕视频 8,785
+- 视频 14,380
+- 语义块（content_chunks）98,271
+- 字幕片段 5,667,374（约 566 万）
+- 有字幕视频 14,160
 
 ## 六、起不来 / 页面打不开时
 

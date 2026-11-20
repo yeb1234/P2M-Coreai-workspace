@@ -5,6 +5,7 @@ export { usePomodoroStore } from './pomodoroStore';
 export { usePluginStore } from './pluginStore';
 export { useNotesStore } from './notesStore';
 export { useMdNotesStore } from './mdNotesStore';
+export { useNoteAiStore } from './noteAiStore';
 export { useNotificationStore } from './notificationStore';
 export { useAuthStore } from './authStore';
 export { useVideoStore } from './videoStore';

@@ -5,7 +5,7 @@ import { PLUGIN_STAGE_LABEL, PLUGIN_VERSIONS } from '../../config/pluginVersions
 import type { PluginStage } from '../../config/pluginVersions';
 
 type StageFilter = 'all' | PluginStage;
-type GroupFilter = 'all' | '日常' | '学习' | '工具';
+type GroupFilter = 'all' | '日常' | '学习' | '产品线' | '工具';
 
 const STAGE_STYLE: Record<PluginStage, string> = {
   stable: 'border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]',
@@ -110,6 +110,7 @@ export function PluginVersionsSection() {
             <option value="all">全部分组</option>
             <option value="日常">日常</option>
             <option value="学习">学习</option>
+            <option value="产品线">产品线</option>
             <option value="工具">工具</option>
           </select>
           <button

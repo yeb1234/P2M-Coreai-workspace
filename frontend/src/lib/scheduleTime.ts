@@ -41,6 +41,26 @@ export function hasScheduleTime<T extends Pick<ScheduleItem, 'startAt' | 'dueAt'
   return Boolean(item.startAt && item.dueAt);
 }
 
+/**
+ * 日期型 Todo：同一天 00:00 到 23:59。
+ *
+ * 这不是一个「24 小时工作块」，只是截止到某一天。历史上 UI 和番茄规划
+ * 都把它当真实时长，才出现「一整天 / 8 个番茄钟」两套口径。
+ */
+export function isAllDaySchedule(item: Pick<ScheduleItem, 'startAt' | 'dueAt'>): boolean {
+  if (!item.startAt || !item.dueAt) return false;
+  const start = new Date(item.startAt);
+  const due = new Date(item.dueAt);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(due.getTime())) return false;
+  return (
+    datePart(item.startAt) === datePart(item.dueAt)
+    && start.getHours() === 0
+    && start.getMinutes() === 0
+    && due.getHours() === 23
+    && due.getMinutes() === 59
+  );
+}
+
 export function getNextWholeHour(now = new Date()): { date: string; startTime: string; endTime: string; endDate: string } {
   const d = new Date(now);
   if (d.getMinutes() !== 0 || d.getSeconds() !== 0 || d.getMilliseconds() !== 0) {

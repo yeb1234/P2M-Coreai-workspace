@@ -134,6 +134,26 @@
 
 .mdn-new-btn:hover { background: var(--mdn-accent-strong); transform: translateY(-1px); }
 
+.mdn-sync-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border: 1px solid var(--mdn-line);
+  border-radius: 8px;
+  background: var(--mdn-paper);
+  color: var(--mdn-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.mdn-sync-btn:hover:not(:disabled) {
+  color: var(--mdn-accent);
+  border-color: var(--mdn-accent);
+  transform: translateY(-1px);
+}
+.mdn-sync-btn:disabled { opacity: 0.65; cursor: wait; }
+
 .mdn-library-collapse {
   display: grid;
   place-items: center;

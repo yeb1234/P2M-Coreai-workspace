@@ -12,6 +12,94 @@
 
 ---
 
+## 2026-11-20（P2 7.2 Lite，已合并 main）
+
+### 轻量 profile
+
+- 新增 `APP_PROFILE=lite`：后端只注册 auth / 用户数据 / 排程 / Agent / 记忆 / 笔记 / 动作审计 / 日历 / 面试 / 管理 / 资产登记 / MCP 12 组路由；视频、分类、AI 任务、检索、学习路径、观看事件、ops 7 组路由不导入。
+- 新增 `VITE_APP_PROFILE=lite`：前端保留工作台、待办、日历、周历、便签、笔记、番茄钟、时间中心、统计、面试 Agent、灵境小助手、设置 12 个业务页，另加视频检索 Mock、P2 Media、P2 Transcribe 3 个静态产品演示页；其余 17 个页面不注册，旧 hash 自动回工作台。
+- Lite 不建 `content_chunks` / `content_chunks_history`，不要求 `vector` 扩展；`/ready` 返回 `profile=lite`、`vectors=skipped (lite)`。
+- Lite 跳过视频扫描、缩略图、embedding 预热、雪碧图、内嵌转写 worker；不启动 RQ worker。
+- Agent 使用 7 个 Lite 能力包与 Lite 基础提示词，不再推荐站内视频；面试题、笔记、待办、日历链路保留，写动作仍走确认卡。
+- Lite 恢复 `/api/mcp`：MCP 路由改为全 profile 注册，Lite 只暴露 11 个实际可用的只读/原生工具（笔记、待办、日历、面试题、Lite 学习状态），不再返回 `search_videos`、`get_learning_profile` 等完整版工具；直接调用被裁工具会报 `KeyError`，完整版清单保持不变。
+- `/api/assistant/capabilities` 在 Lite 下只返回能力包真正会用的 10 个 Agent 工具，不再把视频推荐、学习路径、观看数据工具混进 Lite 能力清单；完整版仍返回全量 18 个工具。
+- Lite 新增“学习状态复盘”：`lite-study-review` 能力包调用 `get_lite_learning_status`，只看 Lite 自己的 Todo、日历、私人笔记、面试练习和每日使用痕迹，不编造视频观看/课程进度。
+- Lite 健康检查改为自己的口径：设置页只检查数据库、LLM 配置、站内数据和 Lite 能力边界，不再因没有 GPU、whisper.cpp、视频库而判红；数据库详情只回传 host/port/database/user，不再把带密码的 DSN 返回给前端。完整版健康检查共用脱敏详情。
+- 灵境小助手页在 Lite 下使用 Lite 工具/能力快照和 Lite 意图文案，MCP 总数按 11 回落，不再显示“实时清单读取失败”；课程推荐明确写“Lite 没有视频库，不推荐站内课程”。
+- 修复聊天助手正文不能选中复制：`.ai-md` 和消息气泡显式 `user-select: text`，每条回答增加“复制”按钮；`useDragResize` 在拖动结束/失焦/窗口外松开时恢复 `body.user-select`，避免整页不可选中。Media 与 Lite 共用该组件；Transcribe 控制台没有聊天框，不受影响。
+- 修复 AI 创建 Todo 的两处口径问题：同一条日期型 Todo 不再一边显示“全天”、一边按 00:00-23:59 反推成 8 个番茄；未显式设置时按 1 个番茄起算，旧 Todo 同样生效。
+- 修复未确认就写入个人数据：同步 `/api/assistant/chat` 收口为只读工具集；流式确认卡改为发放一次性写许可，四个写工具只认运行时许可，模型自己传 `confirm=true` 不再能绕过。
+- 修复本机 Media 被 Lite `dist` 覆盖：完整版 compose 把宿主机 `frontend/dist` 挂进容器，最后跑 Lite 构建后 Media 会显示 Lite 标题；已重新执行 full profile 构建，Media 页恢复为 `P2 7.2 Media · 灵境工作台`。
+- 修复“聊天说已保存、笔记页/便签页却看不到”：后端新增 `GET /api/notes/{id}`；聊天 `done` 事件按动作 `target_id` 把服务端笔记回填到对应 IndexedDB store（便签页进便签墙、笔记页进 Markdown 笔记），刷新和重开页面后仍在；撤回动作会同时清掉本地副本。
+- 修复聊天创建 Todo / 日历后插件页不刷新：`create_calendar_event` 统一写 `schedule_items`（不再写页面不读的 legacy `calendar_events`）；聊天 `done` 后自动刷新待办、日历、周历共用的 `scheduleStore`，撤回后同步重新对齐服务端。日期型 Todo/日程统一为当天 `00:00–23:59`，定时日程缺结束时间默认加 1 小时。
+- 修复笔记 AI“加入待办/加入日历”写到页面不读的数据模型：待办写入 `schedule_items` 并带 `start_at/due_at`；日程改走 `schedule_items`（不再写 legacy `calendar_events`），创建后立即刷新共用 store，已打开的待办/日历/周历页面无需重新进入。
+- 数据中心“日程管理”徽章改为统计 `schedule_items` 中未删除的 event，不再统计 legacy `calendar_events`，与日历页、周历、聊天动作同源。
+- 便签页保存当前便签时，完整正文随聊天请求一起提交，不再只给模型截断摘要；保存后同标题同正文不会在页面上生成第二条重复卡片。
+- 笔记页目录头新增“从服务端同步”按钮，可把已有私人笔记增量拉进本地；已存在的服务端 id 或同标题同正文会复用原条目，不重复插入。
+- Markdown 笔记页打开时、以及从别的窗口切回来时，会自动从服务端增量同步私人笔记，不再需要手动点“从服务端同步”；同步后保留当前正在编辑的笔记，不会把编辑区切到新导入的笔记。本地 `srv-*` 副本若不在服务端列表里，会逐条确认服务端是否已返回 404，只有确认删除才清理，避免列表分页或网络波动误删本地副本。
+- 便签与笔记改成两条独立同步链路：服务端 `notes` 表新增 `surface`（`sticky` / `md`，老数据和视频笔记默认 `md`），`GET /api/notes` 支持按 `surface` 过滤；聊天保存按当前页面把归属写进 `surface`，前端单篇回填也以服务端 `surface` 为准，长文不会塞进便签墙、短便签不会混进笔记页。
+- 修复笔记 AI 面板“切走再回来就没了”：面板开关、当前 tab、加载态、润色/摘要结果和待办/日程回执按 `noteId` 存进内存会话，不再挂在页面组件上。切到别的页面或别的笔记再回来，面板和结果仍在；慢请求继续跑完并按原笔记回填，不会写到当前另一篇。关闭面板不取消请求，重新打开恢复上次 tab。会话只在内存，整页刷新仍会丢失；不写浏览器持久存储，避免 AI 结果里的整篇正文被额外落盘。
+- 便签页接入自动同步：打开页面、切回窗口时拉取 `scope=private&surface=sticky` 的服务端便签；右上角新增“从服务端同步便签”按钮作手动兜底。服务端便签进入本地后仍会随 `p2m-notes-v1` 快照同步到其他设备；正在垃圾箱里的副本不会被自动复活，永久删除或清空垃圾箱时会同步删除服务端记录。
+- 修复番茄钟完成后“日历看不到专注记录、待办番茄数却加两次”：完成 work 阶段时 `pomodoroStore` 已写回待办计数和专注时长，`useCrossModuleSync` 不再重复累加，只补“是否达到计划番茄数”的完成状态；专注记录改写入日历页/周历共用的 `schedule_items`（`type=event`），不再写 legacy `calendar_events`。
+- 确认卡增加同步 in-flight 保护和自动滚入视口：同一 `run_id + interrupt_id` 双击只 resume 一次；新的待确认卡出现时滚动到可见位置，避免按钮滚出聊天面板后点不到。
+- 修复 Lite 后端重建/重启后，已弹出的确认卡再点「确认执行」只返回“请求失败”的问题：确认点原本只存在进程内 `MemorySaver`，进程一换就丢。现在 resume 找不到 checkpoint 时，会从 `AgentRun.steps` 取回已确认的工具名和参数，直接完成一次写入并生成动作回执；点 B 仍只取消不写，已完成的确认重复提交会被拒绝。已用“发起确认 → 重启 Lite backend → 点 A”实测，笔记正文完整落库，`provider=hitl-recovery`。Lite 与 Media 前后端镜像均已重建。
+- 修复发版后入口页仍命中旧 `index.html` 缓存、继续请求已删除旧 hash 资源导致白屏：nginx 的 SPA fallback 对入口文档加 `Cache-Control: no-store`，静态资源仍保持一年 immutable 缓存。
+
+### Lite Demo
+
+- 新增独立演示站 `http://127.0.0.1:12306`：独立库 `db_p2_demo`、Redis DB 5、Cookie `p2m_demo_session`，与正式 Lite 的 `db_p2` / DB 1 完全隔离。
+- Demo 登录页默认预填 `demo / P2Demo2026`，并显示“演示账号已填充”提示；普通 Lite / Media 构建不读取这组凭据，也不会预填。
+- Demo 自带 6 条便签、5 篇 Markdown 笔记、6 条待办、6 个日历事件、4 条番茄历史、4 次面试练习和 2 个 AI 会话；执行 seed 可一键恢复。
+- Demo 侧栏新增“产品线”分组：`#/video-preview` 是两层视频检索 Mock（检索列表 → 静态观看页），`#/media` 介绍真实 Media 的三路召回与 Agent 学习建议，`#/transcribe` 介绍独立控制台、管理升级与 AI 检测扩展。三页只读静态样例，不请求 Lite 后端；完整版 profile 不挂这些入口。
+
+### 共享数据底座
+
+- 新增 `infra/docker-compose.shared.yml`：一套 2GB PostgreSQL 16（与 P1 最终稿对齐；`shared_buffers=512MB`、`max_connections=30`）+ 一套 Redis（256MB、`noeviction`、AOF）。
+- 首次初始化按 `db_p1~db_p4` / `u_p1~u_p4` 建库建角色；P2 Lite 使用 `db_p2` + Redis DB 1 + `p2:` key 前缀。
+- 新增 `infra/docker-compose.lite.yml`：backend `640m`、frontend `96m`，默认入口 `12305` / API `12705`。本机与 P5 全栈并存时，只改本地 `.env` 为 `12315` / `12715`，默认 compose 保持不变。
+- Demo 默认入口 `12306` / API `12706`；本机与 P6 视频流水线并存时，只改 `infra/lite-demo/.env` 为 `12316` / `12716`。
+- P1 最终稿新增 `docker-compose.shared.yml` 与 `.env.shared.example`，可直接接 `db_p1` / Redis DB 0；P1 的 `ROLE_SQL` 增加“admin 非 superuser 时跳过改角色属性”的兼容，已在 `db_p1` 空库跑通 `/ready` 与 10 项 PG / RLS 检查。
+
+### 验收
+
+- 后端 99 项、前端 52 文件 / 406 用例通过；Media / Lite / Demo 构建均为 2700 modules，三套前端镜像均已按同一套代码重建。
+- Lite MCP / 能力清单 / 健康检查接口实测：`/api/mcp/tools` 返回 11 个 Lite 工具，`/api/assistant/capabilities` 返回 7 个 skill / 10 个 tool，`/api/admin/health` 为 `ok=true` 且数据库详情不含密码；灵境小助手页显示“7 个能力包 · 10 个 Agent 工具 · 11 个 MCP 工具”，设置页显示“核心服务正常”。
+- 便签 / 笔记隔离真实浏览器验收：服务端插入 `surface=sticky` 与 `surface=md` 各一篇，便签页重载后自动出现粘性便签（计数 3→4），Markdown 笔记页只出现 `md` 那篇并保留 B-4-1；便签页看不到 `md` 验收篇。删除服务端两篇测试记录后重载，便签页自动回落到 3 条、笔记页回落到原有 4 篇，无 `srv-*` 残留。
+- 本机 4 路并发 Agent 全部完成，P2 Lite 两容器峰值 189.8 MiB（backend 177.7 + frontend 12.1）。
+- 冒烟覆盖 `/ready`、登录、面试题、笔记、待办、日历、Lite Skill 清单；被裁路由返回 404。
+- 个人动作联动真实浏览器验收：聊天确认创建 Todo / 日历后页面即时出现；撤回后页面消失且数据库软删；点 B 取消不产生任何行；聊天待办可被番茄钟关联。便签页与 Markdown 笔记页分别验证“确认保存 → 页面计数 +1 / 卡片出现 → 撤回 → 计数回落、服务端笔记删除”；同一确认按钮双击只落一条 Todo。
+- Media 站点同代码链路用 API 级 SSE 验收：确认卡出现 A/B；选 A 后 `schedule_items` 出现待办；选 B 后不产生行；测试数据已删除。
+- 详见 [docs/2026-11-20-p2-7.2-lite.md](docs/2026-11-20-p2-7.2-lite.md)。
+
+---
+
+## 2026-11-20（P2 7.2 Media / P2 7.2 Transcribe）
+
+### 产品线拆分
+
+- 主站改为 **P2 7.2 Media**：视频播放、字幕阅读、字幕检索、笔记、学习路径继续保留；转写页、AI 任务中心、转写设置入口从正面移除，主站不再轮询转写任务。
+- 新增 **P2 7.2 Transcribe** 独立控制台：基于原流水线监控工作台改造，默认 `http://127.0.0.1:12703`，支持手动扫描视频库或子目录、筛选候选视频、预览与批量转写 / 补总结、暂停 / 恢复队列，并保留转写、向量、总结、ETA 和 worker 监控。
+- 控制台写操作经后端 `/api/ops` 受控接口执行，使用本机 `OPS_TOKEN`；不直接改数据库，也不复制第二套流水线。
+- 子目录扫描只 upsert 该范围，不触发全库缺失删除，避免“扫描课程 A 把课程 B 记录清掉”。
+
+### 界面与话术
+
+- 浏览器标签改为 `P2 7.2 Media · 灵境工作台`；普通页面标题为 `页面名 · P2 7.2 Media`；控制台标签为 `P2 7.2 Transcribe · 转写控制台`。
+- 视频页话术改为“本地视频学习、字幕浏览与智能总结”；无总结时明确提示“总结由 P2 Transcribe 生成后同步到这里”。
+- 设置页移除“转写设置”入口；插件版本台账移除转写页，视频插件摘要改为“视频检索、播放与字幕浏览；转写入口已移出主站”。
+- 控制台顶部改为 `P2 7.2 Transcribe`，控制区文案明确“主站只负责视频浏览与字幕阅读；扫描、转写、总结和队列操作统一在这里完成”。
+
+### 工程与安全
+
+- 新增 `OPS_TOKEN`；为空时 `/api/ops` 直接返回 503，避免控制面退化成无密码转写入口。
+- 控制台只绑定 `127.0.0.1`，不跟随主站暴露到局域网或公网。
+- 新增 `backend/app/routers/ops.py`、`artifacts/pipeline-monitor/transcribe_console.py`、`transcribe_console_overlay.html`。
+- 后端测试新增 OPS_TOKEN、扫描路径边界与扫描占锁等待用例，全量 71 项通过。
+- 控制台复用监控页的 logo 静态资源；暂停队列后按钮禁用状态跟随真实队列状态，不会被“操作完成”重新启用。
+- 手动扫描遇到启动扫描 / 轮询对账占锁时，控制台进入等待状态并自动重试，不再点一次就返回 `busy` 失败；最多等待 10 分钟。
+
+---
+
 ## 2026-11-21（7.0.0 Framework Registry）
 
 ### 配置资产版本库

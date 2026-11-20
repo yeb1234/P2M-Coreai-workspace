@@ -33,8 +33,9 @@ from app.services.rq_client import (
     send_kill_to_worker,
     summary_jobs_queue,
 )
+from app.services.redis_keys import p2_key
 
-_PAUSE_KEY = "ai_queue:paused"
+_PAUSE_KEY = p2_key("ai_queue:paused")
 
 
 def _job_timeout_seconds(db, job) -> int:

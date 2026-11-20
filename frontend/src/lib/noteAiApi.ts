@@ -1,6 +1,7 @@
 import { apiFetch } from './videoApi';
 import { createScheduleItem } from './scheduleApi';
-import { createCalendarEvent } from './calendarApi';
+import { refreshScheduleFromServer } from './scheduleSync';
+import { combineLocalDateTime, defaultDueAt } from './scheduleTime';
 
 export type NoteAiAction = 'summary' | 'polish' | 'actions';
 
@@ -49,29 +50,47 @@ export async function runNoteAi(input: {
 }
 
 export async function createTodoFromAi(item: NoteAiTodo): Promise<void> {
-  const description = [item.description?.trim(), item.due_date ? `建议截止：${item.due_date}` : '']
-    .filter(Boolean)
-    .join('\n');
+  const dueDate = item.due_date?.slice(0, 10);
+  const dueAt = dueDate ? combineLocalDateTime(dueDate, '23:59') : undefined;
+  const startAt = dueDate ? combineLocalDateTime(dueDate, '00:00') : undefined;
   await createScheduleItem({
     type: 'todo',
     title: item.title,
-    description,
+    description: item.description?.trim() || '',
     priority: item.priority || 'green',
     status: 'pending',
+    startAt,
+    dueAt,
   });
+  // 笔记 AI 的“加入待办”也写服务端 schedule_items；刷新共用 store，
+  // 否则已打开的待办 / 日历 / 周历页面要重新进入才能看到。
+  await refreshScheduleFromServer();
 }
 
 export async function createCalendarEventFromAi(item: NoteAiEvent): Promise<void> {
   if (!item.date) throw new Error('这条日程没有明确日期，先补上日期再创建');
-  await createCalendarEvent({
-    title: item.title,
-    date: item.date,
-    startTime: item.start_time || undefined,
-    endTime: item.end_time || undefined,
+  const date = item.date.slice(0, 10);
+  const startTime = item.start_time?.slice(0, 5);
+  const endTime = item.end_time?.slice(0, 5);
+  const startAt = startTime
+    ? combineLocalDateTime(date, startTime)
+    : combineLocalDateTime(date, '00:00');
+  const dueAt = endTime
+    ? combineLocalDateTime(date, endTime)
+    : startTime
+      ? defaultDueAt(startAt)
+      : combineLocalDateTime(date, '23:59');
+
+  // 日历页 / 周历读 scheduleStore；不能继续写 legacy calendar_events，
+  // 否则会出现“已加入日历”但页面永远看不到。
+  await createScheduleItem({
     type: 'event',
-    color: '#8b5cf6',
-    todoId: null,
-    pomodoroSessionId: null,
+    title: item.title,
     description: item.description || '',
+    status: 'pending',
+    priority: 'green',
+    startAt,
+    dueAt,
   });
+  await refreshScheduleFromServer();
 }

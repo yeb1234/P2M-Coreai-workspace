@@ -1,18 +1,18 @@
 # 灵境项目测试流程指南
 
-> 状态：部分现行（最后校对 2026-11-16）。命令与流程仍成立；第 3 节补入当前测试盘点（文件数、口径、覆盖缺口），旧文中与现状不符的例子已更正。
+> 状态：部分现行（最后校对 2026-11-20）。命令与流程仍成立；第 3 节补入当前测试盘点（文件数、口径、覆盖缺口），旧文中与现状不符的例子已更正。
 
 本文档记录项目推荐的测试方法与执行流程，覆盖从代码修改到上线前的完整验证链路。
 
-## 0. 测试盘点（2026-11-16 如实登记，不凑数）
+## 0. 测试盘点（2026-11-20 如实登记，不凑数）
 
 | 层 | 位置 | 数量与口径 | 形态 |
 |---|---|---|---|
-| 前端单元/组件 | `src/__tests__/` | **28** 个 `.test.ts` / `.test.tsx`（口径：该目录下文件计数） | Vitest + jsdom；其中 3 个 dashboard 相关测试（`dashboardCalendarTodoSync` / `dashboardPomodoroStatsSync` / `dashboardTodoNotesSummary`）属未提交的进行中工作流 |
+| 前端单元/组件 | `src/__tests__/` | **51** 个 `.test.ts` / `.test.tsx`（口径：该目录下文件计数） | Vitest + jsdom；覆盖 store、工具函数、关键组件与页面交互 |
 | 前端契约回归 | `tests/contracts/` | **1** 个 `.test.ts` | Vitest，`vitest.config.ts` 的 `include` 同时覆盖 `src/**/*.test.ts(x)` 与 `tests/contracts/**/*.test.ts` |
-| 前端合计 | `src/__tests__` + `tests/contracts` | **29** 个文件 / **232** 个用例 | 2026-11-16 `npm test` 全通过，20.88s |
+| 前端合计 | `src/__tests__` + `tests/contracts` | **52** 个文件 / **406** 个用例 | 2026-11-20 `npm test -- --run` 全通过 |
 | 前端 E2E | `tests/e2e/` | **1** 个 Playwright 规格 | 3 个 Chromium 项目（桌面 1440×900、窄屏 1024×768、Pixel 7 移动）；**没有** Firefox/WebKit 项目 |
-| 后端单元 | `backend/tests/` | **5** 个 `.py`：`test_ai_job_recovery.py`、`test_ai_job_rules.py`、`test_query_rewrite.py`、`test_sprite_quality.py`、`test_video_reference_intents.py`（口径：该目录下 `.py` 计数，不含 `__init__.py`） | 直接 import service 的单元级断言；2 个 `unittest.TestCase`、3 个裸 `def test_*`；`requirements.txt` 未引 pytest，无 `pytest.ini`/`conftest.py` |
+| 后端单元 | `backend/tests/` | **19** 个 `.py`（口径：该目录下 `.py` 计数） | service 直连的单元级断言，共 99 项；含 Lite profile、HITL 恢复、笔记 AI、动作联动、MCP 治理等 |
 | 后端在线校验脚本 | `backend/scripts/verify_fixes.py` | 1 个 | 起容器后用 `urllib` 打 `http://127.0.0.1:8000` 的针对性校验脚本，**不是** pytest 套件 |
 | 手动多账号脚本 | `backend/scripts/test_multi_user.py` | 1 个 | 手动脚本，不在自动测试链路里 |
 
@@ -96,7 +96,7 @@ npm run test:watch
 - **框架**：Vitest + jsdom + `@testing-library/react`
 - **覆盖范围**：工具函数、store 逻辑、组件渲染
 - **策略**：核心工具函数必须覆盖，UI 组件以关键交互为主
-- **盘点**：`src/__tests__/` 28 个文件 + `tests/contracts/` 1 个，合计 29 个文件、232 个用例；口径与清单见第 0 节
+- **盘点**：`src/__tests__/` 51 个文件 + `tests/contracts/` 1 个，合计 52 个文件、406 个用例；口径与清单见第 0 节
 
 ### 3.2 E2E 测试（Playwright）
 
@@ -114,12 +114,12 @@ npm run test:e2e
 ### 3.3 后端测试
 
 ```bash
-# 一条命令跑全部：8 个 unittest + 11 个裸函数
+# 一条命令跑全部：99 项
 docker compose exec backend python scripts/run_unit_tests.py
 ```
 
-- **现状**：5 个 `.py`，全部是 service 直连的单元级断言；2 个走 `unittest.TestCase`，3 个是裸 `def test_*` 函数
-- **2026-11-16 实测**：`unittest=8 failures=0 errors=0 bare=11/11`，合计 **19 条**
+- **现状**：19 个 `.py`，全部是 service 直连的单元级断言
+- **2026-11-20 实测**：99 项通过
 - **缺口**：**没有 API 级集成测试**（不起 `TestClient`、不按端点鉴权/隔离断言）；在线校验仍靠 `backend/scripts/verify_fixes.py` 这类脚本手动跑
 - `backend/scripts/run_unit_tests.py` 是本轮新增的统一 runner，不依赖 pytest；裸函数不再需要手工 import
 

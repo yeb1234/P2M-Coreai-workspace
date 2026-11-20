@@ -670,9 +670,26 @@ def _serialized_scan(fn):
 
 
 @_serialized_scan
-def scan_video_library() -> dict:
+def scan_video_library(target: str | None = None) -> dict:
+    """扫描视频库，或只扫描库内一个子目录。
+
+    target 为空时保持原来的整库行为：新增/更新后还会清理已消失的记录。
+    指定子目录时只 upsert 该范围，不做全库删除判断 —— 否则在控制台点
+    “扫描课程 A”会把课程 B 的记录当成丢失文件清掉。
+    """
     video_root = Path(settings.video_folder)
     video_root.mkdir(parents=True, exist_ok=True)
+    scan_root = video_root
+    prune_missing = True
+    if target:
+        candidate = Path(target)
+        if not candidate.is_absolute():
+            candidate = video_root / candidate
+        candidate = Path(_abs_path(candidate))
+        if not _is_under_video_root(candidate):
+            raise ValueError("扫描路径必须在视频库根目录内")
+        scan_root = candidate
+        prune_missing = False
 
     db = SessionLocal()
     try:
@@ -687,10 +704,14 @@ def scan_video_library() -> dict:
             if filename:
                 failed_dirs.add(_abs_path(filename))
 
-        for root, _dirs, files in os.walk(video_root, onerror=_onerror):
-            for filename in files:
-                if is_video(filename):
-                    all_files.append(Path(root) / filename)
+        if scan_root.is_file():
+            if is_video(scan_root):
+                all_files.append(scan_root)
+        else:
+            for root, _dirs, files in os.walk(scan_root, onerror=_onerror):
+                for filename in files:
+                    if is_video(filename):
+                        all_files.append(Path(root) / filename)
 
         all_files.sort(key=lambda item: natural_sort_key(item.name))
 
@@ -705,7 +726,9 @@ def scan_video_library() -> dict:
                 if video_id:
                     added_ids.append(video_id)
 
-        removed = remove_missing_videos(db, seen, failed_dirs)
+        removed = 0
+        if prune_missing:
+            removed = remove_missing_videos(db, seen, failed_dirs)
         if scan_errors:
             logger.warning(
                 "视频库扫描有 %s 个目录读取失败，跳过这些目录下的删除判断",
@@ -726,7 +749,14 @@ def scan_video_library() -> dict:
     for video_id in added_ids:
         auto_start_video_pipeline(video_id, reason="library_scan_new")
 
-    return {"status": "ok", "added": added, "removed": removed, "total": total}
+    return {
+        "status": "ok",
+        "added": added,
+        "removed": removed,
+        "total": total,
+        "scope": _abs_path(scan_root),
+        "pruned": prune_missing,
+    }
 
 
 class VideoFolderHandler(FileSystemEventHandler):

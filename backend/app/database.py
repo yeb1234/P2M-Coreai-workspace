@@ -52,6 +52,12 @@ DEFAULT_CORS_ORIGINS = (
 
 
 class Settings(BaseSettings):
+    # ---------------- 运行形态 ----------------
+    # full = P2 Media / Transcribe 完整工作台；lite = P2 Lite 云 demo。
+    # Lite 不建 pgvector、不跑视频扫描/缩略图/embedding/内嵌 worker，只保留
+    # Agent、面试题学习、笔记、待办与日历等 OLTP 能力。
+    app_profile: str = "full"
+
     # ---------------- 数据库 ----------------
     database_url: str = "postgresql+psycopg://p2user:p2user@localhost:5432/p2learning"
     db_pool_size: int = 10
@@ -143,6 +149,9 @@ class Settings(BaseSettings):
 
     # ---------------- 队列 ----------------
     redis_url: str = "redis://localhost:6379/0"
+    # 多项目共享一个 Redis 实例时的 key 命名空间。P2 Lite 用 p2:，
+    # 并配合 Redis DB 1 做逻辑隔离；业务 key 不允许裸写。
+    redis_key_prefix: str = "p2:"
     # 是否在 API 进程里内嵌一个 worker 子进程。
     #
     # True（默认）：单进程部署时也能跑转写，起一个子进程 + 监督线程，崩了重拉。
@@ -171,6 +180,9 @@ class Settings(BaseSettings):
     # ---------------- 安全 ----------------
     jwt_secret: str = "dev-only-change-me-please-set-JWT_SECRET-in-env"
     jwt_algorithm: str = "HS256"
+    # 本地运维控制台（P2 Transcribe）用的服务令牌。为空表示关闭 /api/ops。
+    # 只放在本机 .env 和控制台进程环境里，不进入前端，也不下发给浏览器。
+    ops_token: str = ""
     # 缩短到 12 小时：令牌泄露的暴露窗口直接砍半，配合 token_version 可强制下线
     jwt_expire_hours: int = 12
     cors_origins: str = DEFAULT_CORS_ORIGINS
@@ -205,6 +217,15 @@ class Settings(BaseSettings):
     @property
     def is_postgres(self) -> bool:
         return self.database_url.startswith("postgresql")
+
+    @property
+    def is_lite(self) -> bool:
+        """P2 Lite 形态：只跑无向量的 OLTP 业务。"""
+        return (self.app_profile or "").strip().lower() == "lite"
+
+    @property
+    def normalized_app_profile(self) -> str:
+        return "lite" if self.is_lite else "full"
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -333,13 +354,16 @@ def check_database(deep: bool = True) -> dict:
                     pgvector_version=row[1],
                     pg_trgm_version=row[2],
                 )
-            if deep:
+            if deep and not settings.is_lite:
                 # 深探针才查，浅探针每 30 秒一次，不该给库加无关负载
                 from app.tables import CONTENT_CHUNKS
 
                 info["content_chunks"] = connection.execute(
                     text(f"SELECT count(*) FROM {CONTENT_CHUNKS.name}")
                 ).scalar()
+            elif deep:
+                # Lite 没有 content_chunks；探针不能查一张故意不存在的表
+                info["content_chunks"] = "skipped (lite)"
     return info
 
 
@@ -539,13 +563,20 @@ def ensure_runtime_schema() -> None:
         with engine.connect() as lock_conn:
             _acquire_schema_lock(lock_conn)
             try:
-                # create_all 也纳入锁：worker 和 backend 以前各自先 create_all，
-                # 再进 ensure，DDL 仍可能在锁外并发。
-                Base.metadata.create_all(bind=engine)
-                _run_alembic_migrations()
-                from app.migrations import upgrade_postgres
+                if settings.is_lite:
+                    # Lite 不跑 Alembic：baseline 里包含 vector 扩展和 content_chunks，
+                    # 而 Lite 的目标库是普通 PostgreSQL，不能要求安装 pgvector。
+                    from app.migrations import upgrade_postgres_lite
 
-                upgrade_postgres(engine)
+                    upgrade_postgres_lite(engine)
+                else:
+                    # create_all 也纳入锁：worker 和 backend 以前各自先 create_all，
+                    # 再进 ensure，DDL 仍可能在锁外并发。
+                    Base.metadata.create_all(bind=engine)
+                    _run_alembic_migrations()
+                    from app.migrations import upgrade_postgres
+
+                    upgrade_postgres(engine)
             finally:
                 _release_schema_lock(lock_conn)
         return

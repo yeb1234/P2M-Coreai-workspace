@@ -32,9 +32,10 @@ def _is_model_in_hf_cache(model_id: str) -> bool:
         return False
 
 
-def rescan_library() -> dict:
-    result = scan_video_library()
-    generate_missing_thumbnails(limit=3)
+def rescan_library(target: str | None = None) -> dict:
+    result = scan_video_library(target=target)
+    if result.get("status") == "ok":
+        generate_missing_thumbnails(limit=3)
     return result
 
 

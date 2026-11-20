@@ -58,8 +58,10 @@ export const StatsPage: React.FC = () => {
   const todayStats = getTodayStats();
   // 概览卡片同一份投影：今日番茄 / 便签 / 今日事件，两边数字必须一致
   const quick = selectQuickStatsProjection({ items: scheduleItems, todayStats, notes, calendarEvents });
-  // 徽章「日程管理」按 legacy 日历事件全量计数，不随今日口径变（徽章不动）
-  const calendarEventTotal = Object.keys(calendarEvents).length;
+  // 徽章「日程管理」也改成和日历页同源：数 schedule_items 里的 event，
+  // 不再数 legacy calendar_events。聊天/笔记 AI 新建的日程都会进这个全集。
+  const calendarEventTotal = Object.values(scheduleItems)
+    .filter((item) => item.type === 'event' && !item.deletedAt).length;
 
   const weekStats = getWeekStats();
   const streak = getStreakDays(sessions);

@@ -1,26 +1,27 @@
-# SiteYeb / P2M 个人 IT 学习工作台
+# P2 7.2 Media / 灵境工作台
 
-> 状态：现行（最后校对 2026-11-21）
-> 当前发布：7.0.0 Framework Registry（2026-11-21）
+> 状态：现行（P2 7.2 产品线分叉）
+> 当前发布：P2 7.2 Media；配套 P2 7.2 Transcribe；P2 7.2 Lite 已验收并合并到 `main`
 
 一个本地优先的个人学习工作台：React 前端 + FastAPI 后端 + PostgreSQL 17（pgvector）+ Redis（RQ 队列）。把视频学习、笔记、待办、日历、番茄钟、时间中心、AI 助手和长期记忆放在一个界面里，本机和局域网都能用。
 
-> **7.0 Framework Registry（2026-11-21）**
+> **P2 7.2 产品线**
 >
-> 仓库改为标准 monorepo（`frontend/ backend/ configs/ infra/ ops/ artifacts/ data/ docs/`）；
-> 提示词、检索/向量参数、LLM 路由、数据库与工具治理配置进入 PostgreSQL 原生版本库，
-> 支持提交、分支、标签、diff、三路合并、回滚、发布写回与审计。
-> 设置 → 配置资产（管理员）可管理，也可直接打开 `/#/asset-registry`。
-> 详见 [docs/2026-11-21-7.0-framework-overhaul.md](docs/2026-11-21-7.0-framework-overhaul.md)。
+> - **P2 7.2 Media**：主站保留视频浏览、字幕阅读、视频检索、笔记与学习路径；转写入口从主站正面移除。
+> - **P2 7.2 Transcribe**：独立本机控制台（默认 `http://127.0.0.1:12703`），负责扫描路径、批量转写 / 总结、队列暂停与 worker 监控。
+> - **P2 7.2 Lite**：独立轻量 profile，不建 pgvector、不跑视频/转写/embedding/worker；只保留 Agent、面试题、笔记、待办、日历等 OLTP 页面，另带 3 个不接后端的静态产品演示页（视频检索 Mock / P2 Media / P2 Transcribe），与 P1 共用一套 2GB PostgreSQL 和 Redis（`db_p2` / Redis DB 1 / `p2:` key 前缀）。默认入口 `http://127.0.0.1:12305`；本机与 P5 同时运行时，本地 `.env` 使用 `12315` / `12715`。
+> - **P2 7.2 Lite Demo**：独立演示库 `db_p2_demo`（Redis DB 5 / `p2demo:`），默认入口 `http://127.0.0.1:12306`；本机与 P6 同时运行时，本地 `.env` 使用 `12316` / `12716`。登录页预填 `demo / P2Demo2026`，自带便签、笔记、待办、日历、番茄、面试和 AI 会话样例数据。导航另有“产品线”分组：视频检索 Mock、P2 Media 真能力、P2 Transcribe 控制台三页静态演示，不接 Lite 后端。部署与重置见 [infra/lite-demo/README.md](infra/lite-demo/README.md)。
+>
+> 拆分说明见 [docs/2026-11-20-p2-7.2-media-split.md](docs/2026-11-20-p2-7.2-media-split.md)；Lite 边界、共享库与内存验收见 [docs/2026-11-20-p2-7.2-lite.md](docs/2026-11-20-p2-7.2-lite.md)。
 
 项目目前偏个人使用，也欢迎拿去研究、改造和提交想法。定位是个人、家庭、小团队在可信局域网里使用的内部工具底座，不是开箱即用的公网 SaaS；要对外暴露前需要自行做权限、审计和安全加固。
 
-数据基线（截至 2026-11-16）：`videos` 14,327；`content_chunks` 60,259（向量覆盖 100%）；`subtitle_segments` 3,593,723；有字幕视频 8,785。
+数据基线（截至 2026-11-20 扫描）：`videos` 14,380；`content_chunks` 98,271（向量覆盖 100%）；`subtitle_segments` 5,667,374（约 566 万）；有字幕视频 14,160。
 
 ## 适合谁
 
 - 想把待办、日历、番茄钟、笔记、本地视频学习和 AI 助手放到一个工作台里的人。
-- 有一堆本地课程 / 会议 / 学习视频，希望转录、总结、续播和管理的人。
+- 有一堆本地课程 / 会议 / 学习视频，希望把转写放到独立控制台、主站专心浏览和检索的人。
 - 想在局域网里给自己几台设备或小团队共用一个轻量工具的人。
 - 想研究 React + FastAPI + PostgreSQL/pgvector + 本地 / 外部 LLM 工作流的人。
 
@@ -39,10 +40,10 @@
 
 ### 学习
 
-- IT 视频站：本地视频扫描、文件夹导航、继续观看、字幕、AI 总结、AI 任务中心；搜索支持「标题 / 文件夹」与「字幕内容」两种模式。
+- IT 视频站：本地视频浏览、文件夹导航、继续观看、字幕阅读、AI 总结；搜索支持「标题 / 文件夹」与「字幕内容」两种模式。主站不再提供扫描、转写或批量任务入口。
 - 学习路径：规划 Agent 按画像与目标产出分步路径，每一步绑定视频库里真实存在的视频，可直接跳转；进度会被对话 Agent 读取。
 - 学习轨迹：等级、本周对比、连续天数、成就徽章、90 天热力图。
-- 字幕转录王：文件夹勾选批量转写、AI 任务队列控制、模型下载状态可视化。
+- P2 Transcribe：独立于主站的本机控制台，支持手动扫描视频库子目录、按范围筛选候选视频、批量转写 / 补总结、暂停与恢复队列，并保留流水线监控。
 
 ### AI 助手与记忆
 
@@ -58,7 +59,7 @@
 
 ### 界面与配置
 
-- 左侧三组导航：日常 7 项 / 学习 9 项 / 工具 13 项，共 29 个注册页面（`frontend/src/config/pageRegistry.tsx`）；部分工具类页面仍是静态占位，带「施工中」标记。
+- 左侧三组导航：日常 8 项 / 学习 9 项 / 工具 12 项，共 29 个注册页面（`frontend/src/config/pageRegistry.tsx`）；部分工具类页面仍是静态占位，带「施工中」标记。
 - 主题系统（含按时间表自动切换调度）、声音 / 背景音、通知；Header 右上角可呼出主题调色板弹窗。
 
 ## 运行方式
@@ -135,15 +136,30 @@ npm run dev        # http://localhost:12322，/api 代理到 http://127.0.0.1:12
 | 12322 | 前端开发 | Vite 热更新，只在 `npm run dev` 时占用；`/api` 代理到 `127.0.0.1:12302` |
 | 12502 | PostgreSQL | 只绑 `127.0.0.1`，不对外 |
 | 12602 | Redis | 只绑 `127.0.0.1`，不对外 |
-| 监控 | 未分配 | 监控段未分配；旧 11162 作废，不再预留 |
+| 12702 | 只读流水线监控 | `artifacts/pipeline-monitor/monitor_server.py`，只读看板 |
+| 12703 | P2 Transcribe 控制台 | 独立本机进程，绑定 `127.0.0.1`；扫描、批量入队、队列暂停与监控 |
+| 12305 / 12705 | P2 Lite | 默认入口 / API；本机全项目并存时改用 `12315` / `12715`，避开 P5 的 `12305` / `12705` |
+| 12306 / 12706 | P2 Lite Demo | 默认入口 / API；本机全项目并存时改用 `12316` / `12716`，避开 P6 的 `12306` / `12706` |
 | 1234 / 1235 | 宿主机本地模型 | LM Studio；容器内用 `host.docker.internal:1234` / `1235` |
 | 11434 | Ollama | 备选本地 LLM |
 
-`worker` 不暴露宿主端口；`backend` 仅把容器内 `8000` 映射到回环 `12402`，对外请求仍全部经 nginx `/api` 转发。
+`worker` 不暴露宿主端口；`backend` 仅把容器内 `8000` 映射到回环 `12402`，对外请求仍全部经 nginx `/api` 转发。Lite / Demo 的默认端口写在 `infra/lite/.env.example` 与 `infra/lite-demo/.env.example`；本机多项目并存只改各自的本地 `.env`，不动 compose 默认值。
 
-## 视频转录
+## P2 Transcribe 控制台
 
-目前两条路线：
+转写已从主站移动到 **P2 7.2 Transcribe**。主站只展示已有字幕和总结，不再轮询 AI 任务、不再提供转写按钮，也不提供视频库扫描入口。
+
+启动控制台：
+
+```bash
+python artifacts/pipeline-monitor/transcribe_console.py
+# 或者 Windows 双击 ops\p2-transcribe.bat
+# 浏览器打开 http://127.0.0.1:12703
+```
+
+控制台通过 `OPS_TOKEN` 调后端 `/api/ops`，只绑定本机回环。先在 `.env` 设置 `OPS_TOKEN`，再重建 backend；控制台会读取同一份 `.env`。
+
+目前两条转写路线仍在后端 worker 中执行：
 
 - CPU 路线：`faster-whisper`，相对通用，CPU 部分正常。
 - 外部引擎路线：`whisper.cpp`，本机为了 A 卡做过 Windows 兼容层。
@@ -200,7 +216,9 @@ npm run test:e2e
 cd ../backend && python -m compileall app
 ```
 
-测试基线（7.0）：前端 34 文件 / 335 项；后端容器内 62 项；工具路由评估 72 cases / 1 probe / 0 failures。
+测试基线（P2 7.2 Media）：前端 52 文件 / 406 用例（共享代码）；后端 99 项；Media 构建 2700 modules，前端/后端镜像已按同一套代码重建。
+
+测试基线（P2 7.2 Lite）：后端 99 项（含 profile 边界、Lite 学习状态、动作联动、确认卡跨重启恢复、Lite MCP/能力清单/健康检查、Demo 登录预填）；前端 52 文件 / 406 用例；Lite / Demo 构建 2700 modules；4 路并发 Agent 峰值 189.8 MiB（backend 177.7 + frontend 12.1）。
 
 日常改前端时至少跑：
 

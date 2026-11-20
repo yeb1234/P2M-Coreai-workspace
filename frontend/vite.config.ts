@@ -2,9 +2,29 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 
+// 构建期产品形态；Dockerfile 用 VITE_APP_PROFILE 传入。
+const appProfile = (process.env.VITE_APP_PROFILE || 'full').trim().toLowerCase()
+const isLite = appProfile === 'lite'
+
+// index.html 在 JS 执行前就要有正确标题，避免 Lite 首屏闪一下 Media。
+const appProfileHtmlPlugin = {
+  name: 'p2-app-profile-html',
+  transformIndexHtml(html: string) {
+    if (!isLite) return html
+    return html
+      .replaceAll('P2 7.2 Media 灵境工作台', 'P2 7.2 Lite 灵境工作台')
+      .replaceAll('P2 7.2 Media · 灵境工作台', 'P2 7.2 Lite · 灵境工作台')
+      .replaceAll('P2 7.2 Media', 'P2 7.2 Lite')
+      .replace(
+        '待办、日历、笔记、视频浏览、学习路径与 AI Agent。转写已迁移到独立控制台。',
+        '待办、日历、笔记、面试题学习与 AI Agent。视频与转写不在本版本。',
+      )
+  },
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), appProfileHtmlPlugin],
   resolve: {
     alias: {
       '@configs': path.resolve(__dirname, '../configs'),

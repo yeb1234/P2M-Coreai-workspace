@@ -12,7 +12,7 @@ import type { ActiveView } from '../stores/uiStore';
 
 const DEFAULT_ORDER: ActiveView[] = [
   'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'pomodoro', 'timecenter',
-  'health', 'video', 'transcriber', 'compare', 'shop', 'esports',
+  'health', 'video', 'compare', 'shop', 'esports',
   'stats', 'reader', 'snippets', 'habits',
   'flashcards', 'bookmarks', 'tokens',
   'leetcode', 'interview', 'codenav', 'aiagent', 'openclaw', 'hermes',

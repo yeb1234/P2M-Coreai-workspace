@@ -529,7 +529,7 @@ export async function streamAssistantChat(
     sessionId?: string;
     pageContext?: string;
     /** 当前笔记完整正文，供聊天工具保存；不放进提示词 */
-    pageNote?: { title: string; markdown: string };
+    pageNote?: { title: string; markdown: string; surface?: 'sticky' | 'md' };
     systemPrompt?: string;
     videoId?: number;
     /** 前端 detectIntent() 识别到的意图 id，随请求存库，历史会话还原时用 */

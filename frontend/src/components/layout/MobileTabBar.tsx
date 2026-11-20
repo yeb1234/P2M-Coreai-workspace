@@ -3,16 +3,18 @@ import {
   LayoutDashboard,
   LayoutGrid,
   ListTodo,
+  MessageSquare,
   PlayCircle,
   Sparkles,
   Timer,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { VIEW_PATH, preloadPage } from '../../config/pageRegistry';
+import { IS_LITE } from '../../config/appProfile';
 import type { ActiveView } from '../../stores/uiStore';
 
 interface RouteTab {
-  id: Extract<ActiveView, 'dashboard' | 'todo' | 'pomodoro' | 'video'>;
+  id: Extract<ActiveView, 'dashboard' | 'todo' | 'pomodoro' | 'video' | 'interview'>;
   label: string;
   icon: React.ReactNode;
 }
@@ -30,7 +32,9 @@ const ROUTE_TABS: RouteTab[] = [
   { id: 'dashboard', label: '工作台', icon: <LayoutDashboard size={20} /> },
   { id: 'todo', label: '待办', icon: <ListTodo size={20} /> },
   { id: 'pomodoro', label: '番茄', icon: <Timer size={20} /> },
-  { id: 'video', label: '视频', icon: <PlayCircle size={20} /> },
+  IS_LITE
+    ? { id: 'interview', label: '面试', icon: <MessageSquare size={20} /> }
+    : { id: 'video', label: '视频', icon: <PlayCircle size={20} /> },
 ];
 
 const itemClass = (active: boolean) =>

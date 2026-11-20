@@ -55,7 +55,9 @@ def _cache_client():
 
 
 def _profile_cache_key(user_id: int) -> str:
-    return f"{_PROFILE_CACHE_PREFIX}{user_id}"
+    from app.services.redis_keys import p2_key
+
+    return p2_key(f"{_PROFILE_CACHE_PREFIX}{user_id}")
 
 
 def invalidate_profile_cache(user_id: int | None) -> None:

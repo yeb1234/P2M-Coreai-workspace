@@ -5,7 +5,7 @@ export type PluginStage = 'stable' | 'beta' | 'dev';
 export interface PluginVersionMeta {
   version: string;
   updatedAt: string;
-  group: '日常' | '学习' | '工具';
+  group: '日常' | '学习' | '产品线' | '工具';
   stage: PluginStage;
   summary: string;
 }
@@ -27,10 +27,12 @@ export const PLUGIN_VERSIONS: Record<ActiveView, PluginVersionMeta> = {
   mdnotes: { version: '1.2.0', updatedAt: '2026-11-20', group: '日常', stage: 'stable', summary: '独立窗口、三栏拖拽、编辑/预览可折叠' },
   pomodoro: { version: '1.1.0', updatedAt: '2026-11-17', group: '日常', stage: 'stable', summary: '番茄计时与跨页保持' },
   timecenter: { version: '1.1.0', updatedAt: '2026-11-17', group: '日常', stage: 'stable', summary: '时间中心统一收口待办与日程' },
-  video: { version: '1.1.0', updatedAt: '2026-11-18', group: '学习', stage: 'stable', summary: '视频检索、播放与转写入口' },
+  video: { version: '1.2.0', updatedAt: '2026-11-20', group: '学习', stage: 'stable', summary: '视频检索、播放与字幕浏览；转写入口已移出主站' },
+  videopreview: { version: '1.0.0', updatedAt: '2026-11-20', group: '产品线', stage: 'beta', summary: 'P2 Media 视频检索与静态观看演示入口' },
+  media: { version: '1.0.0', updatedAt: '2026-11-20', group: '产品线', stage: 'stable', summary: '真实视频检索、字幕命中与 Agent 学习建议说明' },
+  transcribe: { version: '1.0.0', updatedAt: '2026-11-20', group: '产品线', stage: 'stable', summary: '独立转写控制台与 AI 检测类应用说明' },
   learning: { version: '1.1.1', updatedAt: '2026-11-20', group: '学习', stage: 'stable', summary: '每日投入上限扩到 10 小时' },
   journey: { version: '1.0.0', updatedAt: '2026-11-16', group: '学习', stage: 'stable', summary: '学习轨迹与阶段复盘' },
-  transcriber: { version: '1.1.1', updatedAt: '2026-11-20', group: '学习', stage: 'stable', summary: '单 worker 默认、自适应轮询与轻负载' },
   health: { version: '0.1.0', updatedAt: '2026-11-16', group: '工具', stage: 'dev', summary: '健康记录占位页' },
   compare: { version: '0.1.0', updatedAt: '2026-11-16', group: '工具', stage: 'dev', summary: '产品对比占位页' },
   shop: { version: '0.1.0', updatedAt: '2026-11-16', group: '工具', stage: 'dev', summary: '电商中心占位页' },
