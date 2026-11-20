@@ -556,7 +556,7 @@ await upsertUser(currentUser!, newHash);   // 只改了浏览器 IndexedDB
 1. `flushAllPending()` 改为可 `await`，登出时**先落盘再清会话**（顺序反了数据就丢）
 2. IndexedDB 的 key 加用户前缀 `u{id}:{key}`。后端本来就按 `user_id` 隔离，
    但 IndexedDB 是「后端不可用时的兜底」，不分区就会把上一个人的数据当自己的读
-3. 登录/登出后**整页重载**。各 store 的内存状态都是上一个账号的（现行 `src/stores/` 12 个 zustand store，口径见 `project-structure.md`），
+3. 登录/登出后**整页重载**。各 store 的内存状态都是上一个账号的（现行 `src/stores/` 15 个 zustand store，口径见 `docs/README.md`），
    只换 authStore 的字段会留下一大堆脏数据
 
 第 3 点看起来笨，但它是最可靠的隔离手段 —— 不用逐个 store 写清理逻辑，

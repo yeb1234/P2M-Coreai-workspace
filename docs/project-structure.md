@@ -6,6 +6,8 @@
 > 现有结构为 `frontend/ backend/ configs/ infra/ ops/ artifacts/ data/ docs/`，
 > 详见 [2026-11-21-7.0-framework-overhaul.md](2026-11-21-7.0-framework-overhaul.md)。
 > 本文第一节是 6.0 旧根目录的现状留档；第二至五节关于 `backend/app/services/` 再分层的提案仍未执行。
+>
+> **2026-11-20 7.2 合并后计数**：前端完整版 29 页 + 3 个 Lite-only 静态页；`src/stores/` 15 个、`src/hooks/` 13 个、前端测试 52 文件 / 406 用例。本文第一节仍是 6.0 留档，不按现行计数使用。
 
 > **结论（2026-11-16 对 services 再分层的决定）：暂不做。**
 >

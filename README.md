@@ -1,7 +1,7 @@
 # P2 7.2 Media / 灵境工作台
 
 > 状态：现行（P2 7.2 产品线分叉）
-> 当前发布：P2 7.2 Media；配套 P2 7.2 Transcribe；P2 7.2 Lite 已在 `feat/p2-lite` 实测
+> 当前发布：P2 7.2 Media；配套 P2 7.2 Transcribe；P2 7.2 Lite 已验收并合并到 `main`
 
 一个本地优先的个人学习工作台：React 前端 + FastAPI 后端 + PostgreSQL 17（pgvector）+ Redis（RQ 队列）。把视频学习、笔记、待办、日历、番茄钟、时间中心、AI 助手和长期记忆放在一个界面里，本机和局域网都能用。
 
@@ -9,14 +9,14 @@
 >
 > - **P2 7.2 Media**：主站保留视频浏览、字幕阅读、视频检索、笔记与学习路径；转写入口从主站正面移除。
 > - **P2 7.2 Transcribe**：独立本机控制台（默认 `http://127.0.0.1:12703`），负责扫描路径、批量转写 / 总结、队列暂停与 worker 监控。
-> - **P2 7.2 Lite**：独立轻量 profile，不建 pgvector、不跑视频/转写/embedding/worker；只保留 Agent、面试题、笔记、待办、日历等 OLTP 页面，另带 3 个不接后端的静态产品演示页（视频检索 Mock / P2 Media / P2 Transcribe），与 P1 共用一套 2GB PostgreSQL 和 Redis（`db_p2` / Redis DB 1 / `p2:` key 前缀）。默认入口 `http://127.0.0.1:12305`。
-> - **P2 7.2 Lite Demo**：独立演示库 `db_p2_demo`（Redis DB 5 / `p2demo:`），入口 `http://127.0.0.1:12306`；登录页预填 `demo / P2Demo2026`，自带便签、笔记、待办、日历、番茄、面试和 AI 会话样例数据。导航另有“产品线”分组：视频检索 Mock、P2 Media 真能力、P2 Transcribe 控制台三页静态演示，不接 Lite 后端。部署与重置见 [infra/lite-demo/README.md](infra/lite-demo/README.md)。
+> - **P2 7.2 Lite**：独立轻量 profile，不建 pgvector、不跑视频/转写/embedding/worker；只保留 Agent、面试题、笔记、待办、日历等 OLTP 页面，另带 3 个不接后端的静态产品演示页（视频检索 Mock / P2 Media / P2 Transcribe），与 P1 共用一套 2GB PostgreSQL 和 Redis（`db_p2` / Redis DB 1 / `p2:` key 前缀）。默认入口 `http://127.0.0.1:12305`；本机与 P5 同时运行时，本地 `.env` 使用 `12315` / `12715`。
+> - **P2 7.2 Lite Demo**：独立演示库 `db_p2_demo`（Redis DB 5 / `p2demo:`），默认入口 `http://127.0.0.1:12306`；本机与 P6 同时运行时，本地 `.env` 使用 `12316` / `12716`。登录页预填 `demo / P2Demo2026`，自带便签、笔记、待办、日历、番茄、面试和 AI 会话样例数据。导航另有“产品线”分组：视频检索 Mock、P2 Media 真能力、P2 Transcribe 控制台三页静态演示，不接 Lite 后端。部署与重置见 [infra/lite-demo/README.md](infra/lite-demo/README.md)。
 >
 > 拆分说明见 [docs/2026-11-20-p2-7.2-media-split.md](docs/2026-11-20-p2-7.2-media-split.md)；Lite 边界、共享库与内存验收见 [docs/2026-11-20-p2-7.2-lite.md](docs/2026-11-20-p2-7.2-lite.md)。
 
 项目目前偏个人使用，也欢迎拿去研究、改造和提交想法。定位是个人、家庭、小团队在可信局域网里使用的内部工具底座，不是开箱即用的公网 SaaS；要对外暴露前需要自行做权限、审计和安全加固。
 
-数据基线（截至 2026-11-20 扫描）：`videos` 14,380；`content_chunks` 60,259（向量覆盖 100%）；`subtitle_segments` 3,593,723；有字幕视频 14,157。
+数据基线（截至 2026-11-20 扫描）：`videos` 14,380；`content_chunks` 98,271（向量覆盖 100%）；`subtitle_segments` 5,667,374（约 566 万）；有字幕视频 14,160。
 
 ## 适合谁
 
@@ -138,10 +138,12 @@ npm run dev        # http://localhost:12322，/api 代理到 http://127.0.0.1:12
 | 12602 | Redis | 只绑 `127.0.0.1`，不对外 |
 | 12702 | 只读流水线监控 | `artifacts/pipeline-monitor/monitor_server.py`，只读看板 |
 | 12703 | P2 Transcribe 控制台 | 独立本机进程，绑定 `127.0.0.1`；扫描、批量入队、队列暂停与监控 |
+| 12305 / 12705 | P2 Lite | 默认入口 / API；本机全项目并存时改用 `12315` / `12715`，避开 P5 的 `12305` / `12705` |
+| 12306 / 12706 | P2 Lite Demo | 默认入口 / API；本机全项目并存时改用 `12316` / `12716`，避开 P6 的 `12306` / `12706` |
 | 1234 / 1235 | 宿主机本地模型 | LM Studio；容器内用 `host.docker.internal:1234` / `1235` |
 | 11434 | Ollama | 备选本地 LLM |
 
-`worker` 不暴露宿主端口；`backend` 仅把容器内 `8000` 映射到回环 `12402`，对外请求仍全部经 nginx `/api` 转发。
+`worker` 不暴露宿主端口；`backend` 仅把容器内 `8000` 映射到回环 `12402`，对外请求仍全部经 nginx `/api` 转发。Lite / Demo 的默认端口写在 `infra/lite/.env.example` 与 `infra/lite-demo/.env.example`；本机多项目并存只改各自的本地 `.env`，不动 compose 默认值。
 
 ## P2 Transcribe 控制台
 

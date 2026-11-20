@@ -1,6 +1,6 @@
 # 数据库迁移机制
 
-> 状态：事实已核实（核对基线 2026-11-16）
+> 状态：事实已核实（核对基线 2026-11-20）
 
 ## 一、两套机制并存（2026-11-16 现状，不是「已全部迁完」）
 
@@ -83,7 +83,7 @@ alembic upgrade head     # 升到 head
 
 ## 六、模型对齐口径
 
-- `models.py` 共 21 个 ORM 模型，挂在 `Base.metadata`（`backend/app/models.py`，`__tablename__` 计数 21）。
+- `models.py` 共 34 个 ORM 模型，挂在 `Base.metadata`（`backend/app/models.py`，`__tablename__` 计数 34）。
 - `content_chunks` 不在此映射内，见第三节。
 - 旧文档里「49 个索引」「262 列、82 个索引完全一致」等列/索引计数，是 2026-11-16 首次引入 baseline 时的实测数字，本次未对当前库复核；需要精确数字时在库内 `information_schema` 现查。
 

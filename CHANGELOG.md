@@ -12,7 +12,7 @@
 
 ---
 
-## 2026-11-20（P2 7.2 Lite，feat/p2-lite）
+## 2026-11-20（P2 7.2 Lite，已合并 main）
 
 ### 轻量 profile
 
@@ -56,12 +56,13 @@
 
 - 新增 `infra/docker-compose.shared.yml`：一套 2GB PostgreSQL 16（与 P1 最终稿对齐；`shared_buffers=512MB`、`max_connections=30`）+ 一套 Redis（256MB、`noeviction`、AOF）。
 - 首次初始化按 `db_p1~db_p4` / `u_p1~u_p4` 建库建角色；P2 Lite 使用 `db_p2` + Redis DB 1 + `p2:` key 前缀。
-- 新增 `infra/docker-compose.lite.yml`：backend `640m`、frontend `96m`，默认入口 `12305` / API `12705`。
+- 新增 `infra/docker-compose.lite.yml`：backend `640m`、frontend `96m`，默认入口 `12305` / API `12705`。本机与 P5 全栈并存时，只改本地 `.env` 为 `12315` / `12715`，默认 compose 保持不变。
+- Demo 默认入口 `12306` / API `12706`；本机与 P6 视频流水线并存时，只改 `infra/lite-demo/.env` 为 `12316` / `12716`。
 - P1 最终稿新增 `docker-compose.shared.yml` 与 `.env.shared.example`，可直接接 `db_p1` / Redis DB 0；P1 的 `ROLE_SQL` 增加“admin 非 superuser 时跳过改角色属性”的兼容，已在 `db_p1` 空库跑通 `/ready` 与 10 项 PG / RLS 检查。
 
 ### 验收
 
-- 后端 99 项、前端 48 文件 / 394 用例通过；Media / Lite / Demo 构建均为 2694 modules，三套前端镜像均已按同一套代码重建。
+- 后端 99 项、前端 52 文件 / 406 用例通过；Media / Lite / Demo 构建均为 2700 modules，三套前端镜像均已按同一套代码重建。
 - Lite MCP / 能力清单 / 健康检查接口实测：`/api/mcp/tools` 返回 11 个 Lite 工具，`/api/assistant/capabilities` 返回 7 个 skill / 10 个 tool，`/api/admin/health` 为 `ok=true` 且数据库详情不含密码；灵境小助手页显示“7 个能力包 · 10 个 Agent 工具 · 11 个 MCP 工具”，设置页显示“核心服务正常”。
 - 便签 / 笔记隔离真实浏览器验收：服务端插入 `surface=sticky` 与 `surface=md` 各一篇，便签页重载后自动出现粘性便签（计数 3→4），Markdown 笔记页只出现 `md` 那篇并保留 B-4-1；便签页看不到 `md` 验收篇。删除服务端两篇测试记录后重载，便签页自动回落到 3 条、笔记页回落到原有 4 篇，无 `srv-*` 残留。
 - 本机 4 路并发 Agent 全部完成，P2 Lite 两容器峰值 189.8 MiB（backend 177.7 + frontend 12.1）。
