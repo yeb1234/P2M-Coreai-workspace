@@ -118,10 +118,10 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```bash
 cd backend
 python -m compileall app
-python scripts/run_unit_tests.py
+python -m pytest tests -q
 ```
 
-`backend/tests` 共 19 个测试文件、99 项断言，由 `scripts/run_unit_tests.py` 统一执行；仓库根 `tests/` 下只有 `contracts` 与 `e2e`，后端没有 API 级集成测试。
+`backend/tests` 共 19 个测试文件、99 项；多数是 service 直连单元断言，部分用 `monkeypatch` / 临时库 fixture。`pytest` 只在开发 venv 里安装，运行镜像没有；容器内不要用 `scripts/run_unit_tests.py` 代替全量 pytest，它只覆盖 `unittest.TestCase` 和无 fixture 的裸函数。
 
 回归脚本：
 

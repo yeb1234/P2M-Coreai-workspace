@@ -114,14 +114,16 @@ npm run test:e2e
 ### 3.3 后端测试
 
 ```bash
-# 一条命令跑全部：99 项
-docker compose exec backend python scripts/run_unit_tests.py
+# 宿主机开发 venv（运行镜像没装 pytest）
+cd backend
+python -m pytest tests -q
+# Windows 本机：backend\.venv311\Scripts\python.exe -m pytest tests -q
 ```
 
-- **现状**：19 个 `.py`，全部是 service 直连的单元级断言
-- **2026-11-20 实测**：99 项通过
+- **现状**：19 个 `.py`，99 项；多数是 service 直连单元断言，部分用例使用 `monkeypatch` / 临时库 fixture
+- **2026-11-20 实测**：宿主环境 98 项通过；`test_lite_health_uses_lite_boundary` 因外部 LLM 健康探测未返回而未完成，不是断言失败。此前容器基线为 99 项通过
 - **缺口**：**没有 API 级集成测试**（不起 `TestClient`、不按端点鉴权/隔离断言）；在线校验仍靠 `backend/scripts/verify_fixes.py` 这类脚本手动跑
-- `backend/scripts/run_unit_tests.py` 是本轮新增的统一 runner，不依赖 pytest；裸函数不再需要手工 import
+- `backend/scripts/run_unit_tests.py` 只覆盖 `unittest.TestCase` 和无 fixture 的裸函数，新增 fixture 用例后已不能作为全量入口，统一改用 pytest。
 
 ---
 
