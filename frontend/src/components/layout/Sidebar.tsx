@@ -18,7 +18,7 @@ const NAV_GROUPS: NavGroup<ActiveView>[] = [
   },
   {
     label: '学习',
-    ids: ['bookmarks', 'learning', 'journey', 'video', 'transcriber', 'flashcards', 'leetcode', 'interview', 'reader', 'snippets'],
+    ids: ['bookmarks', 'learning', 'journey', 'video', 'flashcards', 'leetcode', 'interview', 'reader', 'snippets'],
   },
   {
     label: '工具',

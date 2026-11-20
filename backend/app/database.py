@@ -171,6 +171,9 @@ class Settings(BaseSettings):
     # ---------------- 安全 ----------------
     jwt_secret: str = "dev-only-change-me-please-set-JWT_SECRET-in-env"
     jwt_algorithm: str = "HS256"
+    # 本地运维控制台（P2 Transcribe）用的服务令牌。为空表示关闭 /api/ops。
+    # 只放在本机 .env 和控制台进程环境里，不进入前端，也不下发给浏览器。
+    ops_token: str = ""
     # 缩短到 12 小时：令牌泄露的暴露窗口直接砍半，配合 token_version 可强制下线
     jwt_expire_hours: int = 12
     cors_origins: str = DEFAULT_CORS_ORIGINS

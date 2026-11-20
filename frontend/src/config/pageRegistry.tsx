@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ListTodo, Calendar, StickyNote, Timer, PlayCircle, BarChart3,
   BookOpen, Code2, Target, Layers, Bookmark, Heart, GitCompare, ShoppingCart,
   Trophy, Coins, MessageSquare, Compass, Bot, Package, Workflow, Settings,
-  AlarmClock, Captions, Route, Activity, FileText,
+  AlarmClock, Route, Activity, FileText,
 } from 'lucide-react';
 import type { ActiveView } from '../stores/uiStore';
 
@@ -25,7 +25,6 @@ const TimeCenterPage = lazyPage(() => import('../components/timecenter/TimeCente
 const VideoPage = lazyPage(() => import('../components/video/VideoPage'), 'VideoPage');
 const LearningPathPage = lazyPage(() => import('../components/learning/LearningPathPage'), 'LearningPathPage');
 const JourneyPage = lazyPage(() => import('../components/journey/JourneyPage'), 'JourneyPage');
-const TranscriberPage = lazyPage(() => import('../components/transcriber/TranscriberPage'), 'TranscriberPage');
 const HealthPage = lazyPage(() => import('../components/health/HealthPage'), 'HealthPage');
 const ComparePage = lazyPage(() => import('../components/compare/ComparePage'), 'ComparePage');
 const ShopPage = lazyPage(() => import('../components/shop/ShopPage'), 'ShopPage');
@@ -68,7 +67,6 @@ const PAGE_LOADERS: Record<ActiveView, () => Promise<unknown>> = {
   video: () => import('../components/video/VideoPage'),
   learning: () => import('../components/learning/LearningPathPage'),
   journey: () => import('../components/journey/JourneyPage'),
-  transcriber: () => import('../components/transcriber/TranscriberPage'),
   health: () => import('../components/health/HealthPage'),
   compare: () => import('../components/compare/ComparePage'),
   shop: () => import('../components/shop/ShopPage'),
@@ -124,7 +122,6 @@ export const PAGES: PageEntry[] = [
   { id: 'learning', path: 'learning', component: LearningPathPage, label: '学习路径', icon: <Route size={20} />, color: 'text-[var(--success)]' },
   { id: 'bookmarks', path: 'bookmarks', component: BookmarksPage, label: '书签收藏', icon: <Bookmark size={20} />, color: 'text-[#06b6d4]' },
   { id: 'journey', path: 'journey', component: JourneyPage, label: '学习轨迹', icon: <Activity size={20} />, color: 'text-[var(--accent)]' },
-  { id: 'transcriber', path: 'transcriber', component: TranscriberPage, label: '字幕转录王', icon: <Captions size={20} />, color: 'text-[#06b6d4]' },
   { id: 'health', path: 'health', component: HealthPage, label: '健康助手', icon: <Heart size={20} />, color: 'text-[#ec4899]', dev: true },
   { id: 'compare', path: 'compare', component: ComparePage, label: '产品对比', icon: <GitCompare size={20} />, color: 'text-[#06b6d4]', dev: true },
   { id: 'shop', path: 'shop', component: ShopPage, label: '电商中心', icon: <ShoppingCart size={20} />, color: 'text-[var(--warn)]', dev: true },

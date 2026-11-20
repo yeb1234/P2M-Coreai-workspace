@@ -107,6 +107,8 @@
 
 | 文件 | 用途 | 状态 | 最后校对 |
 |---|---|---|---|
+| [2026-11-20-p2-7.2-media-split.md](2026-11-20-p2-7.2-media-split.md) | P2 7.2 产品线拆分：Media 去转写、Transcribe 独立控制台、子目录扫描与 OPS_TOKEN | 现行发布记录 | 2026-11-20 |
+| [2026-11-20-7.1-workbench.md](2026-11-20-7.1-workbench.md) | 7.1 灵境工作台：健康检查、侧栏排序、笔记三栏、插件版本台账 | 现行发布记录 | 2026-11-20 |
 | [2026-11-21-7.0-framework-overhaul.md](2026-11-21-7.0-framework-overhaul.md) | 7.0 框架级重构：monorepo、配置资产版本库、发布与回退 | 现行发布记录 | 2026-11-21 |
 | [2026-11-20-6.0-smartagents-release.md](2026-11-20-6.0-smartagents-release.md) | 6.0 SmartAgents 发布说明：工具与模型解耦、HITL 写动作、审计与撤回 | 历史发布记录（对照线保留） | 2026-11-20 |
 | [project-structure.md](project-structure.md) | 目录树与结构计数（第一节现状；后面几节是未执行的重构提案） | 部分现行 | 2026-11-16 |

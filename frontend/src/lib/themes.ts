@@ -148,7 +148,7 @@ export function generateThemeCss(themeId: string, vars: ThemeVars): string {
     '  - 页面底色：--bg-body、--bg-base',
     '  - 顶栏/侧栏/边框：--header-bg、--sidebar-bg、--border-light',
     '  - 卡片、弹窗、AI 面板：--bg-card、--bg-elevated、--shadow-card',
-    '  - 视频列表和 AI 任务中心：--bg-card、--bg-accent、--border-light、--accent',
+    '  - 视频列表和播放器：--bg-card、--bg-accent、--border-light、--accent',
     '  - 输入框和设置页：--bg-elevated、--border-light、--text-primary、--accent',
     '  - 主按钮和进度条：--accent、--accent-hover、--accent-bg',
     '  - 成功/危险/失败/清空：--success、--danger',

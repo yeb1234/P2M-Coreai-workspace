@@ -6,7 +6,6 @@ import { changePassword } from '../../lib/authApi';
 import type { PomodoroConfig } from '../../types';
 import { AISettings } from './AISettingsSection';
 import { MemorySettingsSection } from './MemorySettingsSection';
-import { TranscriptionSettings } from './TranscriptionSettingsSection';
 import { UserManagementSection } from './UserManagementSection';
 import { AppearanceSettings } from './AppearanceSettings';
 import { SettingsNav } from './SettingsNav';
@@ -23,7 +22,6 @@ const SECTIONS = [
   { id: 'appearance', label: '外观', icon: <Palette size={16} /> },
   { id: 'ai', label: '灵境小助手', icon: <Bot size={16} /> },
   { id: 'memory', label: '记忆与档案', icon: <Brain size={16} /> },
-  { id: 'transcription', label: '转写设置', icon: <Database size={16} /> },
   { id: 'backend', label: '后端状态', icon: <CheckCircle2 size={16} /> },
   { id: 'privacy', label: '隐私', icon: <Shield size={16} /> },
   { id: 'data', label: '数据', icon: <Database size={16} /> },
@@ -340,8 +338,6 @@ export const SettingsPage: React.FC = () => {
         return <div><SettingsPanelTitle>灵境小助手</SettingsPanelTitle><AISettings /></div>;
       case 'memory':
         return <div><SettingsPanelTitle>记忆与档案</SettingsPanelTitle><MemorySettingsSection /></div>;
-      case 'transcription':
-        return <div><SettingsPanelTitle>转写设置</SettingsPanelTitle><TranscriptionSettings /></div>;
       case 'backend':
         return <div><SettingsPanelTitle>后端健康状态</SettingsPanelTitle><BackendHealthSettings /></div>;
       case 'privacy':

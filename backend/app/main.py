@@ -17,7 +17,7 @@ from app.core.errors import register_exception_handlers
 from app.core.observability import RequestContextMiddleware, setup_from_settings
 from app.database import SessionLocal, engine, ensure_runtime_schema, settings
 from app.models import AiJob, Category, Video, WatchHistory
-from app.routers import admin, agent_actions, ai_jobs, assistant, auth, calendar_events, categories, interview, learning, mcp, memory_admin, notes, schedule_items, search, user_data, videos, watch_events
+from app.routers import admin, agent_actions, ai_jobs, assistant, auth, calendar_events, categories, interview, learning, mcp, memory_admin, notes, ops, schedule_items, search, user_data, videos, watch_events
 from app.routers import asset_registry
 from app.schemas import StatsOut
 from app.services.file_scanner import scan_video_library, start_file_watcher, stop_file_watcher
@@ -261,6 +261,7 @@ app.include_router(calendar_events.router)
 app.include_router(mcp.router)
 app.include_router(interview.router)
 app.include_router(admin.router)
+app.include_router(ops.router)
 app.include_router(asset_registry.router)
 
 app.mount("/output", StaticFiles(directory=settings.output_dir), name="output")

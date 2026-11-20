@@ -205,6 +205,8 @@ services:
       # ---- 安全 ----
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 必须设置且长度 >= 32}
       JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-12}
+      # 本机 P2 Transcribe 控制台的服务令牌。空值=关闭 /api/ops。
+      OPS_TOKEN: ${OPS_TOKEN:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:12302,http://localhost:12322,http://127.0.0.1,http://127.0.0.1:12302,http://127.0.0.1:12322}
       # 注册默认关闭：公网/局域网被扫到就会有人灌号。
       # 首个账号建好后保持 false，后续账号由管理员通过 /api/auth/create-user 开通。

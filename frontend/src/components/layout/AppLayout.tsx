@@ -27,7 +27,7 @@ type PageDescriptor = (typeof PAGES)[number];
  * 页面容器单独 memo。
  *
  * keep-alive 下，只要 AppLayout 因路由或 store 重渲染，所有已挂载页面都会跟着
- * 重渲染；字幕转录王、视频站这类页面数据量很大，隐藏页重算一次就能卡住主线程。
+ * 重渲染；视频站这类页面数据量很大，隐藏页重算一次就能卡住主线程。
  * 这里按 page 和 isActive 做浅比较：切页时只让离开/进入的两页重渲染，其余隐藏页保持不动。
  */
 const PageContent = React.memo(function PageContent({ page }: { page: PageDescriptor }) {

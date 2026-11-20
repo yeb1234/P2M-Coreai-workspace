@@ -5,7 +5,7 @@ import { IS_DESKTOP_CLIENT } from '../lib/clientContext';
 import { type ThemeVars, type ThemeScheduleRule, THEME_PRESETS, applyTheme, DEFAULT_THEME_SCHEDULE_RULES } from '../lib/themes';
 import { VIEW_PATH } from '../config/pageRegistry';
 
-export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'mdnotes' | 'pomodoro' | 'timecenter' | 'learning' | 'journey' | 'video' | 'transcriber' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
+export type ActiveView = 'dashboard' | 'todo' | 'calendar' | 'calendar2' | 'notes' | 'mdnotes' | 'pomodoro' | 'timecenter' | 'learning' | 'journey' | 'video' | 'stats' | 'reader' | 'snippets' | 'habits' | 'flashcards' | 'bookmarks' | 'health' | 'compare' | 'shop' | 'esports' | 'tokens' | 'leetcode' | 'interview' | 'codenav' | 'aiagent' | 'openclaw' | 'hermes' | 'settings';
 
 export type FontSize = 'sm' | 'md' | 'lg';
 export type ThemeId = string;
@@ -14,7 +14,7 @@ export type NavPlacement = 'left' | 'top';
 
 const DEFAULT_NAV_ORDER: ActiveView[] = [
   'dashboard', 'todo', 'calendar', 'calendar2', 'notes', 'mdnotes', 'pomodoro', 'timecenter',
-  'health', 'bookmarks', 'learning', 'journey', 'video', 'transcriber', 'compare', 'shop', 'esports',
+  'health', 'bookmarks', 'learning', 'journey', 'video', 'compare', 'shop', 'esports',
   'stats', 'reader', 'snippets', 'habits',
   'flashcards', 'tokens',
   'leetcode', 'interview', 'codenav', 'aiagent', 'openclaw', 'hermes',

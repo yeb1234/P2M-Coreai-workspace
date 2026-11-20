@@ -4,14 +4,12 @@ import { PlayCircle, ArrowLeft } from 'lucide-react';
 import { PageTitle } from '../shared';
 import { useVideoStore } from '../../stores/videoStore';
 import { saveWatchHistory, updateSubtitleSegment } from '../../lib/videoApi';
-import { useAiJobCenter } from '../../hooks/useAiJobCenter';
 import { VideoList } from './VideoList';
 import { VideoAiSummaryPanel } from './VideoAiSummaryPanel';
 import { MediaErrorOverlay, PausedOverlay, SubtitleOverlay } from './VideoOverlays';
 import { SubtitleEditDialog } from './SubtitleEditDialog';
 import { VideoPlayerControls } from './VideoPlayerControls';
 import { VideoPlaylistPanel } from './VideoPlaylistPanel';
-import { VideoAiJobCenter } from './VideoAiJobCenter';
 import { VideoErrorBoundary } from './VideoErrorBoundary';
 import { usePlaylistResize } from './usePlaylistResize';
 import { useVideoControlChrome } from './useVideoControlChrome';
@@ -28,7 +26,7 @@ import { useWatchTelemetry } from './useWatchTelemetry';
 import { useIsMobile, useWindowWidth } from '../../hooks/useMediaQuery';
 
 function VideoPlayerView() {
-  const { currentVideo, currentSegments, jobStatus, jobStage, jobError, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId, toggleFavorite } = useVideoStore();
+  const { currentVideo, currentSegments, clearSelection, selectVideo, loadCurrentVideo, currentCategoryId, toggleFavorite } = useVideoStore();
   const location = useLocation();
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -141,12 +139,7 @@ function VideoPlayerView() {
     subtitleSize,
   });
 
-  // AI Job Center - all logic extracted to hook
-  const { triggerSingleVideo, triggerCorrection, ...aiJobCenterProps } = useAiJobCenter(playlist, playlistScope, currentVideoId, loadCurrentVideo);
-
-  // cancelling 也算「处理中」：任务在优雅退出，还没真正结束。
-  // 不算的话取消瞬间界面会闪一下「还没有总结」，看着像任务被丢掉了。
-  const isProcessing = jobStatus === 'running' || jobStatus === 'queued' || jobStatus === 'cancelling';
+  // AI 总结只作为已生成内容展示；转写、校对和批量任务统一由 P2 Transcribe 处理。
   const progressPct = videoDuration > 0 ? (progress / videoDuration) * 100 : 0;
   const {
     progressBarRef,
@@ -451,14 +444,7 @@ function VideoPlayerView() {
             onConfirm={handleConfirmSubtitleEdit}
             initialText={activeSegIdx >= 0 ? normalizedSegments[activeSegIdx]?.text || '' : ''}
           />
-          <VideoAiSummaryPanel
-            summary={currentVideo.summary}
-            isProcessing={isProcessing}
-            jobStatus={jobStatus}
-            jobStage={jobStage}
-            jobError={jobError}
-            onRetry={() => triggerSingleVideo(currentVideo.id)}
-          />
+          <VideoAiSummaryPanel summary={currentVideo.summary} />
         </div>
 
         <VideoPlaylistPanel
@@ -467,16 +453,11 @@ function VideoPlayerView() {
           playlistScope={playlistScope}
           width={Math.min(playlistPanelWidth, Math.max(250, windowWidth * 0.32))}
           isPlaying={isPlaying}
-          isProcessing={isProcessing}
-          jobStatus={jobStatus}
           autoPlay={autoPlay}
           onResizeStart={startPlaylistResize}
-          onTriggerAi={() => triggerSingleVideo(currentVideo.id)}
-          onCorrectSubtitles={() => triggerCorrection(currentVideo.id)}
           onToggleAutoPlay={() => setAutoPlay(!autoPlay)}
           onToggleScope={togglePlaylistScope}
           onSelectItem={(item) => { void selectPlaylistItem(item, true); }}
-          footer={!isMobile ? <VideoAiJobCenter {...aiJobCenterProps} /> : undefined}
         />
       </div>
     </div>
@@ -491,7 +472,7 @@ export const VideoPage: React.FC = () => {
       {!currentVideo && (
         <PageTitle
           title="IT视频站"
-          subtitle="本地视频学习，AI 字幕转录 + 智能总结"
+          subtitle="本地视频学习、字幕浏览与智能总结"
           icon={<PlayCircle size={22} />}
         />
       )}
